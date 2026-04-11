@@ -1,63 +1,86 @@
-// src/pages/Customers.tsx
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { AdminLayout } from '../components/layout/AdminLayout';
-import { Search, Eye, User, Building2 } from 'lucide-react';
-
-const mockCustomers = [
-  { 
-    id: 1, 
-    customerId: 'CUST-001',
-    displayName: 'Jean Malala',
-    email: 'jean@email.com',
-    phone: '+242 06 124 36 75',
-    type: 'INDIVIDUAL',
-    status: 'ACTIVE',
-    createdAt: '2026-01-15'
-  },
-  { 
-    id: 2, 
-    customerId: 'CUST-002',
-    displayName: 'Tech Solutions SARL',
-    email: 'contact@tech.com',
-    phone: '+242 05 555 55 55',
-    type: 'COMPANY',
-    status: 'ACTIVE',
-    createdAt: '2026-01-20'
-  },
-  { 
-    id: 3, 
-    customerId: 'CUST-003',
-    displayName: 'Marie Konde',
-    email: 'marie@email.com',
-    phone: '+242 06 738 76 54',
-    type: 'INDIVIDUAL',
-    status: 'INACTIVE',
-    createdAt: '2026-02-01'
-  },
-];
+import { Search, Eye, User, Plus } from 'lucide-react';
+import { customerService } from '../services/customer.service';
+import type { CustomerResponse } from '../services/customer.service';
 
 export const AdminCustomers: React.FC = () => {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  const filteredCustomers = mockCustomers.filter(customer => {
-    if (search && !customer.displayName.toLowerCase().includes(search.toLowerCase()) && !customer.email.toLowerCase().includes(search.toLowerCase())) return false;
-    if (typeFilter !== 'all' && customer.type !== typeFilter) return false;
-    if (statusFilter !== 'all' && customer.status !== statusFilter) return false;
-    return true;
-  });
+  const { data: customers, isLoading, error } = useQuery({
+  queryKey: ['customers', search, typeFilter, statusFilter],
+  queryFn: async () => {
+    const allCustomers = await customerService.getAllCustomers(false) as CustomerResponse[];
+    
+    let filtered = allCustomers;
+    
+    if (search) {
+      filtered = filtered.filter(c => {
+        const displayName = c.type === 'PERSON' 
+          ? `${c.firstname} ${c.lastname}` 
+          : c.companyName || '';
+        return displayName.toLowerCase().includes(search.toLowerCase()) ||
+               c.email.toLowerCase().includes(search.toLowerCase());
+      });
+    }
+    
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(c => c.type === typeFilter);
+    }
+    
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(c => c.status === statusFilter);
+    }
+    
+    return filtered;
+  },
+});
+
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <AdminLayout>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
+          Erreur lors du chargement des customers
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
-        <p className="text-gray-600 mt-1">Gérez tous vos customers (personnes et compagnies)</p>
+      <div className="mb-6 opacity-0 animate-[fadeUp_0.6s_ease-out_forwards]">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
+            <p className="text-gray-600 mt-1">Gérez tous vos customers (personnes et compagnies)</p>
+          </div>
+          <button
+            onClick={() => navigate('/customers/create')}
+            className="mt-4 md:mt-0 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center"
+          >
+            <Plus size={18} className="mr-2" />
+            Créer un customer
+          </button>
+        </div>
       </div>
 
       {/* Filtres */}
-      <div className="bg-white rounded-xl p-4 shadow-sm mb-6">
+      <div className="bg-white rounded-xl p-4 shadow-sm mb-6 opacity-0 animate-[fadeUp_0.6s_ease-out_forwards]" style={{ animationDelay: '0.1s' }}>
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -75,7 +98,7 @@ export const AdminCustomers: React.FC = () => {
             className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
           >
             <option value="all">Tous les types</option>
-            <option value="INDIVIDUAL">Personnes</option>
+            <option value="PERSON">Personnes</option>
             <option value="COMPANY">Compagnies</option>
           </select>
           <select
@@ -92,49 +115,39 @@ export const AdminCustomers: React.FC = () => {
       </div>
 
       {/* Tableau */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden opacity-0 animate-[fadeUp_0.6s_ease-out_forwards]" style={{ animationDelay: '0.2s' }}>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Customer</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Contact</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Type</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Statut</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Créé le</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">ID</th>
                 <th className="px-6 py-4 text-right text-sm font-semibold text-gray-600">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredCustomers.map((customer) => (
-                <tr key={customer.id} className="hover:bg-gray-50">
+              {customers?.map((customer) => (
+                <tr key={customer.customerId} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        customer.type === 'INDIVIDUAL' ? 'bg-blue-100' : 'bg-purple-100'
-                      }`}>
-                        {customer.type === 'INDIVIDUAL' ? (
-                          <User size={20} className="text-blue-600" />
-                        ) : (
-                          <Building2 size={20} className="text-purple-600" />
-                        )}
+                      <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                        <User size={20} className="text-gray-500" />
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">{customer.displayName}</p>
+                        <p className="font-medium text-gray-900">
+                           {customer.type === 'PERSON' 
+                             ? `${customer.firstname} ${customer.lastname}` 
+                             : customer.companyName}
+                        </p>
                         <p className="text-xs text-gray-500">{customer.customerId}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-sm text-gray-900">{customer.email}</p>
-                    <p className="text-xs text-gray-500">{customer.phone}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      customer.type === 'INDIVIDUAL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
-                    }`}>
-                      {customer.type === 'INDIVIDUAL' ? 'Personne' : 'Compagnie'}
-                    </span>
+                    <p className="text-xs text-gray-500">{customer.phone || '-'}</p>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded-full text-xs ${
@@ -144,17 +157,27 @@ export const AdminCustomers: React.FC = () => {
                       {customer.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{customer.createdAt}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{customer.customerId}</td>
                   <td className="px-6 py-4 text-right">
-                    <Link to={`/customers/${customer.id}`} className="text-primary-600 hover:text-primary-700">
+                    <button
+                      onClick={() => navigate(`/customers/${customer.customerId}`)}
+                      className="text-primary-600 hover:text-primary-700"
+                    >
                       <Eye size={18} />
-                    </Link>
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        {(!customers || customers.length === 0) && (
+          <div className="text-center py-12">
+            <User size={48} className="mx-auto text-gray-300 mb-4" />
+            <p className="text-gray-500">Aucun customer trouvé</p>
+          </div>
+        )}
       </div>
     </AdminLayout>
   );

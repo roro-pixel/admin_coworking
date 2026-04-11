@@ -1,62 +1,24 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { AdminLayout } from '../components/layout/AdminLayout';
-import { Search, Eye, User, MoreVertical, CheckCircle, XCircle, Lock, Unlock } from 'lucide-react';
-
-const mockMembers = [
-  { 
-    id: 1,
-    memberId: 'MEM-001',
-    fullName: 'Jean Malala',
-    email: 'jean@email.com',
-    phone: '+242 06 124 36 75',
-    status: 'ACTIVE',
-    portalAccess: true,
-    customerId: 'CUST-001',
-    createdAt: '2026-01-15'
-  },
-  { 
-    id: 2,
-    memberId: 'MEM-002',
-    fullName: 'Marie Konde',
-    email: 'marie@email.com',
-    phone: '+242 06 738 76 54',
-    status: 'ACTIVE',
-    portalAccess: true,
-    customerId: 'CUST-003',
-    createdAt: '2026-02-01'
-  },
-  { 
-    id: 3,
-    memberId: 'MEM-003',
-    fullName: 'Paul Ndinga',
-    email: 'paul@email.com',
-    phone: '+242 04 041 25 88',
-    status: 'INACTIVE',
-    portalAccess: false,
-    customerId: 'CUST-004',
-    createdAt: '2026-01-28'
-  },
-  { 
-    id: 4,
-    memberId: 'MEM-004',
-    fullName: 'Sophie Mbemba',
-    email: 'sophie@email.com',
-    phone: '+242 06 100 67 11',
-    status: 'SUSPENDED',
-    portalAccess: true,
-    customerId: 'CUST-005',
-    createdAt: '2026-02-10'
-  },
-];
+import { Search, Eye, User, Plus, CheckCircle, XCircle, Lock, Unlock } from 'lucide-react';
+import { memberService } from '../services/member.service';
+// import type { MemberResponse } from '../services/member.service';
 
 export const AdminMembers: React.FC = () => {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [portalFilter, setPortalFilter] = useState('all');
 
-  const filteredMembers = mockMembers.filter(member => {
-    if (search && !member.fullName.toLowerCase().includes(search.toLowerCase()) && !member.email.toLowerCase().includes(search.toLowerCase())) return false;
+  const { data: members, isLoading, error } = useQuery({
+    queryKey: ['members'],
+    queryFn: () => memberService.getAllMembers(),
+  });
+
+  const filteredMembers = members?.filter(member => {
+    if (search && !member.fullname.toLowerCase().includes(search.toLowerCase()) && !member.email.toLowerCase().includes(search.toLowerCase())) return false;
     if (statusFilter !== 'all' && member.status !== statusFilter) return false;
     if (portalFilter !== 'all' && (portalFilter === 'active' ? member.portalAccess : !member.portalAccess)) return false;
     return true;
@@ -66,6 +28,8 @@ export const AdminMembers: React.FC = () => {
     switch(status) {
       case 'ACTIVE':
         return <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-700 flex items-center w-fit"><CheckCircle size={12} className="mr-1" /> Actif</span>;
+      case 'PENDING':
+        return <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-700 flex items-center w-fit">En attente</span>;
       case 'INACTIVE':
         return <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700 flex items-center w-fit">Inactif</span>;
       case 'SUSPENDED':
@@ -75,11 +39,42 @@ export const AdminMembers: React.FC = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <AdminLayout>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
+          Erreur lors du chargement des members
+        </div>
+      </AdminLayout>
+    );
+  }
+
   return (
     <AdminLayout>
       <div className="mb-6 opacity-0 animate-[fadeUp_0.6s_ease-out_forwards]">
-        <h1 className="text-2xl font-bold text-gray-900">Membres</h1>
-        <p className="text-gray-600 mt-1">Gérez tous les membres ayant accès au portail client</p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Membres</h1>
+            <p className="text-gray-600 mt-1">Gérez tous les membres ayant accès au portail client</p>
+          </div>
+          <button
+            onClick={() => navigate('/members/create')}
+            className="mt-4 md:mt-0 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center"
+          >
+            <Plus size={18} className="mr-2" />
+            Créer un member
+          </button>
+        </div>
       </div>
 
       {/* Filtres */}
@@ -92,23 +87,24 @@ export const AdminMembers: React.FC = () => {
               placeholder="Rechercher par nom ou email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
           >
             <option value="all">Tous les statuts</option>
             <option value="ACTIVE">Actif</option>
+            <option value="PENDING">En attente</option>
             <option value="INACTIVE">Inactif</option>
             <option value="SUSPENDED">Suspendu</option>
           </select>
           <select
             value={portalFilter}
             onChange={(e) => setPortalFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
           >
             <option value="all">Accès portail</option>
             <option value="active">Avec accès</option>
@@ -132,22 +128,22 @@ export const AdminMembers: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredMembers.map((member, index) => (
-                <tr key={member.id} className="hover:bg-gray-50 transition-colors" style={{ animationDelay: `${0.3 + index * 0.05}s` }}>
+              {filteredMembers?.map((member) => (
+                <tr key={member.memberId} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
                         <User size={20} className="text-primary-600" />
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">{member.fullName}</p>
+                        <p className="font-medium text-gray-900">{member.fullname}</p>
                         <p className="text-xs text-gray-500">{member.memberId}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-sm text-gray-900">{member.email}</p>
-                    <p className="text-xs text-gray-500">{member.phone}</p>
+                    <p className="text-xs text-gray-500">{member.phone || '-'}</p>
                   </td>
                   <td className="px-6 py-4">
                     {getStatusBadge(member.status)}
@@ -164,16 +160,19 @@ export const AdminMembers: React.FC = () => {
                     )}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
-                    <Link to={`/customers/${member.customerId}`} className="text-primary-600 hover:underline">
+                    <button
+                      onClick={() => navigate(`/customers/${member.customerId}`)}
+                      className="text-primary-600 hover:underline"
+                    >
                       {member.customerId}
-                    </Link>
+                    </button>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <Link to={`/members/${member.id}`} className="text-primary-600 hover:text-primary-700 mr-3">
+                    <button
+                      onClick={() => navigate(`/members/${member.memberId}`)}
+                      className="text-primary-600 hover:text-primary-700"
+                    >
                       <Eye size={18} />
-                    </Link>
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <MoreVertical size={18} />
                     </button>
                   </td>
                 </tr>
@@ -181,8 +180,8 @@ export const AdminMembers: React.FC = () => {
             </tbody>
           </table>
         </div>
-        
-        {filteredMembers.length === 0 && (
+
+        {(!filteredMembers || filteredMembers.length === 0) && (
           <div className="text-center py-12">
             <User size={48} className="mx-auto text-gray-300 mb-4" />
             <p className="text-gray-500">Aucun membre trouvé</p>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { 
   ArrowLeft, 
@@ -11,114 +12,80 @@ import {
   X,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  UserPlus
 } from 'lucide-react';
-
-interface Address {
-  street?: string;
-  city?: string;
-  postalCode?: string;
-  country?: string;
-}
-
-interface BaseCustomer {
-  id: string;
-  customerId: string;
-  type: 'INDIVIDUAL' | 'COMPANY';
-  email: string;
-  billingEmail?: string;
-  phone?: string;
-  whatsappPhone?: string;
-  address?: Address;
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-  createdAt: string;
-}
-
-interface IndividualCustomer extends BaseCustomer {
-  type: 'INDIVIDUAL';
-  firstname: string;
-  lastname: string;
-}
-
-interface CompanyCustomer extends BaseCustomer {
-  type: 'COMPANY';
-  companyName: string;
-}
-
-type Customer = IndividualCustomer | CompanyCustomer;
-
-// Type guard pour vérifier si c'est une personne physique
-const isIndividualCustomer = (customer: Customer): customer is IndividualCustomer => {
-  return customer.type === 'INDIVIDUAL';
-};
-
-// Type guard pour vérifier si c'est une compagnie
-const isCompanyCustomer = (customer: Customer): customer is CompanyCustomer => {
-  return customer.type === 'COMPANY';
-};
-
-const mockIndividualCustomer: IndividualCustomer = {
-  id: '1',
-  customerId: 'CUST-001',
-  type: 'INDIVIDUAL',
-  firstname: 'Jean',
-  lastname: 'Malala',
-  email: 'jean@email.com',
-  billingEmail: 'factures@jean.com',
-  phone: '+242 06 124 36 75',
-  whatsappPhone: '+242 06 124 36 75',
-  address: {
-    street: '123 Rue Bilélé',
-    city: 'Brazzaville',
-    postalCode: '75001',
-    country: 'Congo'
-  },
-  status: 'ACTIVE',
-  createdAt: '2026-01-15T10:00:00Z'
-};
-
-const mockCompanyCustomer: CompanyCustomer = {
-  id: '2',
-  customerId: 'CUST-002',
-  type: 'COMPANY',
-  companyName: 'Tech Solutions SARL',
-  email: 'contact@tech.com',
-  billingEmail: 'facturation@tech.com',
-  phone: '+242 05 555 55 55',
-  whatsappPhone: '+242 05 555 55 55',
-  address: {
-    street: '45 Avenue Union Africaine',
-    city: 'Brazzaville',
-    postalCode: '75002',
-    country: 'Congo'
-  },
-  status: 'ACTIVE',
-  createdAt: '2026-01-20T10:00:00Z'
-};
+import { customerService } from '../services/customer.service';
+import type { CustomerResponse } from '../services/customer.service';
 
 export const CustomerDetail: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
-  const [customer, setCustomer] = useState<Customer>(
-    id === '2' ? mockCompanyCustomer : mockIndividualCustomer
-  );
-  const [formData, setFormData] = useState<Customer>(customer);
+  const [formData, setFormData] = useState<CustomerResponse | null>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const { data: customer, isLoading, error } = useQuery({
+    queryKey: ['customer', id],
+    queryFn: () => customerService.getCustomerById(id!),
+    enabled: !!id,
+  });
 
-  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      address: { ...(formData.address || {}), [e.target.name]: e.target.value }
+  const updateMutation = useMutation({
+    mutationFn: (data: Partial<CustomerResponse>) => 
+      customerService.updateCustomer(id!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer', id] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setIsEditing(false);
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (error || !customer) {
+    return (
+      <AdminLayout>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
+          Customer non trouvé
+        </div>
+      </AdminLayout>
+    );
+  }
+
+   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => {
+    if (!prev) return prev;
+    return { ...prev, [name]: value };
     });
   };
 
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const { name, value } = e.target;
+  setFormData((prev) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      address: {
+        ...(prev.address || {}),
+        [name]: value
+      }
+    };
+  });
+};
   const handleSave = () => {
-    setCustomer(formData);
-    setIsEditing(false);
+    if (formData) {
+      updateMutation.mutate(formData);
+    }
   };
 
   const getStatusIcon = () => {
@@ -131,7 +98,7 @@ export const CustomerDetail: React.FC = () => {
   };
 
   const getDisplayName = () => {
-    if (isIndividualCustomer(customer)) {
+    if (customer.type === 'PERSON') {
       return `${customer.firstname} ${customer.lastname}`;
     } else {
       return customer.companyName;
@@ -175,20 +142,33 @@ export const CustomerDetail: React.FC = () => {
               </button>
               <button
                 onClick={handleSave}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                disabled={updateMutation.isPending}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
               >
                 <Save size={16} className="inline mr-1" />
-                Enregistrer
+                {updateMutation.isPending ? 'Sauvegarde...' : 'Enregistrer'}
               </button>
             </>
           ) : (
-            <button
-              onClick={() => setIsEditing(true)}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-            >
-              <Edit size={16} className="inline mr-1" />
-              Modifier
-            </button>
+            <>
+              <button
+                onClick={() => navigate(`/members/create?customerId=${customer.customerId}`)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center"
+              >
+                <UserPlus size={16} className="mr-1" />
+                Créer un member
+              </button>
+              <button
+                onClick={() => {
+                  setFormData(customer);
+                  setIsEditing(true);
+                }}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+              >
+                <Edit size={16} className="inline mr-1" />
+                Modifier
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -197,15 +177,15 @@ export const CustomerDetail: React.FC = () => {
       <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Informations générales</h2>
         <div className="grid md:grid-cols-2 gap-6">
-          {isIndividualCustomer(customer) ? (
+          {customer.type === 'PERSON' ? (
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
-                {isEditing ? (
+                {isEditing && formData ? (
                   <input
                     type="text"
                     name="firstname"
-                    value={isIndividualCustomer(formData) ? formData.firstname : ''}
+                    value={formData.firstname || ''}
                     onChange={handleChange}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
@@ -215,11 +195,11 @@ export const CustomerDetail: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
-                {isEditing ? (
+                {isEditing && formData ? (
                   <input
                     type="text"
                     name="lastname"
-                    value={isIndividualCustomer(formData) ? formData.lastname : ''}
+                    value={formData.lastname || ''}
                     onChange={handleChange}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
@@ -231,11 +211,11 @@ export const CustomerDetail: React.FC = () => {
           ) : (
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Nom de l'entreprise</label>
-              {isEditing ? (
+              {isEditing && formData ? (
                 <input
                   type="text"
                   name="companyName"
-                  value={isCompanyCustomer(formData) ? formData.companyName : ''}
+                  value={formData.companyName || ''}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                 />
@@ -255,11 +235,11 @@ export const CustomerDetail: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               <Mail size={14} className="inline mr-1" /> Email principal
             </label>
-            {isEditing ? (
+            {isEditing && formData ? (
               <input
                 type="email"
                 name="email"
-                value={formData.email}
+                value={formData.email || ''}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
               />
@@ -271,7 +251,7 @@ export const CustomerDetail: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               <Mail size={14} className="inline mr-1" /> Email de facturation
             </label>
-            {isEditing ? (
+            {isEditing && formData ? (
               <input
                 type="email"
                 name="billingEmail"
@@ -287,7 +267,7 @@ export const CustomerDetail: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               <Phone size={14} className="inline mr-1" /> Téléphone
             </label>
-            {isEditing ? (
+            {isEditing && formData ? (
               <input
                 type="tel"
                 name="phone"
@@ -303,7 +283,7 @@ export const CustomerDetail: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               <Phone size={14} className="inline mr-1" /> WhatsApp
             </label>
-            {isEditing ? (
+            {isEditing && formData ? (
               <input
                 type="tel"
                 name="whatsappPhone"
@@ -326,21 +306,21 @@ export const CustomerDetail: React.FC = () => {
         <div className="grid md:grid-cols-2 gap-6">
           <div className="col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Rue</label>
-            {isEditing ? (
+            {isEditing && formData ? (
               <input
                 type="text"
-                name="street"
-                value={formData.address?.street || ''}
+                name="streetName"
+                value={formData.address?.streetName || ''}
                 onChange={handleAddressChange}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
               />
             ) : (
-              <p className="text-gray-900">{customer.address?.street || '-'}</p>
+              <p className="text-gray-900">{customer.address?.streetName || '-'}</p>
             )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Ville</label>
-            {isEditing ? (
+            {isEditing && formData ? (
               <input
                 type="text"
                 name="city"
@@ -353,31 +333,17 @@ export const CustomerDetail: React.FC = () => {
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Code postal</label>
-            {isEditing ? (
-              <input
-                type="text"
-                name="postalCode"
-                value={formData.address?.postalCode || ''}
-                onChange={handleAddressChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
-              />
-            ) : (
-              <p className="text-gray-900">{customer.address?.postalCode || '-'}</p>
-            )}
-          </div>
-          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Pays</label>
-            {isEditing ? (
+            {isEditing && formData ? (
               <input
                 type="text"
-                name="country"
-                value={formData.address?.country || ''}
+                name="countryCode"
+                value={formData.address?.countryCode || ''}
                 onChange={handleAddressChange}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
               />
             ) : (
-              <p className="text-gray-900">{customer.address?.country || '-'}</p>
+              <p className="text-gray-900">{customer.address?.countryCode || '-'}</p>
             )}
           </div>
         </div>
@@ -390,7 +356,7 @@ export const CustomerDetail: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
             <p className="text-gray-900">
-              {customer.type === 'INDIVIDUAL' ? 'Personne physique' : 'Compagnie'}
+              {customer.type === 'PERSON' ? 'Personne physique' : 'Compagnie'}
             </p>
           </div>
           <div>
@@ -401,7 +367,7 @@ export const CustomerDetail: React.FC = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Statut</label>
-            {isEditing ? (
+            {isEditing && formData ? (
               <select
                 name="status"
                 value={formData.status}

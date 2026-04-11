@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { 
   ArrowLeft, 
-  User, 
   Mail, 
   Phone, 
   Edit,
@@ -14,40 +14,85 @@ import {
   AlertCircle,
   Lock,
   Unlock,
-  Key
+  Key,
+  RefreshCw
 } from 'lucide-react';
-
-const mockMember = {
-  id: '1',
-  memberId: 'MEM-001',
-  customerId: 'CUST-001',
-  firstname: 'Jean',
-  lastname: 'Malala',
-  fullname: 'Jean Malala',
-  email: 'jean@email.com',
-  phone: '+242 06 124 36 75',
-  whatsappPhone: '+242 06 124 36 75',
-  status: 'ACTIVE',
-  portalAccess: true,
-  createdAt: '2026-01-15T10:00:00Z',
-  updatedAt: '2026-02-20T14:30:00Z'
-};
+import { memberService } from '../services/member.service';
+import type { MemberResponse } from '../services/member.service';
 
 export const MemberDetail: React.FC = () => {
-  // const { id } = useParams();
+  const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
-  const [member, setMember] = useState(mockMember);
-  const [formData, setFormData] = useState(member);
+  const [formData, setFormData] = useState<MemberResponse | null>(null);
   const [showResetPassword, setShowResetPassword] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const { data: member, isLoading, error } = useQuery({
+    queryKey: ['member', id],
+    queryFn: () => memberService.getMemberById(id!),
+    enabled: !!id,
+  });
 
+  const updateMutation = useMutation({
+    mutationFn: (data: Partial<MemberResponse>) => 
+      memberService.updateMember(id!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['member', id] });
+      queryClient.invalidateQueries({ queryKey: ['members'] });
+      setIsEditing(false);
+    },
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: (status: 'PENDING' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED') =>
+      memberService.updateMemberStatus(id!, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['member', id] });
+      queryClient.invalidateQueries({ queryKey: ['members'] });
+    },
+  });
+
+  const portalMutation = useMutation({
+    mutationFn: (enable: boolean) =>
+      enable ? memberService.enablePortalAccess(id!) : memberService.disablePortalAccess(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['member', id] });
+      queryClient.invalidateQueries({ queryKey: ['members'] });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (error || !member) {
+    return (
+      <AdminLayout>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
+          Member non trouvé
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => {
+      if (!prev) return prev;
+        return { ...prev, [name]: value };
+      });
+   };
   const handleSave = () => {
-    setMember(formData);
-    setIsEditing(false);
+    if (formData) {
+      updateMutation.mutate(formData);
+    }
   };
 
   const handleResetPassword = () => {
@@ -59,9 +104,20 @@ export const MemberDetail: React.FC = () => {
   const getStatusIcon = () => {
     switch(member.status) {
       case 'ACTIVE': return <CheckCircle size={16} className="text-green-600" />;
+      case 'PENDING': return <AlertCircle size={16} className="text-yellow-600" />;
       case 'INACTIVE': return <XCircle size={16} className="text-gray-600" />;
       case 'SUSPENDED': return <AlertCircle size={16} className="text-red-600" />;
       default: return null;
+    }
+  };
+
+  const getStatusBadgeClass = () => {
+    switch(member.status) {
+      case 'ACTIVE': return 'bg-green-100 text-green-700';
+      case 'PENDING': return 'bg-yellow-100 text-yellow-700';
+      case 'INACTIVE': return 'bg-gray-100 text-gray-700';
+      case 'SUSPENDED': return 'bg-red-100 text-red-700';
+      default: return 'bg-gray-100 text-gray-700';
     }
   };
 
@@ -78,11 +134,7 @@ export const MemberDetail: React.FC = () => {
           <div>
             <div className="flex items-center space-x-3">
               <h1 className="text-2xl font-bold text-gray-900">{member.fullname}</h1>
-              <span className={`px-2 py-1 rounded-full text-xs flex items-center ${
-                member.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
-                member.status === 'INACTIVE' ? 'bg-gray-100 text-gray-700' :
-                'bg-red-100 text-red-700'
-              }`}>
+              <span className={`px-2 py-1 rounded-full text-xs flex items-center ${getStatusBadgeClass()}`}>
                 {getStatusIcon()}
                 <span className="ml-1">{member.status}</span>
               </span>
@@ -102,10 +154,11 @@ export const MemberDetail: React.FC = () => {
               </button>
               <button
                 onClick={handleSave}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                disabled={updateMutation.isPending}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
               >
                 <Save size={16} className="inline mr-1" />
-                Enregistrer
+                {updateMutation.isPending ? 'Sauvegarde...' : 'Enregistrer'}
               </button>
             </>
           ) : (
@@ -118,7 +171,10 @@ export const MemberDetail: React.FC = () => {
                 Réinitialiser mot de passe
               </button>
               <button
-                onClick={() => setIsEditing(true)}
+                onClick={() => {
+                  setFormData(member);
+                  setIsEditing(true);
+                }}
                 className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
               >
                 <Edit size={16} className="inline mr-1" />
@@ -135,7 +191,7 @@ export const MemberDetail: React.FC = () => {
         <div className="grid md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
-            {isEditing ? (
+            {isEditing && formData ? (
               <input
                 type="text"
                 name="firstname"
@@ -149,7 +205,7 @@ export const MemberDetail: React.FC = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
-            {isEditing ? (
+            {isEditing && formData ? (
               <input
                 type="text"
                 name="lastname"
@@ -172,7 +228,7 @@ export const MemberDetail: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               <Mail size={14} className="inline mr-1" /> Email
             </label>
-            {isEditing ? (
+            {isEditing && formData ? (
               <input
                 type="email"
                 name="email"
@@ -188,7 +244,7 @@ export const MemberDetail: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               <Phone size={14} className="inline mr-1" /> Téléphone
             </label>
-            {isEditing ? (
+            {isEditing && formData ? (
               <input
                 type="tel"
                 name="phone"
@@ -204,7 +260,7 @@ export const MemberDetail: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               <Phone size={14} className="inline mr-1" /> WhatsApp
             </label>
-            {isEditing ? (
+            {isEditing && formData ? (
               <input
                 type="tel"
                 name="whatsappPhone"
@@ -224,9 +280,7 @@ export const MemberDetail: React.FC = () => {
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Accès et statut</h2>
         <div className="grid md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              <User size={14} className="inline mr-1" /> Customer associé
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Customer associé</label>
             <button
               onClick={() => navigate(`/customers/${member.customerId}`)}
               className="text-primary-600 hover:underline"
@@ -236,48 +290,41 @@ export const MemberDetail: React.FC = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Statut</label>
-            {isEditing ? (
-              <select
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-                className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass()}`}>
+                {member.status}
+              </span>
+              <button
+                onClick={() => {
+                  const newStatus = member.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+                  statusMutation.mutate(newStatus);
+                }}
+                className="text-sm text-primary-600 hover:underline"
               >
-                <option value="ACTIVE">Actif</option>
-                <option value="INACTIVE">Inactif</option>
-                <option value="SUSPENDED">Suspendu</option>
-              </select>
-            ) : (
-              <p className="text-gray-900">{member.status}</p>
-            )}
+                <RefreshCw size={14} className="inline mr-1" />
+                {member.status === 'ACTIVE' ? 'Suspendre' : 'Activer'}
+              </button>
+            </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Accès portail
-            </label>
-            {isEditing ? (
-              <select
-                name="portalAccess"
-                value={formData.portalAccess ? 'true' : 'false'}
-                onChange={(e) => setFormData({ ...formData, portalAccess: e.target.value === 'true' })}
-                className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+            <label className="block text-sm font-medium text-gray-700 mb-1">Accès portail</label>
+            <div className="flex items-center gap-2">
+              {member.portalAccess ? (
+                <span className="flex items-center text-green-600">
+                  <Unlock size={14} className="mr-1" /> Activé
+                </span>
+              ) : (
+                <span className="flex items-center text-gray-500">
+                  <Lock size={14} className="mr-1" /> Désactivé
+                </span>
+              )}
+              <button
+                onClick={() => portalMutation.mutate(!member.portalAccess)}
+                className="text-sm text-primary-600 hover:underline"
               >
-                <option value="true">Activé</option>
-                <option value="false">Désactivé</option>
-              </select>
-            ) : (
-              <div className="flex items-center">
-                {member.portalAccess ? (
-                  <span className="flex items-center text-green-600">
-                    <Unlock size={14} className="mr-1" /> Activé
-                  </span>
-                ) : (
-                  <span className="flex items-center text-gray-500">
-                    <Lock size={14} className="mr-1" /> Désactivé
-                  </span>
-                )}
-              </div>
-            )}
+                {member.portalAccess ? 'Désactiver' : 'Activer'}
+              </button>
+            </div>
           </div>
         </div>
       </div>

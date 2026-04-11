@@ -9,7 +9,8 @@ import {
   FileText,
   BarChart3,
   Settings,
-  HelpCircle
+  HelpCircle,
+  Shield,
 } from 'lucide-react';
 import Logo from '../../assets/img/logo.jpeg'
 
@@ -20,6 +21,8 @@ const menuItems = [
   { path: '/spaces', icon: UserCircle, label: 'Espaces' },
   { path: '/bookings', icon: Calendar, label: 'Réservations' },
   { path: '/invoices', icon: FileText, label: 'Factures' },
+  { path: '/kyc-review', icon: Shield, label: 'Revue KYC' },
+  { path: '/contracts', icon: FileText, label: 'Contrats' },
   { path: '/reports', icon: BarChart3, label: 'Rapports' },
   { path: '/settings', icon: Settings, label: 'Paramètres' },
   { path: '/support', icon: HelpCircle, label: 'Support' },
