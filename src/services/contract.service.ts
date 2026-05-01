@@ -32,11 +32,11 @@ export interface ContractResponse {
   title: string;
   description?: string;
   templateCode: string;
-  ownerType: 'MEMBER' | 'CUSTOMER' | 'BUSINESS';
+  ownerType: string;
   ownerCode: string;
   businessCode?: string;
-  status: 'DRAFT' | 'GENERATED' | 'UNDER_REVIEW' | 'AWAITING_SIGNATURE' | 'SIGNED' | 'ACTIVE' | 'SUSPENDED' | 'TERMINATED' | 'EXPIRED' | 'CANCELLED';
-  renewalType: 'FIXED_TERM' | 'AUTO_RENEW' | 'INDEFINITE';
+  status: string;
+  renewalType: string;
   effectiveDate: string;
   startDate: string;
   endDate?: string;
@@ -58,94 +58,98 @@ export interface TemplateResponse {
 }
 
 export const contractService = {
-  // Récupérer les templates disponibles
+  // Templates
   getTemplates: async (): Promise<TemplateResponse[]> => {
     const response = await apiClient.get('/sni/api/v1/contracts/templates');
     return response.data;
   },
 
-  // Créer un contrat
+  // Preview HTML
+  previewContract: async (data: any): Promise<string> => {
+    const response = await apiClient.post('/sni/api/v1/contracts/preview', data);
+    return response.data.html;
+  },
+
+  // Generate PDF (sans sauvegarde)
+  generateContract: async (data: any): Promise<Blob> => {
+    const response = await apiClient.post('/sni/api/v1/contracts/generate', data, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  // CRUD
   createContract: async (data: CreateContractRequest): Promise<ContractResponse> => {
     const response = await apiClient.post('/sni/api/v1/contracts', data);
     return response.data;
   },
 
-  // Récupérer un contrat
   getContract: async (contractCode: string): Promise<ContractResponse> => {
     const response = await apiClient.get(`/sni/api/v1/contracts/${contractCode}`);
     return response.data;
   },
 
-  // Récupérer tous les contrats (paginé)
   getAllContracts: async (params?: {
     ownerType?: string;
     ownerCode?: string;
     status?: string;
+    businessCode?: string;
+    templateCode?: string;
     page?: number;
     size?: number;
-  }): Promise<{ data: ContractResponse[]; pageable: any }> => {
+    sort?: string;
+  }): Promise<{ data: ContractResponse[]; pageable: { page: number; size: number; totalPages: number; totalElements: number } }> => {
     const response = await apiClient.get('/sni/api/v1/contracts', { params });
-    return response.data;
+    if (response.data?.data !== undefined) return response.data;
+    if (Array.isArray(response.data?.content)) {
+      return { data: response.data.content, pageable: { page: params?.page || 0, size: params?.size || 20, totalPages: response.data.totalPages || 1, totalElements: response.data.totalElements || response.data.content.length } };
+    }
+    if (Array.isArray(response.data)) {
+      return { data: response.data, pageable: { page: 0, size: response.data.length, totalPages: 1, totalElements: response.data.length } };
+    }
+    return { data: [], pageable: { page: 0, size: 20, totalPages: 0, totalElements: 0 } };
   },
 
-  // Mettre à jour un contrat
   updateContract: async (contractCode: string, data: Partial<CreateContractRequest>): Promise<ContractResponse> => {
     const response = await apiClient.put(`/sni/api/v1/contracts/${contractCode}`, data);
     return response.data;
   },
 
-  // Supprimer un contrat (soft delete)
   deleteContract: async (contractCode: string): Promise<void> => {
     await apiClient.delete(`/sni/api/v1/contracts/${contractCode}`);
   },
 
-  // Changer le statut
+  // Workflow
   updateContractStatus: async (contractCode: string, status: string): Promise<void> => {
     await apiClient.patch(`/sni/api/v1/contracts/${contractCode}/status`, { status });
   },
 
-  // Activer un contrat
   activateContract: async (contractCode: string): Promise<void> => {
     await apiClient.patch(`/sni/api/v1/contracts/${contractCode}/activate`);
   },
 
-  // Suspendre un contrat
-  suspendContract: async (contractCode: string): Promise<void> => {
-    await apiClient.patch(`/sni/api/v1/contracts/${contractCode}/suspend`);
+  suspendContract: async (contractCode: string, reason?: string): Promise<void> => {
+    await apiClient.patch(`/sni/api/v1/contracts/${contractCode}/suspend`, { reason });
   },
 
-  // Résilier un contrat
   terminateContract: async (contractCode: string, reason?: string): Promise<void> => {
     await apiClient.patch(`/sni/api/v1/contracts/${contractCode}/terminate`, { reason });
   },
 
-  // Annuler un contrat
-  cancelContract: async (contractCode: string): Promise<void> => {
-    await apiClient.patch(`/sni/api/v1/contracts/${contractCode}/cancel`);
+  cancelContract: async (contractCode: string, reason?: string): Promise<void> => {
+    await apiClient.patch(`/sni/api/v1/contracts/${contractCode}/cancel`, { reason });
   },
 
-  // Générer le brouillon PDF
-  generateDraft: async (contractCode: string, uploadedBy: number): Promise<Blob> => {
+  // Documents
+  generateDraft: async (contractCode: string, uploadedBy: string | number): Promise<ContractResponse> => {
     const response = await apiClient.post(
       `/sni/api/v1/contracts/${contractCode}/generate-draft`,
-      { uploadedBy },
-      { responseType: 'blob' }
+      { uploadedBy }
     );
     return response.data;
   },
 
-  // Prévisualiser le contrat en HTML
-  previewContract: async (data: {
-    templateCode: string;
-    ownerType: string;
-    ownerCode: string;
-    title: string;
-    effectiveDate: string;
-    startDate: string;
-    endDate?: string;
-    variables?: Record<string, string>;
-  }): Promise<string> => {
-    const response = await apiClient.post('/sni/api/v1/contracts/preview', data);
-    return response.data.html;
+  attachSignedDocument: async (contractCode: string, documentCode: string): Promise<void> => {
+    await apiClient.patch(`/sni/api/v1/contracts/${contractCode}/signed-document`, { documentCode });
   },
 };

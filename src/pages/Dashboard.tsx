@@ -1,83 +1,181 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AdminLayout } from '../components/layout/AdminLayout';
-import { Users, Building2, Calendar, CreditCard, ArrowUp, ArrowDown, User, Building } from 'lucide-react';
+import { 
+  Users, 
+  Building2, 
+  Calendar, 
+  CreditCard, 
+  ArrowUp, 
+  ArrowDown, 
+  User, 
+  Building,
+  Package,
+  AlertCircle,
+  Wallet,
+  FileText,
+} from 'lucide-react';
 import { customerService } from '../services/customer.service';
 import type { CustomerResponse } from '../services/customer.service';
 import { memberService } from '../services/member.service';
-// import type { MemberResponse } from '../services/member.service';
+import { subscriptionService } from '../services/subscription.service';
+import { bookingService } from '../services/booking.service';
+import { inventoryService } from '../services/inventory.service';
+// import { paymentService } from '../services/payment.service';
+import { walletService } from '../services/wallet.service';
+import { billingService } from '../services/billing.service';
 
 export const AdminDashboard: React.FC = () => {
-  // Récupérer tous les customers
+  // Customers & Members
   const { data: customers, isLoading: customersLoading } = useQuery({
     queryKey: ['dashboard-customers'],
     queryFn: () => customerService.getAllCustomers(false) as Promise<CustomerResponse[]>,
   });
 
-  // Récupérer tous les members
   const { data: members, isLoading: membersLoading } = useQuery({
     queryKey: ['dashboard-members'],
     queryFn: () => memberService.getAllMembers(),
   });
 
+  // Subscriptions
+  const { data: subscriptionsData } = useQuery({
+    queryKey: ['dashboard-subscriptions'],
+    queryFn: () => subscriptionService.getSubscriptions({ size: 100 }),
+  });
+
+  // Bookings
+  const { data: bookingsData } = useQuery({
+    queryKey: ['dashboard-bookings'],
+    queryFn: () => bookingService.getBookings({ size: 100 }),
+  });
+
+  // Inventory
+  const { data: inventoryMetrics } = useQuery({
+    queryKey: ['dashboard-inventory'],
+    queryFn: () => inventoryService.getDashboardMetrics(),
+  });
+
+  // Payments
+  // const { data: paymentsData } = useQuery({
+  //   queryKey: ['dashboard-payments'],
+  //   queryFn: () => paymentService.getPaymentIntents({ size: 100 }),
+  // });
+
+  // Wallets
+  const { data: walletsData } = useQuery({
+    queryKey: ['dashboard-wallets'],
+    queryFn: () => walletService.getWallets({ size: 100 }),
+  });
+
+  // Billing
+  const { data: billingData } = useQuery({
+    queryKey: ['dashboard-billing'],
+    queryFn: () => billingService.getDocuments({ size: 100 }),
+  });
+
   const isLoading = customersLoading || membersLoading;
 
-  // Calculer les statistiques
+  const recentCustomers = customers
+  ?.slice()
+  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  .slice(0, 5) || [];
+
+// Derniers members (5 derniers)
+const recentMembers = members
+  ?.slice()
+  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  .slice(0, 5) || [];
+
+  // Calculs
   const totalCustomers = customers?.length || 0;
   const totalMembers = members?.length || 0;
-  
-  // Customers actifs vs inactifs
   const activeCustomers = customers?.filter(c => c.status === 'ACTIVE').length || 0;
   const activeMembers = members?.filter(m => m.status === 'ACTIVE').length || 0;
   
-  // Taux de conversion (membres / customers)
-  const conversionRate = totalCustomers > 0 ? Math.round((totalMembers / totalCustomers) * 100) : 0;
+  const activeSubscriptions = subscriptionsData?.content?.filter(s => s.status === 'ACTIVE').length || 0;
+  const pendingSubscriptions = subscriptionsData?.content?.filter(s => s.status === 'PENDING_ACTIVATION').length || 0;
   
-  // Derniers customers (5 derniers)
-  const recentCustomers = customers
-    ?.slice()
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5) || [];
+  const confirmedBookings = bookingsData?.data?.filter(b => b.status === 'CONFIRMED').length || 0;
+  const pendingBookings = bookingsData?.data?.filter(b => b.status === 'PENDING_APPROVAL').length || 0;
+  
+  const openAlerts = inventoryMetrics?.openAlerts || 0;
+  const lowStockAlerts = inventoryMetrics?.lowStockAlerts || 0;
+  const totalStockValue = inventoryMetrics?.totalStockValue || 0;
+  
+  // const pendingPayments = paymentsData?.content?.filter(p => p.status === 'PENDING').length || 0;
+  const totalWallets = walletsData?.content?.length || 0;
+  const totalWalletBalance = walletsData?.content?.reduce((sum, w: any) => sum + w.availableBalance, 0) || 0;
+  
+  const unpaidInvoices = billingData?.content?.filter(d => 
+    d.documentType === 'INVOICE' && (d.status === 'ISSUED' || d.status === 'PARTIALLY_PAID')
+  ).length || 0;
+  const totalOutstanding = billingData?.content?.filter(d => d.documentType === 'INVOICE')
+    .reduce((sum, d) => sum + (d.balanceDue || 0), 0) || 0;
 
-  // Récupérer les derniers members
-  const recentMembers = members
-    ?.slice()
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5) || [];
-
-  // Statistiques pour les cartes
   const stats = [
     {
-      title: 'Total Customers',
+      title: 'Customers',
       value: totalCustomers.toString(),
-      change: `+${activeCustomers} actifs`,
+      change: `${activeCustomers} actifs`,
       trend: 'up',
       icon: Building2,
       color: 'bg-blue-500'
     },
     {
-      title: 'Total Members',
+      title: 'Members',
       value: totalMembers.toString(),
-      change: `+${activeMembers} actifs`,
+      change: `${activeMembers} actifs`,
       trend: 'up',
       icon: Users,
       color: 'bg-green-500'
     },
     {
-      title: 'Taux de conversion',
-      value: `${conversionRate}%`,
-      change: `${totalMembers} membres / ${totalCustomers} customers`,
-      trend: conversionRate > 50 ? 'up' : 'down',
+      title: 'Abonnements actifs',
+      value: activeSubscriptions.toString(),
+      change: `${pendingSubscriptions} en attente`,
+      trend: 'up',
+      icon: CreditCard,
+      color: 'bg-purple-500'
+    },
+    {
+      title: 'Réservations',
+      value: confirmedBookings.toString(),
+      change: `${pendingBookings} en attente`,
+      trend: confirmedBookings > pendingBookings ? 'up' : 'down',
       icon: Calendar,
       color: 'bg-orange-500'
     },
     {
-      title: 'Nouveaux ce mois',
-      value: recentCustomers.length.toString(),
-      change: 'Derniers 5',
+      title: 'Valeur du stock',
+      value: `${(totalStockValue / 1000000).toFixed(1)}M FCFA`,
+      change: `${lowStockAlerts} alertes stock`,
+      trend: lowStockAlerts > 0 ? 'down' : 'up',
+      icon: Package,
+      color: 'bg-teal-500'
+    },
+    {
+      title: 'Alertes',
+      value: openAlerts.toString(),
+      change: `${lowStockAlerts} stock bas`,
+      trend: openAlerts > 0 ? 'down' : 'up',
+      icon: AlertCircle,
+      color: 'bg-red-500'
+    },
+    {
+      title: 'Portefeuilles',
+      value: totalWallets.toString(),
+      change: `${(totalWalletBalance / 1000000).toFixed(1)}M FCFA`,
       trend: 'up',
-      icon: CreditCard,
-      color: 'bg-purple-500'
+      icon: Wallet,
+      color: 'bg-indigo-500'
+    },
+    {
+      title: 'Factures impayées',
+      value: unpaidInvoices.toString(),
+      change: `${(totalOutstanding / 1000000).toFixed(1)}M FCFA`,
+      trend: unpaidInvoices > 0 ? 'down' : 'up',
+      icon: FileText,
+      color: 'bg-rose-500'
     }
   ];
 
@@ -177,15 +275,10 @@ export const AdminDashboard: React.FC = () => {
             </tbody>
           </table>
         </div>
-        {recentCustomers.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            Aucun customer trouvé
-          </div>
-        )}
       </div>
 
       {/* Derniers members */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-lg font-semibold text-gray-900">Derniers members</h2>
           <span className="text-sm text-gray-500">Total: {totalMembers}</span>
@@ -239,11 +332,57 @@ export const AdminDashboard: React.FC = () => {
             </tbody>
           </table>
         </div>
-        {recentMembers.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            Aucun member trouvé
-          </div>
-        )}
+      </div>
+
+      {/* Dernières factures */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-900">Dernières factures</h2>
+          <span className="text-sm text-gray-500">{unpaidInvoices} impayées</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">N° Facture</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Client</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Montant</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Échéance</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {billingData?.content?.slice(0, 5).map((doc) => (
+                <tr key={doc.documentNumber} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 text-sm font-mono">{doc.documentNumber}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900">{doc.customerName || doc.customerCode || '-'}</td>
+                  <td className="px-6 py-4 text-right font-semibold">{doc.totalAmount.toLocaleString()} FCFA</td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-full text-xs ${
+                      doc.status === 'PAID' ? 'bg-green-100 text-green-700' :
+                      doc.status === 'PARTIALLY_PAID' ? 'bg-yellow-100 text-yellow-700' :
+                      doc.status === 'OVERDUE' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {doc.status === 'PAID' ? 'Payée' :
+                       doc.status === 'PARTIALLY_PAID' ? 'Partiellement payée' :
+                       doc.status === 'OVERDUE' ? 'En retard' : 'Émise'}
+                    </span>
+                   </td>
+                  <td className="px-6 py-4 text-sm text-gray-500">
+                    {doc.dueDate ? new Date(doc.dueDate).toLocaleDateString('fr-FR') : '-'}
+                   </td>
+                 </tr>
+              ))}
+              {(!billingData?.content || billingData.content.length === 0) && (
+                <tr>
+                  <td colSpan={5} className="text-center py-8 text-gray-500">
+                    Aucune facture trouvée
+                  </td>
+                </tr>
+              )}
+            </tbody>
+           </table>
+        </div>
       </div>
     </AdminLayout>
   );

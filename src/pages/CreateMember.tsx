@@ -7,6 +7,71 @@ import { memberService } from '../services/member.service';
 import type { CreateMemberRequest } from '../services/member.service';
 import type { CustomerSummaryResponse } from '../services/customer.service';
 
+const countries = [
+  { code: 'CG', name: 'Congo', phoneCode: '+242' },
+  { code: 'CD', name: 'République Démocratique du Congo', phoneCode: '+243' },
+  { code: 'CM', name: 'Cameroun', phoneCode: '+237' },
+  { code: 'GA', name: 'Gabon', phoneCode: '+241' },
+  { code: 'GQ', name: 'Guinée équatoriale', phoneCode: '+240' },
+  { code: 'CF', name: 'République centrafricaine', phoneCode: '+236' },
+  { code: 'TD', name: 'Tchad', phoneCode: '+235' },
+  { code: 'ST', name: 'Sao Tomé-et-Principe', phoneCode: '+239' },
+  
+  { code: 'CI', name: 'Côte d\'Ivoire', phoneCode: '+225' },
+  { code: 'SN', name: 'Sénégal', phoneCode: '+221' },
+  { code: 'ML', name: 'Mali', phoneCode: '+223' },
+  { code: 'BF', name: 'Burkina Faso', phoneCode: '+226' },
+  { code: 'NE', name: 'Niger', phoneCode: '+227' },
+  { code: 'BJ', name: 'Bénin', phoneCode: '+229' },
+  { code: 'TG', name: 'Togo', phoneCode: '+228' },
+  { code: 'GN', name: 'Guinée', phoneCode: '+224' },
+  { code: 'GW', name: 'Guinée-Bissau', phoneCode: '+245' },
+  { code: 'SL', name: 'Sierra Leone', phoneCode: '+232' },
+  { code: 'LR', name: 'Libéria', phoneCode: '+231' },
+  { code: 'MR', name: 'Mauritanie', phoneCode: '+222' },
+  
+  { code: 'BI', name: 'Burundi', phoneCode: '+257' },
+  { code: 'RW', name: 'Rwanda', phoneCode: '+250' },
+  { code: 'DJ', name: 'Djibouti', phoneCode: '+253' },
+  { code: 'KM', name: 'Comores', phoneCode: '+269' },
+  { code: 'MG', name: 'Madagascar', phoneCode: '+261' },
+  { code: 'MU', name: 'Maurice', phoneCode: '+230' },
+  { code: 'SC', name: 'Seychelles', phoneCode: '+248' },
+  
+  { code: 'MA', name: 'Maroc', phoneCode: '+212' },
+  { code: 'DZ', name: 'Algérie', phoneCode: '+213' },
+  { code: 'TN', name: 'Tunisie', phoneCode: '+216' },
+  { code: 'LY', name: 'Libye', phoneCode: '+218' },
+  { code: 'EG', name: 'Égypte', phoneCode: '+20' },
+  { code: 'SD', name: 'Soudan', phoneCode: '+249' },
+  
+  { code: 'AO', name: 'Angola', phoneCode: '+244' },
+  { code: 'MZ', name: 'Mozambique', phoneCode: '+258' },
+  { code: 'NA', name: 'Namibie', phoneCode: '+264' },
+  { code: 'ZA', name: 'Afrique du Sud', phoneCode: '+27' },
+  { code: 'ZM', name: 'Zambie', phoneCode: '+260' },
+  { code: 'ZW', name: 'Zimbabwe', phoneCode: '+263' },
+  { code: 'MW', name: 'Malawi', phoneCode: '+265' },
+  { code: 'BW', name: 'Botswana', phoneCode: '+267' },
+  { code: 'SZ', name: 'Eswatini', phoneCode: '+268' },
+  { code: 'LS', name: 'Lesotho', phoneCode: '+266' },
+  
+  { code: 'CA', name: 'Canada', phoneCode: '+1' },
+  { code: 'US', name: 'États-Unis', phoneCode: '+1' },
+  { code: 'FR', name: 'France', phoneCode: '+33' },
+  { code: 'BE', name: 'Belgique', phoneCode: '+32' },
+  { code: 'CH', name: 'Suisse', phoneCode: '+41' },
+  { code: 'LU', name: 'Luxembourg', phoneCode: '+352' },
+  { code: 'MC', name: 'Monaco', phoneCode: '+377' },
+  
+  { code: 'GB', name: 'Royaume-Uni', phoneCode: '+44' },
+  { code: 'DE', name: 'Allemagne', phoneCode: '+49' },
+  { code: 'IT', name: 'Italie', phoneCode: '+39' },
+  { code: 'ES', name: 'Espagne', phoneCode: '+34' },
+  { code: 'PT', name: 'Portugal', phoneCode: '+351' },
+  { code: 'NL', name: 'Pays-Bas', phoneCode: '+31' },
+];
+
 export const CreateMember: React.FC = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
@@ -50,14 +115,14 @@ export const CreateMember: React.FC = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleNewCustomerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNewCustomerChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setNewCustomerData({
       ...newCustomerData,
       [e.target.name]: e.target.value,
     });
   };
 
-  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setNewCustomerData({
       ...newCustomerData,
       address: { ...newCustomerData.address, [e.target.name]: e.target.value },
@@ -108,14 +173,20 @@ export const CreateMember: React.FC = () => {
       generatePassword: formData.generatePassword,
       ...(mode === 'existing' && selectedCustomer && {
         existingCustomerId: selectedCustomer.customerId,
-        customerType: mode === 'existing' && selectedCustomer ? 
-       (customerType === 'COMPANY' ? 'COMPANY' : 'PERSON') : customerType,
       }),
       ...(mode === 'new' && {
         customerType,
         ...(customerType === 'COMPANY' && { companyName: newCustomerData.companyName }),
         ...(newCustomerData.billingEmail && { billingEmail: newCustomerData.billingEmail }),
-        ...(newCustomerData.address.streetNumber || newCustomerData.address.city ? { address: newCustomerData.address } : {}),
+        ...(newCustomerData.address.streetNumber || newCustomerData.address.streetName || newCustomerData.address.city ? { 
+          address: {
+            streetNumber: newCustomerData.address.streetNumber,
+            streetName: newCustomerData.address.streetName,
+            district: newCustomerData.address.district,
+            city: newCustomerData.address.city,
+            countryCode: newCustomerData.address.countryCode,
+          } 
+        } : {}),
       }),
       ...(!formData.generatePassword && formData.password && { password: formData.password }),
     };
@@ -382,14 +453,19 @@ export const CreateMember: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Pays</label>
-                <input
-                  type="text"
+                <select
                   name="countryCode"
                   value={newCustomerData.address.countryCode}
                   onChange={handleAddressChange}
-                  placeholder="CMR, FRA, etc."
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
-                />
+                >
+                  <option value="">Sélectionner un pays</option>
+                  {countries.map((country) => (
+                    <option key={country.code} value={country.code}>
+                      {country.name} ({country.code})
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>

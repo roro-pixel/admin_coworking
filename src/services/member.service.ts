@@ -133,10 +133,10 @@ export const memberService = {
   },
 
   // Recherche basique pour autocomplete
-  searchMembers: async (query: string): Promise<MemberSummaryResponse[]> => {
-    const response = await apiClient.get(`/sni/api/v1/members/search/basic?query=${query}`);
-    return response.data;
-  },
+  // searchMembers: async (query: string): Promise<MemberSummaryResponse[]> => {
+  //   const response = await apiClient.get('/sni/api/v1/members/search/basic', { params: { query } });
+  //   return response.data;
+  // },
 
   // Recherche avancée multicritères
   searchMembersAdvanced: async (
@@ -178,4 +178,9 @@ export const memberService = {
   transferCustomer: async (id: string, customerId: string): Promise<void> => {
     await apiClient.patch(`/sni/api/v1/members/${id}/transfer-customer`, { customerId });
   },
+
+  searchMembers: async (query: string): Promise<MemberSummaryResponse[]> => {
+  const response = await apiClient.get('/sni/api/v1/members/search/basic', { params: { query } });
+  return response.data;
+},
 };

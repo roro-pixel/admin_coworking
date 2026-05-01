@@ -338,12 +338,12 @@ export const CustomerDetail: React.FC = () => {
               <input
                 type="text"
                 name="countryCode"
-                value={formData.address?.countryCode || ''}
+                value={formData.address?.country || ''}
                 onChange={handleAddressChange}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
               />
             ) : (
-              <p className="text-gray-900">{customer.address?.countryCode || '-'}</p>
+              <p className="text-gray-900">{customer.address?.country || '-'}</p>
             )}
           </div>
         </div>

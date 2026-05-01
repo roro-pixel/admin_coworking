@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Bell, User, LogOut, Settings, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 export const AdminHeader: React.FC = () => {
   const [showMenu, setShowMenu] = useState(false);
   const { admin, logout } = useAuth();
-  const navigate = useNavigate();
 
   return (
     <header className="fixed top-0 right-0 left-64 bg-white border-b border-gray-200 z-40 h-16">
@@ -37,11 +35,8 @@ export const AdminHeader: React.FC = () => {
                 <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)} />
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border py-1 z-40">
                   <button
-                    onClick={() => {
-                      setShowMenu(false);
-                      navigate('/settings');
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center"
+                    disabled
+                    className="w-full px-4 py-2 text-left cursor-not-allowed opacity-50 text-sm hover:bg-gray-50 flex items-center"
                   >
                     <Settings size={16} className="mr-2" />
                     Paramètres

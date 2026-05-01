@@ -109,13 +109,6 @@ export const customerService = {
     return response.data?.data || [];
   },
 
-  // Recherche basique pour autocomplete
-  searchCustomers: async (query: string, type?: 'PERSON' | 'COMPANY'): Promise<CustomerSummaryResponse[]> => {
-    const params: { query: string; type?: string } = { query };
-    if (type) params.type = type;
-    const response = await apiClient.get('/sni/api/v1/customers/search/basic', { params });
-    return response.data;
-  },
 
   // Mettre à jour un customer
   updateCustomer: async (customerId: string, data: Partial<CreateCustomerRequest>): Promise<CustomerResponse> => {
@@ -127,4 +120,29 @@ export const customerService = {
   deleteCustomer: async (customerId: string): Promise<void> => {
     await apiClient.delete(`/sni/api/v1/customers/${customerId}`);
   },
+
+//   searchCustomers: async (query: string): Promise<CustomerSummaryResponse[]> => {
+//   const response = await apiClient.get(`/sni/api/v1/customers/search/basic?query=${query}`);
+//   return response.data;
+// },
+
+  searchCustomers: async (query: string, type?: 'PERSON' | 'COMPANY'): Promise<CustomerSummaryResponse[]> => {
+    const params = new URLSearchParams({ query });
+    if (type) params.set('type', type);
+    const response = await apiClient.get(`/sni/api/v1/customers/search/basic?${params.toString()}`);
+    return response.data;
+  },
+
+  // Liste paginée avec summary=true 
+  getCustomersPaginated: async (params?: {
+    page?: number;
+    size?: number;
+    sort?: string;
+  }): Promise<PaginatedResponse<CustomerSummaryResponse>> => {
+    const response = await apiClient.get('/sni/api/v1/customers', { 
+      params: { ...params, summary: true } 
+    });
+    return response.data;
+  },
 };
+

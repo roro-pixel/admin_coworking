@@ -1,171 +1,338 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '../components/layout/AdminLayout';
-import { 
-  Plus, 
-  Search, 
-  Eye, 
-  FileText, 
-  Download,
-  MoreVertical,
-  CheckCircle,
-  XCircle,
-  Clock,
-  AlertCircle,
-  Play,
-  Pause,
-  StopCircle,
-  Ban
+import {
+  Plus, Search, Eye, FileText, Download,
+  CheckCircle, XCircle, Clock, AlertCircle,
+  Play, Pause, StopCircle, Ban, Edit, Trash2,
+  Upload, ChevronLeft, ChevronRight, Loader2,
 } from 'lucide-react';
 import { contractService } from '../services/contract.service';
 import type { ContractResponse } from '../services/contract.service';
 import { ContractFormModal } from '../components/contracts/ContractFormModal';
+import { ContractPreviewModal } from '../components/contracts/ContractPreviewModal';
+import { AttachSignedDocumentModal } from '../components/contracts/AttachSignedDocumentModal';
+import { ModalPortal } from '../components/ui/ModalPortal';
 import { useAuth } from '../contexts/AuthContext';
 
-const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
-  DRAFT: { label: 'Brouillon', color: 'bg-gray-100 text-gray-700', icon: FileText },
-  GENERATED: { label: 'Généré', color: 'bg-blue-100 text-blue-700', icon: FileText },
-  UNDER_REVIEW: { label: 'En relecture', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
-  AWAITING_SIGNATURE: { label: 'Attente signature', color: 'bg-orange-100 text-orange-700', icon: Clock },
-  SIGNED: { label: 'Signé', color: 'bg-green-100 text-green-700', icon: CheckCircle },
-  ACTIVE: { label: 'Actif', color: 'bg-green-100 text-green-700', icon: CheckCircle },
-  SUSPENDED: { label: 'Suspendu', color: 'bg-red-100 text-red-700', icon: Pause },
-  TERMINATED: { label: 'Résilié', color: 'bg-gray-100 text-gray-700', icon: StopCircle },
-  EXPIRED: { label: 'Expiré', color: 'bg-gray-100 text-gray-700', icon: AlertCircle },
-  CANCELLED: { label: 'Annulé', color: 'bg-gray-100 text-gray-700', icon: Ban },
+const statusConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
+  DRAFT:              { label: 'Brouillon',         color: 'bg-gray-100 text-gray-700',    icon: FileText    },
+  GENERATED:          { label: 'Généré',            color: 'bg-blue-100 text-blue-700',    icon: FileText    },
+  UNDER_REVIEW:       { label: 'En relecture',      color: 'bg-yellow-100 text-yellow-700', icon: Clock      },
+  AWAITING_SIGNATURE: { label: 'Attente signature', color: 'bg-orange-100 text-orange-700', icon: Clock      },
+  SIGNED:             { label: 'Signé',             color: 'bg-green-100 text-green-700',  icon: CheckCircle },
+  ACTIVE:             { label: 'Actif',             color: 'bg-green-100 text-green-700',  icon: CheckCircle },
+  SUSPENDED:          { label: 'Suspendu',          color: 'bg-red-100 text-red-700',      icon: Pause       },
+  TERMINATED:         { label: 'Résilié',           color: 'bg-gray-100 text-gray-700',    icon: StopCircle  },
+  EXPIRED:            { label: 'Expiré',            color: 'bg-gray-100 text-gray-700',    icon: AlertCircle },
+  CANCELLED:          { label: 'Annulé',            color: 'bg-gray-100 text-gray-700',    icon: Ban         },
 };
+
+const PAGE_SIZE = 20;
 
 export const AdminContracts: React.FC = () => {
   const { admin } = useAuth();
   const queryClient = useQueryClient();
+
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [ownerTypeFilter, setOwnerTypeFilter] = useState('all');
   const [page, setPage] = useState(0);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<ContractResponse | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
-  const { data: contractsData, isLoading } = useQuery({
-    queryKey: ['contracts', page, statusFilter, ownerTypeFilter],
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewContract, setPreviewContract] = useState<ContractResponse | null>(null);
+
+  const [showAttachModal, setShowAttachModal] = useState(false);
+  const [attachContractCode, setAttachContractCode] = useState<string | null>(null);
+  const [attachContract, setAttachContract] = useState<ContractResponse | null>(null);
+
+  // Modal résiliation
+  const [showTerminateModal, setShowTerminateModal] = useState(false);
+  const [terminateReason, setTerminateReason] = useState('');
+  const [contractToTerminate, setContractToTerminate] = useState<string | null>(null);
+
+  // Modal suspend/cancel motif
+  const [showSuspendModal, setShowSuspendModal] = useState(false);
+  const [suspendReason, setSuspendReason] = useState('');
+  const [contractToSuspend, setContractToSuspend] = useState<string | null>(null);
+
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [contractToCancel, setContractToCancel] = useState<string | null>(null);
+
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  // CORRECTION : debounce 400ms
+  useEffect(() => {
+    const timer = setTimeout(() => { setDebouncedSearch(search); setPage(0); }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const handleFilterChange = <T,>(setter: (v: T) => void, value: T) => {
+    setter(value);
+    setPage(0);
+  };
+
+  const { data: contractsData, isLoading, isFetching } = useQuery({
+    queryKey: ['contracts', page, statusFilter, ownerTypeFilter, debouncedSearch],
     queryFn: () => contractService.getAllContracts({
-      status: statusFilter !== 'all' ? statusFilter : undefined,
+      status:    statusFilter !== 'all'    ? statusFilter    : undefined,
       ownerType: ownerTypeFilter !== 'all' ? ownerTypeFilter : undefined,
       page,
-      size: 20,
+      size: PAGE_SIZE,
+      sort: 'createdAt,desc',
     }),
   });
 
+  const contracts: ContractResponse[] = contractsData?.data || [];
+  const totalPages = contractsData?.pageable?.totalPages ?? 0;
+  const totalElements = contractsData?.pageable?.totalElements ?? 0;
+
+  // CORRECTION : filtre client-side sur search (pas envoyé à l'API car paramètre non documenté)
+  const filteredContracts = debouncedSearch
+    ? contracts.filter(c =>
+        c.title.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        c.contractCode.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        c.ownerCode.toLowerCase().includes(debouncedSearch.toLowerCase())
+      )
+    : contracts;
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['contracts'] });
+
+  // CORRECTION : generateDraft retourne ContractResponse (plus Blob)
   const generateDraftMutation = useMutation({
-    mutationFn: (contractCode: string) => 
-      contractService.generateDraft(contractCode, parseInt(admin?.id || '0')),
-    onSuccess: (data, contractCode) => {
-      const url = window.URL.createObjectURL(data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `contrat_${contractCode}.pdf`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+    mutationFn: (contractCode: string) =>
+      contractService.generateDraft(contractCode, admin?.id || 1),
+    onSuccess: () => {
+      invalidate();
+    },
+    onError: (error: any) => {
+      setActionError(error?.response?.data?.message || 'Erreur lors de la génération du brouillon.');
     },
   });
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ contractCode, status }: { contractCode: string; status: string }) =>
       contractService.updateContractStatus(contractCode, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contracts'] });
-    },
+    onSuccess: invalidate,
+    onError: (error: any) => setActionError(error?.response?.data?.message || 'Erreur lors du changement de statut.'),
   });
 
   const activateMutation = useMutation({
     mutationFn: (contractCode: string) => contractService.activateContract(contractCode),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contracts'] });
-    },
+    onSuccess: invalidate,
+    onError: (error: any) => setActionError(error?.response?.data?.message || 'Erreur lors de l\'activation.'),
   });
 
+  // CORRECTION : suspendContract avec motif
   const suspendMutation = useMutation({
-    mutationFn: (contractCode: string) => contractService.suspendContract(contractCode),
+    mutationFn: ({ contractCode, reason }: { contractCode: string; reason?: string }) =>
+      contractService.suspendContract(contractCode, reason),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      invalidate();
+      setShowSuspendModal(false);
+      setContractToSuspend(null);
+      setSuspendReason('');
     },
+    onError: (error: any) => setActionError(error?.response?.data?.message || 'Erreur lors de la suspension.'),
+  });
+
+  // CORRECTION : cancelContract avec motif
+  const cancelMutation = useMutation({
+    mutationFn: ({ contractCode, reason }: { contractCode: string; reason?: string }) =>
+      contractService.cancelContract(contractCode, reason),
+    onSuccess: () => {
+      invalidate();
+      setShowCancelModal(false);
+      setContractToCancel(null);
+      setCancelReason('');
+    },
+    onError: (error: any) => setActionError(error?.response?.data?.message || 'Erreur lors de l\'annulation.'),
   });
 
   const terminateMutation = useMutation({
     mutationFn: ({ contractCode, reason }: { contractCode: string; reason?: string }) =>
       contractService.terminateContract(contractCode, reason),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      invalidate();
+      setShowTerminateModal(false);
+      setContractToTerminate(null);
+      setTerminateReason('');
     },
+    onError: (error: any) => setActionError(error?.response?.data?.message || 'Erreur lors de la résiliation.'),
   });
 
-  const contracts = contractsData?.data || [];
-  const totalPages = contractsData?.pageable?.totalPages || 0;
+  const deleteMutation = useMutation({
+    mutationFn: (contractCode: string) => contractService.deleteContract(contractCode),
+    onSuccess: invalidate,
+    onError: (error: any) => setActionError(error?.response?.data?.message || 'Erreur lors de la suppression.'),
+  });
 
-  const handleGenerateDraft = (contractCode: string) => {
-    generateDraftMutation.mutate(contractCode);
+  const saveContractMutation = useMutation({
+    mutationFn: (data: any) =>
+      isEditing && selectedContract
+        ? contractService.updateContract(selectedContract.contractCode, data)
+        : contractService.createContract(data),
+    onSuccess: () => {
+      invalidate();
+      setIsModalOpen(false);
+      setSelectedContract(null);
+      setIsEditing(false);
+    },
+    onError: (error: any) => setActionError(error?.response?.data?.message || 'Erreur lors de la sauvegarde.'),
+  });
+
+  const getAvailableActions = (status: string): { label: string; action: string; icon: React.ElementType; color: string }[] => {
+    const a = [];
+    if (status === 'DRAFT') {
+      a.push({ label: 'Générer brouillon',   action: 'generate',           icon: FileText,   color: 'text-blue-600 hover:text-blue-800'   });
+      a.push({ label: 'Mettre en relecture', action: 'under_review',       icon: Clock,      color: 'text-yellow-600 hover:text-yellow-800'});
+      a.push({ label: 'Annuler',             action: 'cancel',             icon: Ban,        color: 'text-gray-500 hover:text-gray-700'    });
+    }
+    if (status === 'GENERATED') {
+      a.push({ label: 'Mettre en relecture',          action: 'under_review',       icon: Clock,    color: 'text-yellow-600 hover:text-yellow-800'  });
+      a.push({ label: 'Mettre en attente signature',  action: 'awaiting_signature', icon: Clock,    color: 'text-orange-600 hover:text-orange-800' });
+    }
+    if (status === 'AWAITING_SIGNATURE') {
+      a.push({ label: 'Rattacher signé', action: 'attach_signed', icon: Upload,  color: 'text-purple-600 hover:text-purple-800' });
+    }
+    if (status === 'SIGNED') {
+      a.push({ label: 'Activer', action: 'activate', icon: Play, color: 'text-green-600 hover:text-green-800' });
+    }
+    if (status === 'ACTIVE') {
+      a.push({ label: 'Suspendre', action: 'suspend',   icon: Pause,      color: 'text-yellow-600 hover:text-yellow-800' });
+      a.push({ label: 'Résilier',  action: 'terminate', icon: StopCircle, color: 'text-red-600 hover:text-red-800'        });
+    }
+    if (['DRAFT', 'GENERATED', 'UNDER_REVIEW', 'AWAITING_SIGNATURE'].includes(status)) {
+      if (!a.find(x => x.action === 'cancel'))
+        a.push({ label: 'Annuler', action: 'cancel', icon: Ban, color: 'text-gray-500 hover:text-gray-700' });
+    }
+    return a;
   };
 
-  const handleStatusChange = (contractCode: string, newStatus: string) => {
-    updateStatusMutation.mutate({ contractCode, status: newStatus });
+  const handleAction = (action: string, contract: ContractResponse) => {
+    setActionError(null);
+    const cc = contract.contractCode;
+    switch (action) {
+      case 'generate':
+        generateDraftMutation.mutate(cc);
+        break;
+      case 'under_review':
+        updateStatusMutation.mutate({ contractCode: cc, status: 'UNDER_REVIEW' });
+        break;
+      case 'awaiting_signature':
+        updateStatusMutation.mutate({ contractCode: cc, status: 'AWAITING_SIGNATURE' });
+        break;
+      case 'activate':
+        activateMutation.mutate(cc);
+        break;
+      case 'suspend':
+        setContractToSuspend(cc);
+        setSuspendReason('');
+        setShowSuspendModal(true);
+        break;
+      case 'terminate':
+        setContractToTerminate(cc);
+        setTerminateReason('');
+        setShowTerminateModal(true);
+        break;
+      case 'cancel':
+        setContractToCancel(cc);
+        setCancelReason('');
+        setShowCancelModal(true);
+        break;
+      case 'attach_signed':
+        setAttachContractCode(cc);
+        setAttachContract(contract);
+        setShowAttachModal(true);
+        break;
+    }
   };
+
+  const anyPending =
+    generateDraftMutation.isPending || updateStatusMutation.isPending ||
+    activateMutation.isPending || suspendMutation.isPending ||
+    cancelMutation.isPending || terminateMutation.isPending || deleteMutation.isPending;
+
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Contrats</h1>
-          <p className="text-gray-600 mt-1">Gérez tous les contrats et leur workflow</p>
+          <p className="text-gray-600 mt-1">
+            Gérez tous les contrats et leur workflow
+            {totalElements > 0 && <span className="ml-2 text-sm">· {totalElements} contrat{totalElements > 1 ? 's' : ''}</span>}
+          </p>
         </div>
         <button
-          onClick={() => {
-            setSelectedContract(null);
-            setIsModalOpen(true);
-          }}
+          onClick={() => { setSelectedContract(null); setIsEditing(false); setIsModalOpen(true); }}
           className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2"
         >
-          <Plus size={18} />
-          Nouveau contrat
+          <Plus size={18} /> Nouveau contrat
         </button>
       </div>
+
+      {/* Erreur globale */}
+      {actionError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 flex justify-between items-center">
+          <span className="text-sm">{actionError}</span>
+          <button onClick={() => setActionError(null)} className="text-red-500 hover:text-red-700 text-xs underline ml-4">Fermer</button>
+        </div>
+      )}
 
       {/* Filtres */}
       <div className="bg-white rounded-xl p-4 shadow-sm mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Rechercher un contrat..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
+            <input type="text" placeholder="Rechercher un contrat..."
+              value={search} onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg" />
+            {isFetching && (
+              <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400" />
+            )}
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
-          >
+          <select value={statusFilter}
+            onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)}
+            className="px-4 py-2 border border-gray-200 rounded-lg bg-white">
             <option value="all">Tous les statuts</option>
             {Object.entries(statusConfig).map(([key, value]) => (
               <option key={key} value={key}>{value.label}</option>
             ))}
           </select>
-          <select
-            value={ownerTypeFilter}
-            onChange={(e) => setOwnerTypeFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
-          >
+          <select value={ownerTypeFilter}
+            onChange={(e) => handleFilterChange(setOwnerTypeFilter, e.target.value)}
+            className="px-4 py-2 border border-gray-200 rounded-lg bg-white">
             <option value="all">Tous les propriétaires</option>
             <option value="MEMBER">Membres</option>
             <option value="CUSTOMER">Customers</option>
             <option value="BUSINESS">Business</option>
           </select>
+          {(statusFilter !== 'all' || ownerTypeFilter !== 'all' || search) && (
+            <button onClick={() => { setSearch(''); setDebouncedSearch(''); setStatusFilter('all'); setOwnerTypeFilter('all'); setPage(0); }}
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 whitespace-nowrap">
+              Réinitialiser
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Liste des contrats */}
+      {/* Tableau */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -173,6 +340,7 @@ export const AdminContracts: React.FC = () => {
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Contrat</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Propriétaire</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Template</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Dates</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Statut</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Documents</th>
@@ -180,109 +348,124 @@ export const AdminContracts: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {contracts.map((contract) => {
-                const StatusIcon = statusConfig[contract.status]?.icon || FileText;
-                const statusClass = statusConfig[contract.status]?.color || 'bg-gray-100 text-gray-700';
-                
+              {filteredContracts.map((contract) => {
+                const sc = statusConfig[contract.status];
+                const StatusIcon = sc?.icon || FileText;
+                const actions = getAvailableActions(contract.status);
+
                 return (
                   <tr key={contract.contractCode} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
-                      <div>
-                        <p className="font-medium text-gray-900">{contract.title}</p>
-                        <p className="text-xs text-gray-500">{contract.contractCode}</p>
-                      </div>
+                      <p className="font-medium text-gray-900">{contract.title}</p>
+                      <p className="text-xs text-gray-400 font-mono">{contract.contractCode}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-gray-900">{contract.ownerType}</p>
-                      <p className="text-xs text-gray-500">{contract.ownerCode}</p>
+                      <p className="text-sm font-medium text-gray-700">{contract.ownerCode}</p>
+                      <p className="text-xs text-gray-500">{contract.ownerType}</p>
+                      {contract.businessCode && contract.businessCode !== contract.ownerCode && (
+                        <p className="text-xs text-gray-400 font-mono">{contract.businessCode}</p>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-xs text-gray-500 font-mono">
+                      {contract.templateCode}
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-sm text-gray-600">
-                        Début: {new Date(contract.startDate).toLocaleDateString('fr-FR')}
+                        Début : {new Date(contract.startDate).toLocaleDateString('fr-FR')}
                       </p>
                       {contract.endDate && (
-                        <p className="text-xs text-gray-500">
-                          Fin: {new Date(contract.endDate).toLocaleDateString('fr-FR')}
+                        <p className="text-xs text-gray-400">
+                          Fin : {new Date(contract.endDate).toLocaleDateString('fr-FR')}
                         </p>
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${statusClass}`}>
-                        <StatusIcon size={12} className="mr-1" />
-                        {statusConfig[contract.status]?.label || contract.status}
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${sc?.color || 'bg-gray-100 text-gray-700'}`}>
+                        <StatusIcon size={11} />
+                        {sc?.label || contract.status}
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex gap-2">
-                        {contract.draftDocumentCode && (
-                          <button
-                            onClick={() => handleGenerateDraft(contract.contractCode)}
-                            className="text-blue-600 hover:text-blue-700"
-                            title="Télécharger brouillon"
-                          >
-                            <Download size={16} />
+                      <div className="flex gap-2 items-center">
+                        {/* Brouillon */}
+                        {contract.draftDocumentCode ? (
+                          <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-mono" title="Brouillon généré">
+                            DRAFT
+                          </span>
+                        ) : null}
+                        {/* Document signé */}
+                        {contract.signedDocumentCode ? (
+                          <span className="text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded font-mono" title="Document signé">
+                            SIGNÉ
+                          </span>
+                        ) : null}
+                        {/* Bouton rattacher signé */}
+                        {['AWAITING_SIGNATURE', 'SIGNED'].includes(contract.status) && !contract.signedDocumentCode && (
+                          <button onClick={() => { setAttachContractCode(contract.contractCode); setAttachContract(contract); setShowAttachModal(true); }}
+                            className="p-1 text-purple-600 hover:text-purple-800" title="Rattacher document signé">
+                            <Upload size={15} />
                           </button>
                         )}
-                        {contract.signedDocumentCode && (
-                          <FileText size={16} className="text-green-600" title="Contrat signé disponible" />
+                        {/* Télécharger brouillon */}
+                        {contract.draftDocumentCode && (
+                          <button onClick={() => generateDraftMutation.mutate(contract.contractCode)}
+                            disabled={generateDraftMutation.isPending}
+                            className="p-1 text-blue-600 hover:text-blue-800 disabled:opacity-40" title="Re-générer brouillon">
+                            {generateDraftMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                          </button>
                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => setSelectedContract(contract)}
-                          className="text-primary-600 hover:text-primary-700"
-                          title="Voir détail"
-                        >
-                          <Eye size={18} />
+                      <div className="flex justify-end gap-1 flex-wrap">
+                        {/* Aperçu */}
+                        <button onClick={() => { setPreviewContract(contract); setShowPreviewModal(true); }}
+                          className="p-1 text-primary-600 hover:text-primary-800" title="Prévisualiser">
+                          <Eye size={16} />
                         </button>
+                        {/* Modifier */}
+                        {['DRAFT', 'GENERATED', 'UNDER_REVIEW'].includes(contract.status) && (
+                          <button onClick={() => { setSelectedContract(contract); setIsEditing(true); setIsModalOpen(true); }}
+                            className="p-1 text-blue-600 hover:text-blue-800" title="Modifier">
+                            <Edit size={16} />
+                          </button>
+                        )}
+                        {/* Supprimer — DRAFT uniquement */}
                         {contract.status === 'DRAFT' && (
-                          <button
-                            onClick={() => handleGenerateDraft(contract.contractCode)}
-                            className="text-blue-600 hover:text-blue-700"
-                            title="Générer brouillon"
-                          >
-                            <FileText size={18} />
+                          <button onClick={() => {
+                            if (confirm(`Supprimer le contrat "${contract.title}" ?`)) {
+                              deleteMutation.mutate(contract.contractCode);
+                            }
+                          }}
+                            disabled={deleteMutation.isPending}
+                            className="p-1 text-red-500 hover:text-red-700 disabled:opacity-40" title="Supprimer">
+                            <Trash2 size={16} />
                           </button>
                         )}
-                        {contract.status === 'GENERATED' && (
-                          <button
-                            onClick={() => handleStatusChange(contract.contractCode, 'UNDER_REVIEW')}
-                            className="text-yellow-600 hover:text-yellow-700"
-                            title="Mettre en relecture"
-                          >
-                            <Clock size={18} />
-                          </button>
-                        )}
-                        {contract.status === 'SIGNED' && (
-                          <button
-                            onClick={() => activateMutation.mutate(contract.contractCode)}
-                            className="text-green-600 hover:text-green-700"
-                            title="Activer"
-                          >
-                            <Play size={18} />
-                          </button>
-                        )}
-                        {contract.status === 'ACTIVE' && (
-                          <button
-                            onClick={() => suspendMutation.mutate(contract.contractCode)}
-                            className="text-orange-600 hover:text-orange-700"
-                            title="Suspendre"
-                          >
-                            <Pause size={18} />
-                          </button>
-                        )}
+                        {/* Actions workflow */}
+                        {actions.map((action) => {
+                          const Icon = action.icon;
+                          return (
+                            <button key={action.action}
+                              onClick={() => handleAction(action.action, contract)}
+                              disabled={anyPending}
+                              className={`p-1 disabled:opacity-40 ${action.color}`}
+                              title={action.label}
+                            >
+                              <Icon size={16} />
+                            </button>
+                          );
+                        })}
                       </div>
                     </td>
-                  </td>
+                  </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
 
-        {contracts.length === 0 && (
+        {filteredContracts.length === 0 && !isLoading && (
           <div className="text-center py-12">
             <FileText size={48} className="mx-auto text-gray-300 mb-4" />
             <p className="text-gray-500">Aucun contrat trouvé</p>
@@ -291,42 +474,157 @@ export const AdminContracts: React.FC = () => {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
-            <button
-              onClick={() => setPage(Math.max(0, page - 1))}
-              disabled={page === 0}
-              className="px-4 py-2 border border-gray-200 rounded-lg disabled:opacity-50"
-            >
-              Précédent
-            </button>
-            <span className="text-sm text-gray-600">Page {page + 1} sur {totalPages}</span>
-            <button
-              onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-              disabled={page === totalPages - 1}
-              className="px-4 py-2 border border-gray-200 rounded-lg disabled:opacity-50"
-            >
-              Suivant
-            </button>
+          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              {totalElements} contrat{totalElements > 1 ? 's' : ''} — Page {page + 1} / {totalPages}
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+                className="p-1.5 border rounded-lg disabled:opacity-50 hover:bg-gray-50">
+                <ChevronLeft size={16} />
+              </button>
+              <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
+                className="p-1.5 border rounded-lg disabled:opacity-50 hover:bg-gray-50">
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Modal de création/édition */}
+      {/* Modal création/édition */}
       <ContractFormModal
         isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setSelectedContract(null);
-        }}
-        onSave={(data) => {
-          contractService.createContract(data).then(() => {
-            queryClient.invalidateQueries({ queryKey: ['contracts'] });
-            setIsModalOpen(false);
-          });
-        }}
+        onClose={() => { setIsModalOpen(false); setSelectedContract(null); setIsEditing(false); }}
+        onSave={(data) => saveContractMutation.mutate(data)}
         initialData={selectedContract}
-        isEditing={!!selectedContract}
+        isEditing={isEditing}
       />
+
+      {/* Modal prévisualisation */}
+      {showPreviewModal && previewContract && (
+        <ContractPreviewModal
+          isOpen={showPreviewModal}
+          onClose={() => { setShowPreviewModal(false); setPreviewContract(null); }}
+          contractData={previewContract}
+          templateCode={previewContract.templateCode}
+        />
+      )}
+
+      {/* Modal rattachement document signé */}
+      {showAttachModal && attachContractCode && (
+        <AttachSignedDocumentModal
+          isOpen={showAttachModal}
+          onClose={() => { setShowAttachModal(false); setAttachContractCode(null); setAttachContract(null); }}
+          contractCode={attachContractCode}
+          // CORRECTION : ownerType/ownerCode passés depuis le contrat sélectionné
+          ownerType={attachContract?.ownerType}
+          ownerCode={attachContract?.ownerCode}
+          onSuccess={() => {
+            invalidate();
+            setShowAttachModal(false);
+            setAttachContractCode(null);
+            setAttachContract(null);
+          }}
+        />
+      )}
+
+      {/* Modal résiliation — ModalPortal */}
+      {showTerminateModal && contractToTerminate && (
+        <ModalPortal onClose={() => setShowTerminateModal(false)}>
+          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+            <h3 className="text-xl font-bold text-red-700">Résilier le contrat</h3>
+            <button onClick={() => setShowTerminateModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
+              <XCircle size={20} />
+            </button>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-sm text-red-700">
+              Contrat : <span className="font-mono font-medium">{contractToTerminate}</span>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Motif de résiliation *</label>
+              <textarea value={terminateReason}
+                onChange={(e) => setTerminateReason(e.target.value)}
+                rows={3} placeholder="Indiquez le motif de résiliation..."
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none" />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setShowTerminateModal(false)} disabled={terminateMutation.isPending}
+                className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                Annuler
+              </button>
+              <button onClick={() => terminateMutation.mutate({ contractCode: contractToTerminate, reason: terminateReason })}
+                disabled={terminateMutation.isPending || !terminateReason.trim()}
+                className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                {terminateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : 'Résilier'}
+              </button>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* Modal suspension — ModalPortal */}
+      {showSuspendModal && contractToSuspend && (
+        <ModalPortal onClose={() => setShowSuspendModal(false)}>
+          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+            <h3 className="text-xl font-bold">Suspendre le contrat</h3>
+            <button onClick={() => setShowSuspendModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">✕</button>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-3 text-sm text-yellow-700">
+              Contrat : <span className="font-mono font-medium">{contractToSuspend}</span>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Motif de suspension *</label>
+              <textarea value={suspendReason}
+                onChange={(e) => setSuspendReason(e.target.value)}
+                rows={3} placeholder="Indiquez le motif de suspension..."
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none" />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setShowSuspendModal(false)} disabled={suspendMutation.isPending}
+                className="flex-1 px-4 py-2 border rounded-lg text-gray-700 disabled:opacity-50">Annuler</button>
+              <button onClick={() => suspendMutation.mutate({ contractCode: contractToSuspend, reason: suspendReason })}
+                disabled={suspendMutation.isPending || !suspendReason.trim()}
+                className="flex-1 bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                {suspendMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : 'Suspendre'}
+              </button>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* Modal annulation — ModalPortal */}
+      {showCancelModal && contractToCancel && (
+        <ModalPortal onClose={() => setShowCancelModal(false)}>
+          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+            <h3 className="text-xl font-bold">Annuler le contrat</h3>
+            <button onClick={() => setShowCancelModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">✕</button>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-700">
+              Contrat : <span className="font-mono font-medium">{contractToCancel}</span>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Motif d&apos;annulation</label>
+              <textarea value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                rows={2} placeholder="Motif optionnel..."
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none" />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setShowCancelModal(false)} disabled={cancelMutation.isPending}
+                className="flex-1 px-4 py-2 border rounded-lg text-gray-700 disabled:opacity-50">Annuler</button>
+              <button onClick={() => cancelMutation.mutate({ contractCode: contractToCancel, reason: cancelReason || undefined })}
+                disabled={cancelMutation.isPending}
+                className="flex-1 bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50 flex items-center justify-center gap-2">
+                {cancelMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : 'Confirmer l\'annulation'}
+              </button>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
     </AdminLayout>
   );
 };

@@ -44,7 +44,7 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
 
       setIsLoading(true);
       try {
-        const data = await customerService.searchCustomers(query, typeFilter);
+        const data = await customerService.searchCustomers(query);
         setResults(data);
         setShowResults(true);
       } catch (error) {
