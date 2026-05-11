@@ -89,7 +89,7 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({ sessionNum
       movementType: formData.movementType,
       amount: formData.amount,
       reason: formData.reason || undefined,
-      createdBy: admin?.email || admin?.id || 'admin',
+      createdBy: admin?.email || String(admin?.id || 'admin'),
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cash-movements'] });

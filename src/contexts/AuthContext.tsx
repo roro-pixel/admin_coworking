@@ -1,48 +1,49 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/auth.service';
-
-interface Admin {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: 'ADMIN' | 'SUPER_ADMIN';
-}
+import type { UserProfile } from '../services/auth.service';
 
 interface AuthContextType {
-  admin: Admin | null;
+  admin: UserProfile | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  hasPermission: (permission: string) => boolean;
+  isAdmin: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [admin, setAdmin] = useState<Admin | null>(null);
+  const [admin, setAdmin] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('admin_token');
-    const storedAdmin = localStorage.getItem('admin');
-
-    if (token && storedAdmin) {
-      setAdmin(JSON.parse(storedAdmin));
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      authService.getProfile()
+        .then(profile => setAdmin(profile))
+        .catch(() => {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+        })
+        .finally(() => setIsLoading(false));
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     try {
       const response = await authService.login({ email, password });
-      localStorage.setItem('admin_token', response.token);
-      localStorage.setItem('admin', JSON.stringify(response.admin));
-      setAdmin(response.admin);
+      localStorage.setItem('accessToken', response.accessToken);
+      localStorage.setItem('refreshToken', response.refreshToken);
+      const profile = await authService.getProfile();
+      setAdmin(profile);
       return true;
     } catch (error) {
-      console.error('Erreur de connexion admin', error);
+      console.error('Erreur de connexion', error);
       return false;
     } finally {
       setIsLoading(false);
@@ -50,9 +51,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
     setAdmin(null);
+  };
+
+  // Vérifie si l'utilisateur est admin (rôle ADMIN ou ROLE_ADMIN)
+  const isAdmin = (): boolean => {
+    if (!admin) return false;
+    const roles = admin.roleNames || [];
+    const authorities = admin.authorities || [];
+    return (
+      roles.includes('ADMIN') ||
+      roles.includes('ROLE_ADMIN') ||
+      authorities.includes('ROLE_ADMIN') ||
+      authorities.includes('ADMIN')
+    );
+  };
+
+  const hasPermission = (permission: string): boolean => {
+    if (!admin) return false;
+
+    // ADMIN voit tout
+    if (isAdmin()) return true;
+
+    // Vérifier dans authorities (peut être vide si le backend ne les remonte pas)
+    const authorities = admin.authorities || [];
+    if (authorities.length > 0) {
+      return (
+        authorities.includes(permission) ||
+        authorities.includes(permission.replace(':', '_'))
+      );
+    }
+
+    // Fallback : si authorities vide, se baser sur roleNames
+    // Un utilisateur connecté avec un rôle a au moins les permissions de base
+    return false;
   };
 
   return (
@@ -61,7 +95,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isAuthenticated: !!admin,
       isLoading,
       login,
-      logout
+      logout,
+      hasPermission,
+      isAdmin,
     }}>
       {children}
     </AuthContext.Provider>

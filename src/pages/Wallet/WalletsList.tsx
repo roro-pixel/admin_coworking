@@ -114,8 +114,7 @@ export const WalletsList: React.FC = () => {
       ownerCode: topUpData.ownerCode,
       currency:  'XAF',
       amount:    topUpData.amount,
-      // CORRECTION : admin?.email au lieu de admin?.id
-      createdBy: admin?.email || admin?.id || 'admin',
+      createdBy: admin?.email || String(admin?.id || 'admin'),
       reference: topUpData.reference || undefined,
     }),
     onSuccess: () => {

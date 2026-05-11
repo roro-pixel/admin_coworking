@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react';
+import { Mail, Lock, LogIn } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import Logo from '../assets/img/logo.jpeg'
 
 export const AdminLogin: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -33,8 +34,8 @@ export const AdminLogin: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-white flex items-center justify-center py-12 px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-primary-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-            <span className="text-white text-2xl font-bold">A</span>
+          <div className="w-16 h-16 bg-primary-400 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+            <img src={Logo} alt="" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
             Administration
@@ -63,8 +64,8 @@ export const AdminLogin: React.FC = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  placeholder="admin@coworkspace.com"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300"
+                  placeholder="admin@bokati.com"
                 />
               </div>
             </div>
@@ -76,11 +77,12 @@ export const AdminLogin: React.FC = () => {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  // type={showPassword ? 'text' : 'password'}
+                  type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-12 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full pl-10 pr-12 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300"
                   placeholder="••••••••"
                 />
                 <button
@@ -88,7 +90,7 @@ export const AdminLogin: React.FC = () => {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {/* {showPassword ? <EyeOff size={18} /> : <Eye size={18} />} */}
                 </button>
               </div>
             </div>
@@ -96,7 +98,7 @@ export const AdminLogin: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+              className="w-full bg-[#C84C9A] text-white py-3 rounded-lg hover:bg-pink-400 transition-colors disabled:opacity-50 flex items-center justify-center"
             >
               {isLoading ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>

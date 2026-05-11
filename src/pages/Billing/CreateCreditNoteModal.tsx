@@ -36,7 +36,7 @@ export const CreateCreditNoteModal: React.FC<CreateCreditNoteModalProps> = ({
       amount,
       reason,
       // CORRECTION : admin?.email au lieu de admin?.id
-      createdBy: admin?.email || admin?.id || 'admin',
+      createdBy: admin?.email || String(admin?.id) || 'admin',
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['billing-documents'] });

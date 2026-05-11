@@ -16,10 +16,10 @@ const statusConfig: Record<VisitorPassStatus, { label: string; color: string }> 
 type SubTab = 'today' | 'all' | 'checkin' | 'create' | 'log';
 
 export const VisitorMaster: React.FC = () => {
-  const { admin } = useAuth();
+  const { admin, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<SubTab>('today');
-  const [visitedTabs, setVisitedTabs] = React.useState<Set<SubTab>>(new Set(['today']));
+  const [visitedTabs, setVisitedTabs] = useState<Set<SubTab>>(new Set(['today']));
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<VisitorPassStatus | ''>('');
   const [page, setPage] = useState(0);
@@ -107,21 +107,22 @@ export const VisitorMaster: React.FC = () => {
     onError: (e: any) => setActionError(e?.response?.data?.message || 'Erreur check-out'),
   });
 
-  const tabs: { id: SubTab; label: string; icon: React.ElementType }[] = [
-    { id: 'today',   label: `Aujourd'hui (${todayPasses.length})`, icon: Users },
-    { id: 'all',     label: 'Tous les passes',                     icon: ClipboardList },
-    { id: 'checkin', label: 'Check-in/out',                        icon: ScanLine },
-    { id: 'create',  label: 'Nouveau pass',                        icon: UserPlus },
-    { id: 'log',     label: 'Journal',                             icon: ClipboardList },
+  const tabs: { id: SubTab; label: string; icon: React.ElementType; permission?: string }[] = [
+    { id: 'today',   label: `Aujourd'hui (${todayPasses.length})`, icon: Users, permission: 'VISITOR:READ' },
+    { id: 'all',     label: 'Tous les passes',                     icon: ClipboardList, permission: 'VISITOR:READ' },
+    { id: 'checkin', label: 'Check-in/out',                        icon: ScanLine, permission: 'VISITOR:CHECKIN' },
+    { id: 'create',  label: 'Nouveau pass',                        icon: UserPlus, permission: 'VISITOR:WRITE' },
+    { id: 'log',     label: 'Journal',                             icon: ClipboardList, permission: 'VISITOR:READ' },
   ];
+
+  const visibleTabs = tabs.filter(tab => !tab.permission || hasPermission(tab.permission));
 
   return (
     <div>
       <h2 className="text-xl font-semibold text-gray-900 mb-4">Gestion des visiteurs</h2>
 
-      {/* Sous-onglets */}
       <div className="flex flex-wrap gap-1 border-b border-gray-200 mb-6">
-        {tabs.map(tab => (
+        {visibleTabs.map(tab => (
           <button key={tab.id} onClick={() => switchTab(tab.id)}
             className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-1.5 ${
               activeTab === tab.id

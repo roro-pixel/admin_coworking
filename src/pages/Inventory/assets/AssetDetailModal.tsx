@@ -63,7 +63,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({ isOpen, onCl
       asset.assetCode,
       assignData.assigneeType,
       assignData.assigneeCode,
-      admin?.id || '1',
+      admin?.email || String(admin?.id || '1'),
       assignData.notes
     ),
     onSuccess: () => {
@@ -76,7 +76,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({ isOpen, onCl
   const returnMutation = useMutation({
     mutationFn: () => inventoryService.returnAsset(
       asset.assetCode,
-      admin?.id || '1',
+      admin?.email || String(admin?.id || '1'),
       returnData.returnedToLocationCode,
       returnData.condition,
       returnData.notes
@@ -93,7 +93,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({ isOpen, onCl
       maintenanceType: maintenanceData.maintenanceType,
       description: maintenanceData.description,
       scheduledDate: maintenanceData.scheduledDate,
-      requestedBy: admin?.id || '1',
+      requestedBy: admin?.email || String(admin?.id || '1'),
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['asset-maintenances'] });
@@ -116,7 +116,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({ isOpen, onCl
   const markDamagedMutation = useMutation({
     mutationFn: () => inventoryService.markAssetDamaged(asset.assetCode, {
       reason: reserveReason,
-      reportedBy: admin?.id || '1',
+      reportedBy: admin?.email || String(admin?.id || '1'),
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assets'] });
@@ -127,7 +127,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({ isOpen, onCl
   const retireMutation = useMutation({
     mutationFn: () => inventoryService.retireAsset(asset.assetCode, {
       reason: reserveReason,
-      reportedBy: admin?.id || '1',
+      reportedBy: admin?.email || String(admin?.id || '1'),
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assets'] });

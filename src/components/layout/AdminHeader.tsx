@@ -1,10 +1,18 @@
 import React, { useState } from 'react';
 import { Bell, User, LogOut, Settings, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 export const AdminHeader: React.FC = () => {
   const [showMenu, setShowMenu] = useState(false);
   const { admin, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    setShowMenu(false);
+    logout();
+    navigate('/login');
+  };
 
   return (
     <header className="fixed top-0 right-0 left-64 bg-white border-b border-gray-200 z-40 h-16">
@@ -26,27 +34,49 @@ export const AdminHeader: React.FC = () => {
               <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
                 <User size={16} className="text-[#C84C9A]" />
               </div>
-              <span className="text-sm font-medium text-gray-700">{admin?.firstName}</span>
+              <div className="text-left">
+                <span className="text-sm font-medium text-gray-700 block">
+                  {admin?.email?.split('@')[0] || 'Utilisateur'}
+                </span>
+                <span className="text-xs text-gray-400">
+                  Bonjour, {admin?.email?.split('@')[0] || 'Utilisateur'}
+                </span>
+              </div>
               <ChevronDown size={16} className="text-gray-500" />
             </button>
 
             {showMenu && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border py-1 z-40">
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border py-1 z-40">
+                  <div className="px-4 py-3 border-b">
+                    <p className="text-sm font-medium text-gray-900">
+                      {admin?.email?.split('@')[0] || 'Utilisateur'}
+                    </p>
+                    <p className="text-xs text-gray-500">{admin?.email}</p>
+                    {admin?.roleNames && admin.roleNames.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {admin.roleNames.map(role => (
+                          <span key={role} className="text-xs px-2 py-0.5 rounded-full bg-primary-50 text-primary-700">
+                            {role}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <button
-                    disabled
-                    className="w-full px-4 py-2 text-left cursor-not-allowed opacity-50 text-sm hover:bg-gray-50 flex items-center"
+                    onClick={() => {
+                      setShowMenu(false);
+                      navigate('/settings');
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center"
                   >
                     <Settings size={16} className="mr-2" />
                     Paramètres
                   </button>
                   <hr className="my-1" />
                   <button
-                    onClick={() => {
-                      setShowMenu(false);
-                      logout();
-                    }}
+                    onClick={handleLogout}
                     className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center"
                   >
                     <LogOut size={16} className="mr-2" />

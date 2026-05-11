@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdminLogin } from './pages/Login';
 import { AdminDashboard } from './pages/Dashboard';
 import { AdminCustomers } from './pages/Customers';
@@ -20,6 +21,7 @@ import { WalletMaster } from './pages/Wallet/WalletMaster';
 import { BillingMaster } from './pages/Billing/BillingMaster';
 import { ReportingMaster } from './pages/Reporting/ReportingMaster';
 import { OperationsMaster } from './pages/Support/Operationsmaster';
+import { SettingsMaster } from './pages/Settings/SettingsMaster';
 
 const queryClient = new QueryClient();
 
@@ -30,24 +32,25 @@ function App() {
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<AdminLogin />} />
-            <Route path="/" element={<AdminDashboard />} />
-            <Route path="/customers" element={<AdminCustomers />} />
-            <Route path="/members" element={<AdminMembers />} />
-            <Route path="/resources/*" element={<ResourceMaster />} />
-            <Route path="/bookings/*" element={<BookingMaster />} />
-            <Route path="/customers/:id" element={<CustomerDetail />} />
-            <Route path="/members/:id" element={<MemberDetail />} />
-            <Route path="/customers/create" element={<CreateCustomer />} />
-            <Route path="/members/create" element={<CreateMember />} />
-            <Route path="/document/*" element={<DocumentMaster />} />
-            <Route path="/contracts" element={<AdminContracts />} />
-            <Route path="/inventory/*" element={<InventoryMaster />} />
-            <Route path="/subscriptions/*" element={<SubscriptionMaster />} />
-            <Route path="/payments/*" element={<PaymentMaster />} />
-            <Route path="/wallets/*" element={<WalletMaster />} />
-            <Route path="/billing/*" element={<BillingMaster />} />
-            <Route path="/reports/*" element={<ReportingMaster />} />
-            <Route path="/operations" element={<OperationsMaster />} />
+            <Route path="/" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+            <Route path="/customers" element={<ProtectedRoute><AdminCustomers /></ProtectedRoute>} />
+            <Route path="/members" element={<ProtectedRoute><AdminMembers /></ProtectedRoute>} />
+            <Route path="/resources/*" element={<ProtectedRoute><ResourceMaster /></ProtectedRoute>} />
+            <Route path="/bookings/*" element={<ProtectedRoute><BookingMaster /></ProtectedRoute>} />
+            <Route path="/customers/:id" element={<ProtectedRoute><CustomerDetail /></ProtectedRoute>} />
+            <Route path="/members/:id" element={<ProtectedRoute><MemberDetail /></ProtectedRoute>} />
+            <Route path="/customers/create" element={<ProtectedRoute><CreateCustomer /></ProtectedRoute>} />
+            <Route path="/members/create" element={<ProtectedRoute><CreateMember /></ProtectedRoute>} />
+            <Route path="/document/*" element={<ProtectedRoute><DocumentMaster /></ProtectedRoute>} />
+            <Route path="/contracts" element={<ProtectedRoute><AdminContracts /></ProtectedRoute>} />
+            <Route path="/inventory/*" element={<ProtectedRoute><InventoryMaster /></ProtectedRoute>} />
+            <Route path="/subscriptions/*" element={<ProtectedRoute><SubscriptionMaster /></ProtectedRoute>} />
+            <Route path="/payments/*" element={<ProtectedRoute><PaymentMaster /></ProtectedRoute>} />
+            <Route path="/wallets/*" element={<ProtectedRoute><WalletMaster /></ProtectedRoute>} />
+            <Route path="/billing/*" element={<ProtectedRoute><BillingMaster /></ProtectedRoute>} />
+            <Route path="/reports/*" element={<ProtectedRoute><ReportingMaster /></ProtectedRoute>} />
+            <Route path="/operations" element={<ProtectedRoute><OperationsMaster /></ProtectedRoute>} />
+            <Route path="/settings/*" element={<ProtectedRoute><SettingsMaster /></ProtectedRoute>} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>

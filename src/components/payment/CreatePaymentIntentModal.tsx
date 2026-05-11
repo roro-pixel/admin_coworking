@@ -112,7 +112,7 @@ export const CreatePaymentIntentModal: React.FC<CreatePaymentIntentModalProps> =
       idempotencyKey: `intent-${formData.customerCode}-${formData.amount}-${Date.now()}`,
       // CORRECTION : expiresAt envoyé au format ISO
       expiresAt: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : undefined,
-      createdBy: admin?.email || admin?.id || 'admin',
+      createdBy: admin?.email || String(admin?.id) || 'admin',
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payment-intents'] });

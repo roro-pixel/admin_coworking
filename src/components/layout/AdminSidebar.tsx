@@ -31,7 +31,7 @@ const menuItems = [
   { path: '/inventory', icon: Package, label: 'Inventaire' },
   { path: '/operations', icon: Briefcase, label: 'Opérations' },
   { path: '/reports', icon: BarChart3, label: 'Rapports' },
-  { path: '/settings', icon: Settings, label: 'Paramètres', disabled: true },
+  { path: '/settings', icon: Settings, label: 'Paramètres'},
 ];
 
 export const AdminSidebar: React.FC = () => {
@@ -46,17 +46,17 @@ export const AdminSidebar: React.FC = () => {
           {menuItems.map((item) => {
             const Icon = item.icon;
 
-            if (item.disabled) {
-              return (
-                <div
-                  key={item.path}
-                  className="flex items-center px-4 py-3 rounded-lg text-gray-400 cursor-not-allowed opacity-50"
-                >
-                  <Icon size={20} className="mr-3" />
-                  <span className="text-sm font-medium">{item.label}</span>
-                </div>
-              );
-            }
+            // if (item.disabled) {
+            //   return (
+            //     <div
+            //       key={item.path}
+            //       className="flex items-center px-4 py-3 rounded-lg text-gray-400 cursor-not-allowed opacity-50"
+            //     >
+            //       <Icon size={20} className="mr-3" />
+            //       <span className="text-sm font-medium">{item.label}</span>
+            //     </div>
+            //   );
+            // }
 
             return (
               <NavLink

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, CheckCircle, Clock, X, Loader2, ChevronLeft, ChevronRight, AlertTriangle, ClipboardList, Calendar, MessageSquare } from 'lucide-react';
+import { Plus, Search, CheckCircle, Clock, X, Loader2, ChevronLeft, ChevronRight, AlertTriangle, ClipboardList, Calendar, MessageSquare, UserPlus } from 'lucide-react';
 import { operationsService } from '../../services/operations.service';
 import type { Task, TaskStatus, TaskPriority } from '../../services/operations.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { ModalPortal } from '../../components/ui/ModalPortal';
+import { RichTextEditor } from '../../components/ui/RichTextEditor';
 
 const statusConfig: Record<TaskStatus, { label: string; color: string }> = {
   OPEN:        { label: 'Ouverte',   color: 'bg-gray-100 text-gray-700' },
@@ -23,10 +24,10 @@ const priorityConfig: Record<TaskPriority, { label: string; color: string }> = {
 type SubTab = 'board' | 'my' | 'today' | 'create';
 
 export const TaskMaster: React.FC = () => {
-  const { admin } = useAuth();
+  const { admin, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<SubTab>('board');
-  const [visitedTabs, setVisitedTabs] = React.useState<Set<SubTab>>(new Set(['board']));
+  const [visitedTabs, setVisitedTabs] = useState<Set<SubTab>>(new Set(['board']));
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<TaskStatus | ''>('');
   const [page, setPage] = useState(0);
@@ -116,6 +117,17 @@ export const TaskMaster: React.FC = () => {
     onError: (e: any) => setActionError(e?.response?.data?.message || 'Erreur finalisation tâche'),
   });
 
+  const assignMutation = useMutation({
+    mutationFn: ({ id, assignedTo }: { id: number; assignedTo: number }) =>
+      operationsService.assignTask(id, assignedTo),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks-board'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks-my'] });
+      refetchDetail();
+    },
+    onError: (e: any) => setActionError(e?.response?.data?.message || 'Erreur assignation'),
+  });
+
   const commentMutation = useMutation({
     mutationFn: () => operationsService.addTaskComment(selectedTask!.id, {
       authorId: admin?.email || 'admin',
@@ -188,7 +200,7 @@ export const TaskMaster: React.FC = () => {
                           )}
                           {task.checklist?.length > 0 && (
                             <p className="text-xs text-gray-400 mt-1">
-                              {task.checklist.filter(c => c.completed).length}/{task.checklist.length} <CheckCircle size={10} className="inline" />
+                              {task.checklist.filter(c => c.completed).length}/{task.checklist.length} <CheckCircle size={10} />
                             </p>
                           )}
                           {task.sourceCode && (
@@ -334,9 +346,11 @@ export const TaskMaster: React.FC = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <textarea value={createForm.description} rows={2}
-              onChange={(e) => setCreateForm(f => ({ ...f, description: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none" />
+            <RichTextEditor
+              value={createForm.description}
+              onChange={(val) => setCreateForm(f => ({ ...f, description: val }))}
+              placeholder="Description de la tâche..."
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -421,7 +435,7 @@ export const TaskMaster: React.FC = () => {
 
       {/* Modal Détail tâche */}
       {isDetailOpen && currentTask && (
-        <ModalPortal onClose={() => { setIsDetailOpen(false); setSelectedTask(null); }}>
+        <ModalPortal onClose={() => { setIsDetailOpen(false); setSelectedTask(null); }} size="2xl">
           <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
             <div>
               <h3 className="text-xl font-bold">{currentTask.title}</h3>
@@ -444,7 +458,12 @@ export const TaskMaster: React.FC = () => {
               </div>
             )}
 
-            {currentTask.description && <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">{currentTask.description}</p>}
+            {currentTask.description && (
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-xs text-gray-500 mb-2">Description</p>
+                <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: currentTask.description }} />
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               {currentTask.dueAt && (
@@ -463,14 +482,29 @@ export const TaskMaster: React.FC = () => {
               )}
             </div>
 
-            {currentTask.status !== 'COMPLETED' && (
-              <button onClick={() => completeMutation.mutate(currentTask.id)}
-                disabled={completeMutation.isPending}
-                className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                {completeMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                Marquer terminée
-              </button>
-            )}
+            {/* Actions */}
+            <div className="flex gap-2">
+              {currentTask.status !== 'COMPLETED' && (
+                <button onClick={() => completeMutation.mutate(currentTask.id)}
+                  disabled={completeMutation.isPending}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm">
+                  {completeMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                  Marquer terminée
+                </button>
+              )}
+              {hasPermission('TASK:ASSIGN') && currentTask.status !== 'COMPLETED' && (
+                <button
+                  onClick={() => {
+                    const userId = prompt('ID de l\'utilisateur à assigner :');
+                    if (userId) assignMutation.mutate({ id: currentTask.id, assignedTo: Number(userId) });
+                  }}
+                  disabled={assignMutation.isPending}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 text-sm">
+                  {assignMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+                  Assigner
+                </button>
+              )}
+            </div>
 
             {/* Checklist */}
             {currentTask.checklist?.length > 0 && (
@@ -503,16 +537,19 @@ export const TaskMaster: React.FC = () => {
                       <span className="text-xs font-medium text-gray-700">{c.authorName}</span>
                       <span className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleString('fr-FR')}</span>
                     </div>
-                    <p className="text-sm text-gray-600">{c.comment}</p>
+                    <div className="prose prose-sm max-w-none text-gray-600" dangerouslySetInnerHTML={{ __html: c.comment }} />
                   </div>
                 ))}
               </div>
-              <textarea value={comment} onChange={(e) => setComment(e.target.value)}
-                rows={2} placeholder="Ajouter un commentaire..."
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none text-sm" />
+              <label className="block text-sm font-medium text-gray-700 mb-2">Ajouter un commentaire</label>
+              <RichTextEditor
+                value={comment}
+                onChange={setComment}
+                placeholder="Votre commentaire..."
+              />
               <button onClick={() => commentMutation.mutate()}
                 disabled={!comment.trim() || commentMutation.isPending}
-                className="mt-2 w-full bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm">
+                className="mt-3 w-full bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm">
                 {commentMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : (
                   <><MessageSquare size={13} /> Commenter</>
                 )}

@@ -5,6 +5,7 @@ import { operationsService } from '../../services/operations.service';
 import type { Lead, LeadStage, ActivityType } from '../../services/operations.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { ModalPortal } from '../../components/ui/ModalPortal';
+import { RichTextEditor } from '../../components/ui/RichTextEditor';
 
 const stageConfig: Record<LeadStage, { label: string; color: string }> = {
   NEW:           { label: 'Nouveau',         color: 'bg-gray-100 text-gray-700' },
@@ -26,10 +27,10 @@ const activityLabels: Record<ActivityType, string> = {
 type SubTab = 'pipeline' | 'list' | 'create';
 
 export const CrmMaster: React.FC = () => {
-  const { admin } = useAuth();
+  const { admin, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<SubTab>('pipeline');
-  const [visitedTabs, setVisitedTabs] = React.useState<Set<SubTab>>(new Set(['pipeline']));
+  const [visitedTabs, setVisitedTabs] = useState<Set<SubTab>>(new Set(['pipeline']));
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<LeadStage | ''>('');
   const [page, setPage] = useState(0);
@@ -195,21 +196,24 @@ export const CrmMaster: React.FC = () => {
         </div>
       )}
 
-      {/* Pipeline Kanban */}
+      {/* Pipeline Kanban - RESPONSIVE */}
       {activeTab === 'pipeline' && (
         <div>
           {pipelineLoading ? <div className="text-center py-8">Chargement...</div> : (
-            <div className="flex gap-4 overflow-x-auto pb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
               {(Object.keys(stageConfig) as LeadStage[]).map(stage => {
                 const col = pipelineData.find(p => p.stage === stage);
                 const stageLeads = col?.leads || [];
                 return (
-                  <div key={stage} className="flex-shrink-0 w-64">
+                  <div key={stage} className="min-w-0">
                     <div className={`px-3 py-2 rounded-t-lg font-medium text-sm ${stageConfig[stage].color}`}>
                       {stageConfig[stage].label} ({stageLeads.length})
                       {col?.totalValue ? <span className="ml-2 text-xs opacity-75">{col.totalValue.toLocaleString('fr-FR')} FCFA</span> : null}
                     </div>
                     <div className="space-y-2 bg-gray-50 rounded-b-lg p-2 min-h-24">
+                      {stageLeads.length === 0 && (
+                        <p className="text-xs text-gray-400 text-center py-4">Aucun lead</p>
+                      )}
                       {stageLeads.map(lead => (
                         <div key={lead.id}
                           className="bg-white rounded-lg p-3 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
@@ -405,7 +409,6 @@ export const CrmMaster: React.FC = () => {
               </div>
             )}
 
-            {/* Infos */}
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 bg-gray-50 rounded-lg">
                 <p className="text-xs text-gray-500">Étape</p>
@@ -423,7 +426,6 @@ export const CrmMaster: React.FC = () => {
               {currentLead.phone && <div className="p-3 bg-gray-50 rounded-lg"><p className="text-xs text-gray-500">Téléphone</p><p className="text-sm">{currentLead.phone}</p></div>}
             </div>
 
-            {/* Changer l'étape */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Changer d'étape</label>
               <div className="flex flex-wrap gap-2">
@@ -445,8 +447,7 @@ export const CrmMaster: React.FC = () => {
               </div>
             </div>
 
-            {/* Convertir */}
-            {!['WON', 'LOST'].includes(currentLead.stage) && (
+            {hasPermission('CRM:CONVERT') && !['WON', 'LOST'].includes(currentLead.stage) && (
               <button onClick={() => { setIsConvertOpen(true); setConvertForm({ ownerType: 'CUSTOMER', ownerCode: '' }); }}
                 className="w-full border border-primary-600 text-primary-600 py-2 rounded-lg hover:bg-primary-50 text-sm flex items-center justify-center gap-1">
                 <ArrowRightLeft size={14} /> Convertir en client
@@ -461,7 +462,6 @@ export const CrmMaster: React.FC = () => {
               </div>
             )}
 
-            {/* Activités */}
             <div className="border-t pt-4">
               <h4 className="text-sm font-semibold text-gray-700 mb-3">Activités ({currentLead.activities?.length || 0})</h4>
               <div className="space-y-2 max-h-48 overflow-y-auto mb-4">
@@ -475,12 +475,13 @@ export const CrmMaster: React.FC = () => {
                         </span>
                         <span className="text-xs text-gray-400">{new Date(act.performedAt).toLocaleDateString('fr-FR')}</span>
                       </div>
-                      {act.notes && <p className="text-xs text-gray-500 mt-1">{act.notes}</p>}
+                      {act.notes && (
+                        <div className="text-xs text-gray-500 mt-1 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: act.notes }} />
+                      )}
                     </div>
                   );
                 })}
               </div>
-              {/* Ajouter activité */}
               <div className="space-y-2 border rounded-lg p-3 bg-gray-50">
                 <p className="text-xs font-medium text-gray-600">Ajouter une activité</p>
                 <div className="grid grid-cols-2 gap-2">
@@ -498,9 +499,11 @@ export const CrmMaster: React.FC = () => {
                 <input type="text" value={activityForm.subject} placeholder="Sujet *"
                   onChange={(e) => setActivityForm(f => ({ ...f, subject: e.target.value }))}
                   className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm" />
-                <textarea value={activityForm.notes} placeholder="Notes" rows={2}
-                  onChange={(e) => setActivityForm(f => ({ ...f, notes: e.target.value }))}
-                  className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm resize-none" />
+                <RichTextEditor
+                  value={activityForm.notes}
+                  onChange={(val) => setActivityForm(f => ({ ...f, notes: val }))}
+                  placeholder="Notes (points de forme, gras, etc.)"
+                />
                 <button onClick={() => activityMutation.mutate()}
                   disabled={!activityForm.subject || activityMutation.isPending}
                   className="w-full bg-primary-600 text-white py-1.5 rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-1">

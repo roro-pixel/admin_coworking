@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Send, Clock, CheckCircle, AlertTriangle, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Send, Clock, CheckCircle, AlertTriangle, X, Loader2, ChevronLeft, ChevronRight, UserCheck, User } from 'lucide-react';
 import { operationsService } from '../../services/operations.service';
 import type { SupportTicket, TicketStatus, TicketPriority, TicketCategory } from '../../services/operations.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { ModalPortal } from '../../components/ui/ModalPortal';
+import { RichTextEditor } from '../../components/ui/RichTextEditor';
+import { apiClient } from '../../services/api';
 
 const statusConfig: Record<TicketStatus, { label: string; color: string }> = {
   OPEN:           { label: 'Ouvert',          color: 'bg-red-100 text-red-700' },
@@ -26,11 +28,17 @@ const categoryLabels: Record<TicketCategory, string> = {
   BILLING: 'Facturation', BOOKING: 'Réservation', ACCESS: 'Accès', TECHNICAL: 'Technique', OTHER: 'Autre',
 };
 
+const ownerTypeLabels: Record<string, string> = {
+  MEMBER: 'Membre',
+  CUSTOMER: 'Customer',
+  BUSINESS_ENTITY: 'Entreprise',
+};
+
 export const SupportMaster: React.FC = () => {
-  const { admin } = useAuth();
+  const { admin, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = React.useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<TicketStatus | ''>('');
   const [priorityFilter, setPriorityFilter] = useState<TicketPriority | ''>('');
   const [page, setPage] = useState(0);
@@ -39,6 +47,12 @@ export const SupportMaster: React.FC = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [messageContent, setMessageContent] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Autocomplete owner
+  const [ownerSearch, setOwnerSearch] = useState('');
+  const [ownerResults, setOwnerResults] = useState<any[]>([]);
+  const [showOwnerResults, setShowOwnerResults] = useState(false);
+  const [ownerLoading, setOwnerLoading] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400);
@@ -58,7 +72,56 @@ export const SupportMaster: React.FC = () => {
       ownerType: '', ownerCode: '', contactName: '', contactEmail: '', contactPhone: '',
       relatedType: '', relatedCode: '' });
     setActionError(null);
+    setOwnerSearch('');
+    setOwnerResults([]);
   }, [isCreateOpen]);
+
+  // Recherche propriétaire via API
+  useEffect(() => {
+    if (!ownerSearch || !createForm.ownerType || ownerSearch.length < 2) {
+      setOwnerResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setOwnerLoading(true);
+      try {
+        let endpoint = '';
+        if (createForm.ownerType === 'MEMBER') endpoint = '/sni/api/v1/members/search/by-name';
+        else if (createForm.ownerType === 'CUSTOMER') endpoint = '/sni/api/v1/customers/search/by-name';
+        else if (createForm.ownerType === 'BUSINESS_ENTITY') endpoint = '/sni/api/v1/business-entities/search/by-name';
+        
+        if (endpoint) {
+          const response = await apiClient.get(endpoint, { params: { query: ownerSearch, size: 10 } });
+          const data = Array.isArray(response.data?.content) ? response.data.content : 
+                       Array.isArray(response.data?.data) ? response.data.data : 
+                       Array.isArray(response.data) ? response.data : [];
+          setOwnerResults(data);
+        }
+      } catch {
+        setOwnerResults([]);
+      } finally {
+        setOwnerLoading(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [ownerSearch, createForm.ownerType]);
+
+  const selectOwner = (owner: any) => {
+    const code = owner.memberId || owner.customerId || owner.code || '';
+    const name = owner.fullName || owner.displayName || owner.name || '';
+    const email = owner.email || '';
+    const phone = owner.phone || '';
+    
+    setCreateForm(f => ({
+      ...f,
+      ownerCode: code,
+      contactName: name,
+      contactEmail: email,
+      contactPhone: phone
+    }));
+    setOwnerSearch(name);
+    setShowOwnerResults(false);
+  };
 
   const { data: ticketsData, isLoading } = useQuery({
     queryKey: ['support-tickets', statusFilter, priorityFilter, page],
@@ -72,6 +135,7 @@ export const SupportMaster: React.FC = () => {
   const { data: metrics } = useQuery({
     queryKey: ['support-metrics'],
     queryFn: () => operationsService.getTicketMetrics(),
+    enabled: hasPermission('SUPPORT:METRICS'),
   });
 
   const { data: ticketDetail, refetch: refetchDetail } = useQuery({
@@ -106,6 +170,16 @@ export const SupportMaster: React.FC = () => {
       refetchDetail();
     },
     onError: (e: any) => setActionError(e?.response?.data?.message || 'Erreur changement statut'),
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: (ticketNumber: string) => 
+      operationsService.assignTicket(ticketNumber, admin?.email || 'admin'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['support-tickets'] });
+      refetchDetail();
+    },
+    onError: (e: any) => setActionError(e?.response?.data?.message || 'Erreur assignation'),
   });
 
   const messageMutation = useMutation({
@@ -229,7 +303,7 @@ export const SupportMaster: React.FC = () => {
 
       {/* Modal Création */}
       {isCreateOpen && (
-        <ModalPortal onClose={() => setIsCreateOpen(false)}>
+        <ModalPortal onClose={() => setIsCreateOpen(false)} size="2xl">
           <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
             <h3 className="text-xl font-bold">Nouveau ticket</h3>
             <button onClick={() => setIsCreateOpen(false)} className="p-1 hover:bg-gray-100 rounded-lg"><X size={20} /></button>
@@ -244,9 +318,11 @@ export const SupportMaster: React.FC = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
-              <textarea value={createForm.description} rows={3}
-                onChange={(e) => setCreateForm(f => ({ ...f, description: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none" />
+              <RichTextEditor
+                value={createForm.description}
+                onChange={(val) => setCreateForm(f => ({ ...f, description: val }))}
+                placeholder="Décrivez le problème..."
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -272,7 +348,7 @@ export const SupportMaster: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Type propriétaire</label>
                 <select value={createForm.ownerType}
-                  onChange={(e) => setCreateForm(f => ({ ...f, ownerType: e.target.value }))}
+                  onChange={(e) => { setCreateForm(f => ({ ...f, ownerType: e.target.value, ownerCode: '' })); setOwnerSearch(''); }}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white">
                   <option value="">Aucun</option>
                   <option value="MEMBER">Membre</option>
@@ -280,14 +356,53 @@ export const SupportMaster: React.FC = () => {
                   <option value="BUSINESS_ENTITY">Entreprise</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Code propriétaire</label>
-                <input type="text" value={createForm.ownerCode}
-                  onChange={(e) => setCreateForm(f => ({ ...f, ownerCode: e.target.value }))}
-                  placeholder="MBR-000001"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg" />
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Rechercher propriétaire</label>
+                <input
+                  type="text"
+                  value={ownerSearch}
+                  onChange={(e) => { setOwnerSearch(e.target.value); setShowOwnerResults(true); if (!e.target.value) setCreateForm(f => ({ ...f, ownerCode: '' })); }}
+                  onFocus={() => setShowOwnerResults(true)}
+                  placeholder={createForm.ownerType ? `Rechercher un ${ownerTypeLabels[createForm.ownerType] || 'propriétaire'}...` : "Sélectionnez un type d'abord"}
+                  disabled={!createForm.ownerType}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg disabled:bg-gray-100"
+                />
+                {ownerLoading && (
+                  <div className="absolute right-3 top-9">
+                    <Loader2 size={14} className="animate-spin text-gray-400" />
+                  </div>
+                )}
+                {showOwnerResults && ownerResults.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {ownerResults.map((owner: any) => (
+                      <button
+                        key={owner.memberId || owner.customerId || owner.code || Math.random()}
+                        type="button"
+                        onClick={() => selectOwner(owner)}
+                        className="w-full px-3 py-2 text-left hover:bg-gray-50 border-b last:border-0"
+                      >
+                        <p className="text-sm font-medium">{owner.fullName || owner.displayName || owner.name}</p>
+                        <p className="text-xs text-gray-500">{owner.memberId || owner.customerId || owner.code} {owner.email ? `· ${owner.email}` : ''}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {showOwnerResults && ownerSearch.length >= 2 && !ownerLoading && ownerResults.length === 0 && createForm.ownerType && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg p-3 text-center text-sm text-gray-400">
+                    Aucun résultat
+                  </div>
+                )}
               </div>
             </div>
+            {createForm.ownerCode && (
+              <div className="p-2 bg-blue-50 rounded-lg text-sm flex items-center gap-2">
+                <User size={14} className="text-blue-600" />
+                <span className="text-blue-700">
+                  {createForm.contactName || createForm.ownerCode}
+                  {createForm.contactEmail ? ` · ${createForm.contactEmail}` : ''}
+                </span>
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Contact</label>
@@ -324,7 +439,7 @@ export const SupportMaster: React.FC = () => {
 
       {/* Modal Détail */}
       {isDetailOpen && currentTicket && (
-        <ModalPortal onClose={() => { setIsDetailOpen(false); setSelectedTicket(null); }}>
+        <ModalPortal onClose={() => { setIsDetailOpen(false); setSelectedTicket(null); }} size="3xl">
           <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
             <div>
               <h3 className="text-xl font-bold">{currentTicket.ticketNumber}</h3>
@@ -337,11 +452,10 @@ export const SupportMaster: React.FC = () => {
             {actionError && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex justify-between">
                 {actionError}
-                <button onClick={() => setActionError(null)} className="underline ml-2">×</button>
+                <button onClick={() => setActionError(null)} className="underline ml-2">x</button>
               </div>
             )}
 
-            {/* Infos + actions statut */}
             <div className="flex flex-wrap gap-2 items-center">
               <span className={`px-2 py-1 rounded-full text-xs font-medium ${priorityConfig[currentTicket.priority]?.color}`}>
                 {priorityConfig[currentTicket.priority]?.label}
@@ -350,17 +464,32 @@ export const SupportMaster: React.FC = () => {
                 {statusConfig[currentTicket.status]?.label}
               </span>
               <span className="text-xs text-gray-400">{categoryLabels[currentTicket.category]}</span>
+              {currentTicket.ownerCode && (
+                <span className="text-xs text-gray-500 flex items-center gap-1">
+                  <User size={11} />
+                  {currentTicket.contactName || currentTicket.ownerCode}
+                </span>
+              )}
               {currentTicket.assignedTo && <span className="text-xs text-gray-500">Agent: {currentTicket.assignedTo}</span>}
             </div>
 
-            {/* Actions de statut */}
             <div className="flex flex-wrap gap-2">
               {currentTicket.status === 'OPEN' && (
-                <button onClick={() => statusMutation.mutate({ ticketNumber: currentTicket.ticketNumber, status: 'IN_PROGRESS' })}
-                  disabled={statusMutation.isPending}
-                  className="px-3 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                  Prendre en charge
-                </button>
+                <>
+                  {hasPermission('SUPPORT:ASSIGN') && (
+                    <button onClick={() => assignMutation.mutate(currentTicket.ticketNumber)}
+                      disabled={assignMutation.isPending}
+                      className="px-3 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1">
+                      {assignMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <UserCheck size={12} />}
+                      Prendre en charge
+                    </button>
+                  )}
+                  <button onClick={() => statusMutation.mutate({ ticketNumber: currentTicket.ticketNumber, status: 'IN_PROGRESS' })}
+                    disabled={statusMutation.isPending}
+                    className="px-3 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                    En cours
+                  </button>
+                </>
               )}
               {['OPEN', 'IN_PROGRESS'].includes(currentTicket.status) && (
                 <button onClick={() => statusMutation.mutate({ ticketNumber: currentTicket.ticketNumber, status: 'WAITING_CLIENT' })}
@@ -372,8 +501,8 @@ export const SupportMaster: React.FC = () => {
               {['OPEN', 'IN_PROGRESS', 'WAITING_CLIENT'].includes(currentTicket.status) && (
                 <button onClick={() => statusMutation.mutate({ ticketNumber: currentTicket.ticketNumber, status: 'RESOLVED' })}
                   disabled={statusMutation.isPending}
-                  className="px-3 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 disabled:opacity-50">
-                  <CheckCircle size={12} className="inline mr-1" />Résoudre
+                  className="px-3 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-1">
+                  <CheckCircle size={12} /> Résoudre
                 </button>
               )}
               {currentTicket.status === 'RESOLVED' && (
@@ -385,38 +514,40 @@ export const SupportMaster: React.FC = () => {
               )}
             </div>
 
-            {/* SLA */}
             {(currentTicket.firstResponseDueAt || currentTicket.resolutionDueAt) && (
               <div className="p-3 bg-orange-50 border border-orange-100 rounded-lg text-xs space-y-1">
                 {currentTicket.firstResponseDueAt && (
-                  <p><Clock size={12} className="inline mr-1 text-orange-500" />
+                  <p className="flex items-center gap-1">
+                    <Clock size={12} className="text-orange-500" />
                     Première réponse due : {new Date(currentTicket.firstResponseDueAt).toLocaleString('fr-FR')}
                   </p>
                 )}
                 {currentTicket.resolutionDueAt && (
-                  <p><AlertTriangle size={12} className="inline mr-1 text-orange-500" />
+                  <p className="flex items-center gap-1">
+                    <AlertTriangle size={12} className="text-orange-500" />
                     Résolution due : {new Date(currentTicket.resolutionDueAt).toLocaleString('fr-FR')}
                   </p>
                 )}
               </div>
             )}
 
-            {/* Description */}
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-700">{currentTicket.description}</p>
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <p className="text-xs text-gray-500 mb-2">Description</p>
+              <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: currentTicket.description }} />
             </div>
 
-            {/* Messages timeline */}
             <div>
               <h4 className="text-sm font-semibold text-gray-700 mb-3">Messages ({currentTicket.messages?.length || 0})</h4>
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {(currentTicket.messages || []).map(msg => (
-                  <div key={msg.id} className="p-3 bg-blue-50 rounded-lg">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-xs font-medium text-blue-700">{msg.authorName}</span>
+                  <div key={msg.id} className="p-4 bg-blue-50 rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs font-medium text-blue-700 flex items-center gap-1">
+                        <User size={12} /> {msg.authorName}
+                      </span>
                       <span className="text-xs text-gray-400">{new Date(msg.createdAt).toLocaleString('fr-FR')}</span>
                     </div>
-                    <p className="text-sm text-gray-700">{msg.content}</p>
+                    <div className="prose prose-sm max-w-none text-gray-700" dangerouslySetInnerHTML={{ __html: msg.content }} />
                   </div>
                 ))}
                 {(currentTicket.messages || []).length === 0 && (
@@ -425,15 +556,17 @@ export const SupportMaster: React.FC = () => {
               </div>
             </div>
 
-            {/* Répondre */}
             {!['CLOSED', 'RESOLVED'].includes(currentTicket.status) && (
               <div className="border-t pt-4">
-                <textarea value={messageContent} onChange={(e) => setMessageContent(e.target.value)}
-                  rows={3} placeholder="Votre réponse..."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none text-sm" />
+                <label className="block text-sm font-medium text-gray-700 mb-2">Votre réponse</label>
+                <RichTextEditor
+                  value={messageContent}
+                  onChange={setMessageContent}
+                  placeholder="Votre réponse..."
+                />
                 <button onClick={() => messageMutation.mutate()}
                   disabled={!messageContent.trim() || messageMutation.isPending}
-                  className="mt-2 w-full bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                  className="mt-3 w-full bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2">
                   {messageMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                   Envoyer
                 </button>

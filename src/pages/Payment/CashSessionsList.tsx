@@ -80,7 +80,7 @@ export const CashSessionsList: React.FC = () => {
   const openSessionMutation = useMutation({
     mutationFn: () => paymentService.openCashSession({
       registerCode: selectedRegisterForOpen || registerFilter,
-      openedBy: admin?.email || admin?.id || 'admin',
+      openedBy: admin?.email || String(admin?.id || 'admin'),
       openingAmount: openingAmount || undefined,
     }),
     onSuccess: () => {
@@ -94,7 +94,7 @@ export const CashSessionsList: React.FC = () => {
 
   const closeSessionMutation = useMutation({
     mutationFn: () => paymentService.closeCashSession(selectedSession!.sessionNumber, {
-      closedBy: admin?.email || admin?.id || 'admin',
+      closedBy: admin?.email || String(admin?.id || 'admin'),
       countedClosingAmount: countedAmount,
       varianceReason: varianceReason || undefined,
     }),
@@ -110,7 +110,7 @@ export const CashSessionsList: React.FC = () => {
 
   const requestClosingMutation = useMutation({
     mutationFn: (session: CashSession) => paymentService.requestSessionClosing(session.sessionNumber, {
-      closedBy: admin?.email || admin?.id || 'admin',
+      closedBy: admin?.email || String(admin?.id || 'admin'),
       countedClosingAmount: session.expectedClosingAmount,
     }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cash-sessions'] }),
