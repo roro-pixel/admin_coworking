@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Loader2 } from 'lucide-react';
-import { resourceService } from '../../../services/resource.service';
-import type { ResourceTypeResponse } from '../../../services/resource.service';
-import { ModalPortal } from '../../../components/ui/ModalPortal';
+import React, { useState, useEffect } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { X, Loader2 } from "lucide-react";
+import { resourceService } from "../../../services/resource.service";
+import type { ResourceTypeResponse } from "../../../services/resource.service";
+import { ModalPortal } from "../../../components/ui/ModalPortal";
 
 interface ResourceTypeFormModalProps {
   isOpen: boolean;
@@ -13,8 +13,8 @@ interface ResourceTypeFormModalProps {
 }
 
 const buildDefaultFormData = (type: ResourceTypeResponse | null) => ({
-  name: type?.name || '',
-  description: type?.description || '',
+  name: type?.name || "",
+  description: type?.description || "",
   active: type?.active ?? true,
 });
 
@@ -26,7 +26,9 @@ export const ResourceTypeFormModal: React.FC<ResourceTypeFormModalProps> = ({
 }) => {
   const queryClient = useQueryClient();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [formData, setFormData] = useState(() => buildDefaultFormData(editingType));
+  const [formData, setFormData] = useState(() =>
+    buildDefaultFormData(editingType),
+  );
 
   useEffect(() => {
     setFormData(buildDefaultFormData(editingType));
@@ -34,34 +36,41 @@ export const ResourceTypeFormModal: React.FC<ResourceTypeFormModalProps> = ({
   }, [editingType, isOpen]);
 
   const createMutation = useMutation({
-    mutationFn: () => resourceService.createResourceType({
-      name: formData.name,
-      description: formData.description || undefined,
-      active: formData.active,
-    }),
+    mutationFn: () =>
+      resourceService.createResourceType({
+        name: formData.name,
+        description: formData.description || undefined,
+        active: formData.active,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['resource-types'] });
-      queryClient.invalidateQueries({ queryKey: ['resource-types-list'] });
+      queryClient.invalidateQueries({ queryKey: ["resource-types"] });
+      queryClient.invalidateQueries({ queryKey: ["resource-types-list"] });
       onSuccess();
     },
     onError: (error: any) => {
-      setErrorMessage(error?.response?.data?.message || 'Erreur lors de la création du type.');
+      setErrorMessage(
+        error?.response?.data?.message || "Erreur lors de la création du type.",
+      );
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: () => resourceService.updateResourceType(editingType!.code, {
-      name: formData.name,
-      description: formData.description || undefined,
-      active: formData.active,
-    }),
+    mutationFn: () =>
+      resourceService.updateResourceType(editingType!.code, {
+        name: formData.name,
+        description: formData.description || undefined,
+        active: formData.active,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['resource-types'] });
-      queryClient.invalidateQueries({ queryKey: ['resource-types-list'] });
+      queryClient.invalidateQueries({ queryKey: ["resource-types"] });
+      queryClient.invalidateQueries({ queryKey: ["resource-types-list"] });
       onSuccess();
     },
     onError: (error: any) => {
-      setErrorMessage(error?.response?.data?.message || 'Erreur lors de la mise à jour du type.');
+      setErrorMessage(
+        error?.response?.data?.message ||
+          "Erreur lors de la mise à jour du type.",
+      );
     },
   });
 
@@ -83,7 +92,7 @@ export const ResourceTypeFormModal: React.FC<ResourceTypeFormModalProps> = ({
     <ModalPortal onClose={onClose}>
       <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
         <h3 className="text-xl font-bold">
-          {editingType ? 'Modifier le type' : 'Nouveau type de ressource'}
+          {editingType ? "Modifier le type" : "Nouveau type de ressource"}
         </h3>
         <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
           <X size={20} />
@@ -98,7 +107,9 @@ export const ResourceTypeFormModal: React.FC<ResourceTypeFormModalProps> = ({
         )}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Nom *
+          </label>
           <input
             type="text"
             value={formData.name}
@@ -109,10 +120,14 @@ export const ResourceTypeFormModal: React.FC<ResourceTypeFormModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Description
+          </label>
           <textarea
             value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, description: e.target.value })
+            }
             rows={3}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 resize-none"
           />
@@ -122,7 +137,9 @@ export const ResourceTypeFormModal: React.FC<ResourceTypeFormModalProps> = ({
           <input
             type="checkbox"
             checked={formData.active}
-            onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
+            onChange={(e) =>
+              setFormData({ ...formData, active: e.target.checked })
+            }
             className="rounded"
           />
           <span className="text-sm">Actif</span>
@@ -142,9 +159,13 @@ export const ResourceTypeFormModal: React.FC<ResourceTypeFormModalProps> = ({
             disabled={isPending}
             className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {isPending
-              ? <Loader2 size={16} className="animate-spin" />
-              : editingType ? 'Mettre à jour' : 'Créer'}
+            {isPending ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : editingType ? (
+              "Mettre à jour"
+            ) : (
+              "Créer"
+            )}
           </button>
         </div>
       </form>

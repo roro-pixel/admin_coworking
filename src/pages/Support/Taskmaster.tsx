@@ -1,221 +1,418 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, CheckCircle, Clock, X, Loader2, ChevronLeft, ChevronRight, AlertTriangle, ClipboardList, Calendar, MessageSquare, UserPlus } from 'lucide-react';
-import { operationsService } from '../../services/operations.service';
-import type { Task, TaskStatus, TaskPriority } from '../../services/operations.service';
-import { useAuth } from '../../contexts/AuthContext';
-import { ModalPortal } from '../../components/ui/ModalPortal';
-import { RichTextEditor } from '../../components/ui/RichTextEditor';
+import React, { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Plus,
+  Search,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  Calendar,
+  MessageSquare,
+  UserPlus,
+  BarChart3,
+  Trash2,
+} from "lucide-react";
+import { operationsService } from "../../services/operations.service";
+import type {
+  Task,
+  TaskStatus,
+  TaskPriority,
+  TaskCard,
+  TaskRecurrence,
+} from "../../services/operations.service";
+import { useAuth } from "../../contexts/AuthContext";
+import { ModalPortal } from "../../components/ui/ModalPortal";
+import { RichTextEditor } from "../../components/ui/RichTextEditor";
+import { AgentAutocomplete } from "../../components/auth/AgentAutocomplete";
+import { TaskSourceAutocomplete } from "../../components/tasks/TaskSourceAutocomplete";
+import type { AdminUser } from "../../services/auth.service";
 
+const activeStatuses: Exclude<TaskStatus, "ARCHIVED">[] = [
+  "OPEN",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "CANCELLED",
+];
 const statusConfig: Record<TaskStatus, { label: string; color: string }> = {
-  OPEN:        { label: 'Ouverte',   color: 'bg-gray-100 text-gray-700' },
-  IN_PROGRESS: { label: 'En cours',  color: 'bg-blue-100 text-blue-700' },
-  COMPLETED:   { label: 'Terminée',  color: 'bg-green-100 text-green-700' },
-  CANCELLED:   { label: 'Annulée',   color: 'bg-red-100 text-red-700' },
+  OPEN: { label: "À faire", color: "bg-gray-100 text-gray-700" },
+  IN_PROGRESS: { label: "En cours", color: "bg-blue-100 text-blue-700" },
+  COMPLETED: { label: "Terminée", color: "bg-green-100 text-green-700" },
+  CANCELLED: { label: "Annulée", color: "bg-red-100 text-red-700" },
+  ARCHIVED: { label: "Archivée", color: "bg-gray-100 text-gray-500" },
 };
-
 const priorityConfig: Record<TaskPriority, { label: string; color: string }> = {
-  LOW:    { label: 'Faible',  color: 'bg-gray-100 text-gray-600' },
-  MEDIUM: { label: 'Moyen',   color: 'bg-blue-100 text-blue-700' },
-  HIGH:   { label: 'Élevé',   color: 'bg-orange-100 text-orange-700' },
-  URGENT: { label: 'Urgent',  color: 'bg-red-100 text-red-700' },
+  LOW: { label: "Faible", color: "bg-gray-100 text-gray-600" },
+  MEDIUM: { label: "Moyen", color: "bg-blue-100 text-blue-700" },
+  HIGH: { label: "Élevé", color: "bg-orange-100 text-orange-700" },
+  URGENT: { label: "Urgent", color: "bg-red-100 text-red-700" },
 };
+const recurrenceOptions: TaskRecurrence[] = [
+  "NONE",
+  "DAILY",
+  "WEEKLY",
+  "MONTHLY",
+  "AFTER_BOOKING",
+];
 
-type SubTab = 'board' | 'my' | 'today' | 'create';
+type SubTab = "board" | "my" | "today" | "metrics" | "create";
 
 export const TaskMaster: React.FC = () => {
-  const { admin, hasPermission } = useAuth();
+  const { admin } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<SubTab>('board');
-  const [visitedTabs, setVisitedTabs] = useState<Set<SubTab>>(new Set(['board']));
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<TaskStatus | ''>('');
+  const [activeTab, setActiveTab] = useState<SubTab>("board");
+  const [visitedTabs, setVisitedTabs] = useState<Set<SubTab>>(
+    new Set(["board"]),
+  );
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<TaskStatus | "">("");
+  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | "">("");
+  const [sourceTypeFilter, setSourceTypeFilter] = useState("");
+  const [assignedToFilter, setAssignedToFilter] = useState("");
   const [page, setPage] = useState(0);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [comment, setComment] = useState('');
-  const [checklistItems, setChecklistItems] = useState<{ label: string; completed: boolean }[]>([]);
-  const [newChecklistItem, setNewChecklistItem] = useState('');
-
+  const [comment, setComment] = useState("");
+  const [assignTo, setAssignTo] = useState("");
+  const [selectedAssignAgent, setSelectedAssignAgent] =
+    useState<AdminUser | null>(null);
+  const [selectedCreateAgent, setSelectedCreateAgent] =
+    useState<AdminUser | null>(null);
+  const [newChecklistItem, setNewChecklistItem] = useState("");
+  const [checklistItems, setChecklistItems] = useState<
+    { label: string; completed: boolean }[]
+  >([]);
   const [createForm, setCreateForm] = useState({
-    title: '', description: '', priority: 'MEDIUM' as TaskPriority,
-    dueAt: '', sourceType: '', sourceCode: '', recurrence: 'NONE' as const,
+    title: "",
+    description: "",
+    assignedTo: "",
+    priority: "MEDIUM" as TaskPriority,
+    dueAt: "",
+    sourceType: "",
+    sourceCode: "",
+    recurrence: "NONE" as TaskRecurrence,
   });
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(0);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
+  useEffect(() => {
+    if (activeTab !== "create") return;
+    setCreateForm({
+      title: "",
+      description: "",
+      assignedTo: "",
+      priority: "MEDIUM",
+      dueAt: "",
+      sourceType: "",
+      sourceCode: "",
+      recurrence: "NONE",
+    });
+    setChecklistItems([]);
+    setSelectedCreateAgent(null);
+  }, [activeTab]);
 
   const switchTab = (tab: SubTab) => {
     setActiveTab(tab);
-    setVisitedTabs(prev => new Set([...prev, tab]));
+    setVisitedTabs((prev) => new Set([...prev, tab]));
     setActionError(null);
   };
 
-  useEffect(() => {
-    if (activeTab !== 'create') return;
-    setCreateForm({ title: '', description: '', priority: 'MEDIUM',
-      dueAt: '', sourceType: '', sourceCode: '', recurrence: 'NONE' });
-    setChecklistItems([]);
-  }, [activeTab]);
-
+  const boardParams = {
+    assignedTo: assignedToFilter ? Number(assignedToFilter) : undefined,
+    priority: priorityFilter || undefined,
+    sourceType: sourceTypeFilter || undefined,
+    searchText: debouncedSearch || undefined,
+  };
   const { data: boardData, isLoading: boardLoading } = useQuery({
-    queryKey: ['tasks-board'],
-    queryFn: () => operationsService.getTasks({ size: 200 }),
-    enabled: visitedTabs.has('board'),
+    queryKey: ["tasks-board", boardParams],
+    queryFn: () => operationsService.getTaskBoard(boardParams),
+    enabled: visitedTabs.has("board"),
   });
-
+  const { data: metrics, isLoading: metricsLoading } = useQuery({
+    queryKey: ["task-metrics"],
+    queryFn: () => operationsService.getTaskMetrics(),
+    enabled: visitedTabs.has("metrics") || visitedTabs.has("board"),
+  });
   const { data: myTasksData, isLoading: myLoading } = useQuery({
-    queryKey: ['tasks-my', page, statusFilter],
-    queryFn: () => operationsService.getTasks({ status: statusFilter || undefined, page, size: 20 }),
-    enabled: visitedTabs.has('my'),
+    queryKey: [
+      "tasks-my",
+      page,
+      statusFilter,
+      priorityFilter,
+      sourceTypeFilter,
+      debouncedSearch,
+    ],
+    queryFn: () =>
+      operationsService.getTasks({
+        status: statusFilter || undefined,
+        priority: priorityFilter || undefined,
+        sourceType: sourceTypeFilter || undefined,
+        searchText: debouncedSearch || undefined,
+        page,
+        size: 20,
+        sort: "dueAt,asc",
+      }),
+    enabled: visitedTabs.has("my"),
   });
-
   const { data: todayTasks = [], isLoading: todayLoading } = useQuery({
-    queryKey: ['tasks-today'],
+    queryKey: ["tasks-today"],
     queryFn: () => operationsService.getDueTodayTasks(),
-    enabled: visitedTabs.has('today'),
+    enabled: visitedTabs.has("today"),
   });
-
   const { data: taskDetail, refetch: refetchDetail } = useQuery({
-    queryKey: ['task-detail', selectedTask?.id],
+    queryKey: ["task-detail", selectedTask?.id],
     queryFn: () => operationsService.getTask(selectedTask!.id),
     enabled: !!selectedTask && isDetailOpen,
   });
 
-  const allBoardTasks = boardData?.content || [];
   const myTasks = myTasksData?.content || [];
   const totalPages = myTasksData?.totalPages ?? 0;
   const currentTask = taskDetail || selectedTask;
 
-  const filteredMy = search
-    ? myTasks.filter(t => t.title.toLowerCase().includes(search.toLowerCase()))
-    : myTasks;
-
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["tasks-board"] });
+    queryClient.invalidateQueries({ queryKey: ["tasks-my"] });
+    queryClient.invalidateQueries({ queryKey: ["tasks-today"] });
+    queryClient.invalidateQueries({ queryKey: ["task-metrics"] });
+    refetchDetail();
+  };
   const createMutation = useMutation({
-    mutationFn: () => operationsService.createTask({
-      ...createForm,
-      dueAt: createForm.dueAt ? new Date(createForm.dueAt).toISOString() : undefined,
-      sourceType: createForm.sourceType || undefined,
-      sourceCode: createForm.sourceCode || undefined,
-      checklist: checklistItems.map((item, i) => ({ ...item, displayOrder: i + 1 })),
-    }),
+    mutationFn: () =>
+      operationsService.createTask({
+        title: createForm.title,
+        description: createForm.description || undefined,
+        assignedTo: createForm.assignedTo
+          ? Number(createForm.assignedTo)
+          : undefined,
+        priority: createForm.priority,
+        dueAt: createForm.dueAt
+          ? new Date(createForm.dueAt).toISOString()
+          : undefined,
+        sourceType: createForm.sourceType || undefined,
+        sourceCode: createForm.sourceCode || undefined,
+        recurrence: createForm.recurrence,
+        checklist: checklistItems.map((item, i) => ({
+          ...item,
+          displayOrder: i + 1,
+        })),
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks-board'] });
-      queryClient.invalidateQueries({ queryKey: ['tasks-my'] });
-      queryClient.invalidateQueries({ queryKey: ['tasks-today'] });
-      switchTab('board');
+      invalidate();
+      switchTab("board");
     },
-    onError: (e: any) => setActionError(e?.response?.data?.message || 'Erreur création tâche'),
+    onError: (e: any) =>
+      setActionError(e?.response?.data?.message || "Erreur création tâche"),
   });
-
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: TaskStatus }) =>
+      operationsService.updateTaskStatus(id, status),
+    onSuccess: invalidate,
+    onError: (e: any) =>
+      setActionError(e?.response?.data?.message || "Erreur changement statut"),
+  });
   const completeMutation = useMutation({
     mutationFn: (id: number) => operationsService.completeTask(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks-board'] });
-      queryClient.invalidateQueries({ queryKey: ['tasks-my'] });
-      queryClient.invalidateQueries({ queryKey: ['tasks-today'] });
-      refetchDetail();
-    },
-    onError: (e: any) => setActionError(e?.response?.data?.message || 'Erreur finalisation tâche'),
+    onSuccess: invalidate,
+    onError: (e: any) =>
+      setActionError(e?.response?.data?.message || "Erreur finalisation tâche"),
   });
-
+  const archiveMutation = useMutation({
+    mutationFn: (id: number) => operationsService.archiveTask(id),
+    onSuccess: invalidate,
+    onError: (e: any) =>
+      setActionError(e?.response?.data?.message || "Erreur archivage tâche"),
+  });
   const assignMutation = useMutation({
-    mutationFn: ({ id, assignedTo }: { id: number; assignedTo: number }) =>
-      operationsService.assignTask(id, assignedTo),
+    mutationFn: ({
+      id,
+      assignedTo,
+    }: {
+      id: number;
+      assignedTo: number | null;
+    }) => operationsService.assignTask(id, assignedTo),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks-board'] });
-      queryClient.invalidateQueries({ queryKey: ['tasks-my'] });
-      refetchDetail();
+      setAssignTo("");
+      setSelectedAssignAgent(null);
+      invalidate();
     },
-    onError: (e: any) => setActionError(e?.response?.data?.message || 'Erreur assignation'),
+    onError: (e: any) =>
+      setActionError(e?.response?.data?.message || "Erreur assignation"),
   });
-
   const commentMutation = useMutation({
-    mutationFn: () => operationsService.addTaskComment(selectedTask!.id, {
-      authorId: admin?.email || 'admin',
-      authorName: admin?.email || 'Admin',
-      comment,
-    }),
-    onSuccess: () => { refetchDetail(); setComment(''); },
-    onError: (e: any) => setActionError(e?.response?.data?.message || 'Erreur ajout commentaire'),
+    mutationFn: () =>
+      operationsService.addTaskComment(selectedTask!.id, {
+        authorId: admin?.email || "admin",
+        authorName: admin?.email || "Admin",
+        comment,
+      }),
+    onSuccess: () => {
+      refetchDetail();
+      setComment("");
+    },
+    onError: (e: any) =>
+      setActionError(e?.response?.data?.message || "Erreur ajout commentaire"),
+  });
+  const addChecklistMutation = useMutation({
+    mutationFn: () =>
+      operationsService.addTaskChecklistItem(selectedTask!.id, {
+        label: newChecklistItem,
+        completed: false,
+        displayOrder: (currentTask?.checklist?.length || 0) + 1,
+      }),
+    onSuccess: () => {
+      setNewChecklistItem("");
+      refetchDetail();
+      invalidate();
+    },
+    onError: (e: any) =>
+      setActionError(e?.response?.data?.message || "Erreur ajout checklist"),
+  });
+  const toggleChecklistMutation = useMutation({
+    mutationFn: ({
+      itemId,
+      completed,
+      label,
+      displayOrder,
+    }: {
+      itemId: number;
+      completed: boolean;
+      label: string;
+      displayOrder: number;
+    }) =>
+      operationsService.updateTaskChecklistItem(selectedTask!.id, itemId, {
+        completed,
+        label,
+        displayOrder,
+      }),
+    onSuccess: () => {
+      refetchDetail();
+      invalidate();
+    },
+    onError: (e: any) =>
+      setActionError(
+        e?.response?.data?.message || "Erreur mise à jour checklist",
+      ),
+  });
+  const deleteChecklistMutation = useMutation({
+    mutationFn: (itemId: number) =>
+      operationsService.deleteTaskChecklistItem(selectedTask!.id, itemId),
+    onSuccess: () => {
+      refetchDetail();
+      invalidate();
+    },
+    onError: (e: any) =>
+      setActionError(
+        e?.response?.data?.message || "Erreur suppression checklist",
+      ),
   });
 
   const tabs: { id: SubTab; label: string; icon: React.ElementType }[] = [
-    { id: 'board',  label: 'Tableau',              icon: ClipboardList },
-    { id: 'today',  label: `Aujourd'hui (${todayTasks.length})`, icon: Calendar },
-    { id: 'my',     label: 'Toutes les tâches',    icon: ClipboardList },
-    { id: 'create', label: 'Nouvelle tâche',       icon: Plus },
+    { id: "board", label: "Kanban", icon: ClipboardList },
+    {
+      id: "today",
+      label: `Aujourd'hui (${todayTasks.length})`,
+      icon: Calendar,
+    },
+    { id: "my", label: "Liste", icon: ClipboardList },
+    { id: "metrics", label: "Métriques", icon: BarChart3 },
+    { id: "create", label: "Nouvelle tâche", icon: Plus },
   ];
 
   return (
     <div>
-      {/* Sous-onglets */}
       <div className="flex flex-wrap gap-1 border-b border-gray-200 mb-6">
-        {tabs.map(tab => (
-          <button key={tab.id} onClick={() => switchTab(tab.id)}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-1.5 ${
-              activeTab === tab.id ? 'bg-primary-50 text-primary-600 border-b-2 border-primary-600' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}>
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => switchTab(tab.id)}
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-1.5 ${activeTab === tab.id ? "bg-primary-50 text-primary-600 border-b-2 border-primary-600" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
+          >
             <tab.icon size={14} />
             {tab.label}
           </button>
         ))}
       </div>
-
       {actionError && (
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex justify-between">
-          {actionError}<button onClick={() => setActionError(null)} className="ml-2 font-bold">x</button>
+          {actionError}
+          <button onClick={() => setActionError(null)}>
+            <X size={14} />
+          </button>
         </div>
       )}
 
-      {/* Board Kanban */}
-      {activeTab === 'board' && (
-        <div>
-          {boardLoading ? <div className="text-center py-8">Chargement...</div> : (
+      {activeTab === "board" && (
+        <div className="space-y-4">
+          <TaskFilters
+            search={search}
+            setSearch={setSearch}
+            assignedToFilter={assignedToFilter}
+            setAssignedToFilter={setAssignedToFilter}
+            priorityFilter={priorityFilter}
+            setPriorityFilter={setPriorityFilter}
+            sourceTypeFilter={sourceTypeFilter}
+            setSourceTypeFilter={setSourceTypeFilter}
+          />
+          {metrics && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Metric label="Total" value={metrics.totalTasks} />
+              <Metric label="Ouvertes" value={metrics.openTasks} />
+              <Metric
+                label="En retard"
+                value={metrics.overdueTasks}
+                color="text-red-600"
+              />
+              <Metric
+                label="Taux complétion"
+                value={`${Number(metrics.completionRate ?? 0).toFixed(1)}%`}
+                color="text-green-600"
+              />
+            </div>
+          )}
+          {boardLoading ? (
+            <div className="py-12 text-center">Chargement...</div>
+          ) : (
             <div className="flex gap-4 overflow-x-auto pb-4">
-              {(['OPEN', 'IN_PROGRESS', 'COMPLETED'] as TaskStatus[]).map(status => {
-                const statusTasks = allBoardTasks.filter(t => t.status === status);
+              {activeStatuses.map((status) => {
+                const col = boardData?.columns?.find(
+                  (c) => c.status === status,
+                );
                 return (
-                  <div key={status} className="flex-shrink-0 w-72">
-                    <div className={`px-3 py-2 rounded-t-lg font-medium text-sm ${statusConfig[status].color}`}>
-                      {statusConfig[status].label} ({statusTasks.length})
+                  <div key={status} className="flex-shrink-0 w-80">
+                    <div
+                      className={`px-3 py-2 rounded-t-lg font-medium text-sm ${statusConfig[status].color}`}
+                    >
+                      {statusConfig[status].label} ({col?.count ?? 0})
                     </div>
-                    <div className="space-y-2 bg-gray-50 rounded-b-lg p-2 min-h-24">
-                      {statusTasks.map(task => (
-                        <div key={task.id}
-                          className="bg-white rounded-lg p-3 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                          onClick={() => { setSelectedTask(task); setIsDetailOpen(true); }}>
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="font-medium text-sm line-clamp-2">{task.title}</p>
-                            <span className={`flex-shrink-0 px-1.5 py-0.5 rounded text-xs ${priorityConfig[task.priority]?.color}`}>
-                              {priorityConfig[task.priority]?.label}
-                            </span>
-                          </div>
-                          {task.dueAt && (
-                            <p className={`text-xs mt-2 flex items-center gap-1 ${
-                              new Date(task.dueAt) < new Date() && task.status !== 'COMPLETED'
-                                ? 'text-red-500' : 'text-gray-400'
-                            }`}>
-                              <Clock size={11} />
-                              {new Date(task.dueAt).toLocaleDateString('fr-FR')}
-                            </p>
-                          )}
-                          {task.checklist?.length > 0 && (
-                            <p className="text-xs text-gray-400 mt-1">
-                              {task.checklist.filter(c => c.completed).length}/{task.checklist.length} <CheckCircle size={10} />
-                            </p>
-                          )}
-                          {task.sourceCode && (
-                            <p className="text-xs text-gray-400 font-mono mt-1">{task.sourceType}: {task.sourceCode}</p>
-                          )}
-                          {status !== 'COMPLETED' && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); completeMutation.mutate(task.id); }}
-                              disabled={completeMutation.isPending}
-                              className="mt-2 w-full text-xs border border-green-300 text-green-600 py-1 rounded hover:bg-green-50 disabled:opacity-50 flex items-center justify-center gap-1">
-                              <CheckCircle size={11} /> Terminer
-                            </button>
-                          )}
-                        </div>
+                    <div className="space-y-2 bg-gray-50 rounded-b-lg p-2 min-h-32">
+                      {(col?.cards || []).map((card) => (
+                        <TaskCardView
+                          key={card.id}
+                          card={card}
+                          onOpen={() => {
+                            setSelectedTask(card as any);
+                            setIsDetailOpen(true);
+                          }}
+                          onMove={(target) =>
+                            statusMutation.mutate({
+                              id: card.id,
+                              status: target,
+                            })
+                          }
+                        />
                       ))}
+                      {(!col?.cards || col.cards.length === 0) && (
+                        <p className="text-xs text-gray-400 p-3">
+                          Aucune tâche
+                        </p>
+                      )}
                     </div>
                   </div>
                 );
@@ -225,334 +422,296 @@ export const TaskMaster: React.FC = () => {
         </div>
       )}
 
-      {/* Aujourd'hui */}
-      {activeTab === 'today' && (
-        <div>
-          {todayLoading ? <div className="text-center py-8">Chargement...</div> : (
-            <div>
-              {todayTasks.length === 0 && (
-                <div className="text-center py-12 bg-white rounded-xl">
-                  <CheckCircle size={48} className="mx-auto text-green-300 mb-4" />
-                  <p className="text-gray-500">Aucune tâche due aujourd'hui</p>
-                </div>
-              )}
-              <div className="space-y-3">
-                {todayTasks.map(task => (
-                  <div key={task.id} className="bg-white rounded-xl p-4 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-md"
-                    onClick={() => { setSelectedTask(task); setIsDetailOpen(true); }}>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded-full text-xs ${priorityConfig[task.priority]?.color}`}>
-                          {priorityConfig[task.priority]?.label}
-                        </span>
-                        <p className="font-medium text-sm">{task.title}</p>
-                      </div>
-                      {task.dueAt && <p className="text-xs text-red-500 mt-1"><AlertTriangle size={11} className="inline mr-1" />Dû le {new Date(task.dueAt).toLocaleString('fr-FR')}</p>}
-                    </div>
-                    {task.status !== 'COMPLETED' && (
-                      <button onClick={(e) => { e.stopPropagation(); completeMutation.mutate(task.id); }}
-                        disabled={completeMutation.isPending}
-                        className="ml-3 px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-1">
-                        <CheckCircle size={11} /> Terminer
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+      {activeTab === "today" && (
+        <TaskSimpleList
+          tasks={todayTasks}
+          loading={todayLoading}
+          open={(t) => {
+            setSelectedTask(t);
+            setIsDetailOpen(true);
+          }}
+        />
       )}
 
-      {/* Toutes les tâches */}
-      {activeTab === 'my' && (
-        <div>
-          <div className="flex flex-wrap gap-3 mb-4">
-            <div className="flex-1 min-w-48 relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input type="text" placeholder="Rechercher..." value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm" />
-            </div>
-            <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value as any); setPage(0); }}
-              className="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm">
-              <option value="">Tous les statuts</option>
-              {(Object.keys(statusConfig) as TaskStatus[]).map(s => (
-                <option key={s} value={s}>{statusConfig[s].label}</option>
-              ))}
-            </select>
-          </div>
-          {myLoading ? <div className="text-center py-8">Chargement...</div> : (
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Titre</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Priorité</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Statut</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Échéance</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Source</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filteredMy.map(task => (
-                    <tr key={task.id} className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => { setSelectedTask(task); setIsDetailOpen(true); }}>
-                      <td className="px-4 py-3 text-sm font-medium">{task.title}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs ${priorityConfig[task.priority]?.color}`}>
-                          {priorityConfig[task.priority]?.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs ${statusConfig[task.status]?.color}`}>
-                          {statusConfig[task.status]?.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {task.dueAt ? new Date(task.dueAt).toLocaleString('fr-FR') : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-400 font-mono">
-                        {task.sourceCode ? `${task.sourceType}: ${task.sourceCode}` : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {filteredMy.length === 0 && <div className="text-center py-12 text-gray-500">Aucune tâche trouvée</div>}
-            </div>
-          )}
+      {activeTab === "my" && (
+        <div className="space-y-4">
+          <TaskFilters
+            search={search}
+            setSearch={setSearch}
+            assignedToFilter={assignedToFilter}
+            setAssignedToFilter={setAssignedToFilter}
+            priorityFilter={priorityFilter}
+            setPriorityFilter={setPriorityFilter}
+            sourceTypeFilter={sourceTypeFilter}
+            setSourceTypeFilter={setSourceTypeFilter}
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as any)}
+            className="px-3 py-2 border rounded-lg bg-white"
+          >
+            <option value="">Statut actif</option>
+            <option value="OPEN">À faire</option>
+            <option value="IN_PROGRESS">En cours</option>
+            <option value="COMPLETED">Terminée</option>
+            <option value="CANCELLED">Annulée</option>
+            <option value="ARCHIVED">Archivée</option>
+          </select>
+          <TaskSimpleList
+            tasks={myTasks}
+            loading={myLoading}
+            open={(t) => {
+              setSelectedTask(t);
+              setIsDetailOpen(true);
+            }}
+          />
           {totalPages > 1 && (
-            <div className="flex justify-center gap-2 mt-4">
-              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-                className="p-2 border rounded-lg disabled:opacity-50"><ChevronLeft size={16} /></button>
-              <span className="px-3 py-2 text-sm text-gray-600">Page {page + 1} / {totalPages}</span>
-              <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
-                className="p-2 border rounded-lg disabled:opacity-50"><ChevronRight size={16} /></button>
-            </div>
+            <Pagination page={page} setPage={setPage} totalPages={totalPages} />
           )}
         </div>
       )}
 
-      {/* Création tâche */}
-      {activeTab === 'create' && (
-        <div className="max-w-lg mx-auto bg-white rounded-xl p-6 shadow-sm space-y-4">
-          <h3 className="font-semibold text-gray-900">Nouvelle tâche</h3>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Titre *</label>
-            <input type="text" value={createForm.title}
-              onChange={(e) => setCreateForm(f => ({ ...f, title: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <RichTextEditor
-              value={createForm.description}
-              onChange={(val) => setCreateForm(f => ({ ...f, description: val }))}
-              placeholder="Description de la tâche..."
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Priorité</label>
-              <select value={createForm.priority}
-                onChange={(e) => setCreateForm(f => ({ ...f, priority: e.target.value as TaskPriority }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white">
-                {(Object.keys(priorityConfig) as TaskPriority[]).map(p =>
-                  <option key={p} value={p}>{priorityConfig[p].label}</option>
-                )}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Récurrence</label>
-              <select value={createForm.recurrence}
-                onChange={(e) => setCreateForm(f => ({ ...f, recurrence: e.target.value as any }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white">
-                {['NONE', 'DAILY', 'WEEKLY', 'MONTHLY', 'AFTER_BOOKING'].map(r =>
-                  <option key={r} value={r}>{r}</option>
-                )}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Échéance</label>
-            <input type="datetime-local" value={createForm.dueAt}
-              onChange={(e) => setCreateForm(f => ({ ...f, dueAt: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Type source</label>
-              <input type="text" value={createForm.sourceType}
-                onChange={(e) => setCreateForm(f => ({ ...f, sourceType: e.target.value }))}
-                placeholder="BOOKING, INVOICE..."
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Code source</label>
-              <input type="text" value={createForm.sourceCode}
-                onChange={(e) => setCreateForm(f => ({ ...f, sourceCode: e.target.value }))}
-                placeholder="BKG-000001"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg" />
-            </div>
-          </div>
-          {/* Checklist */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Checklist</label>
-            <div className="space-y-1 mb-2">
-              {checklistItems.map((item, i) => (
-                <div key={i} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-                  <span className="text-sm flex-1">{item.label}</span>
-                  <button onClick={() => setChecklistItems(prev => prev.filter((_, j) => j !== i))}
-                    className="text-red-400 hover:text-red-600 font-bold">x</button>
+      {activeTab === "metrics" && (
+        <div>
+          {metricsLoading ? (
+            <div>Chargement...</div>
+          ) : (
+            metrics && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Metric label="Total" value={metrics.totalTasks} />
+                  <Metric label="Ouvertes" value={metrics.openTasks} />
+                  <Metric label="En cours" value={metrics.inProgressTasks} />
+                  <Metric
+                    label="Terminées"
+                    value={metrics.completedTasks}
+                    color="text-green-600"
+                  />
+                  <Metric label="Annulées" value={metrics.cancelledTasks} />
+                  <Metric label="Archivées" value={metrics.archivedTasks} />
+                  <Metric
+                    label="En retard"
+                    value={metrics.overdueTasks}
+                    color="text-red-600"
+                  />
+                  <Metric
+                    label="Durée moy."
+                    value={`${Number(metrics.avgCompletionHours ?? 0).toFixed(1)} h`}
+                  />
                 </div>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input type="text" value={newChecklistItem}
-                onChange={(e) => setNewChecklistItem(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && newChecklistItem.trim()) {
-                  setChecklistItems(prev => [...prev, { label: newChecklistItem.trim(), completed: false }]);
-                  setNewChecklistItem('');
-                }}}
-                placeholder="Ajouter un item (Entrée pour valider)"
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-              <button onClick={() => { if (newChecklistItem.trim()) {
-                  setChecklistItems(prev => [...prev, { label: newChecklistItem.trim(), completed: false }]);
-                  setNewChecklistItem('');
-                }}}
-                className="px-3 py-2 bg-gray-100 rounded-lg text-sm hover:bg-gray-200">+</button>
-            </div>
-          </div>
-          <button onClick={() => createMutation.mutate()}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Breakdown title="Par priorité" data={metrics.byPriority} />
+                  <Breakdown title="Par source" data={metrics.bySourceType} />
+                </div>
+              </div>
+            )
+          )}
+        </div>
+      )}
+
+      {activeTab === "create" && (
+        <div className="bg-white rounded-xl shadow-sm p-6 max-w-4xl space-y-4">
+          <TaskCreateForm
+            form={createForm}
+            setForm={setCreateForm}
+            checklistItems={checklistItems}
+            setChecklistItems={setChecklistItems}
+            selectedAgent={selectedCreateAgent}
+            setSelectedAgent={setSelectedCreateAgent}
+          />
+          <button
+            onClick={() => createMutation.mutate()}
             disabled={!createForm.title || createMutation.isPending}
-            className="w-full bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2">
-            {createMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
+          >
             Créer la tâche
           </button>
         </div>
       )}
 
-      {/* Modal Détail tâche */}
       {isDetailOpen && currentTask && (
-        <ModalPortal onClose={() => { setIsDetailOpen(false); setSelectedTask(null); }} size="2xl">
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+        <ModalPortal onClose={() => setIsDetailOpen(false)}>
+          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-start rounded-t-2xl">
             <div>
               <h3 className="text-xl font-bold">{currentTask.title}</h3>
-              <div className="flex gap-2 mt-1">
-                <span className={`px-2 py-0.5 rounded-full text-xs ${priorityConfig[currentTask.priority]?.color}`}>
-                  {priorityConfig[currentTask.priority]?.label}
-                </span>
-                <span className={`px-2 py-0.5 rounded-full text-xs ${statusConfig[currentTask.status]?.color}`}>
-                  {statusConfig[currentTask.status]?.label}
-                </span>
-              </div>
+              <p className="text-sm text-gray-500">#{currentTask.id}</p>
             </div>
-            <button onClick={() => { setIsDetailOpen(false); setSelectedTask(null); }}
-              className="p-1 hover:bg-gray-100 rounded-lg"><X size={20} /></button>
+            <button onClick={() => setIsDetailOpen(false)}>
+              <X size={20} />
+            </button>
           </div>
-          <div className="overflow-y-auto max-h-[80vh] p-6 space-y-4">
-            {actionError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex justify-between">
-                {actionError}<button onClick={() => setActionError(null)} className="ml-2 font-bold">x</button>
-              </div>
-            )}
-
-            {currentTask.description && (
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500 mb-2">Description</p>
-                <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: currentTask.description }} />
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              {currentTask.dueAt && (
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Échéance</p>
-                  <p className={`text-sm font-medium ${new Date(currentTask.dueAt) < new Date() && currentTask.status !== 'COMPLETED' ? 'text-red-600' : ''}`}>
-                    {new Date(currentTask.dueAt).toLocaleString('fr-FR')}
-                  </p>
-                </div>
-              )}
-              {currentTask.sourceCode && (
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Source</p>
-                  <p className="text-sm font-mono">{currentTask.sourceType}: {currentTask.sourceCode}</p>
-                </div>
+          <div className="p-6 space-y-6">
+            <div className="flex flex-wrap gap-2">
+              <span
+                className={`px-2 py-1 rounded-full text-xs ${statusConfig[currentTask.status].color}`}
+              >
+                {statusConfig[currentTask.status].label}
+              </span>
+              <span
+                className={`px-2 py-1 rounded-full text-xs ${priorityConfig[currentTask.priority].color}`}
+              >
+                {priorityConfig[currentTask.priority].label}
+              </span>
+              <span className="px-2 py-1 rounded-full text-xs bg-gray-100">
+                {currentTask.recurrence}
+              </span>
+              {currentTask.sourceType && (
+                <span className="px-2 py-1 rounded-full text-xs bg-blue-50 text-blue-700">
+                  {currentTask.sourceType} · {currentTask.sourceCode}
+                </span>
               )}
             </div>
-
-            {/* Actions */}
-            <div className="flex gap-2">
-              {currentTask.status !== 'COMPLETED' && (
-                <button onClick={() => completeMutation.mutate(currentTask.id)}
-                  disabled={completeMutation.isPending}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm">
-                  {completeMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                  Marquer terminée
-                </button>
-              )}
-              {hasPermission('TASK:ASSIGN') && currentTask.status !== 'COMPLETED' && (
+            <div
+              className="prose prose-sm max-w-none"
+              dangerouslySetInnerHTML={{
+                __html: currentTask.description || "",
+              }}
+            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <AgentAutocomplete
+                    value={assignTo}
+                    selectedAgent={selectedAssignAgent}
+                    onValueChange={setAssignTo}
+                    onSelect={setSelectedAssignAgent}
+                    placeholder="Rechercher un agent..."
+                  />
+                </div>
                 <button
-                  onClick={() => {
-                    const userId = prompt('ID de l\'utilisateur à assigner :');
-                    if (userId) assignMutation.mutate({ id: currentTask.id, assignedTo: Number(userId) });
-                  }}
-                  disabled={assignMutation.isPending}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 text-sm">
-                  {assignMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
-                  Assigner
+                  onClick={() =>
+                    assignMutation.mutate({
+                      id: currentTask.id,
+                      assignedTo: assignTo ? Number(assignTo) : null,
+                    })
+                  }
+                  className="px-3 py-2 bg-primary-600 text-white rounded-lg flex items-center gap-1"
+                >
+                  <UserPlus size={15} /> Assigner
                 </button>
-              )}
-            </div>
-
-            {/* Checklist */}
-            {currentTask.checklist?.length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">
-                  Checklist ({currentTask.checklist.filter(c => c.completed).length}/{currentTask.checklist.length})
-                </h4>
-                <div className="space-y-1">
-                  {currentTask.checklist.map((item, i) => (
-                    <div key={i} className={`flex items-center gap-2 p-2 rounded ${item.completed ? 'bg-green-50' : 'bg-gray-50'}`}>
-                      <span className={item.completed ? 'text-green-500' : 'text-gray-400'}>
-                        {item.completed ? <CheckCircle size={14} /> : <Clock size={14} />}
-                      </span>
-                      <span className={`text-sm ${item.completed ? 'line-through text-gray-400' : ''}`}>{item.label}</span>
-                    </div>
-                  ))}
-                </div>
               </div>
-            )}
-
-            {/* Commentaires */}
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1">
-                <MessageSquare size={14} /> Commentaires ({currentTask.comments?.length || 0})
-              </h4>
-              <div className="space-y-2 max-h-48 overflow-y-auto mb-3">
-                {(currentTask.comments || []).map(c => (
-                  <div key={c.id} className="p-3 bg-gray-50 rounded-lg">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-xs font-medium text-gray-700">{c.authorName}</span>
-                      <span className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleString('fr-FR')}</span>
-                    </div>
-                    <div className="prose prose-sm max-w-none text-gray-600" dangerouslySetInnerHTML={{ __html: c.comment }} />
+              <div className="flex gap-2 flex-wrap">
+                {activeStatuses.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() =>
+                      statusMutation.mutate({ id: currentTask.id, status: s })
+                    }
+                    className="px-2 py-1 border rounded text-xs"
+                  >
+                    {statusConfig[s].label}
+                  </button>
+                ))}
+                <button
+                  onClick={() => completeMutation.mutate(currentTask.id)}
+                  className="px-2 py-1 border rounded text-xs"
+                >
+                  Terminer
+                </button>
+                <button
+                  onClick={() => archiveMutation.mutate(currentTask.id)}
+                  className="px-2 py-1 border rounded text-xs"
+                >
+                  Archiver
+                </button>
+              </div>
+            </div>
+            <div className="border rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-semibold">Checklist</h4>
+                <span className="text-xs text-gray-500">
+                  {
+                    (currentTask.checklist || []).filter((i) => i.completed)
+                      .length
+                  }{" "}
+                  / {(currentTask.checklist || []).length}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {(currentTask.checklist || []).map((item) => (
+                  <div
+                    key={item.id || item.displayOrder}
+                    className="flex items-center gap-2"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={item.completed}
+                      onChange={(e) =>
+                        item.id &&
+                        toggleChecklistMutation.mutate({
+                          itemId: item.id,
+                          completed: e.target.checked,
+                          label: item.label,
+                          displayOrder: item.displayOrder,
+                        })
+                      }
+                    />
+                    <span
+                      className={
+                        item.completed ? "line-through text-gray-400" : ""
+                      }
+                    >
+                      {item.label}
+                    </span>
+                    {item.id && (
+                      <button
+                        onClick={() => deleteChecklistMutation.mutate(item.id!)}
+                        className="ml-auto text-red-600"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {(!currentTask.checklist ||
+                  currentTask.checklist.length === 0) && (
+                  <p className="text-sm text-gray-500">Aucun item.</p>
+                )}
+              </div>
+              <div className="flex gap-2 mt-3">
+                <input
+                  value={newChecklistItem}
+                  onChange={(e) => setNewChecklistItem(e.target.value)}
+                  placeholder="Nouvel item"
+                  className="flex-1 px-3 py-2 border rounded-lg"
+                />
+                <button
+                  onClick={() =>
+                    newChecklistItem.trim() && addChecklistMutation.mutate()
+                  }
+                  className="px-3 py-2 bg-primary-600 text-white rounded-lg"
+                >
+                  Ajouter
+                </button>
+              </div>
+            </div>
+            <div className="border rounded-xl p-4 space-y-3">
+              <h4 className="font-semibold">Commentaires</h4>
+              <div className="space-y-2">
+                {(currentTask.comments || []).map((c) => (
+                  <div key={c.id} className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-xs text-gray-500">
+                      {c.authorName} ·{" "}
+                      {new Date(c.createdAt).toLocaleString("fr-FR")}
+                    </p>
+                    <div
+                      className="prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: c.comment }}
+                    />
                   </div>
                 ))}
               </div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Ajouter un commentaire</label>
               <RichTextEditor
                 value={comment}
                 onChange={setComment}
-                placeholder="Votre commentaire..."
+                minHeight="90px"
               />
-              <button onClick={() => commentMutation.mutate()}
-                disabled={!comment.trim() || commentMutation.isPending}
-                className="mt-3 w-full bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm">
-                {commentMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : (
-                  <><MessageSquare size={13} /> Commenter</>
-                )}
+              <button
+                onClick={() => commentMutation.mutate()}
+                disabled={!comment.trim()}
+                className="px-3 py-2 bg-primary-600 text-white rounded-lg text-sm disabled:opacity-50"
+              >
+                <MessageSquare size={14} className="inline mr-1" /> Commenter
               </button>
             </div>
           </div>
@@ -561,3 +720,370 @@ export const TaskMaster: React.FC = () => {
     </div>
   );
 };
+
+const Metric = ({
+  label,
+  value,
+  color = "text-gray-900",
+}: {
+  label: string;
+  value: string | number;
+  color?: string;
+}) => (
+  <div className="bg-white rounded-xl p-4 shadow-sm">
+    <p className={`text-xl font-bold ${color}`}>{value}</p>
+    <p className="text-xs text-gray-500">{label}</p>
+  </div>
+);
+const TaskFilters = ({
+  search,
+  setSearch,
+  assignedToFilter,
+  setAssignedToFilter,
+  priorityFilter,
+  setPriorityFilter,
+  sourceTypeFilter,
+  setSourceTypeFilter,
+}: any) => (
+  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <div className="relative">
+      <Search
+        size={16}
+        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+      />
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Rechercher..."
+        className="w-full pl-9 pr-3 py-2 border rounded-lg"
+      />
+    </div>
+    <AgentAutocomplete
+      value={assignedToFilter}
+      onValueChange={setAssignedToFilter}
+      onSelect={() => undefined}
+      placeholder="Filtrer par agent..."
+    />
+    <select
+      value={priorityFilter}
+      onChange={(e) => setPriorityFilter(e.target.value)}
+      className="px-3 py-2 border rounded-lg bg-white"
+    >
+      <option value="">Toutes priorités</option>
+      <option value="LOW">Faible</option>
+      <option value="MEDIUM">Moyenne</option>
+      <option value="HIGH">Élevée</option>
+      <option value="URGENT">Urgente</option>
+    </select>
+    <select
+      value={sourceTypeFilter}
+      onChange={(e) => setSourceTypeFilter(e.target.value)}
+      className="px-3 py-2 border rounded-lg bg-white"
+    >
+      <option value="">Toutes sources</option>
+      <option value="CRM_LEAD">CRM lead</option>
+      <option value="BOOKING">Booking</option>
+      <option value="INVENTORY">Inventory</option>
+    </select>
+  </div>
+);
+const TaskCardView = ({
+  card,
+  onOpen,
+  onMove,
+}: {
+  card: TaskCard;
+  onOpen: () => void;
+  onMove: (status: TaskStatus) => void;
+}) => (
+  <div className="bg-white rounded-lg p-3 shadow-sm">
+    <div onClick={onOpen} className="cursor-pointer">
+      <div className="flex justify-between gap-2">
+        <p className="font-medium text-sm line-clamp-2">{card.title}</p>
+        <span
+          className={`px-1.5 py-0.5 rounded text-xs ${priorityConfig[card.priority].color}`}
+        >
+          {priorityConfig[card.priority].label}
+        </span>
+      </div>
+      {card.dueAt && (
+        <p
+          className={`text-xs mt-2 ${card.overdue ? "text-red-600" : "text-gray-500"}`}
+        >
+          {new Date(card.dueAt).toLocaleString("fr-FR")}
+        </p>
+      )}
+      {card.sourceType && (
+        <p className="text-xs mt-1 text-blue-600">
+          {card.sourceType} · {card.sourceCode}
+        </p>
+      )}
+      <div className="flex gap-2 text-xs text-gray-500 mt-2">
+        <span>
+          {card.checklistDone ?? 0}/{card.checklistTotal ?? 0} checklist
+        </span>
+        <span>{card.commentCount ?? 0} commentaires</span>
+      </div>
+    </div>
+    <select
+      value={card.status}
+      onChange={(e) => onMove(e.target.value as TaskStatus)}
+      className="mt-2 w-full px-2 py-1 border rounded text-xs bg-white"
+    >
+      {activeStatuses.map((s) => (
+        <option key={s} value={s}>
+          {statusConfig[s].label}
+        </option>
+      ))}
+    </select>
+  </div>
+);
+const TaskSimpleList = ({
+  tasks,
+  loading,
+  open,
+}: {
+  tasks: Task[];
+  loading?: boolean;
+  open: (task: Task) => void;
+}) =>
+  loading ? (
+    <div className="py-12 text-center">Chargement...</div>
+  ) : (
+    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <table className="w-full text-sm">
+        <tbody className="divide-y">
+          {tasks.map((task) => (
+            <tr
+              key={task.id}
+              onClick={() => open(task)}
+              className="cursor-pointer hover:bg-gray-50"
+            >
+              <td className="px-4 py-3">
+                <p className="font-medium">{task.title}</p>
+                <p className="text-xs text-gray-500">
+                  {task.sourceType
+                    ? `${task.sourceType} · ${task.sourceCode}`
+                    : "Source manuelle"}
+                </p>
+              </td>
+              <td className="px-4 py-3">
+                <span
+                  className={`px-2 py-1 rounded-full text-xs ${statusConfig[task.status].color}`}
+                >
+                  {statusConfig[task.status].label}
+                </span>
+              </td>
+              <td className="px-4 py-3">
+                <span
+                  className={`px-2 py-1 rounded-full text-xs ${priorityConfig[task.priority].color}`}
+                >
+                  {priorityConfig[task.priority].label}
+                </span>
+              </td>
+              <td className="px-4 py-3 text-right">
+                {task.dueAt
+                  ? new Date(task.dueAt).toLocaleDateString("fr-FR")
+                  : "—"}
+              </td>
+            </tr>
+          ))}
+          {tasks.length === 0 && (
+            <tr>
+              <td colSpan={4} className="py-12 text-center text-gray-500">
+                Aucune tâche.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+const Pagination = ({
+  page,
+  setPage,
+  totalPages,
+}: {
+  page: number;
+  setPage: React.Dispatch<React.SetStateAction<number>>;
+  totalPages: number;
+}) => (
+  <div className="flex justify-end items-center gap-2 mt-4">
+    <button
+      disabled={page === 0}
+      onClick={() => setPage((p) => p - 1)}
+      className="p-2 border rounded-lg disabled:opacity-50"
+    >
+      <ChevronLeft size={16} />
+    </button>
+    <span className="text-sm">
+      Page {page + 1} / {totalPages}
+    </span>
+    <button
+      disabled={page >= totalPages - 1}
+      onClick={() => setPage((p) => p + 1)}
+      className="p-2 border rounded-lg disabled:opacity-50"
+    >
+      <ChevronRight size={16} />
+    </button>
+  </div>
+);
+const Breakdown = ({
+  title,
+  data,
+}: {
+  title: string;
+  data?: Record<string, number>;
+}) => {
+  const entries = Object.entries(data || {});
+  const max = Math.max(1, ...entries.map(([, v]) => v));
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-5">
+      <h3 className="font-semibold mb-4">{title}</h3>
+      <div className="space-y-3">
+        {entries.map(([k, v]) => (
+          <div key={k}>
+            <div className="flex justify-between text-sm mb-1">
+              <span>{k}</span>
+              <span>{v}</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full">
+              <div
+                className="h-2 bg-primary-600 rounded-full"
+                style={{ width: `${(v / max) * 100}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+const TaskCreateForm = ({
+  form,
+  setForm,
+  checklistItems,
+  setChecklistItems,
+  selectedAgent,
+  setSelectedAgent,
+}: any) => (
+  <div className="space-y-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <input
+        value={form.title}
+        onChange={(e) => setForm((f: any) => ({ ...f, title: e.target.value }))}
+        placeholder="Titre *"
+        className="px-3 py-2 border rounded-lg"
+      />
+      <AgentAutocomplete
+        value={form.assignedTo}
+        selectedAgent={selectedAgent}
+        onValueChange={(value) =>
+          setForm((f: any) => ({ ...f, assignedTo: value }))
+        }
+        onSelect={setSelectedAgent}
+        placeholder="Assigner à un agent..."
+      />
+      <select
+        value={form.priority}
+        onChange={(e) =>
+          setForm((f: any) => ({
+            ...f,
+            priority: e.target.value as TaskPriority,
+          }))
+        }
+        className="px-3 py-2 border rounded-lg bg-white"
+      >
+        <option value="LOW">Faible</option>
+        <option value="MEDIUM">Moyenne</option>
+        <option value="HIGH">Élevée</option>
+        <option value="URGENT">Urgente</option>
+      </select>
+      <input
+        type="datetime-local"
+        value={form.dueAt}
+        onChange={(e) => setForm((f: any) => ({ ...f, dueAt: e.target.value }))}
+        className="px-3 py-2 border rounded-lg"
+      />
+      <select
+        value={form.sourceType}
+        onChange={(e) =>
+          setForm((f: any) => ({
+            ...f,
+            sourceType: e.target.value,
+            sourceCode: "",
+          }))
+        }
+        className="px-3 py-2 border rounded-lg bg-white"
+      >
+        <option value="">Source manuelle</option>
+        <option value="CRM_LEAD">CRM lead</option>
+        <option value="BOOKING">Booking</option>
+        <option value="INVENTORY">Inventory</option>
+      </select>
+      <TaskSourceAutocomplete
+        sourceType={form.sourceType}
+        value={form.sourceCode}
+        onChange={(sourceCode) => setForm((f: any) => ({ ...f, sourceCode }))}
+      />
+      <select
+        value={form.recurrence}
+        onChange={(e) =>
+          setForm((f: any) => ({
+            ...f,
+            recurrence: e.target.value as TaskRecurrence,
+          }))
+        }
+        className="px-3 py-2 border rounded-lg bg-white"
+      >
+        {recurrenceOptions.map((r) => (
+          <option key={r} value={r}>
+            {r}
+          </option>
+        ))}
+      </select>
+    </div>
+    <RichTextEditor
+      value={form.description}
+      onChange={(v: string) => setForm((f: any) => ({ ...f, description: v }))}
+      minHeight="120px"
+    />
+    <div className="border rounded-xl p-4">
+      <h4 className="font-semibold mb-3">Checklist initiale</h4>
+      {checklistItems.map((item: any, i: number) => (
+        <div key={i} className="flex gap-2 mb-2">
+          <input
+            value={item.label}
+            onChange={(e) => {
+              const arr = [...checklistItems];
+              arr[i] = { ...arr[i], label: e.target.value };
+              setChecklistItems(arr);
+            }}
+            className="flex-1 px-3 py-2 border rounded-lg"
+          />
+          <button
+            onClick={() =>
+              setChecklistItems(
+                checklistItems.filter((_: any, idx: number) => idx !== i),
+              )
+            }
+            className="px-3 py-2 border rounded-lg"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ))}
+      <button
+        onClick={() =>
+          setChecklistItems([
+            ...checklistItems,
+            { label: "", completed: false },
+          ])
+        }
+        className="text-primary-600 text-sm flex items-center gap-1"
+      >
+        <Plus size={14} /> Ajouter un item
+      </button>
+    </div>
+  </div>
+);

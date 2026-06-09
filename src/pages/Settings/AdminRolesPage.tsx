@@ -1,23 +1,25 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Search, Shield, Settings } from 'lucide-react';
-import { authService } from '../../services/auth.service';
-import type { Role } from '../../services/auth.service';
-import { RolePermissionsModal } from './RolePermissionsModal';
+import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Search, Shield, Settings } from "lucide-react";
+import { authService } from "../../services/auth.service";
+import type { Role } from "../../services/auth.service";
+import { RolePermissionsModal } from "./RolePermissionsModal";
 
 export const AdminRolesPage: React.FC = () => {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
 
   const { data: roles = [], isLoading } = useQuery({
-    queryKey: ['admin-roles'],
+    queryKey: ["admin-roles"],
     queryFn: () => authService.getRoles(),
   });
 
-  const filteredRoles = roles.filter(role =>
-    role.name.toLowerCase().includes(search.toLowerCase()) ||
-    (role.displayName && role.displayName.toLowerCase().includes(search.toLowerCase()))
+  const filteredRoles = roles.filter(
+    (role) =>
+      role.name.toLowerCase().includes(search.toLowerCase()) ||
+      (role.displayName &&
+        role.displayName.toLowerCase().includes(search.toLowerCase())),
   );
 
   const handleManagePermissions = (role: Role) => {
@@ -32,7 +34,10 @@ export const AdminRolesPage: React.FC = () => {
       </div>
 
       <div className="relative mb-6">
-        <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        <Search
+          size={18}
+          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+        />
         <input
           type="text"
           placeholder="Rechercher un rôle..."
@@ -49,10 +54,18 @@ export const AdminRolesPage: React.FC = () => {
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold">Rôle</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold">Nom</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold">Description</th>
-                <th className="px-6 py-3 text-center text-sm font-semibold">Actions</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold">
+                  Rôle
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-semibold">
+                  Nom
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-semibold">
+                  Description
+                </th>
+                <th className="px-6 py-3 text-center text-sm font-semibold">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -61,11 +74,15 @@ export const AdminRolesPage: React.FC = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <Shield size={18} className="text-primary-600" />
-                      <span className="font-medium">{role.displayName || role.name}</span>
+                      <span className="font-medium">
+                        {role.displayName || role.name}
+                      </span>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm font-mono">{role.name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{role.description || '—'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">
+                    {role.description || "—"}
+                  </td>
                   <td className="px-6 py-4 text-center">
                     <button
                       onClick={() => handleManagePermissions(role)}

@@ -1,32 +1,32 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, LogIn } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import Logo from '../assets/img/logo.jpeg'
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Mail, Lock, LogIn } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import Logo from "../assets/img/logo.jpeg";
 
 export const AdminLogin: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setIsLoading(true);
 
     const success = await login(email, password);
-    
+
     if (success) {
-      navigate('/');
+      navigate("/");
     } else {
-      setError('Email ou mot de passe incorrect');
+      setError("Email ou mot de passe incorrect");
     }
-    
+
     setIsLoading(false);
   };
 
@@ -58,7 +58,10 @@ export const AdminLogin: React.FC = () => {
                 Email
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                <Mail
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                  size={18}
+                />
                 <input
                   type="email"
                   required
@@ -75,7 +78,10 @@ export const AdminLogin: React.FC = () => {
                 Mot de passe
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                <Lock
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                  size={18}
+                />
                 <input
                   // type={showPassword ? 'text' : 'password'}
                   type="password"

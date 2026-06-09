@@ -1,82 +1,219 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, X, Loader2, TrendingUp, ChevronLeft, ChevronRight, Target, Phone, Mail, Users, Building, Calendar, CheckCircle, ArrowRightLeft } from 'lucide-react';
-import { operationsService } from '../../services/operations.service';
-import type { Lead, LeadStage, ActivityType } from '../../services/operations.service';
-import { useAuth } from '../../contexts/AuthContext';
-import { ModalPortal } from '../../components/ui/ModalPortal';
-import { RichTextEditor } from '../../components/ui/RichTextEditor';
+import React, { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Search,
+  X,
+  TrendingUp,
+  ChevronLeft,
+  ChevronRight,
+  Target,
+  Users,
+  BarChart3,
+  Globe2,
+} from "lucide-react";
+import { operationsService } from "../../services/operations.service";
+import type {
+  Lead,
+  LeadStage,
+  ActivityType,
+  LeadInterest,
+  LeadSource,
+  KanbanCard,
+} from "../../services/operations.service";
+import { useAuth } from "../../contexts/AuthContext";
+import { ModalPortal } from "../../components/ui/ModalPortal";
+import { RichTextEditor } from "../../components/ui/RichTextEditor";
 
+const stages: LeadStage[] = [
+  "NEW",
+  "CONTACTED",
+  "QUALIFIED",
+  "PROPOSAL_SENT",
+  "WON",
+  "LOST",
+];
 const stageConfig: Record<LeadStage, { label: string; color: string }> = {
-  NEW:           { label: 'Nouveau',         color: 'bg-gray-100 text-gray-700' },
-  CONTACTED:     { label: 'Contacté',        color: 'bg-blue-100 text-blue-700' },
-  QUALIFIED:     { label: 'Qualifié',        color: 'bg-purple-100 text-purple-700' },
-  PROPOSAL_SENT: { label: 'Proposition',     color: 'bg-yellow-100 text-yellow-700' },
-  WON:           { label: 'Gagné',           color: 'bg-green-100 text-green-700' },
-  LOST:          { label: 'Perdu',           color: 'bg-red-100 text-red-700' },
+  NEW: { label: "Nouveau", color: "bg-gray-100 text-gray-700" },
+  CONTACTED: { label: "Contacté", color: "bg-blue-100 text-blue-700" },
+  QUALIFIED: { label: "Qualifié", color: "bg-purple-100 text-purple-700" },
+  PROPOSAL_SENT: {
+    label: "Proposition",
+    color: "bg-yellow-100 text-yellow-700",
+  },
+  WON: { label: "Gagné", color: "bg-green-100 text-green-700" },
+  LOST: { label: "Perdu", color: "bg-red-100 text-red-700" },
 };
-
-const activityTypes: ActivityType[] = ['CALL', 'EMAIL', 'MEETING', 'VISIT', 'NOTE'];
-const activityIcons: Record<ActivityType, React.ElementType> = {
-  CALL: Phone, EMAIL: Mail, MEETING: Users, VISIT: Building, NOTE: Calendar,
-};
+const sourceOptions: { value: LeadSource; label: string }[] = [
+  { value: "WEBSITE", label: "Site web" },
+  { value: "REFERRAL", label: "Recommandation" },
+  { value: "COLD_CALL", label: "Prospection" },
+  { value: "TRADE_SHOW", label: "Salon" },
+  { value: "PARTNER", label: "Partenaire" },
+  { value: "SOCIAL_MEDIA", label: "Réseaux sociaux" },
+  { value: "EVENT", label: "Événement" },
+  { value: "OTHER", label: "Autre" },
+];
+const interestOptions: { value: LeadInterest; label: string }[] = [
+  { value: "WORKSPACE", label: "Espace de travail" },
+  { value: "MEETING_ROOM", label: "Salle de réunion" },
+  { value: "VIRTUAL_OFFICE", label: "Bureau virtuel" },
+  { value: "DOMICILIATION", label: "Domiciliation" },
+  { value: "DAY_PASS", label: "Pass journée" },
+  { value: "DEDICATED_DESK", label: "Bureau dédié" },
+  { value: "PRIVATE_OFFICE", label: "Bureau privé" },
+  { value: "OTHER", label: "Autre" },
+];
+const activityTypes: ActivityType[] = [
+  "CALL",
+  "EMAIL",
+  "MEETING",
+  "VISIT",
+  "NOTE",
+];
 const activityLabels: Record<ActivityType, string> = {
-  CALL: 'Appel', EMAIL: 'Email', MEETING: 'Réunion', VISIT: 'Visite', NOTE: 'Note',
+  CALL: "Appel",
+  EMAIL: "Email",
+  MEETING: "Réunion",
+  VISIT: "Visite",
+  NOTE: "Note",
 };
 
-type SubTab = 'pipeline' | 'list' | 'create';
+type SubTab = "board" | "list" | "analytics" | "public" | "create";
 
 export const CrmMaster: React.FC = () => {
-  const { admin, hasPermission } = useAuth();
+  const { admin } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<SubTab>('pipeline');
-  const [visitedTabs, setVisitedTabs] = useState<Set<SubTab>>(new Set(['pipeline']));
-  const [search, setSearch] = useState('');
-  const [stageFilter, setStageFilter] = useState<LeadStage | ''>('');
+  const [activeTab, setActiveTab] = useState<SubTab>("board");
+  const [visitedTabs, setVisitedTabs] = useState<Set<SubTab>>(
+    new Set(["board"]),
+  );
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [stageFilter, setStageFilter] = useState<LeadStage | "">("");
+  const [sourceFilter, setSourceFilter] = useState<LeadSource | "">("");
+  const [interestFilter, setInterestFilter] = useState<LeadInterest | "">("");
+  const [assignedToFilter, setAssignedToFilter] = useState("");
   const [page, setPage] = useState(0);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [activityForm, setActivityForm] = useState({ activityType: 'NOTE' as ActivityType, subject: '', notes: '', performedAt: new Date().toISOString().slice(0, 16) });
-  const [convertForm, setConvertForm] = useState({ ownerType: 'CUSTOMER', ownerCode: '' });
-  const [isConvertOpen, setIsConvertOpen] = useState(false);
-
-  const [createForm, setCreateForm] = useState({
-    fullName: '', email: '', phone: '', company: '', source: '',
-    interest: '', estimatedAmount: 0, probability: 30, expectedCloseDate: '',
+  const [activityForm, setActivityForm] = useState({
+    activityType: "NOTE" as ActivityType,
+    subject: "",
+    notes: "",
+    performedAt: new Date().toISOString().slice(0, 16),
   });
+  const [convertForm, setConvertForm] = useState({
+    ownerType: "CUSTOMER",
+    ownerCode: "",
+  });
+  const [isConvertOpen, setIsConvertOpen] = useState(false);
+  const [analyticsFrom, setAnalyticsFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().slice(0, 10);
+  });
+  const [analyticsTo, setAnalyticsTo] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
+  const [publicResult, setPublicResult] = useState<{
+    leadNumber: string;
+    message: string;
+  } | null>(null);
+  const [publicForm, setPublicForm] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    company: "",
+    interest: "WORKSPACE" as LeadInterest,
+    note: "",
+  });
+  const [createForm, setCreateForm] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    company: "",
+    source: "WEBSITE" as LeadSource,
+    interest: "WORKSPACE" as LeadInterest,
+    estimatedAmount: 0,
+    probability: 30,
+    expectedCloseDate: "",
+    assignedTo: "",
+  });
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(0);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
+  useEffect(() => {
+    if (activeTab !== "create") return;
+    setCreateForm({
+      fullName: "",
+      email: "",
+      phone: "",
+      company: "",
+      source: "WEBSITE",
+      interest: "WORKSPACE",
+      estimatedAmount: 0,
+      probability: 30,
+      expectedCloseDate: "",
+      assignedTo: "",
+    });
+  }, [activeTab]);
 
   const switchTab = (tab: SubTab) => {
     setActiveTab(tab);
-    setVisitedTabs(prev => new Set([...prev, tab]));
+    setVisitedTabs((prev) => new Set([...prev, tab]));
     setActionError(null);
   };
 
-  useEffect(() => {
-    if (activeTab !== 'create') return;
-    setCreateForm({ fullName: '', email: '', phone: '', company: '', source: '',
-      interest: '', estimatedAmount: 0, probability: 30, expectedCloseDate: '' });
-  }, [activeTab]);
-
-  const { data: pipelineData = [], isLoading: pipelineLoading } = useQuery({
-    queryKey: ['crm-pipeline'],
-    queryFn: () => operationsService.getCrmPipeline(),
-    enabled: visitedTabs.has('pipeline'),
+  const { data: board, isLoading: boardLoading } = useQuery({
+    queryKey: [
+      "crm-board",
+      assignedToFilter,
+      sourceFilter,
+      interestFilter,
+      debouncedSearch,
+    ],
+    queryFn: () =>
+      operationsService.getCrmBoard({
+        assignedTo: assignedToFilter ? Number(assignedToFilter) : undefined,
+        source: sourceFilter || undefined,
+        interest: interestFilter || undefined,
+        searchText: debouncedSearch || undefined,
+      }),
+    enabled: visitedTabs.has("board"),
   });
-
-  const { data: metrics } = useQuery({
-    queryKey: ['crm-metrics'],
+  const { data: metrics, isLoading: metricsLoading } = useQuery({
+    queryKey: ["crm-metrics"],
     queryFn: () => operationsService.getCrmMetrics(),
   });
-
-  const { data: leadsData, isLoading: leadsLoading } = useQuery({
-    queryKey: ['crm-leads', stageFilter, page],
-    queryFn: () => operationsService.getLeads({ stage: stageFilter || undefined, page, size: 20 }),
-    enabled: visitedTabs.has('list'),
+  const { data: analytics, isLoading: analyticsLoading } = useQuery({
+    queryKey: ["crm-analytics", analyticsFrom, analyticsTo],
+    queryFn: () =>
+      operationsService.getCrmAnalytics({
+        from: `${analyticsFrom}T00:00:00Z`,
+        to: `${analyticsTo}T23:59:59Z`,
+      }),
+    enabled: visitedTabs.has("analytics"),
   });
-
+  const { data: leadsData, isLoading: leadsLoading } = useQuery({
+    queryKey: ["crm-leads", stageFilter, debouncedSearch, page],
+    queryFn: () =>
+      operationsService.getLeads({
+        stage: stageFilter || undefined,
+        searchText: debouncedSearch || undefined,
+        page,
+        size: 20,
+        sort: "updatedAt,desc",
+      }),
+    enabled: visitedTabs.has("list"),
+  });
   const { data: leadDetail, refetch: refetchDetail } = useQuery({
-    queryKey: ['crm-lead', selectedLead?.id],
+    queryKey: ["crm-lead", selectedLead?.id],
     queryFn: () => operationsService.getLead(selectedLead!.id),
     enabled: !!selectedLead && isDetailOpen,
   });
@@ -85,151 +222,243 @@ export const CrmMaster: React.FC = () => {
   const totalPages = leadsData?.totalPages ?? 0;
   const currentLead = leadDetail || selectedLead;
 
-  const filteredLeads = search
-    ? leads.filter(l => l.fullName.toLowerCase().includes(search.toLowerCase()) ||
-        l.company?.toLowerCase().includes(search.toLowerCase()))
-    : leads;
-
   const createMutation = useMutation({
-    mutationFn: () => operationsService.createLead({
-      ...createForm,
-      estimatedAmount: createForm.estimatedAmount || undefined,
-      probability: createForm.probability || undefined,
-      expectedCloseDate: createForm.expectedCloseDate || undefined,
-    }),
+    mutationFn: () =>
+      operationsService.createLead({
+        ...createForm,
+        assignedTo: createForm.assignedTo
+          ? Number(createForm.assignedTo)
+          : undefined,
+        estimatedAmount: createForm.estimatedAmount || undefined,
+        probability: createForm.probability || undefined,
+        expectedCloseDate: createForm.expectedCloseDate || undefined,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['crm-leads'] });
-      queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
-      queryClient.invalidateQueries({ queryKey: ['crm-metrics'] });
-      switchTab('list');
+      queryClient.invalidateQueries({ queryKey: ["crm-leads"] });
+      queryClient.invalidateQueries({ queryKey: ["crm-board"] });
+      queryClient.invalidateQueries({ queryKey: ["crm-metrics"] });
+      switchTab("list");
     },
-    onError: (e: any) => setActionError(e?.response?.data?.message || 'Erreur création lead'),
+    onError: (e: any) =>
+      setActionError(e?.response?.data?.message || "Erreur création lead"),
   });
-
+  const publicCaptureMutation = useMutation({
+    mutationFn: () =>
+      operationsService.captureLeadPublic({ ...publicForm, source: "WEBSITE" }),
+    onSuccess: (data) => {
+      setPublicResult(data);
+      setPublicForm({
+        fullName: "",
+        email: "",
+        phone: "",
+        company: "",
+        interest: "WORKSPACE",
+        note: "",
+      });
+    },
+    onError: (e: any) =>
+      setActionError(e?.response?.data?.message || "Erreur capture publique"),
+  });
   const stageMutation = useMutation({
-    mutationFn: ({ id, stage }: { id: number; stage: LeadStage }) =>
-      operationsService.updateLeadStage(id, stage),
+    mutationFn: ({
+      id,
+      stage,
+      reason,
+    }: {
+      id: number;
+      stage: LeadStage;
+      reason?: string;
+    }) => operationsService.updateLeadStage(id, stage, reason),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['crm-leads'] });
-      queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
+      queryClient.invalidateQueries({ queryKey: ["crm-leads"] });
+      queryClient.invalidateQueries({ queryKey: ["crm-board"] });
+      queryClient.invalidateQueries({ queryKey: ["crm-metrics"] });
       refetchDetail();
     },
-    onError: (e: any) => setActionError(e?.response?.data?.message || 'Erreur changement étape'),
+    onError: (e: any) =>
+      setActionError(e?.response?.data?.message || "Erreur changement étape"),
   });
-
   const qualifyMutation = useMutation({
     mutationFn: (id: number) => operationsService.qualifyLead(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['crm-leads'] });
-      queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
+      queryClient.invalidateQueries({ queryKey: ["crm-leads"] });
+      queryClient.invalidateQueries({ queryKey: ["crm-board"] });
       refetchDetail();
     },
-    onError: (e: any) => setActionError(e?.response?.data?.message || 'Erreur qualification'),
+    onError: (e: any) =>
+      setActionError(e?.response?.data?.message || "Erreur qualification"),
   });
-
   const activityMutation = useMutation({
-    mutationFn: () => operationsService.addLeadActivity(selectedLead!.id, {
-      ...activityForm,
-      performedBy: admin?.email || 'admin',
-      performedAt: new Date(activityForm.performedAt).toISOString(),
-    }),
+    mutationFn: () =>
+      operationsService.addLeadActivity(selectedLead!.id, {
+        ...activityForm,
+        performedBy: admin?.email || "admin",
+        performedAt: new Date(activityForm.performedAt).toISOString(),
+      }),
     onSuccess: () => {
       refetchDetail();
-      setActivityForm({ activityType: 'NOTE', subject: '', notes: '', performedAt: new Date().toISOString().slice(0, 16) });
+      queryClient.invalidateQueries({ queryKey: ["crm-board"] });
+      setActivityForm({
+        activityType: "NOTE",
+        subject: "",
+        notes: "",
+        performedAt: new Date().toISOString().slice(0, 16),
+      });
     },
-    onError: (e: any) => setActionError(e?.response?.data?.message || 'Erreur ajout activité'),
+    onError: (e: any) =>
+      setActionError(e?.response?.data?.message || "Erreur ajout activité"),
   });
-
   const convertMutation = useMutation({
-    mutationFn: () => operationsService.convertLead(selectedLead!.id, convertForm),
+    mutationFn: () =>
+      operationsService.convertLead(selectedLead!.id, convertForm),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['crm-leads'] });
-      queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
+      queryClient.invalidateQueries({ queryKey: ["crm-leads"] });
+      queryClient.invalidateQueries({ queryKey: ["crm-board"] });
       setIsConvertOpen(false);
       refetchDetail();
     },
-    onError: (e: any) => setActionError(e?.response?.data?.message || 'Erreur conversion'),
+    onError: (e: any) =>
+      setActionError(e?.response?.data?.message || "Erreur conversion"),
+  });
+  const quoteMutation = useMutation({
+    mutationFn: (id: number) =>
+      operationsService.generateLeadQuote(id, {
+        currency: "XAF",
+        performedBy: admin?.email || "admin",
+      }),
+    onSuccess: (data) => {
+      alert(`Devis généré : ${data.quoteNumber}`);
+      refetchDetail();
+    },
+    onError: (e: any) =>
+      setActionError(e?.response?.data?.message || "Erreur génération devis"),
   });
 
+  const conversionRate = Number(metrics?.conversionRate ?? 0);
   const tabs: { id: SubTab; label: string; icon: React.ElementType }[] = [
-    { id: 'pipeline', label: 'Pipeline', icon: Target },
-    { id: 'list',     label: 'Liste',    icon: Users },
-    { id: 'create',   label: 'Nouveau lead', icon: TrendingUp },
+    { id: "board", label: "Kanban", icon: Target },
+    { id: "list", label: "Liste", icon: Users },
+    { id: "analytics", label: "Analytics", icon: BarChart3 },
+    { id: "public", label: "Capture site", icon: Globe2 },
+    { id: "create", label: "Nouveau lead", icon: TrendingUp },
   ];
 
   return (
     <div>
-      {/* Métriques */}
-      {metrics && (
+      {metricsLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-          {[
-            { label: 'Total leads', value: metrics.totalLeads, color: 'text-gray-900' },
-            { label: 'Gagnés', value: metrics.wonLeads, color: 'text-green-600' },
-            { label: 'Perdus', value: metrics.lostLeads, color: 'text-red-600' },
-            { label: 'Valeur pipeline', value: `${(metrics.pipelineValue || 0).toLocaleString('fr-FR')} FCFA`, color: 'text-primary-600' },
-            { label: 'Taux conversion', value: `${((metrics.conversionRate || 0) * 100).toFixed(0)}%`, color: 'text-blue-600' },
-          ].map(m => (
-            <div key={m.label} className="bg-white rounded-xl p-4 shadow-sm">
-              <p className={`text-xl font-bold ${m.color}`}>{m.value}</p>
-              <p className="text-xs text-gray-500">{m.label}</p>
-            </div>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="bg-white rounded-xl p-4 shadow-sm animate-pulse h-20"
+            />
           ))}
         </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <Metric label="Total leads" value={metrics?.totalLeads ?? 0} />
+          <Metric
+            label="Gagnés"
+            value={metrics?.wonLeads ?? 0}
+            color="text-green-600"
+          />
+          <Metric
+            label="Perdus"
+            value={metrics?.lostLeads ?? 0}
+            color="text-red-600"
+          />
+          <Metric
+            label="Valeur pipeline"
+            value={`${(metrics?.pipelineValue ?? 0).toLocaleString("fr-FR")} FCFA`}
+            color="text-primary-600"
+          />
+          <Metric
+            label="Taux conversion"
+            value={`${conversionRate.toFixed(1)}%`}
+            color="text-blue-600"
+          />
+        </div>
       )}
-
-      {/* Sous-onglets */}
-      <div className="flex gap-1 border-b border-gray-200 mb-6">
+      <div className="flex flex-wrap gap-1 border-b border-gray-200 mb-6">
         {tabs.map(({ id, label, icon: Icon }) => (
-          <button key={id} onClick={() => switchTab(id)}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-1.5 ${
-              activeTab === id ? 'bg-primary-50 text-primary-600 border-b-2 border-primary-600' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}>
+          <button
+            key={id}
+            onClick={() => switchTab(id)}
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg flex items-center gap-1.5 ${activeTab === id ? "bg-primary-50 text-primary-600 border-b-2 border-primary-600" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
+          >
             <Icon size={14} />
             {label}
           </button>
         ))}
       </div>
-
       {actionError && (
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex justify-between">
-          {actionError}<button onClick={() => setActionError(null)} className="ml-2 font-bold">x</button>
+          {actionError}
+          <button onClick={() => setActionError(null)}>
+            <X size={14} />
+          </button>
         </div>
       )}
 
-      {/* Pipeline Kanban - RESPONSIVE */}
-      {activeTab === 'pipeline' && (
-        <div>
-          {pipelineLoading ? <div className="text-center py-8">Chargement...</div> : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-              {(Object.keys(stageConfig) as LeadStage[]).map(stage => {
-                const col = pipelineData.find(p => p.stage === stage);
-                const stageLeads = col?.leads || [];
+      {activeTab === "board" && (
+        <div className="space-y-4">
+          <Filters
+            search={search}
+            setSearch={setSearch}
+            sourceFilter={sourceFilter}
+            setSourceFilter={setSourceFilter}
+            interestFilter={interestFilter}
+            setInterestFilter={setInterestFilter}
+            assignedToFilter={assignedToFilter}
+            setAssignedToFilter={setAssignedToFilter}
+          />
+          {boardLoading ? (
+            <div className="py-12 text-center">Chargement...</div>
+          ) : (
+            <div className="flex gap-4 overflow-x-auto pb-4">
+              {stages.map((stage) => {
+                const col = board?.columns?.find((c) => c.stage === stage);
                 return (
-                  <div key={stage} className="min-w-0">
-                    <div className={`px-3 py-2 rounded-t-lg font-medium text-sm ${stageConfig[stage].color}`}>
-                      {stageConfig[stage].label} ({stageLeads.length})
-                      {col?.totalValue ? <span className="ml-2 text-xs opacity-75">{col.totalValue.toLocaleString('fr-FR')} FCFA</span> : null}
+                  <div key={stage} className="flex-shrink-0 w-80">
+                    <div
+                      className={`px-3 py-2 rounded-t-lg font-medium text-sm ${stageConfig[stage].color}`}
+                    >
+                      {stageConfig[stage].label} ({col?.count ?? 0})
+                      <span className="block text-xs font-normal">
+                        {(col?.totalAmount ?? 0).toLocaleString("fr-FR")} FCFA
+                      </span>
                     </div>
-                    <div className="space-y-2 bg-gray-50 rounded-b-lg p-2 min-h-24">
-                      {stageLeads.length === 0 && (
-                        <p className="text-xs text-gray-400 text-center py-4">Aucun lead</p>
-                      )}
-                      {stageLeads.map(lead => (
-                        <div key={lead.id}
-                          className="bg-white rounded-lg p-3 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                          onClick={() => { setSelectedLead(lead); setIsDetailOpen(true); }}>
-                          <p className="font-medium text-sm">{lead.fullName}</p>
-                          {lead.company && <p className="text-xs text-gray-500">{lead.company}</p>}
-                          {lead.estimatedAmount && (
-                            <p className="text-xs text-primary-600 font-medium mt-1">{lead.estimatedAmount.toLocaleString('fr-FR')} FCFA</p>
-                          )}
-                          {lead.probability !== undefined && (
-                            <div className="mt-2 bg-gray-100 rounded-full h-1">
-                              <div className="bg-primary-500 h-1 rounded-full" style={{ width: `${lead.probability}%` }} />
-                            </div>
-                          )}
-                        </div>
+                    <div className="space-y-2 bg-gray-50 rounded-b-lg p-2 min-h-32">
+                      {(col?.cards || []).map((card) => (
+                        <LeadCard
+                          key={card.id}
+                          card={card}
+                          onOpen={() => {
+                            setSelectedLead(card as any);
+                            setIsDetailOpen(true);
+                          }}
+                          onMove={(target) => {
+                            if (target === "LOST") {
+                              const reason = prompt(
+                                "Motif de perte obligatoire",
+                              );
+                              if (!reason) return;
+                              stageMutation.mutate({
+                                id: card.id,
+                                stage: target,
+                                reason,
+                              });
+                            } else
+                              stageMutation.mutate({
+                                id: card.id,
+                                stage: target,
+                              });
+                          }}
+                        />
                       ))}
+                      {(!col?.cards || col.cards.length === 0) && (
+                        <p className="text-xs text-gray-400 p-3">Aucun lead</p>
+                      )}
                     </div>
                   </div>
                 );
@@ -239,320 +468,667 @@ export const CrmMaster: React.FC = () => {
         </div>
       )}
 
-      {/* Liste */}
-      {activeTab === 'list' && (
+      {activeTab === "list" && (
         <div>
-          <div className="flex flex-wrap gap-3 mb-4">
-            <div className="flex-1 min-w-48 relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input type="text" placeholder="Rechercher..." value={search}
+          <div className="flex gap-3 mb-4">
+            <div className="relative flex-1">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+              <input
+                value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm" />
+                placeholder="Rechercher un lead..."
+                className="w-full pl-9 pr-3 py-2 border rounded-lg"
+              />
             </div>
-            <select value={stageFilter} onChange={(e) => { setStageFilter(e.target.value as any); setPage(0); }}
-              className="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm">
-              <option value="">Toutes les étapes</option>
-              {(Object.keys(stageConfig) as LeadStage[]).map(s => (
-                <option key={s} value={s}>{stageConfig[s].label}</option>
+            <select
+              value={stageFilter}
+              onChange={(e) => setStageFilter(e.target.value as any)}
+              className="px-3 py-2 border rounded-lg bg-white"
+            >
+              <option value="">Tous stages</option>
+              {stages.map((s) => (
+                <option key={s} value={s}>
+                  {stageConfig[s].label}
+                </option>
               ))}
             </select>
           </div>
-          {leadsLoading ? <div className="text-center py-8">Chargement...</div> : (
+          {leadsLoading ? (
+            <div className="py-12 text-center">Chargement...</div>
+          ) : (
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Prospect</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Intérêt</th>
-                    <th className="px-4 py-3 text-right text-sm font-semibold">Montant</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Étape</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Date clôture</th>
-                  </tr>
-                </thead>
+              <table className="w-full text-sm">
                 <tbody className="divide-y">
-                  {filteredLeads.map(lead => (
-                    <tr key={lead.id} className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => { setSelectedLead(lead); setIsDetailOpen(true); }}>
+                  {leads.map((lead) => (
+                    <tr
+                      key={lead.id}
+                      onClick={() => {
+                        setSelectedLead(lead);
+                        setIsDetailOpen(true);
+                      }}
+                      className="cursor-pointer hover:bg-gray-50"
+                    >
                       <td className="px-4 py-3">
-                        <p className="text-sm font-medium">{lead.fullName}</p>
-                        {lead.company && <p className="text-xs text-gray-400">{lead.company}</p>}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">{lead.interest || '—'}</td>
-                      <td className="px-4 py-3 text-right text-sm font-medium">
-                        {lead.estimatedAmount ? `${lead.estimatedAmount.toLocaleString('fr-FR')} FCFA` : '—'}
+                        <p className="font-medium">{lead.fullName}</p>
+                        <p className="text-xs text-gray-500">
+                          {lead.leadNumber} · {lead.company || "—"}
+                        </p>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs ${stageConfig[lead.stage]?.color}`}>
-                          {stageConfig[lead.stage]?.label}
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs ${stageConfig[lead.stage].color}`}
+                        >
+                          {stageConfig[lead.stage].label}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {lead.expectedCloseDate ? new Date(lead.expectedCloseDate).toLocaleDateString('fr-FR') : '—'}
+                      <td className="px-4 py-3">
+                        {interestOptions.find((i) => i.value === lead.interest)
+                          ?.label ||
+                          lead.interest ||
+                          "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {(lead.estimatedAmount ?? 0).toLocaleString("fr-FR")}{" "}
+                        FCFA
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {filteredLeads.length === 0 && <div className="text-center py-12 text-gray-500">Aucun lead trouvé</div>}
             </div>
           )}
           {totalPages > 1 && (
-            <div className="flex justify-center gap-2 mt-4">
-              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-                className="p-2 border rounded-lg disabled:opacity-50"><ChevronLeft size={16} /></button>
-              <span className="px-3 py-2 text-sm text-gray-600">Page {page + 1} / {totalPages}</span>
-              <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
-                className="p-2 border rounded-lg disabled:opacity-50"><ChevronRight size={16} /></button>
-            </div>
+            <Pagination page={page} setPage={setPage} totalPages={totalPages} />
           )}
         </div>
       )}
 
-      {/* Création lead */}
-      {activeTab === 'create' && (
-        <div className="max-w-lg mx-auto bg-white rounded-xl p-6 shadow-sm space-y-4">
-          <h3 className="font-semibold text-gray-900">Nouveau prospect</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nom complet *</label>
-              <input type="text" value={createForm.fullName}
-                onChange={(e) => setCreateForm(f => ({ ...f, fullName: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input type="email" value={createForm.email}
-                onChange={(e) => setCreateForm(f => ({ ...f, email: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
-              <input type="tel" value={createForm.phone}
-                onChange={(e) => setCreateForm(f => ({ ...f, phone: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Entreprise</label>
-              <input type="text" value={createForm.company}
-                onChange={(e) => setCreateForm(f => ({ ...f, company: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
-              <select value={createForm.source} onChange={(e) => setCreateForm(f => ({ ...f, source: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white">
-                <option value="">—</option>
-                {['WEBSITE', 'REFERRAL', 'SOCIAL', 'EVENT', 'COLD_CALL', 'OTHER'].map(s =>
-                  <option key={s} value={s}>{s}</option>
-                )}
-              </select>
-            </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Intérêt</label>
-              <input type="text" value={createForm.interest}
-                onChange={(e) => setCreateForm(f => ({ ...f, interest: e.target.value }))}
-                placeholder="Bureau privé, salle de réunion..."
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Montant estimé (FCFA)</label>
-              <input type="text" inputMode="numeric"
-                value={createForm.estimatedAmount === 0 ? '' : createForm.estimatedAmount}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '');
-                  setCreateForm(f => ({ ...f, estimatedAmount: val === '' ? 0 : Number(val) }));
-                }}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Probabilité (%)</label>
-              <input type="text" inputMode="numeric"
-                value={createForm.probability}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '');
-                  const num = val === '' ? 0 : Math.min(100, Number(val));
-                  setCreateForm(f => ({ ...f, probability: num }));
-                }}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg" />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date de clôture prévue</label>
-              <input type="date" value={createForm.expectedCloseDate}
-                onChange={(e) => setCreateForm(f => ({ ...f, expectedCloseDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg" />
-            </div>
+      {activeTab === "analytics" && (
+        <div className="space-y-6">
+          <div className="flex gap-3">
+            <input
+              type="date"
+              value={analyticsFrom}
+              onChange={(e) => setAnalyticsFrom(e.target.value)}
+              className="px-3 py-2 border rounded-lg"
+            />
+            <input
+              type="date"
+              value={analyticsTo}
+              onChange={(e) => setAnalyticsTo(e.target.value)}
+              className="px-3 py-2 border rounded-lg"
+            />
           </div>
-          <button onClick={() => createMutation.mutate()}
-            disabled={!createForm.fullName || createMutation.isPending}
-            className="w-full bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2">
-            {createMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <TrendingUp size={16} />}
-            Créer le prospect
+          {analyticsLoading ? (
+            <div>Chargement...</div>
+          ) : (
+            analytics && (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <Metric label="Créés" value={analytics.totalCreated} />
+                  <Metric
+                    label="Gagnés"
+                    value={analytics.totalWon}
+                    color="text-green-600"
+                  />
+                  <Metric
+                    label="Perdus"
+                    value={analytics.totalLost}
+                    color="text-red-600"
+                  />
+                  <Metric
+                    label="Conversion"
+                    value={`${Number(analytics.conversionRate ?? 0).toFixed(1)}%`}
+                  />
+                  <Metric
+                    label="Jours moy. pour gagner"
+                    value={Number(analytics.avgDaysToWin ?? 0).toFixed(1)}
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Breakdown title="Par source" data={analytics.bySource} />
+                  <Breakdown title="Par stage" data={analytics.byStage} />
+                </div>
+                <p className="text-xs text-gray-500">
+                  Valeur pipeline actuelle :{" "}
+                  {(analytics.pipelineValue ?? 0).toLocaleString("fr-FR")} FCFA.
+                </p>
+              </>
+            )
+          )}
+        </div>
+      )}
+
+      {activeTab === "public" && (
+        <div className="bg-white rounded-xl shadow-sm p-6 max-w-3xl space-y-4">
+          <h3 className="font-semibold">
+            Test intégration formulaire site vitrine
+          </h3>
+          <p className="text-sm text-gray-500">
+            Ce formulaire appelle l'endpoint public de capture CRM, utilisable
+            depuis le site web.
+          </p>
+          {publicResult && (
+            <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg p-3 text-sm">
+              {publicResult.message} Référence : {publicResult.leadNumber}
+            </div>
+          )}
+          <LeadForm
+            form={publicForm}
+            setForm={setPublicForm as any}
+            publicMode
+          />
+          <button
+            onClick={() => publicCaptureMutation.mutate()}
+            disabled={!publicForm.fullName || publicCaptureMutation.isPending}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
+          >
+            Envoyer au CRM
           </button>
         </div>
       )}
 
-      {/* Modal Détail lead */}
-      {isDetailOpen && currentLead && (
-        <ModalPortal onClose={() => { setIsDetailOpen(false); setSelectedLead(null); }} size="2xl">
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
-            <div>
-              <h3 className="text-xl font-bold">{currentLead.fullName}</h3>
-              {currentLead.company && <p className="text-sm text-gray-500">{currentLead.company}</p>}
-            </div>
-            <button onClick={() => { setIsDetailOpen(false); setSelectedLead(null); }}
-              className="p-1 hover:bg-gray-100 rounded-lg"><X size={20} /></button>
-          </div>
-          <div className="overflow-y-auto max-h-[80vh] p-6 space-y-4">
-            {actionError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex justify-between">
-                {actionError}<button onClick={() => setActionError(null)} className="ml-2 font-bold">x</button>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500">Étape</p>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${stageConfig[currentLead.stage]?.color}`}>
-                  {stageConfig[currentLead.stage]?.label}
-                </span>
-              </div>
-              {currentLead.estimatedAmount && (
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Valeur estimée</p>
-                  <p className="font-semibold text-primary-600">{currentLead.estimatedAmount.toLocaleString('fr-FR')} FCFA</p>
-                </div>
-              )}
-              {currentLead.email && <div className="p-3 bg-gray-50 rounded-lg"><p className="text-xs text-gray-500">Email</p><p className="text-sm">{currentLead.email}</p></div>}
-              {currentLead.phone && <div className="p-3 bg-gray-50 rounded-lg"><p className="text-xs text-gray-500">Téléphone</p><p className="text-sm">{currentLead.phone}</p></div>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Changer d'étape</label>
-              <div className="flex flex-wrap gap-2">
-                {(Object.keys(stageConfig) as LeadStage[]).filter(s => s !== currentLead.stage).map(stage => (
-                  <button key={stage}
-                    onClick={() => stageMutation.mutate({ id: currentLead.id, stage })}
-                    disabled={stageMutation.isPending}
-                    className={`px-2 py-1 rounded-full text-xs border disabled:opacity-50 ${stageConfig[stage].color}`}>
-                    {stageConfig[stage].label}
-                  </button>
-                ))}
-                {currentLead.stage === 'CONTACTED' && (
-                  <button onClick={() => qualifyMutation.mutate(currentLead.id)}
-                    disabled={qualifyMutation.isPending}
-                    className="px-2 py-1 rounded-full text-xs bg-purple-600 text-white disabled:opacity-50 flex items-center gap-1">
-                    <CheckCircle size={11} /> Qualifier
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {hasPermission('CRM:CONVERT') && !['WON', 'LOST'].includes(currentLead.stage) && (
-              <button onClick={() => { setIsConvertOpen(true); setConvertForm({ ownerType: 'CUSTOMER', ownerCode: '' }); }}
-                className="w-full border border-primary-600 text-primary-600 py-2 rounded-lg hover:bg-primary-50 text-sm flex items-center justify-center gap-1">
-                <ArrowRightLeft size={14} /> Convertir en client
-              </button>
-            )}
-            {currentLead.convertedOwnerCode && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
-                <p className="text-green-700 font-medium flex items-center gap-1">
-                  <CheckCircle size={14} /> Converti
-                </p>
-                <p className="text-xs">{currentLead.convertedOwnerType} : {currentLead.convertedOwnerCode}</p>
-              </div>
-            )}
-
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">Activités ({currentLead.activities?.length || 0})</h4>
-              <div className="space-y-2 max-h-48 overflow-y-auto mb-4">
-                {(currentLead.activities || []).map(act => {
-                  const ActIcon = activityIcons[act.activityType] || Calendar;
-                  return (
-                    <div key={act.id} className="p-3 bg-gray-50 rounded-lg">
-                      <div className="flex justify-between">
-                        <span className="text-xs font-medium flex items-center gap-1">
-                          <ActIcon size={12} /> {activityLabels[act.activityType]} — {act.subject}
-                        </span>
-                        <span className="text-xs text-gray-400">{new Date(act.performedAt).toLocaleDateString('fr-FR')}</span>
-                      </div>
-                      {act.notes && (
-                        <div className="text-xs text-gray-500 mt-1 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: act.notes }} />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="space-y-2 border rounded-lg p-3 bg-gray-50">
-                <p className="text-xs font-medium text-gray-600">Ajouter une activité</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <select value={activityForm.activityType}
-                    onChange={(e) => setActivityForm(f => ({ ...f, activityType: e.target.value as ActivityType }))}
-                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white">
-                    {activityTypes.map(t => (
-                     <option key={t} value={t}>{activityLabels[t]}</option>
-                    ))}
-                  </select>
-                  <input type="datetime-local" value={activityForm.performedAt}
-                    onChange={(e) => setActivityForm(f => ({ ...f, performedAt: e.target.value }))}
-                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm" />
-                </div>
-                <input type="text" value={activityForm.subject} placeholder="Sujet *"
-                  onChange={(e) => setActivityForm(f => ({ ...f, subject: e.target.value }))}
-                  className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm" />
-                <RichTextEditor
-                  value={activityForm.notes}
-                  onChange={(val) => setActivityForm(f => ({ ...f, notes: val }))}
-                  placeholder="Notes (points de forme, gras, etc.)"
-                />
-                <button onClick={() => activityMutation.mutate()}
-                  disabled={!activityForm.subject || activityMutation.isPending}
-                  className="w-full bg-primary-600 text-white py-1.5 rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-1">
-                  {activityMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : 'Ajouter'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </ModalPortal>
+      {activeTab === "create" && (
+        <div className="bg-white rounded-xl shadow-sm p-6 max-w-4xl space-y-4">
+          <LeadForm form={createForm} setForm={setCreateForm as any} />
+          <button
+            onClick={() => createMutation.mutate()}
+            disabled={!createForm.fullName || createMutation.isPending}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
+          >
+            Créer le lead
+          </button>
+        </div>
       )}
 
-      {/* Modal Conversion */}
-      {isConvertOpen && (
-        <ModalPortal onClose={() => setIsConvertOpen(false)}>
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-xl font-bold">Convertir le prospect</h3>
-            <button onClick={() => setIsConvertOpen(false)} className="p-1 hover:bg-gray-100 rounded-lg"><X size={20} /></button>
+      {isDetailOpen && currentLead && (
+        <ModalPortal onClose={() => setIsDetailOpen(false)}>
+          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-start rounded-t-2xl">
+            <div>
+              <h3 className="text-xl font-bold">{currentLead.fullName}</h3>
+              <p className="text-sm text-gray-500 font-mono">
+                {currentLead.leadNumber}
+              </p>
+            </div>
+            <button onClick={() => setIsDetailOpen(false)}>
+              <X size={20} />
+            </button>
           </div>
-          <div className="p-6 space-y-4">
-            <p className="text-sm text-gray-600">Associez ce prospect à un client, membre ou entreprise existant.</p>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Type *</label>
-              <select value={convertForm.ownerType} onChange={(e) => setConvertForm(f => ({ ...f, ownerType: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white">
-                <option value="CUSTOMER">Customer</option>
-                <option value="MEMBER">Membre</option>
-                <option value="BUSINESS_ENTITY">Entreprise</option>
-              </select>
+          <div className="p-6 space-y-6">
+            <div className="flex flex-wrap gap-2">
+              <span
+                className={`px-2 py-1 rounded-full text-xs ${stageConfig[currentLead.stage].color}`}
+              >
+                {stageConfig[currentLead.stage].label}
+              </span>
+              <span className="px-2 py-1 rounded-full text-xs bg-gray-100">
+                Score auto{" "}
+                {currentLead.scoredProbability ??
+                  (currentLead as any).score ??
+                  0}
+                %
+              </span>
+              <span className="px-2 py-1 rounded-full text-xs bg-gray-100">
+                Probabilité agent {currentLead.probability ?? 0}%
+              </span>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Code *</label>
-              <input type="text" value={convertForm.ownerCode}
-                onChange={(e) => setConvertForm(f => ({ ...f, ownerCode: e.target.value }))}
-                placeholder="CUS-000001 ou MBR-000001"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg font-mono" />
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <Info label="Email" value={currentLead.email || "—"} />
+              <Info label="Téléphone" value={currentLead.phone || "—"} />
+              <Info label="Société" value={currentLead.company || "—"} />
+              <Info
+                label="Intérêt"
+                value={
+                  interestOptions.find((i) => i.value === currentLead.interest)
+                    ?.label ||
+                  currentLead.interest ||
+                  "—"
+                }
+              />
             </div>
-            <div className="flex gap-3">
-              <button onClick={() => setIsConvertOpen(false)} className="flex-1 px-4 py-2 border rounded-lg text-gray-700">Annuler</button>
-              <button onClick={() => convertMutation.mutate()}
-                disabled={!convertForm.ownerCode || convertMutation.isPending}
-                className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                {convertMutation.isPending ? <Loader2 size={15} className="animate-spin" /> : (
-                  <><ArrowRightLeft size={15} /> Convertir</>
-                )}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => qualifyMutation.mutate(currentLead.id)}
+                className="px-3 py-2 border rounded-lg text-sm"
+              >
+                Qualifier
+              </button>
+              <button
+                onClick={() => quoteMutation.mutate(currentLead.id)}
+                disabled={currentLead.stage === "LOST"}
+                className="px-3 py-2 border rounded-lg text-sm disabled:opacity-50"
+              >
+                Générer devis
+              </button>
+              <button
+                onClick={() => setIsConvertOpen(true)}
+                className="px-3 py-2 border rounded-lg text-sm"
+              >
+                Convertir
+              </button>
+              {stages.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => {
+                    if (s === "LOST") {
+                      const reason = prompt("Motif de perte obligatoire");
+                      if (!reason) return;
+                      stageMutation.mutate({
+                        id: currentLead.id,
+                        stage: s,
+                        reason,
+                      });
+                    } else {
+                      stageMutation.mutate({ id: currentLead.id, stage: s });
+                    }
+                  }}
+                  className="px-2 py-1 border rounded text-xs"
+                >
+                  {stageConfig[s].label}
+                </button>
+              ))}
+            </div>
+            <div className="border rounded-xl p-4 space-y-3">
+              <h4 className="font-semibold">Ajouter une activité</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <select
+                  value={activityForm.activityType}
+                  onChange={(e) =>
+                    setActivityForm((f) => ({
+                      ...f,
+                      activityType: e.target.value as ActivityType,
+                    }))
+                  }
+                  className="px-3 py-2 border rounded-lg bg-white"
+                >
+                  {activityTypes.map((t) => (
+                    <option key={t} value={t}>
+                      {activityLabels[t]}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={activityForm.subject}
+                  onChange={(e) =>
+                    setActivityForm((f) => ({ ...f, subject: e.target.value }))
+                  }
+                  placeholder="Sujet"
+                  className="px-3 py-2 border rounded-lg"
+                />
+                <input
+                  type="datetime-local"
+                  value={activityForm.performedAt}
+                  onChange={(e) =>
+                    setActivityForm((f) => ({
+                      ...f,
+                      performedAt: e.target.value,
+                    }))
+                  }
+                  className="px-3 py-2 border rounded-lg"
+                />
+              </div>
+              <RichTextEditor
+                value={activityForm.notes}
+                onChange={(v) => setActivityForm((f) => ({ ...f, notes: v }))}
+                minHeight="90px"
+              />
+              <button
+                onClick={() => activityMutation.mutate()}
+                className="px-3 py-2 bg-primary-600 text-white rounded-lg text-sm"
+              >
+                Ajouter l'activité
               </button>
             </div>
+            <div className="space-y-3">
+              {(currentLead.activities || []).map((a) => (
+                <div key={a.id} className="bg-gray-50 rounded-lg p-3">
+                  <p className="font-medium text-sm">
+                    {activityLabels[a.activityType]}{" "}
+                    {a.subject ? `· ${a.subject}` : ""}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {a.performedBy} ·{" "}
+                    {a.performedAt
+                      ? new Date(a.performedAt).toLocaleString("fr-FR")
+                      : "—"}
+                  </p>
+                  <div
+                    className="prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: a.notes || "" }}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
+          {isConvertOpen && (
+            <ModalPortal onClose={() => setIsConvertOpen(false)}>
+              <div className="p-5 border-b flex justify-between">
+                <h3 className="font-bold">Convertir le lead</h3>
+                <button onClick={() => setIsConvertOpen(false)}>
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <select
+                  value={convertForm.ownerType}
+                  onChange={(e) =>
+                    setConvertForm((f) => ({ ...f, ownerType: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 border rounded-lg bg-white"
+                >
+                  <option value="CUSTOMER">Customer</option>
+                  <option value="MEMBER">Membre</option>
+                </select>
+                <input
+                  value={convertForm.ownerCode}
+                  onChange={(e) =>
+                    setConvertForm((f) => ({ ...f, ownerCode: e.target.value }))
+                  }
+                  placeholder="Code client/membre"
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+                <button
+                  onClick={() => convertMutation.mutate()}
+                  disabled={!convertForm.ownerCode}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
+                >
+                  Convertir
+                </button>
+              </div>
+            </ModalPortal>
+          )}
         </ModalPortal>
       )}
     </div>
   );
 };
+
+const Metric = ({
+  label,
+  value,
+  color = "text-gray-900",
+}: {
+  label: string;
+  value: number | string;
+  color?: string;
+}) => (
+  <div className="bg-white rounded-xl p-4 shadow-sm">
+    <p className={`text-xl font-bold ${color}`}>{value}</p>
+    <p className="text-xs text-gray-500">{label}</p>
+  </div>
+);
+const Info = ({ label, value }: { label: string; value: string }) => (
+  <div>
+    <p className="text-xs text-gray-500">{label}</p>
+    <p className="font-medium">{value}</p>
+  </div>
+);
+const Pagination = ({
+  page,
+  setPage,
+  totalPages,
+}: {
+  page: number;
+  setPage: React.Dispatch<React.SetStateAction<number>>;
+  totalPages: number;
+}) => (
+  <div className="flex justify-end items-center gap-2 mt-4">
+    <button
+      disabled={page === 0}
+      onClick={() => setPage((p) => p - 1)}
+      className="p-2 border rounded-lg disabled:opacity-50"
+    >
+      <ChevronLeft size={16} />
+    </button>
+    <span className="text-sm">
+      Page {page + 1} / {totalPages}
+    </span>
+    <button
+      disabled={page >= totalPages - 1}
+      onClick={() => setPage((p) => p + 1)}
+      className="p-2 border rounded-lg disabled:opacity-50"
+    >
+      <ChevronRight size={16} />
+    </button>
+  </div>
+);
+const Breakdown = ({
+  title,
+  data,
+}: {
+  title: string;
+  data?: Record<string, number>;
+}) => {
+  const entries = Object.entries(data || {});
+  const max = Math.max(1, ...entries.map(([, v]) => v));
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-5">
+      <h3 className="font-semibold mb-4">{title}</h3>
+      <div className="space-y-3">
+        {entries.map(([k, v]) => (
+          <div key={k}>
+            <div className="flex justify-between text-sm mb-1">
+              <span>{k}</span>
+              <span>{v}</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full">
+              <div
+                className="h-2 bg-primary-600 rounded-full"
+                style={{ width: `${(v / max) * 100}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+const Filters = ({
+  search,
+  setSearch,
+  sourceFilter,
+  setSourceFilter,
+  interestFilter,
+  setInterestFilter,
+  assignedToFilter,
+  setAssignedToFilter,
+}: any) => (
+  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <input
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      placeholder="Rechercher..."
+      className="px-3 py-2 border rounded-lg"
+    />
+    <input
+      value={assignedToFilter}
+      onChange={(e) => setAssignedToFilter(e.target.value)}
+      placeholder="Agent ID"
+      className="px-3 py-2 border rounded-lg"
+    />
+    <select
+      value={sourceFilter}
+      onChange={(e) => setSourceFilter(e.target.value)}
+      className="px-3 py-2 border rounded-lg bg-white"
+    >
+      <option value="">Toutes sources</option>
+      {sourceOptions.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+    <select
+      value={interestFilter}
+      onChange={(e) => setInterestFilter(e.target.value)}
+      className="px-3 py-2 border rounded-lg bg-white"
+    >
+      <option value="">Tous intérêts</option>
+      {interestOptions.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  </div>
+);
+const LeadCard = ({
+  card,
+  onOpen,
+  onMove,
+}: {
+  card: KanbanCard;
+  onOpen: () => void;
+  onMove: (stage: LeadStage) => void;
+}) => (
+  <div className="bg-white rounded-lg p-3 shadow-sm">
+    <div onClick={onOpen} className="cursor-pointer">
+      <p className="font-medium text-sm">{card.fullName}</p>
+      <p className="text-xs text-gray-500">{card.company || card.leadNumber}</p>
+      <div className="flex flex-wrap gap-1 mt-2">
+        <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100">
+          Score {card.score ?? 0}%
+        </span>
+        {card.interest && (
+          <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">
+            {card.interest}
+          </span>
+        )}
+      </div>
+      <p className="text-xs mt-2 text-gray-500">
+        {(card.estimatedAmount ?? 0).toLocaleString("fr-FR")} FCFA
+      </p>
+    </div>
+    <select
+      value={card.stage}
+      onChange={(e) => onMove(e.target.value as LeadStage)}
+      className="mt-2 w-full px-2 py-1 border rounded text-xs bg-white"
+    >
+      {stages.map((s) => (
+        <option key={s} value={s}>
+          {stageConfig[s].label}
+        </option>
+      ))}
+    </select>
+  </div>
+);
+const LeadForm = ({
+  form,
+  setForm,
+  publicMode = false,
+}: {
+  form: any;
+  setForm: (fn: any) => void;
+  publicMode?: boolean;
+}) => (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <input
+      value={form.fullName}
+      onChange={(e) =>
+        setForm((f: any) => ({ ...f, fullName: e.target.value }))
+      }
+      placeholder="Nom complet *"
+      className="px-3 py-2 border rounded-lg"
+    />
+    <input
+      value={form.email}
+      onChange={(e) => setForm((f: any) => ({ ...f, email: e.target.value }))}
+      placeholder="Email"
+      className="px-3 py-2 border rounded-lg"
+    />
+    <input
+      value={form.phone}
+      onChange={(e) => setForm((f: any) => ({ ...f, phone: e.target.value }))}
+      placeholder="Téléphone"
+      className="px-3 py-2 border rounded-lg"
+    />
+    <input
+      value={form.company}
+      onChange={(e) => setForm((f: any) => ({ ...f, company: e.target.value }))}
+      placeholder="Société"
+      className="px-3 py-2 border rounded-lg"
+    />
+    {!publicMode && (
+      <select
+        value={form.source}
+        onChange={(e) =>
+          setForm((f: any) => ({ ...f, source: e.target.value as LeadSource }))
+        }
+        className="px-3 py-2 border rounded-lg bg-white"
+      >
+        {sourceOptions.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    )}
+    <select
+      value={form.interest}
+      onChange={(e) =>
+        setForm((f: any) => ({
+          ...f,
+          interest: e.target.value as LeadInterest,
+        }))
+      }
+      className="px-3 py-2 border rounded-lg bg-white"
+    >
+      {interestOptions.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+    {!publicMode && (
+      <>
+        <input
+          type="number"
+          value={form.estimatedAmount}
+          onChange={(e) =>
+            setForm((f: any) => ({
+              ...f,
+              estimatedAmount: Number(e.target.value),
+            }))
+          }
+          placeholder="Montant estimé"
+          className="px-3 py-2 border rounded-lg"
+        />
+        <input
+          type="number"
+          value={form.probability}
+          onChange={(e) =>
+            setForm((f: any) => ({ ...f, probability: Number(e.target.value) }))
+          }
+          placeholder="Probabilité agent"
+          className="px-3 py-2 border rounded-lg"
+        />
+        <input
+          type="date"
+          value={form.expectedCloseDate}
+          onChange={(e) =>
+            setForm((f: any) => ({ ...f, expectedCloseDate: e.target.value }))
+          }
+          className="px-3 py-2 border rounded-lg"
+        />
+        <input
+          value={form.assignedTo}
+          onChange={(e) =>
+            setForm((f: any) => ({ ...f, assignedTo: e.target.value }))
+          }
+          placeholder="Agent ID"
+          className="px-3 py-2 border rounded-lg"
+        />
+      </>
+    )}
+    <textarea
+      value={form.note}
+      onChange={(e) => setForm((f: any) => ({ ...f, note: e.target.value }))}
+      placeholder="Note"
+      className="md:col-span-2 px-3 py-2 border rounded-lg"
+      rows={4}
+    />
+  </div>
+);

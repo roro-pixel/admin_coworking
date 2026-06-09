@@ -1,23 +1,56 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Users, Ticket, AlertCircle, Package, CreditCard, Clock, RefreshCw, TrendingUp } from 'lucide-react';
-import { subscriptionService } from '../../../services/subscription.service';
+import React from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Users,
+  Ticket,
+  AlertCircle,
+  Package,
+  CreditCard,
+  Clock,
+  RefreshCw,
+  TrendingUp,
+  XCircle,
+  Layers,
+  Activity,
+  BarChart2,
+} from "lucide-react";
+import { subscriptionService } from "../../../services/subscription.service";
+
+// FIX : helper de lecture défensive — évite NaN/undefined sur champs inconnus ou manquants
+const safeNum = (val: unknown): number =>
+  typeof val === "number" && isFinite(val) ? val : 0;
+
+// FIX : formatage monétaire centralisé
+const formatCurrency = (value: number): string =>
+  `${value.toLocaleString("fr-FR")} FCFA`;
+
+const formatNumber = (value: number): string => value.toLocaleString("fr-FR");
 
 export const SubscriptionMetrics: React.FC = () => {
-  const { data: metrics, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ['subscription-metrics'],
+  const {
+    data: metrics,
+    isLoading,
+    isError,
+    refetch,
+    isFetching,
+  } = useQuery({
+    queryKey: ["subscription-metrics"],
     queryFn: () => subscriptionService.getSubscriptionMetrics(),
-    // Refresh automatique toutes les 5 minutes
-    staleTime: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 min
   });
 
   if (isLoading) {
     return (
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-6">Métriques des abonnements</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-6">
+          Métriques des abonnements
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-xl p-6 shadow-sm animate-pulse">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-white rounded-xl p-6 shadow-sm animate-pulse"
+            >
               <div className="w-12 h-12 bg-gray-200 rounded-lg mb-4" />
               <div className="h-8 bg-gray-200 rounded w-24 mb-2" />
               <div className="h-4 bg-gray-100 rounded w-32" />
@@ -31,10 +64,14 @@ export const SubscriptionMetrics: React.FC = () => {
   if (isError) {
     return (
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-6">Métriques des abonnements</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-6">
+          Métriques des abonnements
+        </h2>
         <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
           <AlertCircle size={32} className="mx-auto text-red-400 mb-3" />
-          <p className="text-red-700 font-medium">Erreur de chargement des métriques</p>
+          <p className="text-red-700 font-medium">
+            Erreur de chargement des métriques
+          </p>
           <button
             onClick={() => refetch()}
             className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
@@ -46,113 +83,204 @@ export const SubscriptionMetrics: React.FC = () => {
     );
   }
 
-  // CORRECTION : accès défensif à tous les champs — l'API retourne `any`
-  // On utilise `?? 0` pour éviter les NaN/undefined sur des champs inconnus
-  const safeNum = (val: any): number =>
-    typeof val === 'number' && !isNaN(val) ? val : 0;
-
-  const cards = [
+  // FIX : tous les champs proviennent directement des clés documentées dans la doc API
+  // Pas d'alias ni de fallback sur des noms hypothétiques (mrr, totalActivePlans…)
+  const cards: {
+    title: string;
+    value: number;
+    icon: React.ElementType;
+    color: string;
+    format: "number" | "currency";
+    section?: string;
+  }[] = [
+    // ── Souscriptions ──────────────────────────────
     {
-      title: 'Souscriptions actives',
+      title: "Souscriptions actives",
       value: safeNum(metrics?.activeSubscriptions),
       icon: Users,
-      color: 'bg-green-100 text-green-600',
-      format: 'number',
+      color: "bg-green-100 text-green-600",
+      format: "number",
+      section: "Souscriptions",
     },
     {
-      title: 'En attente d\'activation',
-      value: safeNum(metrics?.pendingSubscriptions ?? metrics?.pendingActivationSubscriptions),
+      title: "En attente d'activation",
+      value: safeNum(metrics?.pendingSubscriptions),
       icon: Clock,
-      color: 'bg-yellow-100 text-yellow-600',
-      format: 'number',
+      color: "bg-yellow-100 text-yellow-600",
+      format: "number",
     },
     {
-      title: 'Souscriptions suspendues',
+      title: "Suspendues",
       value: safeNum(metrics?.suspendedSubscriptions),
       icon: AlertCircle,
-      color: 'bg-orange-100 text-orange-600',
-      format: 'number',
+      color: "bg-orange-100 text-orange-600",
+      format: "number",
     },
     {
-      title: 'MRR',
-      value: safeNum(metrics?.activeSubscriptionMrr ?? metrics?.mrr ?? metrics?.monthlyRecurringRevenue),
+      title: "Annulées",
+      value: safeNum(metrics?.cancelledSubscriptions),
+      icon: XCircle,
+      color: "bg-red-100 text-red-600",
+      format: "number",
+    },
+
+    // ── Revenus ────────────────────────────────────
+    {
+      title: "MRR actif",
+      value: safeNum(metrics?.activeSubscriptionMrr),
       icon: TrendingUp,
-      color: 'bg-blue-100 text-blue-600',
-      format: 'currency',
+      color: "bg-blue-100 text-blue-600",
+      format: "currency",
+      section: "Revenus & Facturation",
     },
     {
-      title: 'Promotions actives',
-      value: safeNum(metrics?.activePromotions),
-      icon: Ticket,
-      color: 'bg-pink-100 text-pink-600',
-      format: 'number',
-    },
-    {
-      title: 'Plans actifs',
-      value: safeNum(metrics?.activePlans ?? metrics?.totalActivePlans),
-      icon: Package,
-      color: 'bg-indigo-100 text-indigo-600',
-      format: 'number',
-    },
-    {
-      title: 'Souscriptions expirées',
-      value: safeNum(metrics?.expiredSubscriptions),
-      icon: AlertCircle,
-      color: 'bg-gray-100 text-gray-500',
-      format: 'number',
-    },
-    {
-      title: 'Factures en attente',
-      value: safeNum(metrics?.pendingBillableAmount ?? metrics?.pendingInvoiceAmount),
+      title: "Montant facturable en attente",
+      value: safeNum(metrics?.pendingBillableAmount),
       icon: CreditCard,
-      color: 'bg-red-100 text-red-600',
-      format: 'currency',
+      color: "bg-red-100 text-red-600",
+      format: "currency",
+    },
+    {
+      title: "Items facturables en attente",
+      value: safeNum(metrics?.pendingBillableItems),
+      icon: BarChart2,
+      color: "bg-pink-100 text-pink-600",
+      format: "number",
+    },
+
+    // ── Passes & Add-ons ───────────────────────────
+    {
+      title: "Passes actifs",
+      value: safeNum(metrics?.activePasses),
+      icon: Ticket,
+      color: "bg-purple-100 text-purple-600",
+      format: "number",
+      section: "Passes & Add-ons",
+    },
+    {
+      title: "Add-ons actifs",
+      value: safeNum(metrics?.activeAddons),
+      icon: Layers,
+      color: "bg-indigo-100 text-indigo-600",
+      format: "number",
+    },
+    {
+      title: "Promotions actives",
+      value: safeNum(metrics?.activePromotions),
+      icon: Package,
+      color: "bg-pink-100 text-pink-600",
+      format: "number",
+    },
+
+    // ── Usage & Overage ────────────────────────────
+    {
+      title: "Usage enregistré",
+      value: safeNum(metrics?.recordedUsageQuantity),
+      icon: Activity,
+      color: "bg-teal-100 text-teal-600",
+      format: "number",
+      section: "Usage & Overage",
+    },
+    {
+      title: "Usage facturable",
+      value: safeNum(metrics?.billableUsageQuantity),
+      icon: Activity,
+      color: "bg-cyan-100 text-cyan-600",
+      format: "number",
+    },
+    {
+      title: "Charges overage",
+      value: safeNum(metrics?.overageCharges),
+      icon: AlertCircle,
+      color: "bg-orange-100 text-orange-600",
+      format: "number",
+    },
+    {
+      title: "Montant overage",
+      value: safeNum(metrics?.overageAmount),
+      icon: TrendingUp,
+      color: "bg-red-100 text-red-600",
+      format: "currency",
+    },
+
+    // ── Rollover ───────────────────────────────────
+    {
+      title: "Reports appliqués",
+      value: safeNum(metrics?.rolloverRecords),
+      icon: RefreshCw,
+      color: "bg-gray-100 text-gray-600",
+      format: "number",
+      section: "Rollover",
+    },
+    {
+      title: "Quantité reportée",
+      value: safeNum(metrics?.rolloverQuantity),
+      icon: RefreshCw,
+      color: "bg-gray-100 text-gray-500",
+      format: "number",
     },
   ];
 
-  const formatValue = (value: number, format: string): string => {
-    if (format === 'currency') {
-      return `${value.toLocaleString('fr-FR')} FCFA`;
+  // Regroupe les cartes par section
+  const sections: { label: string; items: typeof cards }[] = [];
+  let currentSection: { label: string; items: typeof cards } | null = null;
+
+  for (const card of cards) {
+    if (card.section) {
+      currentSection = { label: card.section, items: [] };
+      sections.push(currentSection);
     }
-    return value.toLocaleString('fr-FR');
-  };
+    currentSection?.items.push(card);
+  }
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Métriques des abonnements</h2>
+        <h2 className="text-xl font-semibold text-gray-900">
+          Métriques des abonnements
+        </h2>
         <button
           onClick={() => refetch()}
           disabled={isFetching}
           className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
         >
-          <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
+          <RefreshCw size={14} className={isFetching ? "animate-spin" : ""} />
           Actualiser
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {cards.map((card, index) => {
-          const Icon = card.icon;
-          return (
-            <div
-              key={index}
-              className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-lg ${card.color}`}>
-                  <Icon size={24} />
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-gray-900 mb-1">
-                {formatValue(card.value, card.format)}
-              </p>
-              <p className="text-sm text-gray-600">{card.title}</p>
+      <div className="space-y-8">
+        {sections.map((section) => (
+          <div key={section.label}>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+              {section.label}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {section.items.map((card, index) => {
+                const Icon = card.icon;
+                return (
+                  <div
+                    key={index}
+                    className="bg-white rounded-xl p-5 shadow-sm hover:shadow-md transition-all"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className={`p-2.5 rounded-lg ${card.color}`}>
+                        <Icon size={20} />
+                      </div>
+                    </div>
+                    <p className="text-2xl font-bold text-gray-900 mb-1">
+                      {card.format === "currency"
+                        ? formatCurrency(card.value)
+                        : formatNumber(card.value)}
+                    </p>
+                    <p className="text-sm text-gray-500">{card.title}</p>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
-
     </div>
   );
 };

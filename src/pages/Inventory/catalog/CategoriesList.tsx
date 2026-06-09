@@ -1,29 +1,31 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Search, X } from 'lucide-react';
-import { inventoryService } from '../../../services/inventory.service';
-import type { InventoryCategory } from '../../../services/inventory.service';
+import React, { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Plus, Edit, Trash2, Search, X } from "lucide-react";
+import { inventoryService } from "../../../services/inventory.service";
+import type { InventoryCategory } from "../../../services/inventory.service";
+import { ModalPortal } from "../../../components/ui/ModalPortal";
 
 export const CategoriesList: React.FC = () => {
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<InventoryCategory | null>(null);
+  const [editingCategory, setEditingCategory] =
+    useState<InventoryCategory | null>(null);
   const [formData, setFormData] = useState({
-    categoryCode: '',
-    name: '',
-    description: '',
+    categoryCode: "",
+    name: "",
+    description: "",
   });
 
   const { data: categories = [], isLoading } = useQuery({
-    queryKey: ['inventory-categories'],
+    queryKey: ["inventory-categories"],
     queryFn: () => inventoryService.getCategories(),
   });
 
   const createMutation = useMutation({
     mutationFn: (data: any) => inventoryService.createCategory(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory-categories'] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-categories"] });
       handleCloseModal();
     },
   });
@@ -32,7 +34,7 @@ export const CategoriesList: React.FC = () => {
     mutationFn: ({ code, data }: { code: string; data: any }) =>
       inventoryService.updateCategory(code, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory-categories'] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-categories"] });
       handleCloseModal();
     },
   });
@@ -40,13 +42,14 @@ export const CategoriesList: React.FC = () => {
   const deleteMutation = useMutation({
     mutationFn: (code: string) => inventoryService.deleteCategory(code),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory-categories'] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-categories"] });
     },
   });
 
-  const filteredCategories = categories.filter(cat =>
-    cat.name.toLowerCase().includes(search.toLowerCase()) ||
-    cat.code.toLowerCase().includes(search.toLowerCase())
+  const filteredCategories = categories.filter(
+    (cat) =>
+      cat.name.toLowerCase().includes(search.toLowerCase()) ||
+      cat.code.toLowerCase().includes(search.toLowerCase()),
   );
 
   const handleOpenModal = (category?: InventoryCategory) => {
@@ -55,11 +58,11 @@ export const CategoriesList: React.FC = () => {
       setFormData({
         categoryCode: category.code,
         name: category.name,
-        description: category.description || '',
+        description: category.description || "",
       });
     } else {
       setEditingCategory(null);
-      setFormData({ categoryCode: '', name: '', description: '' });
+      setFormData({ categoryCode: "", name: "", description: "" });
     }
     setIsModalOpen(true);
   };
@@ -67,7 +70,7 @@ export const CategoriesList: React.FC = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingCategory(null);
-    setFormData({ categoryCode: '', name: '', description: '' });
+    setFormData({ categoryCode: "", name: "", description: "" });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -80,7 +83,7 @@ export const CategoriesList: React.FC = () => {
   };
 
   const handleDelete = (code: string) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cette catégorie ?')) {
+    if (confirm("Êtes-vous sûr de vouloir supprimer cette catégorie ?")) {
       deleteMutation.mutate(code);
     }
   };
@@ -90,141 +93,166 @@ export const CategoriesList: React.FC = () => {
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Catégories d'articles</h2>
+    <div className="p-4">
+      <div className="flex justify-between items-center mb-8">
+        <h2 className="text-2xl font-semibold text-gray-900">
+          Catégories d'articles
+        </h2>
         <button
           onClick={() => handleOpenModal()}
-          className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2"
+          className="bg-primary-600 text-white px-5 py-2.5 rounded-lg hover:bg-primary-700 flex items-center gap-2 text-base"
         >
-          <Plus size={18} />
+          <Plus size={20} />
           Nouvelle catégorie
         </button>
       </div>
 
-      {/* Recherche */}
-      <div className="relative mb-6">
-        <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+      {/* Recherche - AGRANDIE */}
+      <div className="relative mb-8">
+        <Search
+          size={20}
+          className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
+        />
         <input
           type="text"
           placeholder="Rechercher une catégorie..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
         />
       </div>
 
-      {/* Tableau */}
+      {/* Tableau - AGRANDI */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Code</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Nom</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Description</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Articles</th>
-              <th className="px-6 py-3 text-right text-sm font-semibold">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {filteredCategories.map((cat) => (
-              <tr key={cat.code} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-mono">{cat.code}</td>
-                <td className="px-6 py-4 text-sm font-medium">{cat.name}</td>
-                <td className="px-6 py-4 text-sm text-gray-500">{cat.description || '-'}</td>
-                <td className="px-6 py-4 text-sm">{cat.itemCount || 0}</td>
-                <td className="px-6 py-4 text-right">
-                  <button
-                    onClick={() => handleOpenModal(cat)}
-                    className="p-1 text-blue-600 hover:text-blue-800 mr-2"
-                  >
-                    <Edit size={18} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(cat.code)}
-                    className="p-1 text-red-600 hover:text-red-800"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-base">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="px-6 py-4 text-left font-semibold">Code</th>
+                <th className="px-6 py-4 text-left font-semibold">Nom</th>
+                <th className="px-6 py-4 text-left font-semibold">
+                  Description
+                </th>
+                <th className="px-6 py-4 text-left font-semibold">Articles</th>
+                <th className="px-6 py-4 text-right font-semibold">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y">
+              {filteredCategories.map((cat) => (
+                <tr key={cat.code} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 font-mono text-sm">{cat.code}</td>
+                  <td className="px-6 py-4 font-medium">{cat.name}</td>
+                  <td className="px-6 py-4 text-gray-500">
+                    {cat.description || "-"}
+                  </td>
+                  <td className="px-6 py-4">{cat.itemCount || 0}</td>
+                  <td className="px-6 py-4 text-right">
+                    <button
+                      onClick={() => handleOpenModal(cat)}
+                      className="p-1.5 text-blue-600 hover:text-blue-800 mr-2"
+                      title="Modifier"
+                    >
+                      <Edit size={18} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(cat.code)}
+                      className="p-1.5 text-red-600 hover:text-red-800"
+                      title="Supprimer"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {filteredCategories.length === 0 && (
-        <div className="text-center py-12 bg-white rounded-xl">
-          <p className="text-gray-500">Aucune catégorie trouvée</p>
+        <div className="text-center py-16 bg-white rounded-xl">
+          <p className="text-gray-500 text-base">Aucune catégorie trouvée</p>
         </div>
       )}
 
-      {/* Modal */}
+      {/* ========== MODAL AVEC ModalPortal - AGRANDI ========== */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={handleCloseModal} />
-          <div className="relative bg-white rounded-2xl w-full max-w-md">
-            <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
-              <h3 className="text-xl font-bold">
-                {editingCategory ? 'Modifier la catégorie' : 'Nouvelle catégorie'}
-              </h3>
-              <button onClick={handleCloseModal} className="p-1 hover:bg-gray-100 rounded-lg">
-                <X size={20} />
+        <ModalPortal onClose={handleCloseModal} size="2xl">
+          <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
+            <h3 className="text-2xl font-bold">
+              {editingCategory ? "Modifier la catégorie" : "Nouvelle catégorie"}
+            </h3>
+            <button
+              onClick={handleCloseModal}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
+              <X size={24} />
+            </button>
+          </div>
+          <form onSubmit={handleSubmit} className="p-8 space-y-6">
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">
+                Code *
+              </label>
+              <input
+                type="text"
+                value={formData.categoryCode}
+                onChange={(e) =>
+                  setFormData({ ...formData, categoryCode: e.target.value })
+                }
+                disabled={!!editingCategory}
+                required
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 text-base"
+                placeholder="ex: MOBILIER"
+              />
+            </div>
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">
+                Nom *
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                required
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 text-base"
+                placeholder="ex: Mobilier"
+              />
+            </div>
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">
+                Description
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 text-base"
+                placeholder="Description optionnelle"
+              />
+            </div>
+            <div className="flex gap-4 pt-6">
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                className="flex-1 px-5 py-3 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 text-base"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={createMutation.isPending || updateMutation.isPending}
+                className="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 text-base"
+              >
+                {editingCategory ? "Mettre à jour" : "Créer"}
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Code *</label>
-                <input
-                  type="text"
-                  value={formData.categoryCode}
-                  onChange={(e) => setFormData({ ...formData, categoryCode: e.target.value })}
-                  disabled={!!editingCategory}
-                  required
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100"
-                  placeholder="ex: MOBILIER"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  placeholder="ex: Mobilier"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  placeholder="Description optionnelle"
-                />
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={createMutation.isPending || updateMutation.isPending}
-                  className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50"
-                >
-                  {editingCategory ? 'Mettre à jour' : 'Créer'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+          </form>
+        </ModalPortal>
       )}
     </div>
   );

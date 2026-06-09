@@ -1,4 +1,4 @@
-import { apiClient } from './api';
+import { apiClient } from "./api";
 
 export type BookingPaymentMode = "DIRECT" | "SUBSCRIPTION" | "PASS";
 export type BookingStatus =
@@ -13,7 +13,19 @@ export type BookingStatus =
   | "EXPIRED";
 export type BookingHoldStatus = "ACTIVE" | "CONFIRMED" | "RELEASED" | "EXPIRED";
 export type BookingParticipantRole = "HOST" | "GUEST" | "ORGANIZER";
-export type BookingParticipantStatus = "INVITED" | "CONFIRMED" | "DECLINED" | "REMOVED";
+export type BookingParticipantStatus =
+  | "INVITED"
+  | "CONFIRMED"
+  | "DECLINED"
+  | "REMOVED";
+
+export interface BookingRecurrence {
+  recurrenceType: "DAILY" | "WEEKLY" | "MONTHLY" | "CUSTOM";
+  intervalValue: number;
+  endDate: string;
+  excludedDates?: string[];
+  recurrenceGroupNumber?: string;
+}
 
 export interface BookingParticipant {
   id?: number;
@@ -46,6 +58,7 @@ export interface BookingResponse {
   resourceGroupCode?: string;
   ownerType: string;
   ownerCode: string;
+  ownerName?: string;
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
@@ -71,6 +84,11 @@ export interface BookingResponse {
   createdAt: string;
   lines: BookingLine[];
   participants: BookingParticipant[];
+  recurrence?: BookingRecurrence;
+  recurrenceGroupNumber?: string;
+  checkInToken?: string;
+  checkInQrValue?: string;
+  virtualMeetingUrl?: string;
 }
 
 export interface BookingHistory {
@@ -151,7 +169,8 @@ export interface CreateBookingRequest {
   sendEmail?: boolean;
   notes?: string;
   metadataJson?: string;
-  participants?: Omit<BookingParticipant, 'id' | 'status'>[];
+  participants?: Omit<BookingParticipant, "id" | "status">[];
+  recurrence?: Omit<BookingRecurrence, "recurrenceGroupNumber">;
 }
 
 export interface BookingStatusChangeRequest {
@@ -204,20 +223,60 @@ export interface BookingMetrics {
   completedAmount: number;
 }
 
+function normalizeBookingsResponse(responseData: any): {
+  data: BookingResponse[];
+  pageable: any;
+} {
+  if (responseData?.data !== undefined) {
+    return { data: responseData.data, pageable: responseData.pageable || {} };
+  }
+  if (Array.isArray(responseData?.content)) {
+    return {
+      data: responseData.content,
+      pageable: {
+        totalPages: responseData.totalPages,
+        totalElements: responseData.totalElements,
+      },
+    };
+  }
+  if (Array.isArray(responseData)) {
+    return {
+      data: responseData,
+      pageable: { totalPages: 1, totalElements: responseData.length },
+    };
+  }
+  return { data: [], pageable: {} };
+}
+
+export interface BookingCancellationPolicyRule {
+  id: number | string;
+  hoursBeforeStart: number;
+  refundPercentage: number;
+  ruleOrder: number;
+  active: boolean;
+}
+
 export const bookingService = {
-  // Vérifier disponibilité
-  checkAvailability: async (data: CheckAvailabilityRequest): Promise<CheckAvailabilityResponse> => {
-    const response = await apiClient.post('/sni/api/v1/bookings/check-availability', data);
+  checkAvailability: async (
+    data: CheckAvailabilityRequest,
+  ): Promise<CheckAvailabilityResponse> => {
+    const response = await apiClient.post(
+      "/sni/api/v1/bookings/check-availability",
+      data,
+    );
     return response.data;
   },
 
-  // Suggestions alternatives
-  getSuggestions: async (data: CheckAvailabilityRequest): Promise<BookingSuggestion[]> => {
-    const response = await apiClient.post('/sni/api/v1/bookings/suggestions', data);
+  getSuggestions: async (
+    data: CheckAvailabilityRequest,
+  ): Promise<BookingSuggestion[]> => {
+    const response = await apiClient.post(
+      "/sni/api/v1/bookings/suggestions",
+      data,
+    );
     return response.data;
   },
 
-  // Créer un hold
   createHold: async (data: {
     resourceCode: string;
     memberId?: string;
@@ -229,30 +288,28 @@ export const bookingService = {
     ttlMinutes: number;
     idempotencyKey?: string;
   }): Promise<{ holdNumber: string; status: string; expiresAt: string }> => {
-    const response = await apiClient.post('/sni/api/v1/bookings/holds', data);
+    const response = await apiClient.post("/sni/api/v1/bookings/holds", data);
     return response.data;
   },
 
-  // Libérer un hold
   releaseHold: async (holdNumber: string): Promise<void> => {
     await apiClient.patch(`/sni/api/v1/bookings/holds/${holdNumber}/release`);
   },
 
-  // Créer un booking
-  createBooking: async (data: CreateBookingRequest): Promise<BookingResponse> => {
-    const response = await apiClient.post('/sni/api/v1/bookings', data);
+  createBooking: async (
+    data: CreateBookingRequest,
+  ): Promise<BookingResponse> => {
+    const response = await apiClient.post("/sni/api/v1/bookings", data);
     return response.data;
   },
 
-  // Récupérer un booking
   getBooking: async (bookingNumber: string): Promise<BookingResponse> => {
-    const response = await apiClient.get(`/sni/api/v1/bookings/${bookingNumber}`);
+    const response = await apiClient.get(
+      `/sni/api/v1/bookings/${bookingNumber}`,
+    );
     return response.data;
   },
 
-  // Lister les bookings
-  // L'API retourne { data: [...], pageable: { totalPages, totalElements, ... } }
-  // format non standard (pas content/totalPages au premier niveau)
   getBookings: async (params?: {
     query?: string;
     ownerType?: string;
@@ -264,131 +321,233 @@ export const bookingService = {
     page?: number;
     size?: number;
     sort?: string;
-  }): Promise<{ data: BookingResponse[]; pageable: { page: number; size: number; totalPages: number; totalElements: number; first: boolean; last: boolean; hasNext: boolean; hasPrevious: boolean } }> => {
-    const response = await apiClient.get('/sni/api/v1/bookings', { params });
-    // Wrapper defensif
-    if (response.data?.data !== undefined) return response.data;
-    if (Array.isArray(response.data?.content)) {
-      return { data: response.data.content, pageable: { page: params?.page || 0, size: params?.size || 20, totalPages: response.data.totalPages || 1, totalElements: response.data.totalElements || response.data.content.length, first: (params?.page || 0) === 0, last: true, hasNext: false, hasPrevious: (params?.page || 0) > 0 } };
-    }
-    if (Array.isArray(response.data)) {
-      return { data: response.data, pageable: { page: 0, size: response.data.length, totalPages: 1, totalElements: response.data.length, first: true, last: true, hasNext: false, hasPrevious: false } };
-    }
-    return { data: [], pageable: { page: 0, size: 20, totalPages: 0, totalElements: 0, first: true, last: true, hasNext: false, hasPrevious: false } };
+  }): Promise<{ data: BookingResponse[]; pageable: any }> => {
+    const response = await apiClient.get("/sni/api/v1/bookings", { params });
+    return normalizeBookingsResponse(response.data);
   },
 
-  // Recherche rapide
   searchBookings: async (query: string): Promise<BookingResponse[]> => {
-    const response = await apiClient.get('/sni/api/v1/bookings/search', { params: { query } });
+    const response = await apiClient.get("/sni/api/v1/bookings/search", {
+      params: { query },
+    });
     return response.data;
   },
 
-  // Confirmer
-  confirmBooking: async (bookingNumber: string, data?: BookingStatusChangeRequest): Promise<BookingResponse> => {
-    const response = await apiClient.patch(`/sni/api/v1/bookings/${bookingNumber}/confirm`, data || {});
+  confirmBooking: async (
+    bookingNumber: string,
+    data?: BookingStatusChangeRequest,
+  ): Promise<BookingResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/bookings/${bookingNumber}/confirm`,
+      data || {},
+    );
     return response.data;
   },
 
-  // Approuver
-  approveBooking: async (bookingNumber: string, data?: BookingStatusChangeRequest): Promise<BookingResponse> => {
-    const response = await apiClient.patch(`/sni/api/v1/bookings/${bookingNumber}/approve`, data || {});
+  approveBooking: async (
+    bookingNumber: string,
+    data?: BookingStatusChangeRequest,
+  ): Promise<BookingResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/bookings/${bookingNumber}/approve`,
+      data || {},
+    );
     return response.data;
   },
 
-  // Rejeter
-  rejectBooking: async (bookingNumber: string, data?: BookingStatusChangeRequest): Promise<BookingResponse> => {
-    const response = await apiClient.patch(`/sni/api/v1/bookings/${bookingNumber}/reject`, data || {});
+  rejectBooking: async (
+    bookingNumber: string,
+    data?: BookingStatusChangeRequest,
+  ): Promise<BookingResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/bookings/${bookingNumber}/reject`,
+      data || {},
+    );
     return response.data;
   },
 
-  // Démarrer
-  startBooking: async (bookingNumber: string, data?: BookingStatusChangeRequest): Promise<BookingResponse> => {
-    const response = await apiClient.patch(`/sni/api/v1/bookings/${bookingNumber}/start`, data || {});
+  startBooking: async (
+    bookingNumber: string,
+    data?: BookingStatusChangeRequest,
+  ): Promise<BookingResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/bookings/${bookingNumber}/start`,
+      data || {},
+    );
     return response.data;
   },
 
-  // Check-in
-  checkIn: async (bookingNumber: string, data?: { actor?: string; note?: string; sendEmail?: boolean }): Promise<BookingResponse> => {
-    const response = await apiClient.patch(`/sni/api/v1/bookings/${bookingNumber}/check-in`, data || {});
+  checkIn: async (
+    bookingNumber: string,
+    data?: { actor?: string; note?: string; sendEmail?: boolean },
+  ): Promise<BookingResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/bookings/${bookingNumber}/check-in`,
+      data || {},
+    );
     return response.data;
   },
 
-  // Check-out
-  checkOut: async (bookingNumber: string, data?: { actor?: string; note?: string; sendEmail?: boolean }): Promise<BookingResponse> => {
-    const response = await apiClient.patch(`/sni/api/v1/bookings/${bookingNumber}/check-out`, data || {});
+  checkOut: async (
+    bookingNumber: string,
+    data?: { actor?: string; note?: string; sendEmail?: boolean },
+  ): Promise<BookingResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/bookings/${bookingNumber}/check-out`,
+      data || {},
+    );
     return response.data;
   },
 
-  // Compléter
-  completeBooking: async (bookingNumber: string, data?: BookingStatusChangeRequest): Promise<BookingResponse> => {
-    const response = await apiClient.patch(`/sni/api/v1/bookings/${bookingNumber}/complete`, data || {});
+  completeBooking: async (
+    bookingNumber: string,
+    data?: BookingStatusChangeRequest,
+  ): Promise<BookingResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/bookings/${bookingNumber}/complete`,
+      data || {},
+    );
     return response.data;
   },
 
-  // Annuler
-  cancelBooking: async (bookingNumber: string, data?: BookingStatusChangeRequest): Promise<BookingResponse> => {
-    const response = await apiClient.patch(`/sni/api/v1/bookings/${bookingNumber}/cancel`, data || {});
+  cancelBooking: async (
+    bookingNumber: string,
+    data?: BookingStatusChangeRequest,
+  ): Promise<BookingResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/bookings/${bookingNumber}/cancel`,
+      data || {},
+    );
     return response.data;
   },
 
-  // No-show
-  noShowBooking: async (bookingNumber: string, data?: BookingStatusChangeRequest): Promise<BookingResponse> => {
-    const response = await apiClient.patch(`/sni/api/v1/bookings/${bookingNumber}/no-show`, data || {});
+  noShowBooking: async (
+    bookingNumber: string,
+    data?: BookingStatusChangeRequest,
+  ): Promise<BookingResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/bookings/${bookingNumber}/no-show`,
+      data || {},
+    );
     return response.data;
   },
 
-  // Historique
-  getBookingHistory: async (bookingNumber: string): Promise<BookingHistory[]> => {
-    const response = await apiClient.get(`/sni/api/v1/bookings/${bookingNumber}/history`);
+  getBookingHistory: async (
+    bookingNumber: string,
+  ): Promise<BookingHistory[]> => {
+    const response = await apiClient.get(
+      `/sni/api/v1/bookings/${bookingNumber}/history`,
+    );
     return response.data;
   },
 
-  // Événements
   getBookingEvents: async (bookingNumber: string): Promise<BookingEvent[]> => {
-    const response = await apiClient.get(`/sni/api/v1/bookings/${bookingNumber}/events`);
+    const response = await apiClient.get(
+      `/sni/api/v1/bookings/${bookingNumber}/events`,
+    );
     return response.data;
   },
 
-  // Participants
-  addParticipant: async (bookingNumber: string, data: Omit<BookingParticipant, 'id' | 'status'>): Promise<BookingParticipant> => {
-    const response = await apiClient.post(`/sni/api/v1/bookings/${bookingNumber}/participants`, data);
+  addParticipant: async (
+    bookingNumber: string,
+    data: Omit<BookingParticipant, "id" | "status">,
+  ): Promise<BookingParticipant> => {
+    const response = await apiClient.post(
+      `/sni/api/v1/bookings/${bookingNumber}/participants`,
+      data,
+    );
     return response.data;
   },
 
-  removeParticipant: async (bookingNumber: string, participantId: number): Promise<void> => {
-    await apiClient.delete(`/sni/api/v1/bookings/${bookingNumber}/participants/${participantId}`);
+  removeParticipant: async (
+    bookingNumber: string,
+    participantId: number,
+  ): Promise<void> => {
+    await apiClient.delete(
+      `/sni/api/v1/bookings/${bookingNumber}/participants/${participantId}`,
+    );
   },
 
-  // Politiques
-  getPolicies: async (params?: { audienceType?: string; active?: boolean }): Promise<BookingAudiencePolicy[]> => {
-    const response = await apiClient.get('/sni/api/v1/bookings/policies', { params });
+  previewRecurrence: async (data: {
+    resourceCode: string;
+    startedAt: string;
+    endedAt: string;
+    recurrence: Omit<BookingRecurrence, "recurrenceGroupNumber">;
+  }): Promise<{
+    occurrences: Array<{ startedAt: string; endedAt: string }>;
+  }> => {
+    const response = await apiClient.post(
+      "/sni/api/v1/bookings/recurrence/preview",
+      data,
+    );
     return response.data;
   },
 
-  createPolicy: async (data: BookingAudiencePolicy): Promise<BookingAudiencePolicy> => {
-    const response = await apiClient.post('/sni/api/v1/bookings/policies', data);
+  getPolicies: async (params?: {
+    audienceType?: string;
+    active?: boolean;
+  }): Promise<BookingAudiencePolicy[]> => {
+    const response = await apiClient.get("/sni/api/v1/bookings/policies", {
+      params,
+    });
     return response.data;
   },
 
-  updatePolicy: async (policyId: number, data: Partial<BookingAudiencePolicy>): Promise<BookingAudiencePolicy> => {
-    const response = await apiClient.put(`/sni/api/v1/bookings/policies/${policyId}`, data);
+  createPolicy: async (
+    data: BookingAudiencePolicy,
+  ): Promise<BookingAudiencePolicy> => {
+    const response = await apiClient.post(
+      "/sni/api/v1/bookings/policies",
+      data,
+    );
     return response.data;
   },
 
-  // Quota overrides
-  getQuotaOverrides: async (params?: { ownerType?: string; ownerCode?: string; active?: boolean }): Promise<BookingQuotaOverride[]> => {
-    const response = await apiClient.get('/sni/api/v1/bookings/quota-overrides', { params });
+  updatePolicy: async (
+    policyId: number,
+    data: Partial<BookingAudiencePolicy>,
+  ): Promise<BookingAudiencePolicy> => {
+    const response = await apiClient.put(
+      `/sni/api/v1/bookings/policies/${policyId}`,
+      data,
+    );
+    return response.data;
+  },
+
+  getQuotaOverrides: async (params?: {
+    ownerType?: string;
+    ownerCode?: string;
+    active?: boolean;
+  }): Promise<BookingQuotaOverride[]> => {
+    const response = await apiClient.get(
+      "/sni/api/v1/bookings/quota-overrides",
+      { params },
+    );
     return response.data;
   },
 
   createQuotaOverride: async (data: any): Promise<BookingQuotaOverride> => {
-    const response = await apiClient.post('/sni/api/v1/bookings/quota-overrides', data);
+    const response = await apiClient.post(
+      "/sni/api/v1/bookings/quota-overrides",
+      data,
+    );
     return response.data;
   },
 
-  // Métriques
   getMetrics: async (): Promise<BookingMetrics> => {
-    const response = await apiClient.get('/sni/api/v1/bookings/metrics/overview');
+    const response = await apiClient.get(
+      "/sni/api/v1/bookings/metrics/overview",
+    );
     return response.data;
+  },
+
+  getCancellationPolicy: async (): Promise<BookingCancellationPolicyRule[]> => {
+    const response = await apiClient.get(
+      "/sni/api/v1/bookings/cancellation-policy",
+    );
+    if (Array.isArray(response.data)) return response.data;
+    if (Array.isArray(response.data?.data)) return response.data.data;
+    if (Array.isArray(response.data?.content)) return response.data.content;
+    return [];
   },
 };

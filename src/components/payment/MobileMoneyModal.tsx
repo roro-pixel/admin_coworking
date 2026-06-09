@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Loader2, Smartphone, AlertCircle, CheckCircle } from 'lucide-react';
-import { paymentService } from '../../services/payment.service';
-import type { PaymentIntent } from '../../services/payment.service';
-import { ModalPortal } from '../../components/ui/ModalPortal';
-import { useAuth } from '../../contexts/AuthContext';
+import React, { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { X, Loader2, Smartphone, AlertCircle, CheckCircle } from "lucide-react";
+import { paymentService } from "../../services/payment.service";
+import type { PaymentIntent } from "../../services/payment.service";
+import { ModalPortal } from "../../components/ui/ModalPortal";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface MobileMoneyModalProps {
   isOpen: boolean;
@@ -22,46 +22,50 @@ export const MobileMoneyModal: React.FC<MobileMoneyModalProps> = ({
   const { admin } = useAuth();
   const queryClient = useQueryClient();
 
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [correspondent, setCorrespondent] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [correspondent, setCorrespondent] = useState("");
   const [amount, setAmount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
 
   const { data: providers = [], isLoading: providersLoading } = useQuery({
-    queryKey: ['mobile-money-providers'],
+    queryKey: ["mobile-money-providers"],
     queryFn: () => paymentService.getMobileMoneyProviders(),
     enabled: isOpen,
   });
 
   const depositMutation = useMutation({
-    mutationFn: () => paymentService.initiateMobileMoneyDeposit({
-      intentNumber: intent.intentNumber,
-      phoneNumber,
-      correspondent,
-      amount: amount > 0 ? amount : undefined,
-      createdBy: admin?.email || 'admin',
-    }),
+    mutationFn: () =>
+      paymentService.initiateMobileMoneyDeposit({
+        intentNumber: intent.intentNumber,
+        phoneNumber,
+        correspondent,
+        amount: amount > 0 ? amount : undefined,
+        createdBy: admin?.email || "admin",
+      }),
     onSuccess: (data) => {
       setResult(data);
       setError(null);
-      queryClient.invalidateQueries({ queryKey: ['payment-intents'] });
+      queryClient.invalidateQueries({ queryKey: ["payment-intents"] });
       if (data.transactionNumber && onPaymentSuccess) {
         onPaymentSuccess(data.transactionNumber);
       }
     },
     onError: (err: any) => {
-      setError(err?.response?.data?.message || 'Erreur lors de l\'initiation du paiement.');
+      setError(
+        err?.response?.data?.message ||
+          "Erreur lors de l'initiation du paiement.",
+      );
     },
   });
 
   const handleSubmit = () => {
     if (!phoneNumber.trim()) {
-      setError('Le numéro de téléphone est obligatoire.');
+      setError("Le numéro de téléphone est obligatoire.");
       return;
     }
     if (!correspondent) {
-      setError('Veuillez sélectionner un provider.');
+      setError("Veuillez sélectionner un provider.");
       return;
     }
     setError(null);
@@ -110,7 +114,9 @@ export const MobileMoneyModal: React.FC<MobileMoneyModalProps> = ({
               </div>
               <div className="p-3 bg-gray-50 rounded-lg">
                 <p className="text-xs text-gray-500">Montant</p>
-                <p className="font-bold">{result.amount?.toLocaleString('fr-FR')} {result.currency}</p>
+                <p className="font-bold">
+                  {result.amount?.toLocaleString("fr-FR")} {result.currency}
+                </p>
               </div>
               <div className="p-3 bg-gray-50 rounded-lg">
                 <p className="text-xs text-gray-500">Transaction</p>
@@ -141,12 +147,24 @@ export const MobileMoneyModal: React.FC<MobileMoneyModalProps> = ({
         ) : (
           <>
             <div className="bg-gray-50 p-3 rounded-lg text-sm">
-              <p>Intention : <span className="font-mono font-medium">{intent.intentNumber}</span></p>
-              <p>Montant : <span className="font-bold">{intent.amount.toLocaleString('fr-FR')} {intent.currency}</span></p>
+              <p>
+                Intention :{" "}
+                <span className="font-mono font-medium">
+                  {intent.intentNumber}
+                </span>
+              </p>
+              <p>
+                Montant :{" "}
+                <span className="font-bold">
+                  {intent.amount.toLocaleString("fr-FR")} {intent.currency}
+                </span>
+              </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Provider *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Provider *
+              </label>
               {providersLoading ? (
                 <div className="text-center py-2">
                   <Loader2 size={14} className="animate-spin mx-auto" />
@@ -168,19 +186,23 @@ export const MobileMoneyModal: React.FC<MobileMoneyModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Numéro de téléphone *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Numéro de téléphone *
+              </label>
               <input
                 type="text"
                 inputMode="numeric"
                 value={phoneNumber}
                 onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '');
+                  const val = e.target.value.replace(/\D/g, "");
                   setPhoneNumber(val);
                 }}
                 placeholder="242061135836"
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg font-mono"
               />
-              <p className="text-xs text-gray-400 mt-1">Format international sans "+"</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Format international sans "+"
+              </p>
             </div>
 
             <div>
@@ -190,12 +212,12 @@ export const MobileMoneyModal: React.FC<MobileMoneyModalProps> = ({
               <input
                 type="text"
                 inputMode="numeric"
-                value={amount === 0 ? '' : amount}
+                value={amount === 0 ? "" : amount}
                 onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '');
-                  setAmount(val === '' ? 0 : parseInt(val));
+                  const val = e.target.value.replace(/\D/g, "");
+                  setAmount(val === "" ? 0 : parseInt(val));
                 }}
-                placeholder={`Total : ${intent.amount.toLocaleString('fr-FR')} ${intent.currency}`}
+                placeholder={`Total : ${intent.amount.toLocaleString("fr-FR")} ${intent.currency}`}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg"
               />
               <p className="text-xs text-gray-400 mt-1">
@@ -213,7 +235,11 @@ export const MobileMoneyModal: React.FC<MobileMoneyModalProps> = ({
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={depositMutation.isPending || !phoneNumber.trim() || !correspondent}
+                disabled={
+                  depositMutation.isPending ||
+                  !phoneNumber.trim() ||
+                  !correspondent
+                }
                 className="flex-1 bg-yellow-600 text-white py-2 rounded-lg hover:bg-yellow-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {depositMutation.isPending ? (

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Loader2 } from 'lucide-react';
-import { resourceService } from '../../../services/resource.service';
-import type { ResourceGroupResponse } from '../../../services/resource.service';
-import { ModalPortal } from '../../../components/ui/ModalPortal';
+import React, { useState, useEffect } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { X, Loader2 } from "lucide-react";
+import { resourceService } from "../../../services/resource.service";
+import type { ResourceGroupResponse } from "../../../services/resource.service";
+import { ModalPortal } from "../../../components/ui/ModalPortal";
 
 interface ResourceGroupFormModalProps {
   isOpen: boolean;
@@ -13,8 +13,8 @@ interface ResourceGroupFormModalProps {
 }
 
 const buildDefaultFormData = (group: ResourceGroupResponse | null) => ({
-  name: group?.name || '',
-  description: group?.description || '',
+  name: group?.name || "",
+  description: group?.description || "",
   portalVisible: group?.portalVisible ?? true,
   active: group?.active ?? true,
 });
@@ -27,7 +27,9 @@ export const ResourceGroupFormModal: React.FC<ResourceGroupFormModalProps> = ({
 }) => {
   const queryClient = useQueryClient();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [formData, setFormData] = useState(() => buildDefaultFormData(editingGroup));
+  const [formData, setFormData] = useState(() =>
+    buildDefaultFormData(editingGroup),
+  );
 
   // CORRECTION : resynchronisation à chaque ouverture ou changement de groupe
   useEffect(() => {
@@ -36,36 +38,44 @@ export const ResourceGroupFormModal: React.FC<ResourceGroupFormModalProps> = ({
   }, [editingGroup, isOpen]);
 
   const createMutation = useMutation({
-    mutationFn: () => resourceService.createResourceGroup({
-      name: formData.name,
-      description: formData.description || undefined,
-      portalVisible: formData.portalVisible,
-      active: formData.active,
-    }),
+    mutationFn: () =>
+      resourceService.createResourceGroup({
+        name: formData.name,
+        description: formData.description || undefined,
+        portalVisible: formData.portalVisible,
+        active: formData.active,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['resource-groups'] });
-      queryClient.invalidateQueries({ queryKey: ['resource-groups-list'] });
+      queryClient.invalidateQueries({ queryKey: ["resource-groups"] });
+      queryClient.invalidateQueries({ queryKey: ["resource-groups-list"] });
       onSuccess();
     },
     onError: (error: any) => {
-      setErrorMessage(error?.response?.data?.message || 'Erreur lors de la création du groupe.');
+      setErrorMessage(
+        error?.response?.data?.message ||
+          "Erreur lors de la création du groupe.",
+      );
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: () => resourceService.updateResourceGroup(editingGroup!.code, {
-      name: formData.name,
-      description: formData.description || undefined,
-      portalVisible: formData.portalVisible,
-      active: formData.active,
-    }),
+    mutationFn: () =>
+      resourceService.updateResourceGroup(editingGroup!.code, {
+        name: formData.name,
+        description: formData.description || undefined,
+        portalVisible: formData.portalVisible,
+        active: formData.active,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['resource-groups'] });
-      queryClient.invalidateQueries({ queryKey: ['resource-groups-list'] });
+      queryClient.invalidateQueries({ queryKey: ["resource-groups"] });
+      queryClient.invalidateQueries({ queryKey: ["resource-groups-list"] });
       onSuccess();
     },
     onError: (error: any) => {
-      setErrorMessage(error?.response?.data?.message || 'Erreur lors de la mise à jour du groupe.');
+      setErrorMessage(
+        error?.response?.data?.message ||
+          "Erreur lors de la mise à jour du groupe.",
+      );
     },
   });
 
@@ -88,7 +98,7 @@ export const ResourceGroupFormModal: React.FC<ResourceGroupFormModalProps> = ({
     <ModalPortal onClose={onClose}>
       <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
         <h3 className="text-xl font-bold">
-          {editingGroup ? 'Modifier le groupe' : 'Nouveau groupe de ressources'}
+          {editingGroup ? "Modifier le groupe" : "Nouveau groupe de ressources"}
         </h3>
         <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
           <X size={20} />
@@ -103,7 +113,9 @@ export const ResourceGroupFormModal: React.FC<ResourceGroupFormModalProps> = ({
         )}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Nom *
+          </label>
           <input
             type="text"
             value={formData.name}
@@ -114,10 +126,14 @@ export const ResourceGroupFormModal: React.FC<ResourceGroupFormModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Description
+          </label>
           <textarea
             value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, description: e.target.value })
+            }
             rows={3}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 resize-none"
           />
@@ -128,7 +144,9 @@ export const ResourceGroupFormModal: React.FC<ResourceGroupFormModalProps> = ({
             <input
               type="checkbox"
               checked={formData.portalVisible}
-              onChange={(e) => setFormData({ ...formData, portalVisible: e.target.checked })}
+              onChange={(e) =>
+                setFormData({ ...formData, portalVisible: e.target.checked })
+              }
               className="rounded"
             />
             <span className="text-sm">Visible sur le portail</span>
@@ -137,7 +155,9 @@ export const ResourceGroupFormModal: React.FC<ResourceGroupFormModalProps> = ({
             <input
               type="checkbox"
               checked={formData.active}
-              onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
+              onChange={(e) =>
+                setFormData({ ...formData, active: e.target.checked })
+              }
               className="rounded"
             />
             <span className="text-sm">Actif</span>
@@ -158,9 +178,13 @@ export const ResourceGroupFormModal: React.FC<ResourceGroupFormModalProps> = ({
             disabled={isPending}
             className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {isPending
-              ? <Loader2 size={16} className="animate-spin" />
-              : editingGroup ? 'Mettre à jour' : 'Créer'}
+            {isPending ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : editingGroup ? (
+              "Mettre à jour"
+            ) : (
+              "Créer"
+            )}
           </button>
         </div>
       </form>

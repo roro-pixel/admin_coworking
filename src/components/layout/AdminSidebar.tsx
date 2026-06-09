@@ -1,5 +1,5 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React from "react";
+import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
@@ -13,25 +13,25 @@ import {
   CreditCard,
   Wallet,
   Briefcase,
-} from 'lucide-react';
-import Logo from '../../assets/img/logo.jpeg';
+} from "lucide-react";
+import Logo from "../../assets/img/logo.jpeg";
 
 const menuItems = [
-  { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { path: '/customers', icon: Building2, label: 'Customers' },
-  { path: '/members', icon: Users, label: 'Members' },
-  { path: '/subscriptions', icon: CreditCard, label: 'Abonnements' },
-  { path: '/resources', icon: Building2, label: 'Ressources' },
-  { path: '/bookings', icon: Calendar, label: 'Réservations' },
-  { path: '/payments', icon: CreditCard, label: 'Paiements' },
-  { path: '/billing', icon: FileText, label: 'Facturation' },
-  { path: '/wallets', icon: Wallet, label: 'Portefeuilles' },
-  { path: '/document', icon: FolderOpen, label: 'Gestion documentaire' },
-  { path: '/contracts', icon: FileText, label: 'Contrats' },
-  { path: '/inventory', icon: Package, label: 'Inventaire' },
-  { path: '/operations', icon: Briefcase, label: 'Opérations' },
-  { path: '/reports', icon: BarChart3, label: 'Rapports' },
-  { path: '/settings', icon: Settings, label: 'Paramètres'},
+  { path: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { path: "/customers", icon: Building2, label: "Customers" },
+  { path: "/members", icon: Users, label: "Members" },
+  { path: "/subscriptions", icon: CreditCard, label: "Abonnements" },
+  { path: "/resources", icon: Building2, label: "Ressources" },
+  { path: "/bookings", icon: Calendar, label: "Réservations" },
+  { path: "/payments", icon: CreditCard, label: "Paiements" },
+  { path: "/billing", icon: FileText, label: "Facturation" },
+  { path: "/wallets", icon: Wallet, label: "Portefeuilles" },
+  { path: "/document", icon: FolderOpen, label: "Gestion documentaire" },
+  { path: "/contracts", icon: FileText, label: "Contrats" },
+  { path: "/inventory", icon: Package, label: "Inventaire" },
+  { path: "/operations", icon: Briefcase, label: "Opérations" },
+  { path: "/reports", icon: BarChart3, label: "Rapports" },
+  { path: "/settings", icon: Settings, label: "Paramètres" },
 ];
 
 export const AdminSidebar: React.FC = () => {
@@ -62,12 +62,12 @@ export const AdminSidebar: React.FC = () => {
               <NavLink
                 key={item.path}
                 to={item.path}
-                end={item.path === '/'}
+                end={item.path === "/"}
                 className={({ isActive }) =>
                   `flex items-center px-4 py-3 rounded-lg transition-colors ${
                     isActive
-                      ? 'bg-primary-50 text-primary-600'
-                      : 'text-gray-700 hover:bg-gray-100'
+                      ? "bg-primary-50 text-primary-600"
+                      : "text-gray-700 hover:bg-gray-100"
                   }`
                 }
               >

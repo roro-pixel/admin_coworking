@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { X, Loader2, Eye, EyeOff, Copy, CheckCircle } from 'lucide-react';
-import { authService } from '../../services/auth.service';
-import { ModalPortal } from '../../components/ui/ModalPortal';
+import React, { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { X, Loader2, Eye, EyeOff, Copy, CheckCircle } from "lucide-react";
+import { authService } from "../../services/auth.service";
+import { ModalPortal } from "../../components/ui/ModalPortal";
 
 interface CreateUserModalProps {
   isOpen: boolean;
@@ -10,10 +10,14 @@ interface CreateUserModalProps {
   onSuccess: () => void;
 }
 
-export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const [email, setEmail] = useState('');
+export const CreateUserModal: React.FC<CreateUserModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+}) => {
+  const [email, setEmail] = useState("");
   const [generatePassword, setGeneratePassword] = useState(true);
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -21,16 +25,16 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
   const [copied, setCopied] = useState(false);
 
   const { data: roles = [] } = useQuery({
-    queryKey: ['admin-roles'],
+    queryKey: ["admin-roles"],
     queryFn: () => authService.getRoles(),
     enabled: isOpen,
   });
 
   useEffect(() => {
     if (isOpen) {
-      setEmail('');
+      setEmail("");
       setGeneratePassword(true);
-      setPassword('');
+      setPassword("");
       setShowPassword(false);
       setSelectedRoles([]);
       setError(null);
@@ -39,25 +43,28 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
   }, [isOpen]);
 
   const createMutation = useMutation({
-    mutationFn: () => authService.createUser({
-      email,
-      generatePassword,
-      password: generatePassword ? undefined : password,
-      roleNames: selectedRoles,
-    }),
+    mutationFn: () =>
+      authService.createUser({
+        email,
+        generatePassword,
+        password: generatePassword ? undefined : password,
+        roleNames: selectedRoles,
+      }),
     onSuccess: (data) => {
       setResult(data);
       setError(null);
       onSuccess();
     },
     onError: (err: any) => {
-      setError(err?.response?.data?.message || 'Erreur lors de la création.');
+      setError(err?.response?.data?.message || "Erreur lors de la création.");
     },
   });
 
   const toggleRole = (roleName: string) => {
-    setSelectedRoles(prev =>
-      prev.includes(roleName) ? prev.filter(r => r !== roleName) : [...prev, roleName]
+    setSelectedRoles((prev) =>
+      prev.includes(roleName)
+        ? prev.filter((r) => r !== roleName)
+        : [...prev, roleName],
     );
   };
 
@@ -72,11 +79,11 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
-      setError('L\'email est obligatoire.');
+      setError("L'email est obligatoire.");
       return;
     }
     if (!generatePassword && !password.trim()) {
-      setError('Le mot de passe est obligatoire.');
+      setError("Le mot de passe est obligatoire.");
       return;
     }
     setError(null);
@@ -105,7 +112,9 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
           <div className="space-y-4">
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
               <CheckCircle size={32} className="mx-auto text-green-600 mb-2" />
-              <p className="font-medium text-green-800">Utilisateur créé avec succès</p>
+              <p className="font-medium text-green-800">
+                Utilisateur créé avec succès
+              </p>
             </div>
 
             <div className="bg-gray-50 rounded-lg p-4 space-y-2">
@@ -119,10 +128,12 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
               </div>
               {result.generatedPassword && (
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">Mot de passe généré</span>
+                  <span className="text-sm text-gray-500">
+                    Mot de passe généré
+                  </span>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-mono bg-white px-2 py-1 rounded border">
-                      {showPassword ? result.generatedPassword : '••••••••'}
+                      {showPassword ? result.generatedPassword : "••••••••"}
                     </span>
                     <button
                       onClick={() => setShowPassword(!showPassword)}
@@ -135,20 +146,28 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
                       className="p-1 text-gray-400 hover:text-primary-600"
                       title="Copier"
                     >
-                      {copied ? <CheckCircle size={14} className="text-green-600" /> : <Copy size={14} />}
+                      {copied ? (
+                        <CheckCircle size={14} className="text-green-600" />
+                      ) : (
+                        <Copy size={14} />
+                      )}
                     </button>
                   </div>
                 </div>
               )}
               <div className="flex justify-between">
                 <span className="text-sm text-gray-500">Rôles</span>
-                <span className="text-sm">{result.roleNames?.join(', ') || 'Aucun'}</span>
+                <span className="text-sm">
+                  {result.roleNames?.join(", ") || "Aucun"}
+                </span>
               </div>
             </div>
 
             <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-700">
-              Un email de bienvenue a été envoyé à l'utilisateur avec l'URL d'accès.
-              {result.generatedPassword && ' Le mot de passe ne figure pas dans cet email.'}
+              Un email de bienvenue a été envoyé à l'utilisateur avec l'URL
+              d'accès.
+              {result.generatedPassword &&
+                " Le mot de passe ne figure pas dans cet email."}
             </div>
 
             <button
@@ -161,7 +180,9 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email *
+              </label>
               <input
                 type="email"
                 value={email}
@@ -180,16 +201,20 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
                   onChange={(e) => setGeneratePassword(e.target.checked)}
                   className="rounded"
                 />
-                <span className="text-sm text-gray-700">Générer un mot de passe automatiquement</span>
+                <span className="text-sm text-gray-700">
+                  Générer un mot de passe automatiquement
+                </span>
               </label>
             </div>
 
             {!generatePassword && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Mot de passe *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Mot de passe *
+                </label>
                 <div className="relative">
                   <input
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Mot de passe temporaire"
@@ -208,15 +233,17 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Rôles</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Rôles
+              </label>
               <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                 {roles.map((role) => (
                   <label
                     key={role.id}
                     className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${
                       selectedRoles.includes(role.name)
-                        ? 'border-primary-500 bg-primary-50 text-primary-700'
-                        : 'border-gray-200 hover:bg-gray-50'
+                        ? "border-primary-500 bg-primary-50 text-primary-700"
+                        : "border-gray-200 hover:bg-gray-50"
                     }`}
                   >
                     <input
@@ -226,8 +253,14 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
                       className="rounded"
                     />
                     <div>
-                      <p className="font-medium">{role.displayName || role.name}</p>
-                      {role.description && <p className="text-xs text-gray-400">{role.description}</p>}
+                      <p className="font-medium">
+                        {role.displayName || role.name}
+                      </p>
+                      {role.description && (
+                        <p className="text-xs text-gray-400">
+                          {role.description}
+                        </p>
+                      )}
                     </div>
                   </label>
                 ))}
@@ -250,7 +283,11 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
                 disabled={createMutation.isPending || !email.trim()}
                 className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {createMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : 'Créer'}
+                {createMutation.isPending ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  "Créer"
+                )}
               </button>
             </div>
           </form>

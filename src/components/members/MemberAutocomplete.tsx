@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, User } from 'lucide-react';
-import { memberService } from '../../services/member.service';
-import type { MemberSummaryResponse } from '../../services/member.service';
+import React, { useState, useEffect, useRef } from "react";
+import { Search, X, User } from "lucide-react";
+import { memberService } from "../../services/member.service";
+import type { MemberSummaryResponse } from "../../services/member.service";
 
 interface MemberAutocompleteProps {
   onSelect: (member: MemberSummaryResponse | null) => void;
@@ -13,10 +13,10 @@ interface MemberAutocompleteProps {
 export const MemberAutocomplete: React.FC<MemberAutocompleteProps> = ({
   onSelect,
   selectedMember,
-  placeholder = 'Rechercher un membre...',
+  placeholder = "Rechercher un membre...",
   required = false,
 }) => {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState<MemberSummaryResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
@@ -24,19 +24,22 @@ export const MemberAutocomplete: React.FC<MemberAutocompleteProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(event.target as Node)
+      ) {
         setShowResults(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   useEffect(() => {
     if (selectedMember) {
       setQuery(selectedMember.fullName);
     } else {
-      setQuery('');
+      setQuery("");
     }
   }, [selectedMember]);
 
@@ -53,7 +56,7 @@ export const MemberAutocomplete: React.FC<MemberAutocompleteProps> = ({
         setResults(data);
         setShowResults(true);
       } catch (error) {
-        console.error('Erreur recherche membres', error);
+        console.error("Erreur recherche membres", error);
         setResults([]);
       } finally {
         setIsLoading(false);
@@ -71,7 +74,7 @@ export const MemberAutocomplete: React.FC<MemberAutocompleteProps> = ({
   };
 
   const handleClear = () => {
-    setQuery('');
+    setQuery("");
     setResults([]);
     onSelect(null);
     setShowResults(false);
@@ -80,7 +83,10 @@ export const MemberAutocomplete: React.FC<MemberAutocompleteProps> = ({
   return (
     <div ref={wrapperRef} className="relative">
       <div className="relative">
-        <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        <Search
+          size={18}
+          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+        />
         <input
           type="text"
           value={query}
@@ -88,7 +94,7 @@ export const MemberAutocomplete: React.FC<MemberAutocompleteProps> = ({
           onFocus={() => query.length >= 2 && setShowResults(true)}
           placeholder={placeholder}
           className={`w-full pl-10 pr-10 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
-            required && !selectedMember ? 'border-red-300' : ''
+            required && !selectedMember ? "border-red-300" : ""
           }`}
         />
         {query && (
@@ -127,9 +133,13 @@ export const MemberAutocomplete: React.FC<MemberAutocompleteProps> = ({
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-500">{member.memberId}</p>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  member.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-                }`}>
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full ${
+                    member.status === "ACTIVE"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-100 text-gray-700"
+                  }`}
+                >
                   {member.status}
                 </span>
               </div>
@@ -142,9 +152,13 @@ export const MemberAutocomplete: React.FC<MemberAutocompleteProps> = ({
         <div className="mt-2 p-3 bg-primary-50 rounded-lg">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-900">Membre sélectionné</p>
+              <p className="text-sm font-medium text-gray-900">
+                Membre sélectionné
+              </p>
               <p className="text-sm text-gray-700">{selectedMember.fullName}</p>
-              <p className="text-xs text-gray-500">{selectedMember.memberId} • {selectedMember.email}</p>
+              <p className="text-xs text-gray-500">
+                {selectedMember.memberId} • {selectedMember.email}
+              </p>
             </div>
             <button
               type="button"

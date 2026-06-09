@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Loader2 } from 'lucide-react';
-import { resourceService } from '../../../services/resource.service';
-import type { ResourcePolicyResponse } from '../../../services/resource.service';
-import { ModalPortal } from '../../../components/ui/ModalPortal';
+import React, { useState, useEffect } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { X, Loader2 } from "lucide-react";
+import { resourceService } from "../../../services/resource.service";
+import type { ResourcePolicyResponse } from "../../../services/resource.service";
+import { ModalPortal } from "../../../components/ui/ModalPortal";
 
 interface ResourcePolicyFormModalProps {
   isOpen: boolean;
@@ -13,8 +13,8 @@ interface ResourcePolicyFormModalProps {
 }
 
 const buildDefaultFormData = (policy: ResourcePolicyResponse | null) => ({
-  name: policy?.name || '',
-  description: policy?.description || '',
+  name: policy?.name || "",
+  description: policy?.description || "",
   minBookingDurationMinutes: policy?.minBookingDurationMinutes ?? 30,
   maxBookingDurationMinutes: policy?.maxBookingDurationMinutes ?? 480,
   minBookingNoticeMinutes: policy?.minBookingNoticeMinutes ?? 60,
@@ -31,15 +31,14 @@ const formatDuration = (minutes: number): string => {
   return mins > 0 ? `${hours}h${mins}` : `${hours}h`;
 };
 
-export const ResourcePolicyFormModal: React.FC<ResourcePolicyFormModalProps> = ({
-  isOpen,
-  onClose,
-  editingPolicy,
-  onSuccess,
-}) => {
+export const ResourcePolicyFormModal: React.FC<
+  ResourcePolicyFormModalProps
+> = ({ isOpen, onClose, editingPolicy, onSuccess }) => {
   const queryClient = useQueryClient();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [formData, setFormData] = useState(() => buildDefaultFormData(editingPolicy));
+  const [formData, setFormData] = useState(() =>
+    buildDefaultFormData(editingPolicy),
+  );
 
   // CORRECTION : resynchronisation à chaque ouverture ou changement de politique
   useEffect(() => {
@@ -64,32 +63,43 @@ export const ResourcePolicyFormModal: React.FC<ResourcePolicyFormModalProps> = (
   const createMutation = useMutation({
     mutationFn: () => resourceService.createResourcePolicy(buildPayload()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['resource-policies'] });
-      queryClient.invalidateQueries({ queryKey: ['resource-policies-list'] });
+      queryClient.invalidateQueries({ queryKey: ["resource-policies"] });
+      queryClient.invalidateQueries({ queryKey: ["resource-policies-list"] });
       onSuccess();
     },
     onError: (error: any) => {
-      setErrorMessage(error?.response?.data?.message || 'Erreur lors de la création de la politique.');
+      setErrorMessage(
+        error?.response?.data?.message ||
+          "Erreur lors de la création de la politique.",
+      );
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: () => resourceService.updateResourcePolicy(editingPolicy!.code, buildPayload()),
+    mutationFn: () =>
+      resourceService.updateResourcePolicy(editingPolicy!.code, buildPayload()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['resource-policies'] });
-      queryClient.invalidateQueries({ queryKey: ['resource-policies-list'] });
+      queryClient.invalidateQueries({ queryKey: ["resource-policies"] });
+      queryClient.invalidateQueries({ queryKey: ["resource-policies-list"] });
       onSuccess();
     },
     onError: (error: any) => {
-      setErrorMessage(error?.response?.data?.message || 'Erreur lors de la mise à jour de la politique.');
+      setErrorMessage(
+        error?.response?.data?.message ||
+          "Erreur lors de la mise à jour de la politique.",
+      );
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // CORRECTION : validation minDuration < maxDuration
-    if (formData.minBookingDurationMinutes >= formData.maxBookingDurationMinutes) {
-      setErrorMessage('La durée minimale doit être inférieure à la durée maximale.');
+    if (
+      formData.minBookingDurationMinutes >= formData.maxBookingDurationMinutes
+    ) {
+      setErrorMessage(
+        "La durée minimale doit être inférieure à la durée maximale.",
+      );
       return;
     }
     setErrorMessage(null);
@@ -109,7 +119,9 @@ export const ResourcePolicyFormModal: React.FC<ResourcePolicyFormModalProps> = (
     <ModalPortal onClose={onClose}>
       <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
         <h3 className="text-xl font-bold">
-          {editingPolicy ? 'Modifier la politique' : 'Nouvelle politique de réservation'}
+          {editingPolicy
+            ? "Modifier la politique"
+            : "Nouvelle politique de réservation"}
         </h3>
         <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
           <X size={20} />
@@ -124,7 +136,9 @@ export const ResourcePolicyFormModal: React.FC<ResourcePolicyFormModalProps> = (
         )}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Nom *
+          </label>
           <input
             type="text"
             value={formData.name}
@@ -135,10 +149,14 @@ export const ResourcePolicyFormModal: React.FC<ResourcePolicyFormModalProps> = (
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Description
+          </label>
           <textarea
             value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, description: e.target.value })
+            }
             rows={2}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 resize-none"
           />
@@ -158,7 +176,12 @@ export const ResourcePolicyFormModal: React.FC<ResourcePolicyFormModalProps> = (
             <input
               type="number"
               value={formData.minBookingDurationMinutes}
-              onChange={(e) => setFormData({ ...formData, minBookingDurationMinutes: Number(e.target.value) || 0 })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  minBookingDurationMinutes: Number(e.target.value) || 0,
+                })
+              }
               min="1"
               className="w-full px-3 py-2 border border-gray-200 rounded-lg"
             />
@@ -175,7 +198,12 @@ export const ResourcePolicyFormModal: React.FC<ResourcePolicyFormModalProps> = (
             <input
               type="number"
               value={formData.maxBookingDurationMinutes}
-              onChange={(e) => setFormData({ ...formData, maxBookingDurationMinutes: Number(e.target.value) || 0 })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  maxBookingDurationMinutes: Number(e.target.value) || 0,
+                })
+              }
               min="1"
               className="w-full px-3 py-2 border border-gray-200 rounded-lg"
             />
@@ -194,7 +222,12 @@ export const ResourcePolicyFormModal: React.FC<ResourcePolicyFormModalProps> = (
           <input
             type="number"
             value={formData.minBookingNoticeMinutes}
-            onChange={(e) => setFormData({ ...formData, minBookingNoticeMinutes: Number(e.target.value) || 0 })}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                minBookingNoticeMinutes: Number(e.target.value) || 0,
+              })
+            }
             min="0"
             className="w-full px-3 py-2 border border-gray-200 rounded-lg"
           />
@@ -206,7 +239,12 @@ export const ResourcePolicyFormModal: React.FC<ResourcePolicyFormModalProps> = (
             <input
               type="checkbox"
               checked={formData.allowCancellation}
-              onChange={(e) => setFormData({ ...formData, allowCancellation: e.target.checked })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  allowCancellation: e.target.checked,
+                })
+              }
               className="rounded"
             />
             <span className="text-sm font-medium">Autoriser l'annulation</span>
@@ -226,7 +264,12 @@ export const ResourcePolicyFormModal: React.FC<ResourcePolicyFormModalProps> = (
               <input
                 type="number"
                 value={formData.cancellationNoticeMinutes}
-                onChange={(e) => setFormData({ ...formData, cancellationNoticeMinutes: Number(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    cancellationNoticeMinutes: Number(e.target.value) || 0,
+                  })
+                }
                 min="0"
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
               />
@@ -238,7 +281,9 @@ export const ResourcePolicyFormModal: React.FC<ResourcePolicyFormModalProps> = (
           <input
             type="checkbox"
             checked={formData.active}
-            onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
+            onChange={(e) =>
+              setFormData({ ...formData, active: e.target.checked })
+            }
             className="rounded"
           />
           <span className="text-sm">Actif</span>
@@ -258,9 +303,13 @@ export const ResourcePolicyFormModal: React.FC<ResourcePolicyFormModalProps> = (
             disabled={isPending}
             className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {isPending
-              ? <Loader2 size={16} className="animate-spin" />
-              : editingPolicy ? 'Mettre à jour' : 'Créer'}
+            {isPending ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : editingPolicy ? (
+              "Mettre à jour"
+            ) : (
+              "Créer"
+            )}
           </button>
         </div>
       </form>

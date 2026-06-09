@@ -1,22 +1,22 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { AdminLayout } from '../components/layout/AdminLayout';
-import { 
-  ArrowLeft, 
-  Mail, 
-  Phone, 
-  MapPin, 
+import React, { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { AdminLayout } from "../components/layout/AdminLayout";
+import {
+  ArrowLeft,
+  Mail,
+  Phone,
+  MapPin,
   Edit,
   Save,
   X,
   CheckCircle,
   XCircle,
   AlertCircle,
-  UserPlus
-} from 'lucide-react';
-import { customerService } from '../services/customer.service';
-import type { CustomerResponse } from '../services/customer.service';
+  UserPlus,
+} from "lucide-react";
+import { customerService } from "../services/customer.service";
+import type { CustomerResponse } from "../services/customer.service";
 
 export const CustomerDetail: React.FC = () => {
   const { id } = useParams();
@@ -25,18 +25,22 @@ export const CustomerDetail: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<CustomerResponse | null>(null);
 
-  const { data: customer, isLoading, error } = useQuery({
-    queryKey: ['customer', id],
+  const {
+    data: customer,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["customer", id],
     queryFn: () => customerService.getCustomerById(id!),
     enabled: !!id,
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<CustomerResponse>) => 
+    mutationFn: (data: Partial<CustomerResponse>) =>
       customerService.updateCustomer(id!, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customer', id] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ["customer", id] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
       setIsEditing(false);
     },
   });
@@ -61,27 +65,29 @@ export const CustomerDetail: React.FC = () => {
     );
   }
 
-   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
     const { name, value } = e.target;
     setFormData((prev) => {
-    if (!prev) return prev;
-    return { ...prev, [name]: value };
+      if (!prev) return prev;
+      return { ...prev, [name]: value };
     });
   };
 
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const { name, value } = e.target;
-  setFormData((prev) => {
-    if (!prev) return prev;
-    return {
-      ...prev,
-      address: {
-        ...(prev.address || {}),
-        [name]: value
-      }
-    };
-  });
-};
+    const { name, value } = e.target;
+    setFormData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        address: {
+          ...(prev.address || {}),
+          [name]: value,
+        },
+      };
+    });
+  };
   const handleSave = () => {
     if (formData) {
       updateMutation.mutate(formData);
@@ -89,16 +95,20 @@ export const CustomerDetail: React.FC = () => {
   };
 
   const getStatusIcon = () => {
-    switch(customer.status) {
-      case 'ACTIVE': return <CheckCircle size={16} className="text-green-600" />;
-      case 'INACTIVE': return <XCircle size={16} className="text-gray-600" />;
-      case 'SUSPENDED': return <AlertCircle size={16} className="text-red-600" />;
-      default: return null;
+    switch (customer.status) {
+      case "ACTIVE":
+        return <CheckCircle size={16} className="text-green-600" />;
+      case "INACTIVE":
+        return <XCircle size={16} className="text-gray-600" />;
+      case "SUSPENDED":
+        return <AlertCircle size={16} className="text-red-600" />;
+      default:
+        return null;
     }
   };
 
   const getDisplayName = () => {
-    if (customer.type === 'PERSON') {
+    if (customer.type === "PERSON") {
       return `${customer.firstname} ${customer.lastname}`;
     } else {
       return customer.companyName;
@@ -110,19 +120,25 @@ export const CustomerDetail: React.FC = () => {
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center">
           <button
-            onClick={() => navigate('/customers')}
+            onClick={() => navigate("/customers")}
             className="mr-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <ArrowLeft size={20} className="text-gray-600" />
           </button>
           <div>
             <div className="flex items-center space-x-3">
-              <h1 className="text-2xl font-bold text-gray-900">{getDisplayName()}</h1>
-              <span className={`px-2 py-1 rounded-full text-xs flex items-center ${
-                customer.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
-                customer.status === 'INACTIVE' ? 'bg-gray-100 text-gray-700' :
-                'bg-red-100 text-red-700'
-              }`}>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {getDisplayName()}
+              </h1>
+              <span
+                className={`px-2 py-1 rounded-full text-xs flex items-center ${
+                  customer.status === "ACTIVE"
+                    ? "bg-green-100 text-green-700"
+                    : customer.status === "INACTIVE"
+                      ? "bg-gray-100 text-gray-700"
+                      : "bg-red-100 text-red-700"
+                }`}
+              >
                 {getStatusIcon()}
                 <span className="ml-1">{customer.status}</span>
               </span>
@@ -146,13 +162,15 @@ export const CustomerDetail: React.FC = () => {
                 className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
               >
                 <Save size={16} className="inline mr-1" />
-                {updateMutation.isPending ? 'Sauvegarde...' : 'Enregistrer'}
+                {updateMutation.isPending ? "Sauvegarde..." : "Enregistrer"}
               </button>
             </>
           ) : (
             <>
               <button
-                onClick={() => navigate(`/members/create?customerId=${customer.customerId}`)}
+                onClick={() =>
+                  navigate(`/members/create?customerId=${customer.customerId}`)
+                }
                 className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center"
               >
                 <UserPlus size={16} className="mr-1" />
@@ -175,17 +193,21 @@ export const CustomerDetail: React.FC = () => {
 
       {/* Informations générales */}
       <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Informations générales</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          Informations générales
+        </h2>
         <div className="grid md:grid-cols-2 gap-6">
-          {customer.type === 'PERSON' ? (
+          {customer.type === "PERSON" ? (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Prénom
+                </label>
                 {isEditing && formData ? (
                   <input
                     type="text"
                     name="firstname"
-                    value={formData.firstname || ''}
+                    value={formData.firstname || ""}
                     onChange={handleChange}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
@@ -194,12 +216,14 @@ export const CustomerDetail: React.FC = () => {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nom
+                </label>
                 {isEditing && formData ? (
                   <input
                     type="text"
                     name="lastname"
-                    value={formData.lastname || ''}
+                    value={formData.lastname || ""}
                     onChange={handleChange}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
@@ -210,12 +234,14 @@ export const CustomerDetail: React.FC = () => {
             </>
           ) : (
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nom de l'entreprise</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nom de l'entreprise
+              </label>
               {isEditing && formData ? (
                 <input
                   type="text"
                   name="companyName"
-                  value={formData.companyName || ''}
+                  value={formData.companyName || ""}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                 />
@@ -239,7 +265,7 @@ export const CustomerDetail: React.FC = () => {
               <input
                 type="email"
                 name="email"
-                value={formData.email || ''}
+                value={formData.email || ""}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
               />
@@ -255,12 +281,12 @@ export const CustomerDetail: React.FC = () => {
               <input
                 type="email"
                 name="billingEmail"
-                value={formData.billingEmail || ''}
+                value={formData.billingEmail || ""}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
               />
             ) : (
-              <p className="text-gray-900">{customer.billingEmail || '-'}</p>
+              <p className="text-gray-900">{customer.billingEmail || "-"}</p>
             )}
           </div>
           <div>
@@ -271,12 +297,12 @@ export const CustomerDetail: React.FC = () => {
               <input
                 type="tel"
                 name="phone"
-                value={formData.phone || ''}
+                value={formData.phone || ""}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
               />
             ) : (
-              <p className="text-gray-900">{customer.phone || '-'}</p>
+              <p className="text-gray-900">{customer.phone || "-"}</p>
             )}
           </div>
           <div>
@@ -287,12 +313,12 @@ export const CustomerDetail: React.FC = () => {
               <input
                 type="tel"
                 name="whatsappPhone"
-                value={formData.whatsappPhone || ''}
+                value={formData.whatsappPhone || ""}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
               />
             ) : (
-              <p className="text-gray-900">{customer.whatsappPhone || '-'}</p>
+              <p className="text-gray-900">{customer.whatsappPhone || "-"}</p>
             )}
           </div>
         </div>
@@ -305,45 +331,55 @@ export const CustomerDetail: React.FC = () => {
         </h2>
         <div className="grid md:grid-cols-2 gap-6">
           <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Rue</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Rue
+            </label>
             {isEditing && formData ? (
               <input
                 type="text"
                 name="streetName"
-                value={formData.address?.streetName || ''}
+                value={formData.address?.streetName || ""}
                 onChange={handleAddressChange}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
               />
             ) : (
-              <p className="text-gray-900">{customer.address?.streetName || '-'}</p>
+              <p className="text-gray-900">
+                {customer.address?.streetName || "-"}
+              </p>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Ville</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Ville
+            </label>
             {isEditing && formData ? (
               <input
                 type="text"
                 name="city"
-                value={formData.address?.city || ''}
+                value={formData.address?.city || ""}
                 onChange={handleAddressChange}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
               />
             ) : (
-              <p className="text-gray-900">{customer.address?.city || '-'}</p>
+              <p className="text-gray-900">{customer.address?.city || "-"}</p>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Pays</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Pays
+            </label>
             {isEditing && formData ? (
               <input
                 type="text"
                 name="countryCode"
-                value={formData.address?.country || ''}
+                value={formData.address?.country || ""}
                 onChange={handleAddressChange}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
               />
             ) : (
-              <p className="text-gray-900">{customer.address?.country || '-'}</p>
+              <p className="text-gray-900">
+                {customer.address?.country || "-"}
+              </p>
             )}
           </div>
         </div>
@@ -351,22 +387,30 @@ export const CustomerDetail: React.FC = () => {
 
       {/* Métadonnées */}
       <div className="bg-white rounded-xl p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Métadonnées</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          Métadonnées
+        </h2>
         <div className="grid md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Type
+            </label>
             <p className="text-gray-900">
-              {customer.type === 'PERSON' ? 'Personne physique' : 'Compagnie'}
+              {customer.type === "PERSON" ? "Personne physique" : "Compagnie"}
             </p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Créé le</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Créé le
+            </label>
             <p className="text-gray-900">
-              {new Date(customer.createdAt).toLocaleDateString('fr-FR')}
+              {new Date(customer.createdAt).toLocaleDateString("fr-FR")}
             </p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Statut</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Statut
+            </label>
             {isEditing && formData ? (
               <select
                 name="status"

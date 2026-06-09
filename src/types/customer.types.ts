@@ -7,7 +7,7 @@ export interface AddressResponse {
 
 export interface CustomerResponse {
   customerId: string;
-  type: 'INDIVIDUAL' | 'COMPANY';
+  type: "INDIVIDUAL" | "COMPANY";
   firstname?: string;
   lastname?: string;
   companyName?: string;
@@ -16,7 +16,7 @@ export interface CustomerResponse {
   phone?: string;
   whatsappPhone?: string;
   address?: AddressResponse;
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
   createdAt: string;
 }
 
@@ -26,5 +26,5 @@ export interface CustomerSummaryResponse {
   displayName: string;
   email: string;
   phone?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
 }

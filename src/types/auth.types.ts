@@ -11,6 +11,6 @@ export interface AdminLoginResponse {
     email: string;
     firstName: string;
     lastName: string;
-    role: 'ADMIN' | 'SUPER_ADMIN';
+    role: "ADMIN" | "SUPER_ADMIN";
   };
 }

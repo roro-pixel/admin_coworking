@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, User } from 'lucide-react';
-import { memberService } from '../../services/member.service';
-import type { MemberSummaryResponse } from '../../services/member.service';
+import React, { useState, useEffect, useRef } from "react";
+import { Search, X, User } from "lucide-react";
+import { memberService } from "../../services/member.service";
+import type { MemberSummaryResponse } from "../../services/member.service";
 
 interface MemberAutocompleteProps {
   onSelect: (member: MemberSummaryResponse | null) => void;
@@ -12,9 +12,9 @@ interface MemberAutocompleteProps {
 export const MemberAutocomplete: React.FC<MemberAutocompleteProps> = ({
   onSelect,
   selectedMember,
-  placeholder = 'Rechercher un membre...',
+  placeholder = "Rechercher un membre...",
 }) => {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState<MemberSummaryResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
@@ -22,12 +22,15 @@ export const MemberAutocomplete: React.FC<MemberAutocompleteProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(event.target as Node)
+      ) {
         setShowResults(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -59,7 +62,7 @@ export const MemberAutocomplete: React.FC<MemberAutocompleteProps> = ({
   };
 
   const handleClear = () => {
-    setQuery('');
+    setQuery("");
     onSelect(null);
     setShowResults(false);
   };
@@ -68,14 +71,17 @@ export const MemberAutocomplete: React.FC<MemberAutocompleteProps> = ({
     if (selectedMember) {
       setQuery(selectedMember.fullName);
     } else {
-      setQuery('');
+      setQuery("");
     }
   }, [selectedMember]);
 
   return (
     <div ref={wrapperRef} className="relative">
       <div className="relative">
-        <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        <Search
+          size={18}
+          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+        />
         <input
           type="text"
           value={query}

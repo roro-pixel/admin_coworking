@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Building2 } from 'lucide-react';
-import { customerService } from '../../services/customer.service';
-import type { CustomerSummaryResponse } from '../../services/customer.service';
+import React, { useState, useEffect, useRef } from "react";
+import { Search, X, Building2 } from "lucide-react";
+import { customerService } from "../../services/customer.service";
+import type { CustomerSummaryResponse } from "../../services/customer.service";
 
 interface CustomerAutocompleteProps {
   onSelect: (customer: CustomerSummaryResponse | null) => void;
@@ -12,9 +12,9 @@ interface CustomerAutocompleteProps {
 export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
   onSelect,
   selectedCustomer,
-  placeholder = 'Rechercher un customer...',
+  placeholder = "Rechercher un customer...",
 }) => {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState<CustomerSummaryResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
@@ -22,12 +22,15 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(event.target as Node)
+      ) {
         setShowResults(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -59,7 +62,7 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
   };
 
   const handleClear = () => {
-    setQuery('');
+    setQuery("");
     onSelect(null);
     setShowResults(false);
   };
@@ -68,14 +71,17 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
     if (selectedCustomer) {
       setQuery(selectedCustomer.displayName);
     } else {
-      setQuery('');
+      setQuery("");
     }
   }, [selectedCustomer]);
 
   return (
     <div ref={wrapperRef} className="relative">
       <div className="relative">
-        <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        <Search
+          size={18}
+          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+        />
         <input
           type="text"
           value={query}
@@ -116,7 +122,9 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
                 <Building2 size={16} className="text-gray-500" />
               </div>
               <div className="flex-1">
-                <p className="font-medium text-gray-900">{customer.displayName}</p>
+                <p className="font-medium text-gray-900">
+                  {customer.displayName}
+                </p>
                 <p className="text-xs text-gray-500">{customer.email}</p>
               </div>
               <p className="text-xs text-gray-500">{customer.customerId}</p>

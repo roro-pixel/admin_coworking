@@ -1,4 +1,4 @@
-import { apiClient } from './api';
+import { apiClient } from "./api";
 
 export interface Address {
   streetNumber?: string;
@@ -11,7 +11,7 @@ export interface Address {
 // Interface pour la création de member
 export interface CreateMemberRequest {
   existingCustomerId?: string;
-  customerType?: 'PERSON' | 'COMPANY';
+  customerType?: "PERSON" | "COMPANY";
   firstname: string;
   lastname: string;
   email: string;
@@ -35,7 +35,7 @@ export interface CreateMemberResponse {
   email: string;
   phone?: string;
   whatsappPhone?: string;
-  status: 'PENDING' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  status: "PENDING" | "ACTIVE" | "INACTIVE" | "SUSPENDED";
   portalAccess: boolean;
   createdAt: string;
   updatedAt: string;
@@ -51,7 +51,7 @@ export interface MemberResponse {
   email: string;
   phone?: string;
   whatsappPhone?: string;
-  status: 'PENDING' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  status: "PENDING" | "ACTIVE" | "INACTIVE" | "SUSPENDED";
   portalAccess: boolean;
   createdAt: string;
   updatedAt: string;
@@ -64,7 +64,7 @@ export interface MemberSummaryResponse {
   email: string;
   phone?: string;
   whatsapp_phone?: string;
-  status: 'PENDING' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  status: "PENDING" | "ACTIVE" | "INACTIVE" | "SUSPENDED";
   portalAccess: boolean;
 }
 
@@ -102,8 +102,13 @@ export interface PaginatedResponse<T> {
 
 export const memberService = {
   // Création admin d'un member
-  createMemberAdmin: async (data: CreateMemberRequest): Promise<CreateMemberResponse> => {
-    const response = await apiClient.post('/sni/api/v1/members/admin/create', data);
+  createMemberAdmin: async (
+    data: CreateMemberRequest,
+  ): Promise<CreateMemberResponse> => {
+    const response = await apiClient.post(
+      "/sni/api/v1/members/admin/create",
+      data,
+    );
     return response.data;
   },
 
@@ -120,15 +125,18 @@ export const memberService = {
     size?: number;
     sort?: string;
   }): Promise<PaginatedResponse<MemberResponse>> => {
-    const response = await apiClient.get('/sni/api/v1/members', { params });
+    const response = await apiClient.get("/sni/api/v1/members", { params });
     return response.data;
   },
 
   // Récupérer tous les members (non paginé pour dashboard)
   getAllMembers: async (customerId?: string): Promise<MemberResponse[]> => {
-    const params: { page?: number; size?: number; customerId?: string } = { page: 0, size: 1000 };
+    const params: { page?: number; size?: number; customerId?: string } = {
+      page: 0,
+      size: 1000,
+    };
     if (customerId) params.customerId = customerId;
-    const response = await apiClient.get('/sni/api/v1/members', { params });
+    const response = await apiClient.get("/sni/api/v1/members", { params });
     return response.data?.data || [];
   },
 
@@ -142,25 +150,35 @@ export const memberService = {
   searchMembersAdvanced: async (
     payload: MemberSearchPayload,
     page?: number,
-    size?: number
+    size?: number,
   ): Promise<PaginatedResponse<MemberSummaryResponse>> => {
     const params: { page?: number; size?: number; sort?: string } = {};
     if (page !== undefined) params.page = page;
     if (size !== undefined) params.size = size;
-    params.sort = 'createdAt,desc';
-    
-    const response = await apiClient.post('/sni/api/v1/members/search', payload, { params });
+    params.sort = "createdAt,desc";
+
+    const response = await apiClient.post(
+      "/sni/api/v1/members/search",
+      payload,
+      { params },
+    );
     return response.data;
   },
 
   // Mettre à jour un member
-  updateMember: async (id: string, data: Partial<CreateMemberRequest>): Promise<MemberResponse> => {
+  updateMember: async (
+    id: string,
+    data: Partial<CreateMemberRequest>,
+  ): Promise<MemberResponse> => {
     const response = await apiClient.patch(`/sni/api/v1/members/${id}`, data);
     return response.data;
   },
 
   // Changer le statut
-  updateMemberStatus: async (id: string, status: 'PENDING' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'): Promise<void> => {
+  updateMemberStatus: async (
+    id: string,
+    status: "PENDING" | "ACTIVE" | "INACTIVE" | "SUSPENDED",
+  ): Promise<void> => {
     await apiClient.patch(`/sni/api/v1/members/${id}/status`, { status });
   },
 
@@ -176,11 +194,15 @@ export const memberService = {
 
   // Transférer vers un autre customer
   transferCustomer: async (id: string, customerId: string): Promise<void> => {
-    await apiClient.patch(`/sni/api/v1/members/${id}/transfer-customer`, { customerId });
+    await apiClient.patch(`/sni/api/v1/members/${id}/transfer-customer`, {
+      customerId,
+    });
   },
 
   searchMembers: async (query: string): Promise<MemberSummaryResponse[]> => {
-  const response = await apiClient.get('/sni/api/v1/members/search/basic', { params: { query } });
-  return response.data;
-},
+    const response = await apiClient.get("/sni/api/v1/members/search/basic", {
+      params: { query },
+    });
+    return response.data;
+  },
 };

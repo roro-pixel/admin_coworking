@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Loader2 } from 'lucide-react';
-import { subscriptionService } from '../../../services/subscription.service';
-import type { Plan } from '../../../services/subscription.service';
+import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { X, Loader2 } from "lucide-react";
+import { subscriptionService } from "../../../services/subscription.service";
+import type { Plan } from "../../../services/subscription.service";
 
 interface PlanFormModalProps {
   isOpen: boolean;
@@ -13,85 +13,97 @@ interface PlanFormModalProps {
 }
 
 const planTypes = [
-  { value: 'MEMBERSHIP', label: 'Adhésion' },
-  { value: 'COWORKING_ACCESS', label: 'Accès coworking' },
-  { value: 'DEDICATED_DESK', label: 'Bureau dédié' },
-  { value: 'PRIVATE_OFFICE', label: 'Bureau privé' },
-  { value: 'MEETING_ROOM_PACK', label: 'Pack salle de réunion' },
-  { value: 'VIRTUAL_OFFICE', label: 'Bureau virtuel' },
-  { value: 'COMPANY_PLAN', label: 'Plan entreprise' },
-  { value: 'CUSTOM', label: 'Personnalisé' },
+  { value: "MEMBERSHIP", label: "Adhésion" },
+  { value: "COWORKING_ACCESS", label: "Accès coworking" },
+  { value: "DEDICATED_DESK", label: "Bureau dédié" },
+  { value: "PRIVATE_OFFICE", label: "Bureau privé" },
+  { value: "MEETING_ROOM_PACK", label: "Pack salle de réunion" },
+  { value: "VIRTUAL_OFFICE", label: "Bureau virtuel" },
+  { value: "COMPANY_PLAN", label: "Plan entreprise" },
+  { value: "CUSTOM", label: "Personnalisé" },
 ];
 
 const targetAudiences = [
-  { value: 'INDIVIDUAL', label: 'Particulier' },
-  { value: 'COMPANY', label: 'Entreprise' },
-  { value: 'BOTH', label: 'Les deux' },
+  { value: "INDIVIDUAL", label: "Particulier" },
+  { value: "COMPANY", label: "Entreprise" },
+  { value: "BOTH", label: "Les deux" },
 ];
 
-// Valeurs par défaut extraites pour éviter la duplication
+// FIX : helper extrait pour éviter la duplication et faciliter le reset
 const buildDefaultFormData = (plan: Plan | null) => ({
-  name: plan?.name || '',
-  description: plan?.description || '',
-  planType: plan?.planType || 'MEMBERSHIP',
-  targetAudience: plan?.targetAudience || 'BOTH',
+  name: plan?.name ?? "",
+  description: plan?.description ?? "",
+  planType: plan?.planType ?? "MEMBERSHIP",
+  targetAudience: plan?.targetAudience ?? "BOTH",
   visible: plan?.visible ?? false,
   sortOrder: plan?.sortOrder ?? 0,
 });
 
-export const PlanFormModal: React.FC<PlanFormModalProps> = ({ isOpen, onClose, editingPlan, onSuccess }) => {
+export const PlanFormModal: React.FC<PlanFormModalProps> = ({
+  isOpen,
+  onClose,
+  editingPlan,
+  onSuccess,
+}) => {
   const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // CORRECTION : formData se réinitialise à chaque changement de editingPlan ou ouverture
-  const [formData, setFormData] = useState(() => buildDefaultFormData(editingPlan));
+  const [formData, setFormData] = useState(() =>
+    buildDefaultFormData(editingPlan),
+  );
 
   useEffect(() => {
     setMounted(true);
     return () => setMounted(false);
   }, []);
 
-  // CORRECTION : resynchronise le formulaire quand editingPlan change
+  // Resynchronise le formulaire à chaque changement de plan ou d'ouverture
   useEffect(() => {
     setFormData(buildDefaultFormData(editingPlan));
     setErrorMessage(null);
   }, [editingPlan, isOpen]);
 
+  // FIX : payload create — code jamais envoyé (généré par le backend selon la doc)
   const createMutation = useMutation({
-    mutationFn: () => subscriptionService.createPlan({
-      name: formData.name,
-      description: formData.description || undefined,
-      planType: formData.planType,
-      targetAudience: formData.targetAudience,
-      visible: formData.visible,
-      sortOrder: formData.sortOrder,
-    }),
+    mutationFn: () =>
+      subscriptionService.createPlan({
+        name: formData.name,
+        description: formData.description || undefined,
+        planType: formData.planType,
+        targetAudience: formData.targetAudience,
+        visible: formData.visible,
+        sortOrder: formData.sortOrder,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subscription-plans'] });
+      queryClient.invalidateQueries({ queryKey: ["subscription-plans"] });
       onSuccess();
     },
     onError: (error: any) => {
-      const msg = error?.response?.data?.message || 'Erreur lors de la création du plan.';
+      const msg =
+        error?.response?.data?.message ?? "Erreur lors de la création du plan.";
       setErrorMessage(msg);
     },
   });
 
+  // FIX : payload update — code, status et versions conservés côté backend
   const updateMutation = useMutation({
-    mutationFn: () => subscriptionService.updatePlan(editingPlan!.code, {
-      name: formData.name,
-      description: formData.description || undefined,
-      planType: formData.planType as Plan['planType'],
-      targetAudience: formData.targetAudience as Plan['targetAudience'],
-      visible: formData.visible,
-      sortOrder: formData.sortOrder,
-    }),
+    mutationFn: () =>
+      subscriptionService.updatePlan(editingPlan!.code, {
+        name: formData.name,
+        description: formData.description || undefined,
+        planType: formData.planType as Plan["planType"],
+        targetAudience: formData.targetAudience as Plan["targetAudience"],
+        visible: formData.visible,
+        sortOrder: formData.sortOrder,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subscription-plans'] });
+      queryClient.invalidateQueries({ queryKey: ["subscription-plans"] });
       onSuccess();
     },
     onError: (error: any) => {
-      const msg = error?.response?.data?.message || 'Erreur lors de la mise à jour du plan.';
+      const msg =
+        error?.response?.data?.message ??
+        "Erreur lors de la mise à jour du plan.";
       setErrorMessage(msg);
     },
   });
@@ -114,49 +126,79 @@ export const PlanFormModal: React.FC<PlanFormModalProps> = ({ isOpen, onClose, e
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       style={{
-        position: 'fixed',
-        top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
         zIndex: 9999,
       }}
       onClick={onClose}
     >
       <div
         className="relative bg-white rounded-2xl w-full max-w-md shadow-xl"
-        style={{ position: 'relative', zIndex: 10000 }}
+        style={{ position: "relative", zIndex: 10000 }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b p-4 flex justify-between items-center">
-          <h3 className="text-xl font-bold">{editingPlan ? 'Modifier le plan' : 'Nouveau plan'}</h3>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
+          <h3 className="text-xl font-bold">
+            {editingPlan ? "Modifier le plan" : "Nouveau plan"}
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-gray-100 rounded-lg"
+          >
             <X size={20} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Message d'erreur */}
           {errorMessage && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
               {errorMessage}
             </div>
           )}
 
+          {/* FIX : code affiché en lecture seule en mode édition */}
+          {editingPlan && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Code
+              </label>
+              <input
+                type="text"
+                value={editingPlan.code}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 font-mono text-sm cursor-not-allowed"
+              />
+            </div>
+          )}
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nom *
+            </label>
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
               required
               className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Description
+            </label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               rows={2}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
             />
@@ -164,26 +206,44 @@ export const PlanFormModal: React.FC<PlanFormModalProps> = ({ isOpen, onClose, e
 
           <div className="flex flex-col gap-4 sm:flex-row sm:gap-4">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Type de plan *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Type de plan *
+              </label>
               <select
                 value={formData.planType}
-                onChange={(e) => setFormData({ ...formData, planType: e.target.value as Plan['planType'] })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    planType: e.target.value as Plan["planType"],
+                  })
+                }
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               >
-                {planTypes.map(type => (
-                  <option key={type.value} value={type.value}>{type.label}</option>
+                {planTypes.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
                 ))}
               </select>
             </div>
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Public cible *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Public cible *
+              </label>
               <select
                 value={formData.targetAudience}
-                onChange={(e) => setFormData({ ...formData, targetAudience: e.target.value as Plan['targetAudience'] })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    targetAudience: e.target.value as Plan["targetAudience"],
+                  })
+                }
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               >
-                {targetAudiences.map(ta => (
-                  <option key={ta.value} value={ta.value}>{ta.label}</option>
+                {targetAudiences.map((ta) => (
+                  <option key={ta.value} value={ta.value}>
+                    {ta.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -191,11 +251,18 @@ export const PlanFormModal: React.FC<PlanFormModalProps> = ({ isOpen, onClose, e
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="w-full sm:w-32">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ordre d'affichage</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Ordre d'affichage
+              </label>
               <input
                 type="number"
                 value={formData.sortOrder}
-                onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    sortOrder: parseInt(e.target.value) || 0,
+                  })
+                }
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
@@ -203,7 +270,9 @@ export const PlanFormModal: React.FC<PlanFormModalProps> = ({ isOpen, onClose, e
               <input
                 type="checkbox"
                 checked={formData.visible}
-                onChange={(e) => setFormData({ ...formData, visible: e.target.checked })}
+                onChange={(e) =>
+                  setFormData({ ...formData, visible: e.target.checked })
+                }
                 className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
               />
               <span className="text-sm">Visible dans le catalogue</span>
@@ -226,14 +295,16 @@ export const PlanFormModal: React.FC<PlanFormModalProps> = ({ isOpen, onClose, e
             >
               {isPending ? (
                 <Loader2 size={16} className="animate-spin" />
+              ) : editingPlan ? (
+                "Mettre à jour"
               ) : (
-                editingPlan ? 'Mettre à jour' : 'Créer'
+                "Créer"
               )}
             </button>
           </div>
         </form>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };

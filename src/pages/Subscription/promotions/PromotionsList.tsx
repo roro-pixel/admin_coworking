@@ -1,23 +1,34 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Search, Eye, Play, Ticket, Calendar, Users, ChevronLeft, ChevronRight } from 'lucide-react';
-import { subscriptionService } from '../../../services/subscription.service';
-import type { Promotion } from '../../../services/subscription.service';
-import { PromotionFormModal } from './PromotionFormModal';
-import { PromotionDetailModal } from './PromotionDetailModal';
+import React, { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Plus,
+  Edit,
+  Search,
+  Eye,
+  Play,
+  Ticket,
+  Calendar,
+  Users,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { subscriptionService } from "../../../services/subscription.service";
+import type { Promotion } from "../../../services/subscription.service";
+import { PromotionFormModal } from "./PromotionFormModal";
+import { PromotionDetailModal } from "./PromotionDetailModal";
 
 const discountTypeLabels: Record<string, string> = {
-  PERCENTAGE: 'Pourcentage',
-  FIXED_AMOUNT: 'Montant fixe',
-  FREE_ENTITLEMENT: 'Droit gratuit',
+  PERCENTAGE: "Pourcentage",
+  FIXED_AMOUNT: "Montant fixe",
+  FREE_ENTITLEMENT: "Droit gratuit",
   WAIVE_SETUP_FEE: "Frais d'installation offerts",
 };
 
 const statusConfig: Record<string, { label: string; color: string }> = {
-  DRAFT: { label: 'Brouillon', color: 'bg-gray-100 text-gray-700' },
-  ACTIVE: { label: 'Active', color: 'bg-green-100 text-green-700' },
-  EXPIRED: { label: 'Expirée', color: 'bg-gray-100 text-gray-500' },
-  CANCELLED: { label: 'Annulée', color: 'bg-red-100 text-red-700' },
+  DRAFT: { label: "Brouillon", color: "bg-gray-100 text-gray-700" },
+  ACTIVE: { label: "Active", color: "bg-green-100 text-green-700" },
+  EXPIRED: { label: "Expirée", color: "bg-gray-100 text-gray-500" },
+  CANCELLED: { label: "Annulée", color: "bg-red-100 text-red-700" },
 };
 
 const PAGE_SIZE = 20;
@@ -25,59 +36,77 @@ const PAGE_SIZE = 20;
 export const PromotionsList: React.FC = () => {
   const queryClient = useQueryClient();
 
-  // Recherche locale (nom) — pas d'endpoint search
-  const [search, setSearch] = useState('');
-
-  // Filtres API (code et status supportés par getPromotions)
-  const [statusFilter, setStatusFilter] = useState('');
+  // FIX : debounce sur la recherche locale (par nom)
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(0);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
-  const [selectedPromotion, setSelectedPromotion] = useState<Promotion | null>(null);
+  const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(
+    null,
+  );
+  const [selectedPromotion, setSelectedPromotion] = useState<Promotion | null>(
+    null,
+  );
 
-  // CORRECTION : changement de filtre remet à la page 0
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const handleFilterChange = <T,>(setter: (v: T) => void, value: T) => {
     setter(value);
     setPage(0);
   };
 
   const { data: promotionsData, isLoading } = useQuery({
-    queryKey: ['promotions', statusFilter, page],
-    queryFn: () => subscriptionService.getPromotions({
-      status: statusFilter || undefined,
-      page,
-      size: PAGE_SIZE,
-    }),
+    queryKey: ["promotions", statusFilter, page],
+    queryFn: () =>
+      subscriptionService.getPromotions({
+        status: statusFilter || undefined,
+        page,
+        size: PAGE_SIZE,
+      }),
   });
 
   const activateMutation = useMutation({
     mutationFn: (code: string) => subscriptionService.activatePromotion(code),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['promotions'] });
-      // CORRECTION : met à jour la promotion sélectionnée dans le détail si elle est ouverte
-      if (selectedPromotion) {
-        const updated = promotionsData?.content?.find(p => p.code === selectedPromotion.code);
-        if (updated) setSelectedPromotion({ ...updated, status: 'ACTIVE' });
+    onSuccess: (_, activatedCode) => {
+      queryClient.invalidateQueries({ queryKey: ["promotions"] });
+      // FIX : mise à jour optimiste de la promotion sélectionnée dans le détail
+      if (selectedPromotion?.code === activatedCode) {
+        setSelectedPromotion((prev) =>
+          prev ? { ...prev, status: "ACTIVE" } : prev,
+        );
       }
     },
-    onError: () => alert('Erreur lors de l\'activation de la promotion.'),
+    onError: (error: any) => {
+      alert(
+        error?.response?.data?.message ??
+          "Erreur lors de l'activation de la promotion.",
+      );
+    },
   });
 
-  const promotions = promotionsData?.content || [];
-  const totalPages = (promotionsData as any)?.totalPages ?? 1;
-  const totalElements = (promotionsData as any)?.totalElements ?? promotions.length;
+  const promotions = promotionsData?.content ?? [];
+  const totalPages = promotionsData?.totalPages ?? 1;
+  const totalElements = promotionsData?.totalElements ?? promotions.length;
 
-  // Filtre client-side sur le nom uniquement (code et status sont gérés par l'API)
-  const filteredPromotions = search
-    ? promotions.filter(promo =>
-        promo.name.toLowerCase().includes(search.toLowerCase())
+  // Filtre client-side sur le nom (pas d'endpoint search/query côté API pour les promotions)
+  const filteredPromotions = debouncedSearch
+    ? promotions.filter((promo) =>
+        promo.name.toLowerCase().includes(debouncedSearch.toLowerCase()),
       )
     : promotions;
 
   const handleActivate = (code: string) => {
-    if (confirm('Activer cette promotion ? Elle deviendra disponible pour les utilisateurs.')) {
+    if (
+      confirm(
+        "Activer cette promotion ? Elle deviendra disponible pour les utilisateurs.",
+      )
+    ) {
       activateMutation.mutate(code);
     }
   };
@@ -88,8 +117,9 @@ export const PromotionsList: React.FC = () => {
   };
 
   const handleResetFilters = () => {
-    setSearch('');
-    setStatusFilter('');
+    setSearch("");
+    setDebouncedSearch("");
+    setStatusFilter("");
     setPage(0);
   };
 
@@ -118,7 +148,10 @@ export const PromotionsList: React.FC = () => {
       {/* Barre de recherche et filtres */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="flex-1 relative">
-          <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <Search
+            size={18}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          />
           <input
             type="text"
             placeholder="Rechercher par nom..."
@@ -153,14 +186,28 @@ export const PromotionsList: React.FC = () => {
         <table className="w-full">
           <thead className="bg-gray-50 border-b">
             <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Code</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                Code
+              </th>
               <th className="px-6 py-3 text-left text-sm font-semibold">Nom</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Type</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Valeur</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Période</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Utilisations</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Statut</th>
-              <th className="px-6 py-3 text-right text-sm font-semibold">Actions</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                Type
+              </th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                Valeur
+              </th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                Période
+              </th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                Utilisations
+              </th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                Statut
+              </th>
+              <th className="px-6 py-3 text-right text-sm font-semibold">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -172,39 +219,49 @@ export const PromotionsList: React.FC = () => {
               >
                 <td className="px-6 py-4 text-sm font-mono">{promo.code}</td>
                 <td className="px-6 py-4 text-sm font-medium">{promo.name}</td>
-                <td className="px-6 py-4 text-sm">{discountTypeLabels[promo.discountType] || promo.discountType}</td>
                 <td className="px-6 py-4 text-sm">
-                  {promo.discountType === 'PERCENTAGE'
+                  {discountTypeLabels[promo.discountType] ?? promo.discountType}
+                </td>
+                <td className="px-6 py-4 text-sm">
+                  {promo.discountType === "PERCENTAGE"
                     ? `${promo.discountValue}%`
-                    : promo.discountType === 'FIXED_AMOUNT'
-                    ? `${promo.discountValue.toLocaleString('fr-FR')} FCFA`
-                    : '—'}
+                    : promo.discountType === "FIXED_AMOUNT"
+                      ? `${promo.discountValue.toLocaleString("fr-FR")} FCFA`
+                      : "—"}
                 </td>
                 <td className="px-6 py-4 text-sm">
                   <div className="flex items-center gap-1">
                     <Calendar size={12} className="text-gray-400" />
-                    {new Date(promo.startsAt).toLocaleDateString('fr-FR')}
+                    {new Date(promo.startsAt).toLocaleDateString("fr-FR")}
                   </div>
                   {promo.endsAt && (
                     <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
                       <Calendar size={12} />
-                      {new Date(promo.endsAt).toLocaleDateString('fr-FR')}
+                      {new Date(promo.endsAt).toLocaleDateString("fr-FR")}
                     </div>
                   )}
                 </td>
                 <td className="px-6 py-4 text-sm">
                   <div className="flex items-center gap-1">
                     <Users size={12} className="text-gray-400" />
-                    {promo.redeemedCount} / {promo.maxRedemptions || '∞'}
+                    {promo.redeemedCount} / {promo.maxRedemptions ?? "∞"}
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded-full text-xs ${statusConfig[promo.status]?.color}`}>
-                    {statusConfig[promo.status]?.label}
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs ${
+                      statusConfig[promo.status]?.color ??
+                      "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {statusConfig[promo.status]?.label ?? promo.status}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                  <div
+                    className="flex justify-end gap-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <button
                       onClick={() => handleViewDetail(promo)}
                       className="p-1 text-gray-600 hover:text-primary-600"
@@ -212,28 +269,28 @@ export const PromotionsList: React.FC = () => {
                     >
                       <Eye size={16} />
                     </button>
-                    {promo.status === 'DRAFT' && (
-                      <button
-                        onClick={() => handleActivate(promo.code)}
-                        disabled={activateMutation.isPending}
-                        className="p-1 text-green-600 hover:text-green-800 disabled:opacity-40"
-                        title="Activer"
-                      >
-                        <Play size={16} />
-                      </button>
-                    )}
-                    {/* CORRECTION : modification uniquement si DRAFT (une promotion ACTIVE ne devrait pas être modifiée) */}
-                    {promo.status === 'DRAFT' && (
-                      <button
-                        onClick={() => {
-                          setEditingPromotion(promo);
-                          setIsModalOpen(true);
-                        }}
-                        className="p-1 text-blue-600 hover:text-blue-800"
-                        title="Modifier"
-                      >
-                        <Edit size={16} />
-                      </button>
+                    {promo.status === "DRAFT" && (
+                      <>
+                        <button
+                          onClick={() => handleActivate(promo.code)}
+                          disabled={activateMutation.isPending}
+                          className="p-1 text-green-600 hover:text-green-800 disabled:opacity-40"
+                          title="Activer"
+                        >
+                          <Play size={16} />
+                        </button>
+                        {/* FIX : modification uniquement si DRAFT — une ACTIVE ne doit pas être modifiée */}
+                        <button
+                          onClick={() => {
+                            setEditingPromotion(promo);
+                            setIsModalOpen(true);
+                          }}
+                          className="p-1 text-blue-600 hover:text-blue-800"
+                          title="Modifier"
+                        >
+                          <Edit size={16} />
+                        </button>
+                      </>
                     )}
                   </div>
                 </td>
@@ -248,7 +305,10 @@ export const PromotionsList: React.FC = () => {
           <Ticket size={48} className="mx-auto text-gray-300 mb-4" />
           <p className="text-gray-500">Aucune promotion trouvée</p>
           {hasActiveFilters && (
-            <button onClick={handleResetFilters} className="mt-2 text-primary-600 hover:underline">
+            <button
+              onClick={handleResetFilters}
+              className="mt-2 text-primary-600 hover:underline"
+            >
               Réinitialiser les filtres
             </button>
           )}
@@ -259,19 +319,21 @@ export const PromotionsList: React.FC = () => {
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4 px-2">
           <p className="text-sm text-gray-500">
-            {totalElements} promotion{totalElements > 1 ? 's' : ''} au total
+            {totalElements} promotion{totalElements > 1 ? "s" : ""} au total
           </p>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setPage(p => Math.max(0, p - 1))}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
               className="p-1 rounded border disabled:opacity-40 hover:bg-gray-50"
             >
               <ChevronLeft size={16} />
             </button>
-            <span className="text-sm text-gray-600">Page {page + 1} / {totalPages}</span>
+            <span className="text-sm text-gray-600">
+              Page {page + 1} / {totalPages}
+            </span>
             <button
-              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
               className="p-1 rounded border disabled:opacity-40 hover:bg-gray-50"
             >
@@ -289,7 +351,7 @@ export const PromotionsList: React.FC = () => {
         }}
         editingPromotion={editingPromotion}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['promotions'] });
+          queryClient.invalidateQueries({ queryKey: ["promotions"] });
           setIsModalOpen(false);
           setEditingPromotion(null);
         }}

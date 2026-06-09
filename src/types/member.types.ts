@@ -8,7 +8,7 @@ export interface MemberResponse {
   email: string;
   phone?: string;
   whatsappPhone?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
   portalAccess: boolean;
   createdAt: string;
   updatedAt: string;
@@ -21,6 +21,6 @@ export interface MemberSummaryResponse {
   email: string;
   phone?: string;
   whatsapp_phone?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
   portalAccess: boolean;
 }

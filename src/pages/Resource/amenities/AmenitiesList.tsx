@@ -1,42 +1,48 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Search, Package } from 'lucide-react';
-import { resourceService } from '../../../services/resource.service';
-import type { AmenityResponse } from '../../../services/resource.service';
-import { AmenityFormModal } from './AmenityFormModal';
+import React, { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Plus, Edit, Trash2, Search, Package } from "lucide-react";
+import { resourceService } from "../../../services/resource.service";
+import type { AmenityResponse } from "../../../services/resource.service";
+import { AmenityFormModal } from "./AmenityFormModal";
 
 export const AmenitiesList: React.FC = () => {
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingAmenity, setEditingAmenity] = useState<AmenityResponse | null>(null);
+  const [editingAmenity, setEditingAmenity] = useState<AmenityResponse | null>(
+    null,
+  );
 
   // CORRECTION : size: 500 (faible volume, pas de pagination nécessaire)
   const { data: amenitiesData, isLoading } = useQuery({
-    queryKey: ['resource-amenities'],
+    queryKey: ["resource-amenities"],
     queryFn: () => resourceService.getAmenities({ size: 500 }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (code: string) => resourceService.deleteAmenity(code),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['resource-amenities'] });
-      queryClient.invalidateQueries({ queryKey: ['all-amenities'] });
+      queryClient.invalidateQueries({ queryKey: ["resource-amenities"] });
+      queryClient.invalidateQueries({ queryKey: ["all-amenities"] });
     },
-    onError: () => alert('Erreur lors de la suppression. Cet équipement est peut-être associé à des ressources.'),
+    onError: () =>
+      alert(
+        "Erreur lors de la suppression. Cet équipement est peut-être associé à des ressources.",
+      ),
   });
 
   const amenities: AmenityResponse[] = amenitiesData?.content || [];
 
   const filteredAmenities = search
-    ? amenities.filter(a =>
-        a.name.toLowerCase().includes(search.toLowerCase()) ||
-        a.code.toLowerCase().includes(search.toLowerCase())
+    ? amenities.filter(
+        (a) =>
+          a.name.toLowerCase().includes(search.toLowerCase()) ||
+          a.code.toLowerCase().includes(search.toLowerCase()),
       )
     : amenities;
 
   const handleDelete = (code: string) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cet équipement ?')) {
+    if (confirm("Êtes-vous sûr de vouloir supprimer cet équipement ?")) {
       deleteMutation.mutate(code);
     }
   };
@@ -62,7 +68,10 @@ export const AmenitiesList: React.FC = () => {
       </div>
 
       <div className="relative mb-6">
-        <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        <Search
+          size={18}
+          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+        />
         <input
           type="text"
           placeholder="Rechercher par nom ou code..."
@@ -76,44 +85,84 @@ export const AmenitiesList: React.FC = () => {
         <table className="w-full">
           <thead className="bg-gray-50 border-b">
             <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Code</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                Code
+              </th>
               <th className="px-6 py-3 text-left text-sm font-semibold">Nom</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Description</th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">Qté</th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">Optionnel</th>
-              <th className="px-6 py-3 text-right text-sm font-semibold">Supplément</th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">Actif</th>
-              <th className="px-6 py-3 text-right text-sm font-semibold">Actions</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                Description
+              </th>
+              <th className="px-6 py-3 text-center text-sm font-semibold">
+                Qté
+              </th>
+              <th className="px-6 py-3 text-center text-sm font-semibold">
+                Optionnel
+              </th>
+              <th className="px-6 py-3 text-right text-sm font-semibold">
+                Supplément
+              </th>
+              <th className="px-6 py-3 text-center text-sm font-semibold">
+                Actif
+              </th>
+              <th className="px-6 py-3 text-right text-sm font-semibold">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {filteredAmenities.map((amenity) => (
-              <tr key={amenity.code} className={`hover:bg-gray-50 ${!amenity.active ? 'opacity-60' : ''}`}>
+              <tr
+                key={amenity.code}
+                className={`hover:bg-gray-50 ${!amenity.active ? "opacity-60" : ""}`}
+              >
                 <td className="px-6 py-4 text-sm font-mono">{amenity.code}</td>
-                <td className="px-6 py-4 text-sm font-medium">{amenity.name}</td>
-                <td className="px-6 py-4 text-sm text-gray-500">{amenity.description || '—'}</td>
-                <td className="px-6 py-4 text-center text-sm">{amenity.quantity ?? 1}</td>
+                <td className="px-6 py-4 text-sm font-medium">
+                  {amenity.name}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-500">
+                  {amenity.description || "—"}
+                </td>
+                <td className="px-6 py-4 text-center text-sm">
+                  {amenity.quantity ?? 1}
+                </td>
                 <td className="px-6 py-4 text-center">
-                  {amenity.optional
-                    ? <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-700">Optionnel</span>
-                    : <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-500">Inclus</span>}
+                  {amenity.optional ? (
+                    <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-700">
+                      Optionnel
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-500">
+                      Inclus
+                    </span>
+                  )}
                 </td>
                 <td className="px-6 py-4 text-right text-sm">
-                  {amenity.extraPrice && amenity.extraPrice > 0
-                    ? <span className="text-orange-600 font-medium">+{amenity.extraPrice.toLocaleString('fr-FR')} FCFA</span>
-                    : <span className="text-gray-400">—</span>}
+                  {amenity.extraPrice && amenity.extraPrice > 0 ? (
+                    <span className="text-orange-600 font-medium">
+                      +{amenity.extraPrice.toLocaleString("fr-FR")} FCFA
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
                 </td>
                 <td className="px-6 py-4 text-center">
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    amenity.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                  }`}>
-                    {amenity.active ? 'Actif' : 'Inactif'}
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs ${
+                      amenity.active
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-100 text-gray-500"
+                    }`}
+                  >
+                    {amenity.active ? "Actif" : "Inactif"}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex justify-end gap-2">
                     <button
-                      onClick={() => { setEditingAmenity(amenity); setIsModalOpen(true); }}
+                      onClick={() => {
+                        setEditingAmenity(amenity);
+                        setIsModalOpen(true);
+                      }}
                       className="p-1 text-blue-600 hover:text-blue-800"
                       title="Modifier"
                     >
@@ -144,10 +193,13 @@ export const AmenitiesList: React.FC = () => {
 
       <AmenityFormModal
         isOpen={isModalOpen}
-        onClose={() => { setIsModalOpen(false); setEditingAmenity(null); }}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingAmenity(null);
+        }}
         editingAmenity={editingAmenity}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['resource-amenities'] });
+          queryClient.invalidateQueries({ queryKey: ["resource-amenities"] });
           setIsModalOpen(false);
           // CORRECTION : reset editingAmenity après succès
           setEditingAmenity(null);

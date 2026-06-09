@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { AdminLayout } from '../components/layout/AdminLayout';
-import { 
-  ArrowLeft, 
-  Mail, 
-  Phone, 
+import React, { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { AdminLayout } from "../components/layout/AdminLayout";
+import {
+  ArrowLeft,
+  Mail,
+  Phone,
   Edit,
   Save,
   X,
@@ -15,10 +15,10 @@ import {
   Lock,
   Unlock,
   Key,
-  RefreshCw
-} from 'lucide-react';
-import { memberService } from '../services/member.service';
-import type { MemberResponse } from '../services/member.service';
+  RefreshCw,
+} from "lucide-react";
+import { memberService } from "../services/member.service";
+import type { MemberResponse } from "../services/member.service";
 
 export const MemberDetail: React.FC = () => {
   const { id } = useParams();
@@ -28,37 +28,43 @@ export const MemberDetail: React.FC = () => {
   const [formData, setFormData] = useState<MemberResponse | null>(null);
   const [showResetPassword, setShowResetPassword] = useState(false);
 
-  const { data: member, isLoading, error } = useQuery({
-    queryKey: ['member', id],
+  const {
+    data: member,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["member", id],
     queryFn: () => memberService.getMemberById(id!),
     enabled: !!id,
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<MemberResponse>) => 
+    mutationFn: (data: Partial<MemberResponse>) =>
       memberService.updateMember(id!, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['member', id] });
-      queryClient.invalidateQueries({ queryKey: ['members'] });
+      queryClient.invalidateQueries({ queryKey: ["member", id] });
+      queryClient.invalidateQueries({ queryKey: ["members"] });
       setIsEditing(false);
     },
   });
 
   const statusMutation = useMutation({
-    mutationFn: (status: 'PENDING' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED') =>
+    mutationFn: (status: "PENDING" | "ACTIVE" | "INACTIVE" | "SUSPENDED") =>
       memberService.updateMemberStatus(id!, status),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['member', id] });
-      queryClient.invalidateQueries({ queryKey: ['members'] });
+      queryClient.invalidateQueries({ queryKey: ["member", id] });
+      queryClient.invalidateQueries({ queryKey: ["members"] });
     },
   });
 
   const portalMutation = useMutation({
     mutationFn: (enable: boolean) =>
-      enable ? memberService.enablePortalAccess(id!) : memberService.disablePortalAccess(id!),
+      enable
+        ? memberService.enablePortalAccess(id!)
+        : memberService.disablePortalAccess(id!),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['member', id] });
-      queryClient.invalidateQueries({ queryKey: ['members'] });
+      queryClient.invalidateQueries({ queryKey: ["member", id] });
+      queryClient.invalidateQueries({ queryKey: ["members"] });
     },
   });
 
@@ -82,13 +88,15 @@ export const MemberDetail: React.FC = () => {
     );
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
     const { name, value } = e.target;
     setFormData((prev) => {
       if (!prev) return prev;
-        return { ...prev, [name]: value };
-      });
-   };
+      return { ...prev, [name]: value };
+    });
+  };
   const handleSave = () => {
     if (formData) {
       updateMutation.mutate(formData);
@@ -97,27 +105,37 @@ export const MemberDetail: React.FC = () => {
 
   const handleResetPassword = () => {
     // Appel API pour réinitialiser le mot de passe
-    alert('Un email de réinitialisation a été envoyé');
+    alert("Un email de réinitialisation a été envoyé");
     setShowResetPassword(false);
   };
 
   const getStatusIcon = () => {
-    switch(member.status) {
-      case 'ACTIVE': return <CheckCircle size={16} className="text-green-600" />;
-      case 'PENDING': return <AlertCircle size={16} className="text-yellow-600" />;
-      case 'INACTIVE': return <XCircle size={16} className="text-gray-600" />;
-      case 'SUSPENDED': return <AlertCircle size={16} className="text-red-600" />;
-      default: return null;
+    switch (member.status) {
+      case "ACTIVE":
+        return <CheckCircle size={16} className="text-green-600" />;
+      case "PENDING":
+        return <AlertCircle size={16} className="text-yellow-600" />;
+      case "INACTIVE":
+        return <XCircle size={16} className="text-gray-600" />;
+      case "SUSPENDED":
+        return <AlertCircle size={16} className="text-red-600" />;
+      default:
+        return null;
     }
   };
 
   const getStatusBadgeClass = () => {
-    switch(member.status) {
-      case 'ACTIVE': return 'bg-green-100 text-green-700';
-      case 'PENDING': return 'bg-yellow-100 text-yellow-700';
-      case 'INACTIVE': return 'bg-gray-100 text-gray-700';
-      case 'SUSPENDED': return 'bg-red-100 text-red-700';
-      default: return 'bg-gray-100 text-gray-700';
+    switch (member.status) {
+      case "ACTIVE":
+        return "bg-green-100 text-green-700";
+      case "PENDING":
+        return "bg-yellow-100 text-yellow-700";
+      case "INACTIVE":
+        return "bg-gray-100 text-gray-700";
+      case "SUSPENDED":
+        return "bg-red-100 text-red-700";
+      default:
+        return "bg-gray-100 text-gray-700";
     }
   };
 
@@ -126,15 +144,19 @@ export const MemberDetail: React.FC = () => {
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center">
           <button
-            onClick={() => navigate('/members')}
+            onClick={() => navigate("/members")}
             className="mr-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <ArrowLeft size={20} className="text-gray-600" />
           </button>
           <div>
             <div className="flex items-center space-x-3">
-              <h1 className="text-2xl font-bold text-gray-900">{member.fullname}</h1>
-              <span className={`px-2 py-1 rounded-full text-xs flex items-center ${getStatusBadgeClass()}`}>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {member.fullname}
+              </h1>
+              <span
+                className={`px-2 py-1 rounded-full text-xs flex items-center ${getStatusBadgeClass()}`}
+              >
                 {getStatusIcon()}
                 <span className="ml-1">{member.status}</span>
               </span>
@@ -158,7 +180,7 @@ export const MemberDetail: React.FC = () => {
                 className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
               >
                 <Save size={16} className="inline mr-1" />
-                {updateMutation.isPending ? 'Sauvegarde...' : 'Enregistrer'}
+                {updateMutation.isPending ? "Sauvegarde..." : "Enregistrer"}
               </button>
             </>
           ) : (
@@ -187,10 +209,14 @@ export const MemberDetail: React.FC = () => {
 
       {/* Informations personnelles */}
       <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Informations personnelles</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          Informations personnelles
+        </h2>
         <div className="grid md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Prénom
+            </label>
             {isEditing && formData ? (
               <input
                 type="text"
@@ -204,7 +230,9 @@ export const MemberDetail: React.FC = () => {
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nom
+            </label>
             {isEditing && formData ? (
               <input
                 type="text"
@@ -248,12 +276,12 @@ export const MemberDetail: React.FC = () => {
               <input
                 type="tel"
                 name="phone"
-                value={formData.phone || ''}
+                value={formData.phone || ""}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
               />
             ) : (
-              <p className="text-gray-900">{member.phone || '-'}</p>
+              <p className="text-gray-900">{member.phone || "-"}</p>
             )}
           </div>
           <div>
@@ -264,12 +292,12 @@ export const MemberDetail: React.FC = () => {
               <input
                 type="tel"
                 name="whatsappPhone"
-                value={formData.whatsappPhone || ''}
+                value={formData.whatsappPhone || ""}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
               />
             ) : (
-              <p className="text-gray-900">{member.whatsappPhone || '-'}</p>
+              <p className="text-gray-900">{member.whatsappPhone || "-"}</p>
             )}
           </div>
         </div>
@@ -277,10 +305,14 @@ export const MemberDetail: React.FC = () => {
 
       {/* Accès et statut */}
       <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Accès et statut</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          Accès et statut
+        </h2>
         <div className="grid md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Customer associé</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Customer associé
+            </label>
             <button
               onClick={() => navigate(`/customers/${member.customerId}`)}
               className="text-primary-600 hover:underline"
@@ -289,25 +321,32 @@ export const MemberDetail: React.FC = () => {
             </button>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Statut</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Statut
+            </label>
             <div className="flex items-center gap-2">
-              <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass()}`}>
+              <span
+                className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass()}`}
+              >
                 {member.status}
               </span>
               <button
                 onClick={() => {
-                  const newStatus = member.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+                  const newStatus =
+                    member.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
                   statusMutation.mutate(newStatus);
                 }}
                 className="text-sm text-primary-600 hover:underline"
               >
                 <RefreshCw size={14} className="inline mr-1" />
-                {member.status === 'ACTIVE' ? 'Suspendre' : 'Activer'}
+                {member.status === "ACTIVE" ? "Suspendre" : "Activer"}
               </button>
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Accès portail</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Accès portail
+            </label>
             <div className="flex items-center gap-2">
               {member.portalAccess ? (
                 <span className="flex items-center text-green-600">
@@ -322,7 +361,7 @@ export const MemberDetail: React.FC = () => {
                 onClick={() => portalMutation.mutate(!member.portalAccess)}
                 className="text-sm text-primary-600 hover:underline"
               >
-                {member.portalAccess ? 'Désactiver' : 'Activer'}
+                {member.portalAccess ? "Désactiver" : "Activer"}
               </button>
             </div>
           </div>
@@ -331,18 +370,24 @@ export const MemberDetail: React.FC = () => {
 
       {/* Métadonnées */}
       <div className="bg-white rounded-xl p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Métadonnées</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          Métadonnées
+        </h2>
         <div className="grid md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Créé le</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Créé le
+            </label>
             <p className="text-gray-900">
-              {new Date(member.createdAt).toLocaleDateString('fr-FR')}
+              {new Date(member.createdAt).toLocaleDateString("fr-FR")}
             </p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Dernière modification</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Dernière modification
+            </label>
             <p className="text-gray-900">
-              {new Date(member.updatedAt).toLocaleDateString('fr-FR')}
+              {new Date(member.updatedAt).toLocaleDateString("fr-FR")}
             </p>
           </div>
         </div>
@@ -351,11 +396,17 @@ export const MemberDetail: React.FC = () => {
       {/* Modal réinitialisation mot de passe */}
       {showResetPassword && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowResetPassword(false)} />
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowResetPassword(false)}
+          />
           <div className="relative bg-white rounded-2xl w-full max-w-md p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Réinitialiser le mot de passe</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">
+              Réinitialiser le mot de passe
+            </h3>
             <p className="text-gray-600 mb-6">
-              Un email de réinitialisation sera envoyé à <strong>{member.email}</strong>.
+              Un email de réinitialisation sera envoyé à{" "}
+              <strong>{member.email}</strong>.
             </p>
             <div className="flex gap-3">
               <button

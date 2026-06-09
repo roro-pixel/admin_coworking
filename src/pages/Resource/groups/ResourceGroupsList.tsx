@@ -1,42 +1,47 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Search, Users } from 'lucide-react';
-import { resourceService } from '../../../services/resource.service';
-import type { ResourceGroupResponse } from '../../../services/resource.service';
-import { ResourceGroupFormModal } from './ResourceGroupFormModal';
+import React, { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Plus, Edit, Trash2, Search, Users } from "lucide-react";
+import { resourceService } from "../../../services/resource.service";
+import type { ResourceGroupResponse } from "../../../services/resource.service";
+import { ResourceGroupFormModal } from "./ResourceGroupFormModal";
 
 export const ResourceGroupsList: React.FC = () => {
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingGroup, setEditingGroup] = useState<ResourceGroupResponse | null>(null);
+  const [editingGroup, setEditingGroup] =
+    useState<ResourceGroupResponse | null>(null);
 
   // CORRECTION : size: 500 (faible volume, pas de pagination nécessaire)
   const { data: groupsData, isLoading } = useQuery({
-    queryKey: ['resource-groups'],
-    queryFn: () => resourceService.getResourceGroups({ size: 500 }),
+    queryKey: ["resource-groups"],
+    queryFn: () => resourceService.getResourceGroups(),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (code: string) => resourceService.deleteResourceGroup(code),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['resource-groups'] });
-      queryClient.invalidateQueries({ queryKey: ['resource-groups-list'] });
+      queryClient.invalidateQueries({ queryKey: ["resource-groups"] });
+      queryClient.invalidateQueries({ queryKey: ["resource-groups-list"] });
     },
-    onError: () => alert('Erreur lors de la suppression. Ce groupe est peut-être utilisé par des ressources.'),
+    onError: () =>
+      alert(
+        "Erreur lors de la suppression. Ce groupe est peut-être utilisé par des ressources.",
+      ),
   });
 
   const groups: ResourceGroupResponse[] = groupsData?.content || [];
 
   const filteredGroups = search
-    ? groups.filter(g =>
-        g.name.toLowerCase().includes(search.toLowerCase()) ||
-        g.code.toLowerCase().includes(search.toLowerCase())
+    ? groups.filter(
+        (g) =>
+          g.name.toLowerCase().includes(search.toLowerCase()) ||
+          g.code.toLowerCase().includes(search.toLowerCase()),
       )
     : groups;
 
   const handleDelete = (code: string) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce groupe ?')) {
+    if (confirm("Êtes-vous sûr de vouloir supprimer ce groupe ?")) {
       deleteMutation.mutate(code);
     }
   };
@@ -48,7 +53,9 @@ export const ResourceGroupsList: React.FC = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Groupes de ressources</h2>
+        <h2 className="text-xl font-semibold text-gray-900">
+          Groupes de ressources
+        </h2>
         <button
           onClick={() => {
             setEditingGroup(null);
@@ -62,7 +69,10 @@ export const ResourceGroupsList: React.FC = () => {
       </div>
 
       <div className="relative mb-6">
-        <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        <Search
+          size={18}
+          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+        />
         <input
           type="text"
           placeholder="Rechercher par nom ou code..."
@@ -76,38 +86,64 @@ export const ResourceGroupsList: React.FC = () => {
         <table className="w-full">
           <thead className="bg-gray-50 border-b">
             <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Code</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                Code
+              </th>
               <th className="px-6 py-3 text-left text-sm font-semibold">Nom</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Description</th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">Portail</th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">Actif</th>
-              <th className="px-6 py-3 text-right text-sm font-semibold">Actions</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">
+                Description
+              </th>
+              <th className="px-6 py-3 text-center text-sm font-semibold">
+                Portail
+              </th>
+              <th className="px-6 py-3 text-center text-sm font-semibold">
+                Actif
+              </th>
+              <th className="px-6 py-3 text-right text-sm font-semibold">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {filteredGroups.map((group) => (
-              <tr key={group.code} className={`hover:bg-gray-50 ${!group.active ? 'opacity-60' : ''}`}>
+              <tr
+                key={group.code}
+                className={`hover:bg-gray-50 ${!group.active ? "opacity-60" : ""}`}
+              >
                 <td className="px-6 py-4 text-sm font-mono">{group.code}</td>
                 <td className="px-6 py-4 text-sm font-medium">{group.name}</td>
-                <td className="px-6 py-4 text-sm text-gray-500">{group.description || '—'}</td>
+                <td className="px-6 py-4 text-sm text-gray-500">
+                  {group.description || "—"}
+                </td>
                 <td className="px-6 py-4 text-center">
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    group.portalVisible ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'
-                  }`}>
-                    {group.portalVisible ? 'Visible' : 'Masqué'}
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs ${
+                      group.portalVisible
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-gray-100 text-gray-500"
+                    }`}
+                  >
+                    {group.portalVisible ? "Visible" : "Masqué"}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-center">
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    group.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                  }`}>
-                    {group.active ? 'Actif' : 'Inactif'}
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs ${
+                      group.active
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-100 text-gray-500"
+                    }`}
+                  >
+                    {group.active ? "Actif" : "Inactif"}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex justify-end gap-2">
                     <button
-                      onClick={() => { setEditingGroup(group); setIsModalOpen(true); }}
+                      onClick={() => {
+                        setEditingGroup(group);
+                        setIsModalOpen(true);
+                      }}
                       className="p-1 text-blue-600 hover:text-blue-800"
                       title="Modifier"
                     >
@@ -138,10 +174,13 @@ export const ResourceGroupsList: React.FC = () => {
 
       <ResourceGroupFormModal
         isOpen={isModalOpen}
-        onClose={() => { setIsModalOpen(false); setEditingGroup(null); }}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingGroup(null);
+        }}
         editingGroup={editingGroup}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['resource-groups'] });
+          queryClient.invalidateQueries({ queryKey: ["resource-groups"] });
           setIsModalOpen(false);
           setEditingGroup(null);
         }}

@@ -1,80 +1,86 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { AdminLayout } from '../components/layout/AdminLayout';
-import { Search, Eye, User, Plus, Trash2 } from 'lucide-react';
-import { customerService } from '../services/customer.service';
-import type { CustomerSummaryResponse } from '../services/customer.service';
-import { useDebounce } from '../hooks/useDebounce';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { AdminLayout } from "../components/layout/AdminLayout";
+import { Search, Eye, User, Plus, Trash2 } from "lucide-react";
+import { customerService } from "../services/customer.service";
+import type { CustomerSummaryResponse } from "../services/customer.service";
+import { useDebounce } from "../hooks/useDebounce";
 
 export const AdminCustomers: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  
+
   // États pour la recherche
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDebounce(searchTerm, 300);
-  
+
   // États pour les filtres
-  const [typeFilter, setTypeFilter] = useState<'PERSON' | 'COMPANY' | ''>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  
+  const [typeFilter, setTypeFilter] = useState<"PERSON" | "COMPANY" | "">("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
+
   // Pagination - seulement utilisée pour la vue liste (pas pour la recherche)
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
   // Cas 1: Recherche active (query non vide)
   // Utilise GET /customers/search/basic?query=...&type=...
-  const { 
-    data: searchResults, 
+  const {
+    data: searchResults,
     isLoading: isSearchLoading,
-    error: searchError 
+    error: searchError,
   } = useQuery({
-    queryKey: ['customers', 'search-basic', debouncedSearch, typeFilter],
-    queryFn: () => customerService.searchCustomers(debouncedSearch, typeFilter || undefined),
+    queryKey: ["customers", "search-basic", debouncedSearch, typeFilter],
+    queryFn: () =>
+      customerService.searchCustomers(debouncedSearch, typeFilter || undefined),
     enabled: debouncedSearch.length >= 2, // Ne chercher qu'à partir de 2 caractères
   });
 
   // Cas 2: Pas de recherche active - afficher la liste paginée
   // Utilise GET /customers?summary=true&page=...
-  const { 
-    data: paginatedResult, 
+  const {
+    data: paginatedResult,
     isLoading: isListLoading,
-    error: listError 
+    error: listError,
   } = useQuery({
-    queryKey: ['customers', 'paginated', page, statusFilter],
-    queryFn: () => customerService.getCustomersPaginated({
-      page,
-      size: pageSize,
-      sort: 'createdAt,desc',
-    }),
+    queryKey: ["customers", "paginated", page, statusFilter],
+    queryFn: () =>
+      customerService.getCustomersPaginated({
+        page,
+        size: pageSize,
+        sort: "createdAt,desc",
+      }),
     enabled: debouncedSearch.length < 2, // Désactivé quand on recherche
   });
 
   // Application du filtre status sur les résultats de recherche
   // Note: Le filtre status n'est pas supporté par /search/basic, on filtre côté client
-  const filteredSearchResults = searchResults?.filter(customer => {
-    if (statusFilter && customer.status !== statusFilter) return false;
-    return true;
-  }) || [];
+  const filteredSearchResults =
+    searchResults?.filter((customer) => {
+      if (statusFilter && customer.status !== statusFilter) return false;
+      return true;
+    }) || [];
 
   // Déterminer les données à afficher
   const isSearchMode = debouncedSearch.length >= 2;
-  const customers = isSearchMode ? filteredSearchResults : (paginatedResult?.data || []);
+  const customers = isSearchMode
+    ? filteredSearchResults
+    : paginatedResult?.data || [];
   const pagination = isSearchMode ? null : paginatedResult?.pageable;
   const isLoading = isSearchMode ? isSearchLoading : isListLoading;
   const error = isSearchMode ? searchError : listError;
 
   const deleteMutation = useMutation({
-    mutationFn: (customerId: string) => customerService.deleteCustomer(customerId),
+    mutationFn: (customerId: string) =>
+      customerService.deleteCustomer(customerId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
     },
   });
 
   const handleDelete = (e: React.MouseEvent, customerId: string) => {
     e.stopPropagation(); // Empêche le clic sur la ligne
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce customer ?')) {
+    if (confirm("Êtes-vous sûr de vouloir supprimer ce customer ?")) {
       deleteMutation.mutate(customerId);
     }
   };
@@ -84,9 +90,9 @@ export const AdminCustomers: React.FC = () => {
   };
 
   const handleClearFilters = () => {
-    setSearchTerm('');
-    setTypeFilter('');
-    setStatusFilter('');
+    setSearchTerm("");
+    setTypeFilter("");
+    setStatusFilter("");
     setPage(0);
   };
 
@@ -116,10 +122,12 @@ export const AdminCustomers: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
-            <p className="text-gray-600 mt-1">Gérez tous vos customers (personnes et compagnies)</p>
+            <p className="text-gray-600 mt-1">
+              Gérez tous vos customers (personnes et compagnies)
+            </p>
           </div>
           <button
-            onClick={() => navigate('/customers/create')}
+            onClick={() => navigate("/customers/create")}
             className="mt-4 md:mt-0 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center"
           >
             <Plus size={18} className="mr-2" />
@@ -129,11 +137,17 @@ export const AdminCustomers: React.FC = () => {
       </div>
 
       {/* Filtres */}
-      <div className="bg-white rounded-xl p-4 shadow-sm mb-6 opacity-0 animate-[fadeUp_0.6s_ease-out_forwards]" style={{ animationDelay: '0.1s' }}>
+      <div
+        className="bg-white rounded-xl p-4 shadow-sm mb-6 opacity-0 animate-[fadeUp_0.6s_ease-out_forwards]"
+        style={{ animationDelay: "0.1s" }}
+      >
         <div className="flex flex-col gap-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <Search
+                size={18}
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+              />
               <input
                 type="text"
                 placeholder="Rechercher par nom, email ou téléphone..."
@@ -148,7 +162,7 @@ export const AdminCustomers: React.FC = () => {
             <select
               value={typeFilter}
               onChange={(e) => {
-                setTypeFilter(e.target.value as 'PERSON' | 'COMPANY' | '');
+                setTypeFilter(e.target.value as "PERSON" | "COMPANY" | "");
                 setPage(0);
               }}
               className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
@@ -193,22 +207,35 @@ export const AdminCustomers: React.FC = () => {
       </div>
 
       {/* Tableau */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden opacity-0 animate-[fadeUp_0.6s_ease-out_forwards]" style={{ animationDelay: '0.2s' }}>
+      <div
+        className="bg-white rounded-xl shadow-sm overflow-hidden opacity-0 animate-[fadeUp_0.6s_ease-out_forwards]"
+        style={{ animationDelay: "0.2s" }}
+      >
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Customer</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Contact</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Statut</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">ID</th>
-                <th className="px-6 py-4 text-right text-sm font-semibold text-gray-600">Actions</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
+                  Customer
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
+                  Contact
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
+                  Statut
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
+                  ID
+                </th>
+                <th className="px-6 py-4 text-right text-sm font-semibold text-gray-600">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {customers.map((customer: CustomerSummaryResponse) => (
-                <tr 
-                  key={customer.customerId} 
+                <tr
+                  key={customer.customerId}
                   onClick={() => handleRowClick(customer.customerId)}
                   className="hover:bg-gray-50 transition-colors cursor-pointer"
                 >
@@ -218,22 +245,36 @@ export const AdminCustomers: React.FC = () => {
                         <User size={20} className="text-primary-600" />
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">{customer.displayName}</p>
-                        <p className="text-xs text-gray-500">{customer.customerId}</p>
+                        <p className="font-medium text-gray-900">
+                          {customer.displayName}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {customer.customerId}
+                        </p>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-sm text-gray-900">{customer.email}</p>
-                    <p className="text-xs text-gray-500">{customer.phone || '-'}</p>
+                    <p className="text-xs text-gray-500">
+                      {customer.phone || "-"}
+                    </p>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      customer.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 
-                      customer.status === 'INACTIVE' ? 'bg-gray-100 text-gray-700' : 'bg-red-100 text-red-700'
-                    }`}>
-                      {customer.status === 'ACTIVE' ? 'Actif' : 
-                       customer.status === 'INACTIVE' ? 'Inactif' : 'Suspendu'}
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        customer.status === "ACTIVE"
+                          ? "bg-green-100 text-green-700"
+                          : customer.status === "INACTIVE"
+                            ? "bg-gray-100 text-gray-700"
+                            : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {customer.status === "ACTIVE"
+                        ? "Actif"
+                        : customer.status === "INACTIVE"
+                          ? "Inactif"
+                          : "Suspendu"}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500 font-mono">
@@ -286,18 +327,20 @@ export const AdminCustomers: React.FC = () => {
         {!isSearchMode && pagination && pagination.totalPages > 1 && (
           <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
             <div className="text-sm text-gray-500">
-              Affichage de {page * pageSize + 1} à {Math.min((page + 1) * pageSize, pagination.totalElements)} sur {pagination.totalElements} customers
+              Affichage de {page * pageSize + 1} à{" "}
+              {Math.min((page + 1) * pageSize, pagination.totalElements)} sur{" "}
+              {pagination.totalElements} customers
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => setPage(p => Math.max(0, p - 1))}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
                 disabled={page === 0}
                 className="px-3 py-1 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
               >
                 Précédent
               </button>
               <button
-                onClick={() => setPage(p => p + 1)}
+                onClick={() => setPage((p) => p + 1)}
                 disabled={!pagination.hasNext}
                 className="px-3 py-1 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
               >

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Loader2 } from 'lucide-react';
-import { resourceService } from '../../../services/resource.service';
-import type { AmenityResponse } from '../../../services/resource.service';
-import { ModalPortal } from '../../../components/ui/ModalPortal';
+import React, { useState, useEffect } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { X, Loader2 } from "lucide-react";
+import { resourceService } from "../../../services/resource.service";
+import type { AmenityResponse } from "../../../services/resource.service";
+import { ModalPortal } from "../../../components/ui/ModalPortal";
 
 interface AmenityFormModalProps {
   isOpen: boolean;
@@ -13,8 +13,8 @@ interface AmenityFormModalProps {
 }
 
 const buildDefaultFormData = (amenity: AmenityResponse | null) => ({
-  name: amenity?.name || '',
-  description: amenity?.description || '',
+  name: amenity?.name || "",
+  description: amenity?.description || "",
   active: amenity?.active ?? true,
   quantity: amenity?.quantity ?? 1,
   optional: amenity?.optional ?? false,
@@ -29,7 +29,9 @@ export const AmenityFormModal: React.FC<AmenityFormModalProps> = ({
 }) => {
   const queryClient = useQueryClient();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [formData, setFormData] = useState(() => buildDefaultFormData(editingAmenity));
+  const [formData, setFormData] = useState(() =>
+    buildDefaultFormData(editingAmenity),
+  );
 
   // CORRECTION : resynchronisation à chaque ouverture ou changement d'équipement
   useEffect(() => {
@@ -38,40 +40,42 @@ export const AmenityFormModal: React.FC<AmenityFormModalProps> = ({
   }, [editingAmenity, isOpen]);
 
   const createMutation = useMutation({
-    mutationFn: () => resourceService.createAmenity({
-      name: formData.name,
-      description: formData.description || undefined,
-      active: formData.active,
-      quantity: formData.quantity,
-      optional: formData.optional,
-      extraPrice: formData.extraPrice || undefined,
-    }),
+    mutationFn: () =>
+      resourceService.createAmenity({
+        name: formData.name,
+        description: formData.description || undefined,
+        active: formData.active,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['resource-amenities'] });
-      queryClient.invalidateQueries({ queryKey: ['all-amenities'] });
+      queryClient.invalidateQueries({ queryKey: ["resource-amenities"] });
+      queryClient.invalidateQueries({ queryKey: ["all-amenities"] });
       onSuccess();
     },
     onError: (error: any) => {
-      setErrorMessage(error?.response?.data?.message || 'Erreur lors de la création de l\'équipement.');
+      setErrorMessage(
+        error?.response?.data?.message ||
+          "Erreur lors de la création de l'équipement.",
+      );
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: () => resourceService.updateAmenity(editingAmenity!.code, {
-      name: formData.name,
-      description: formData.description || undefined,
-      active: formData.active,
-      quantity: formData.quantity,
-      optional: formData.optional,
-      extraPrice: formData.extraPrice || undefined,
-    }),
+    mutationFn: () =>
+      resourceService.updateAmenity(editingAmenity!.code, {
+        name: formData.name,
+        description: formData.description || undefined,
+        active: formData.active,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['resource-amenities'] });
-      queryClient.invalidateQueries({ queryKey: ['all-amenities'] });
+      queryClient.invalidateQueries({ queryKey: ["resource-amenities"] });
+      queryClient.invalidateQueries({ queryKey: ["all-amenities"] });
       onSuccess();
     },
     onError: (error: any) => {
-      setErrorMessage(error?.response?.data?.message || 'Erreur lors de la mise à jour de l\'équipement.');
+      setErrorMessage(
+        error?.response?.data?.message ||
+          "Erreur lors de la mise à jour de l'équipement.",
+      );
     },
   });
 
@@ -94,7 +98,7 @@ export const AmenityFormModal: React.FC<AmenityFormModalProps> = ({
     <ModalPortal onClose={onClose}>
       <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
         <h3 className="text-xl font-bold">
-          {editingAmenity ? 'Modifier l\'équipement' : 'Nouvel équipement'}
+          {editingAmenity ? "Modifier l'équipement" : "Nouvel équipement"}
         </h3>
         <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
           <X size={20} />
@@ -109,7 +113,9 @@ export const AmenityFormModal: React.FC<AmenityFormModalProps> = ({
         )}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Nom *
+          </label>
           <input
             type="text"
             value={formData.name}
@@ -120,10 +126,14 @@ export const AmenityFormModal: React.FC<AmenityFormModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Description
+          </label>
           <textarea
             value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, description: e.target.value })
+            }
             rows={3}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 resize-none"
           />
@@ -131,31 +141,63 @@ export const AmenityFormModal: React.FC<AmenityFormModalProps> = ({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Quantité</label>
-            <input type="number" value={formData.quantity} min="1"
-              onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) || 1 })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg" />
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Quantité
+            </label>
+            <input
+              type="number"
+              value={formData.quantity}
+              min="1"
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  quantity: Number(e.target.value) || 1,
+                })
+              }
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+            />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Supplément (FCFA)</label>
-            <input type="number" value={formData.extraPrice || ''} min="0"
-              onChange={(e) => setFormData({ ...formData, extraPrice: Number(e.target.value) || 0 })}
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Supplément (FCFA)
+            </label>
+            <input
+              type="number"
+              value={formData.extraPrice || ""}
+              min="0"
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  extraPrice: Number(e.target.value) || 0,
+                })
+              }
               placeholder="0 = inclus"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg" />
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+            />
           </div>
         </div>
 
         <div className="flex items-center gap-6">
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={formData.optional}
-              onChange={(e) => setFormData({ ...formData, optional: e.target.checked })}
-              className="rounded" />
+            <input
+              type="checkbox"
+              checked={formData.optional}
+              onChange={(e) =>
+                setFormData({ ...formData, optional: e.target.checked })
+              }
+              className="rounded"
+            />
             <span className="text-sm">Optionnel</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={formData.active}
-              onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
-              className="rounded" />
+            <input
+              type="checkbox"
+              checked={formData.active}
+              onChange={(e) =>
+                setFormData({ ...formData, active: e.target.checked })
+              }
+              className="rounded"
+            />
             <span className="text-sm">Actif</span>
           </label>
         </div>
@@ -174,9 +216,13 @@ export const AmenityFormModal: React.FC<AmenityFormModalProps> = ({
             disabled={isPending}
             className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {isPending
-              ? <Loader2 size={16} className="animate-spin" />
-              : editingAmenity ? 'Mettre à jour' : 'Créer'}
+            {isPending ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : editingAmenity ? (
+              "Mettre à jour"
+            ) : (
+              "Créer"
+            )}
           </button>
         </div>
       </form>
