@@ -11,18 +11,14 @@ import {
 import { inventoryService } from "../../../services/inventory.service";
 
 const importTypes = [
-  { value: "items", label: "Articles", endpoint: "items", template: "items" },
-  { value: "assets", label: "Actifs", endpoint: "assets", template: "assets" },
-  {
-    value: "stock",
-    label: "Stocks initiaux",
-    endpoint: "stock",
-    template: "stock",
-  },
+  { value: "ITEMS", label: "Articles" },
+  { value: "ASSETS", label: "Actifs" },
+  { value: "INITIAL_STOCK", label: "Stocks initiaux" },
+  { value: "SUPPLIERS", label: "Fournisseurs" },
 ];
 
 export const ImportPage: React.FC = () => {
-  const [importType, setImportType] = useState("items");
+  const [importType, setImportType] = useState("ITEMS");
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState("");
@@ -31,24 +27,7 @@ export const ImportPage: React.FC = () => {
     mutationFn: async () => {
       if (!file) throw new Error("Veuillez sélectionner un fichier");
 
-      const formData = new FormData();
-      formData.append("file", file);
-
-      let response;
-      switch (importType) {
-        case "items":
-          response = await inventoryService.importItems(formData);
-          break;
-        case "assets":
-          response = await inventoryService.importAssets(formData);
-          break;
-        case "stock":
-          response = await inventoryService.importStock(formData);
-          break;
-        default:
-          throw new Error("Type d'import invalide");
-      }
-      return response;
+      return inventoryService.importInventory(importType, file);
     },
     onSuccess: (data) => {
       setResult(data);
@@ -66,7 +45,7 @@ export const ImportPage: React.FC = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `template_${importType}.csv`;
+      a.download = `template_${importType.toLowerCase()}.csv`;
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (err: any) {

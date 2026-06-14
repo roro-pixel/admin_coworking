@@ -428,13 +428,13 @@ export const CreateSubscriptionModal: React.FC<
                         autoRenew: !prev.autoRenew,
                       }))
                     }
-                    className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                    className={`relative h-6 w-11 rounded-full transition-colors flex-shrink-0 overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
                       formData.autoRenew ? "bg-primary-600" : "bg-gray-300"
                     }`}
                   >
                     <span
-                      className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                        formData.autoRenew ? "translate-x-6" : "translate-x-1"
+                      className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm ring-1 ring-black/5 transition-transform ${
+                        formData.autoRenew ? "translate-x-5" : "translate-x-0"
                       }`}
                     />
                   </button>

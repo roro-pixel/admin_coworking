@@ -84,23 +84,23 @@ export const CashAnomaliesPanel: React.FC = () => {
           Analyse, suivi et revue des anomalies de caisse.
         </p>
       </div>
-      <div className="bg-white rounded-xl shadow-sm p-4 grid grid-cols-1 md:grid-cols-5 gap-3">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-4 grid grid-cols-1 md:grid-cols-5 gap-3">
         <input
           value={sessionNumber}
           onChange={(e) => setSessionNumber(e.target.value)}
           placeholder="Session"
-          className="px-3 py-2 border rounded-lg font-mono"
+          className="px-3 py-2 border border-gray-200 rounded-xl font-mono"
         />
         <input
           value={registerCode}
           onChange={(e) => setRegisterCode(e.target.value)}
           placeholder="Caisse"
-          className="px-3 py-2 border rounded-lg font-mono"
+          className="px-3 py-2 border border-gray-200 rounded-xl font-mono"
         />
         <select
           value={severity}
           onChange={(e) => setSeverity(e.target.value)}
-          className="px-3 py-2 border rounded-lg bg-white"
+          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
         >
           <option value="">Toutes sévérités</option>
           <option value="LOW">Faible</option>
@@ -110,7 +110,7 @@ export const CashAnomaliesPanel: React.FC = () => {
         <select
           value={reviewStatus}
           onChange={(e) => setReviewStatus(e.target.value)}
-          className="px-3 py-2 border rounded-lg bg-white"
+          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
         >
           <option value="">Tous statuts</option>
           <option value="PENDING">En attente</option>
@@ -123,7 +123,7 @@ export const CashAnomaliesPanel: React.FC = () => {
           <Search size={16} /> {data?.totalElements ?? 0} anomalie(s)
         </div>
       </div>
-      <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col md:flex-row gap-3 items-end">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-4 flex flex-col md:flex-row gap-3 items-end">
         <div className="flex-1">
           <label className="text-sm font-medium">Analyser une session</label>
           <input
@@ -160,19 +160,19 @@ export const CashAnomaliesPanel: React.FC = () => {
           <Loader2 className="animate-spin mx-auto" />
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b">
+        <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+          <table className="w-full border-separate border-spacing-y-2">
+            <thead className="bg-gray-50/70">
               <tr>
-                <th className="px-4 py-3 text-left text-sm">Flag</th>
-                <th className="px-4 py-3 text-left text-sm">Session</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Flag</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Session</th>
                 <th className="px-4 py-3 text-center text-sm">Sévérité</th>
-                <th className="px-4 py-3 text-left text-sm">Description</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Description</th>
                 <th className="px-4 py-3 text-center text-sm">Revue</th>
-                <th className="px-4 py-3 text-right text-sm">Actions</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody>
               {anomalies.map((a) => (
                 <tr key={a.flagNumber}>
                   <td className="px-4 py-3 font-mono text-sm">

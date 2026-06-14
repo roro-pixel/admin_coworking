@@ -88,7 +88,7 @@ export const PassDetailModal: React.FC<PassDetailModalProps> = ({
 
   return (
     <ModalPortal onClose={onClose}>
-      <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-gray-100 p-4 flex justify-between items-center rounded-t-2xl">
         <div>
           <h3 className="text-xl font-bold">{pass.name}</h3>
           <p className="text-sm text-gray-500 font-mono">{pass.passNumber}</p>
@@ -111,19 +111,19 @@ export const PassDetailModal: React.FC<PassDetailModalProps> = ({
 
         {/* Infos générales */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="p-3 bg-gray-50 rounded-lg">
+          <div className="p-4 bg-gray-50/70 border border-gray-100 rounded-xl">
             <p className="text-xs text-gray-500">Type</p>
             <p className="font-medium text-sm">
               {passTypeLabels[pass.passType] ?? pass.passType}
             </p>
           </div>
-          <div className="p-3 bg-gray-50 rounded-lg">
+          <div className="p-4 bg-gray-50/70 border border-gray-100 rounded-xl">
             <p className="text-xs text-gray-500">Propriétaire</p>
             <p className="font-medium text-sm font-mono">{pass.ownerCode}</p>
             <p className="text-xs text-gray-400">{pass.ownerType}</p>
           </div>
           {pass.description && (
-            <div className="col-span-2 p-3 bg-gray-50 rounded-lg">
+            <div className="col-span-2 p-4 bg-gray-50/70 border border-gray-100 rounded-xl">
               <p className="text-xs text-gray-500">Description</p>
               <p className="text-sm">{pass.description}</p>
             </div>
@@ -132,7 +132,7 @@ export const PassDetailModal: React.FC<PassDetailModalProps> = ({
 
         {/* Validité */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="p-3 bg-gray-50 rounded-lg">
+          <div className="p-4 bg-gray-50/70 border border-gray-100 rounded-xl">
             <p className="text-xs text-gray-500 flex items-center gap-1">
               <Calendar size={11} /> Valide du
             </p>
@@ -140,7 +140,7 @@ export const PassDetailModal: React.FC<PassDetailModalProps> = ({
               {new Date(pass.validFrom).toLocaleString("fr-FR")}
             </p>
           </div>
-          <div className="p-3 bg-gray-50 rounded-lg">
+          <div className="p-4 bg-gray-50/70 border border-gray-100 rounded-xl">
             <p className="text-xs text-gray-500 flex items-center gap-1">
               <Calendar size={11} /> Jusqu'au
             </p>
@@ -151,19 +151,19 @@ export const PassDetailModal: React.FC<PassDetailModalProps> = ({
             </p>
           </div>
           {pass.maxUses !== undefined && (
-            <div className="p-3 bg-gray-50 rounded-lg">
+            <div className="p-4 bg-gray-50/70 border border-gray-100 rounded-xl">
               <p className="text-xs text-gray-500 flex items-center gap-1">
                 <Users size={11} /> Utilisations max
               </p>
               <p className="font-medium text-sm">{pass.maxUses}</p>
             </div>
           )}
-          <div className="p-3 bg-gray-50 rounded-lg">
+          <div className="p-4 bg-gray-50/70 border border-gray-100 rounded-xl">
             <p className="text-xs text-gray-500">Options</p>
             <p className="text-sm">
-              {pass.transferable ? "✅ Transférable" : "❌ Non transférable"}
+              {pass.transferable ? "Transférable" : "Non transférable"}
               {" · "}
-              {pass.shareable ? "✅ Partageable" : "❌ Non partageable"}
+              {pass.shareable ? "Partageable" : "Non partageable"}
             </p>
           </div>
         </div>
@@ -176,7 +176,7 @@ export const PassDetailModal: React.FC<PassDetailModalProps> = ({
             </p>
             <div className="space-y-2">
               {pass.entitlements.map((ent, i) => (
-                <div key={i} className="border rounded-lg p-3">
+                <div key={i} className="border border-gray-100 rounded-xl p-3 bg-white shadow-sm">
                   <div className="flex justify-between items-center">
                     <p className="text-sm font-medium font-mono">
                       {ent.entitlementCode}
@@ -243,7 +243,7 @@ export const PassDetailModal: React.FC<PassDetailModalProps> = ({
           )}
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50"
+            className="flex-1 px-4 py-2 border rounded-xl text-gray-700 hover:bg-primary-50/40 transition-colors"
           >
             Fermer
           </button>

@@ -18,8 +18,8 @@ export const ReportsPage: React.FC = () => {
     ],
     queryFn: () =>
       inventoryService.getMovementsReport({
-        from: fromDate || undefined,
-        to: toDate || undefined,
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
         itemCode: itemFilter || undefined,
         locationCode: locationFilter || undefined,
       }),
@@ -33,8 +33,8 @@ export const ReportsPage: React.FC = () => {
 
   const handleExportCSV = async () => {
     const blob = await inventoryService.exportMovementsCSV({
-      from: fromDate,
-      to: toDate,
+      fromDate: fromDate || undefined,
+      toDate: toDate || undefined,
     });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -46,8 +46,8 @@ export const ReportsPage: React.FC = () => {
 
   const handleExportPDF = async () => {
     const blob = await inventoryService.exportMovementsPDF({
-      from: fromDate,
-      to: toDate,
+      fromDate: fromDate || undefined,
+      toDate: toDate || undefined,
     });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");

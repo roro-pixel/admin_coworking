@@ -1,12 +1,11 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
-  Edit,
-  Trash2,
   Search,
+  Trash2,
   Eye,
-  Power,
   EyeOff,
   Building2,
   ChevronLeft,
@@ -15,6 +14,7 @@ import {
   ToggleRight,
   ArrowUp,
   ArrowDown,
+  Filter,
 } from "lucide-react";
 import { resourceService } from "../../../services/resource.service";
 import type {
@@ -22,34 +22,27 @@ import type {
   ResourceTypeResponse,
   ResourceGroupResponse,
 } from "../../../services/resource.service";
-import { ResourceFormModal } from "./ResourceFormModal";
-import { ResourceDetailModal } from "./ResourceDetailModal";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
-  ACTIVE: { label: "Actif", color: "bg-green-100 text-green-700" },
-  INACTIVE: { label: "Inactif", color: "bg-gray-100 text-gray-700" },
-  MAINTENANCE: { label: "Maintenance", color: "bg-orange-100 text-orange-700" },
-  OUT_OF_SERVICE: { label: "Hors service", color: "bg-red-100 text-red-700" },
-  ARCHIVED: { label: "Archivé", color: "bg-gray-100 text-gray-500" },
+  ACTIVE: { label: "Actif", color: "bg-green-50 text-green-700 ring-green-100" },
+  INACTIVE: { label: "Inactif", color: "bg-gray-50 text-gray-700 ring-gray-100" },
+  MAINTENANCE: { label: "Maintenance", color: "bg-orange-50 text-orange-700 ring-orange-100" },
+  OUT_OF_SERVICE: { label: "Hors service", color: "bg-red-50 text-red-700 ring-red-100" },
+  ARCHIVED: { label: "Archivé", color: "bg-gray-50 text-gray-500 ring-gray-100" },
 };
 
 const PAGE_SIZE = 20;
 
 export const ResourcesList: React.FC = () => {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [groupFilter, setGroupFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(0);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [editingResource, setEditingResource] =
-    useState<ResourceResponse | null>(null);
-  const [selectedResource, setSelectedResource] =
-    useState<ResourceResponse | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
-  // CORRECTION : changement de filtre remet à la page 0
   const handleFilterChange = <T,>(setter: (v: T) => void, value: T) => {
     setter(value);
     setPage(0);
@@ -82,7 +75,6 @@ export const ResourcesList: React.FC = () => {
   const totalPages = resourcesData?.totalPages ?? 0;
   const totalElements = resourcesData?.totalElements ?? 0;
 
-  // Filtre client-side sur la page courante (pas d'endpoint search par nom dans getResources)
   const filteredResources = search
     ? resources.filter(
         (res) =>
@@ -98,25 +90,15 @@ export const ResourcesList: React.FC = () => {
   });
 
   const updateBookingEnabledMutation = useMutation({
-    mutationFn: ({
-      code,
-      bookingEnabled,
-    }: {
-      code: string;
-      bookingEnabled: boolean;
-    }) => resourceService.updateResourceBookingEnabled(code, bookingEnabled),
+    mutationFn: ({ code, bookingEnabled }: { code: string; bookingEnabled: boolean }) =>
+      resourceService.updateResourceBookingEnabled(code, bookingEnabled),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["resources"] }),
     onError: () => alert("Erreur lors de la mise à jour de la réservabilité."),
   });
 
   const updatePortalVisibleMutation = useMutation({
-    mutationFn: ({
-      code,
-      portalVisible,
-    }: {
-      code: string;
-      portalVisible: boolean;
-    }) => resourceService.updateResourcePortalVisible(code, portalVisible),
+    mutationFn: ({ code, portalVisible }: { code: string; portalVisible: boolean }) =>
+      resourceService.updateResourcePortalVisible(code, portalVisible),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["resources"] }),
     onError: () => alert("Erreur lors de la mise à jour de la visibilité."),
   });
@@ -129,16 +111,10 @@ export const ResourcesList: React.FC = () => {
   });
 
   const updateDisplayOrderMutation = useMutation({
-    mutationFn: ({
-      code,
-      displayOrder,
-    }: {
-      code: string;
-      displayOrder: number;
-    }) => resourceService.updateResourceDisplayOrder(code, displayOrder),
+    mutationFn: ({ code, displayOrder }: { code: string; displayOrder: number }) =>
+      resourceService.updateResourceDisplayOrder(code, displayOrder),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["resources"] }),
-    onError: () =>
-      alert("Erreur lors de la mise à jour de l ordre d affichage."),
+    onError: () => alert("Erreur lors de la mise à jour de l'ordre d'affichage."),
   });
 
   const handleDelete = (code: string) => {
@@ -157,358 +133,161 @@ export const ResourcesList: React.FC = () => {
 
   const hasActiveFilters = search || typeFilter || groupFilter || statusFilter;
 
-  if (isLoading) {
-    return <div className="text-center py-8">Chargement...</div>;
-  }
+  if (isLoading) return <div className="text-center py-8">Chargement...</div>;
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Ressources</h2>
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900">Ressources</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Gérez les espaces, salles, bureaux et ressources réservables.
+          </p>
+        </div>
         <button
-          onClick={() => {
-            setEditingResource(null);
-            setIsModalOpen(true);
-          }}
-          className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2"
+          onClick={() => navigate("/resources/create")}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-primary-700"
         >
           <Plus size={18} />
           Nouvelle ressource
         </button>
       </div>
 
-      {/* Filtres */}
-      <div className="flex flex-col md:flex-row gap-3 mb-6 flex-wrap">
-        <div className="flex-1 relative min-w-[200px]">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Rechercher par nom ou code..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg"
-          />
-        </div>
-        <select
-          value={typeFilter}
-          onChange={(e) => handleFilterChange(setTypeFilter, e.target.value)}
-          className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
-        >
-          <option value="">Tous les types</option>
-          {types.map((type) => (
-            <option key={type.code} value={type.code}>
-              {type.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={groupFilter}
-          onChange={(e) => handleFilterChange(setGroupFilter, e.target.value)}
-          className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
-        >
-          <option value="">Tous les groupes</option>
-          {groups.map((group) => (
-            <option key={group.code} value={group.code}>
-              {group.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)}
-          className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
-        >
-          <option value="">Tous les statuts</option>
-          <option value="ACTIVE">Actif</option>
-          <option value="INACTIVE">Inactif</option>
-          <option value="MAINTENANCE">Maintenance</option>
-          <option value="OUT_OF_SERVICE">Hors service</option>
-          <option value="ARCHIVED">Archivé</option>
-        </select>
-        {hasActiveFilters && (
+      <div className="mb-6 grid gap-3 md:grid-cols-4">
+        <Metric label="Ressources" value={totalElements} />
+        <Metric label="Actives" value={resources.filter((r) => r.active).length} />
+        <Metric label="Réservables" value={resources.filter((r) => r.bookingEnabled).length} />
+        <Metric label="Visibles portail" value={resources.filter((r) => r.portalVisible).length} />
+      </div>
+
+      <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <div className="flex flex-col gap-3 md:flex-row">
+          <div className="relative flex-1">
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Rechercher par nom ou code..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+            />
+          </div>
           <button
-            onClick={handleResetFilters}
-            className="px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+            onClick={() => setShowFilters((v) => !v)}
+            className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition ${
+              showFilters || hasActiveFilters
+                ? "border-primary-200 bg-primary-50 text-primary-700"
+                : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+            }`}
           >
-            Réinitialiser
+            <Filter size={16} />
+            Filtres
+            {hasActiveFilters && <span className="h-2 w-2 rounded-full bg-primary-600" />}
           </button>
+        </div>
+
+        {showFilters && (
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <select value={typeFilter} onChange={(e) => handleFilterChange(setTypeFilter, e.target.value)} className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm">
+              <option value="">Tous les types</option>
+              {types.map((type) => <option key={type.code} value={type.code}>{type.name}</option>)}
+            </select>
+            <select value={groupFilter} onChange={(e) => handleFilterChange(setGroupFilter, e.target.value)} className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm">
+              <option value="">Tous les groupes</option>
+              {groups.map((group) => <option key={group.code} value={group.code}>{group.name}</option>)}
+            </select>
+            <select value={statusFilter} onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)} className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm">
+              <option value="">Tous les statuts</option>
+              {Object.entries(statusConfig).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}
+            </select>
+            {hasActiveFilters && <button onClick={handleResetFilters} className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-600 hover:bg-gray-50">Réinitialiser</button>}
+          </div>
         )}
       </div>
 
-      {/* Tableau */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                Code
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Nom</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                Type
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                Groupe
-              </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
-                Capacité
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                Statut
-              </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
-                Réservable
-              </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
-                Visible
-              </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
-                Actif
-              </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
-                Ordre
-              </th>
-              <th className="px-6 py-3 text-right text-sm font-semibold">
-                Actions
-              </th>
+      <div className="overflow-x-auto">
+        <table className="w-full border-separate border-spacing-y-2">
+          <thead>
+            <tr className="text-xs uppercase tracking-wide text-gray-400">
+              <th className="px-4 py-2 text-left font-semibold">Ressource</th>
+              <th className="px-4 py-2 text-left font-semibold">Classification</th>
+              <th className="px-4 py-2 text-center font-semibold">Capacité</th>
+              <th className="px-4 py-2 text-center font-semibold">Statut</th>
+              <th className="px-4 py-2 text-center font-semibold">Portail</th>
+              <th className="px-4 py-2 text-center font-semibold">Ordre</th>
+              <th className="px-4 py-2 text-right font-semibold">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
-            {filteredResources.map((resource) => (
-              <tr key={resource.code} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-mono">{resource.code}</td>
-                <td className="px-6 py-4 text-sm font-medium">
-                  {resource.name}
-                </td>
-                <td className="px-6 py-4 text-sm">{resource.typeCode}</td>
-                <td className="px-6 py-4 text-sm">
-                  {resource.groupCode || "—"}
-                </td>
-                <td className="px-6 py-4 text-center text-sm">
-                  {resource.capacity}
-                </td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs ${statusConfig[resource.status]?.color}`}
-                  >
-                    {statusConfig[resource.status]?.label}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <button
-                    onClick={() =>
-                      updateBookingEnabledMutation.mutate({
-                        code: resource.code,
-                        bookingEnabled: !resource.bookingEnabled,
-                      })
-                    }
-                    disabled={updateBookingEnabledMutation.isPending}
-                    className={`p-1 rounded disabled:opacity-40 ${
-                      resource.bookingEnabled
-                        ? "text-green-600 hover:text-green-800"
-                        : "text-red-600 hover:text-red-800"
-                    }`}
-                    title={
-                      resource.bookingEnabled
-                        ? "Désactiver la réservation"
-                        : "Activer la réservation"
-                    }
-                  >
-                    <Power size={16} />
-                  </button>
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <button
-                    onClick={() =>
-                      updatePortalVisibleMutation.mutate({
-                        code: resource.code,
-                        portalVisible: !resource.portalVisible,
-                      })
-                    }
-                    disabled={updatePortalVisibleMutation.isPending}
-                    className={`p-1 rounded disabled:opacity-40 ${
-                      resource.portalVisible
-                        ? "text-blue-600 hover:text-blue-800"
-                        : "text-gray-400 hover:text-gray-600"
-                    }`}
-                    title={
-                      resource.portalVisible
-                        ? "Masquer du portail"
-                        : "Afficher sur le portail"
-                    }
-                  >
-                    {resource.portalVisible ? (
-                      <Eye size={16} />
-                    ) : (
-                      <EyeOff size={16} />
-                    )}
-                  </button>
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <button
-                    onClick={() =>
-                      updateActiveMutation.mutate({
-                        code: resource.code,
-                        active: !resource.active,
-                      })
-                    }
-                    disabled={updateActiveMutation.isPending}
-                    className={`p-1 rounded disabled:opacity-40 ${resource.active ? "text-green-600 hover:text-green-800" : "text-gray-400 hover:text-gray-600"}`}
-                    title={resource.active ? "Désactiver" : "Activer"}
-                  >
-                    {resource.active ? (
-                      <ToggleRight size={18} />
-                    ) : (
-                      <ToggleLeft size={18} />
-                    )}
-                  </button>
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <div className="flex items-center justify-center gap-1">
-                    <span className="text-xs text-gray-500 w-6 text-right">
-                      {resource.displayOrder}
-                    </span>
-                    <div className="flex flex-col gap-0.5">
-                      <button
-                        onClick={() =>
-                          updateDisplayOrderMutation.mutate({
-                            code: resource.code,
-                            displayOrder: (resource.displayOrder ?? 0) - 1,
-                          })
-                        }
-                        disabled={
-                          updateDisplayOrderMutation.isPending ||
-                          (resource.displayOrder ?? 0) <= 0
-                        }
-                        className="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30"
-                        title="Monter"
-                      >
-                        <ArrowUp size={12} />
-                      </button>
-                      <button
-                        onClick={() =>
-                          updateDisplayOrderMutation.mutate({
-                            code: resource.code,
-                            displayOrder: (resource.displayOrder ?? 0) + 1,
-                          })
-                        }
-                        disabled={updateDisplayOrderMutation.isPending}
-                        className="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30"
-                        title="Descendre"
-                      >
-                        <ArrowDown size={12} />
-                      </button>
+          <tbody>
+            {filteredResources.map((res) => {
+              const cfg = statusConfig[res.status] || statusConfig.INACTIVE;
+              return (
+                <tr key={res.code} onClick={() => navigate(`/resources/${res.code}`)} className={`group cursor-pointer rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 transition hover:-translate-y-0.5 hover:shadow-md ${!res.active ? "opacity-60" : ""}`}>
+                  <td className="rounded-l-2xl px-4 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-xl bg-primary-50 p-2 text-primary-600"><Building2 size={18} /></div>
+                      <div>
+                        <p className="font-medium text-gray-900">{res.name}</p>
+                        <p className="font-mono text-xs text-gray-400">{res.code}</p>
+                        {res.locationLabel && <p className="text-xs text-gray-500">{res.locationLabel}</p>}
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex justify-end gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedResource(resource);
-                        setIsDetailOpen(true);
-                      }}
-                      className="p-1 text-gray-600 hover:text-primary-600"
-                      title="Voir détail"
-                    >
-                      <Eye size={16} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingResource(resource);
-                        setIsModalOpen(true);
-                      }}
-                      className="p-1 text-blue-600 hover:text-blue-800"
-                      title="Modifier"
-                    >
-                      <Edit size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(resource.code)}
-                      disabled={deleteMutation.isPending}
-                      className="p-1 text-red-600 hover:text-red-800 disabled:opacity-40"
-                      title="Supprimer"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-4 py-4 text-sm">
+                    <p className="font-mono text-xs text-gray-500">Type : {res.typeCode || "—"}</p>
+                    <p className="font-mono text-xs text-gray-400">Groupe : {res.groupCode || "—"}</p>
+                  </td>
+                  <td className="px-4 py-4 text-center text-sm font-semibold text-gray-900">{res.capacity ?? "—"}</td>
+                  <td className="px-4 py-4 text-center"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${cfg.color}`}>{cfg.label}</span></td>
+                  <td className="px-4 py-4 text-center">
+                    <button onClick={(e) => { e.stopPropagation(); updatePortalVisibleMutation.mutate({ code: res.code, portalVisible: !res.portalVisible }); }} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${res.portalVisible ? "bg-blue-50 text-blue-700" : "bg-gray-50 text-gray-500"}`}>{res.portalVisible ? <Eye size={13} /> : <EyeOff size={13} />}{res.portalVisible ? "Visible" : "Masqué"}</button>
+                  </td>
+                  <td className="px-4 py-4 text-center">
+                    <div className="inline-flex items-center rounded-xl bg-gray-50 p-1">
+                      <button onClick={(e) => { e.stopPropagation(); updateDisplayOrderMutation.mutate({ code: res.code, displayOrder: (res.displayOrder ?? 0) - 1 }); }} className="rounded-lg p-1 text-gray-400 hover:bg-white hover:text-gray-700"><ArrowUp size={14} /></button>
+                      <span className="px-2 text-xs font-medium text-gray-600">{res.displayOrder ?? 0}</span>
+                      <button onClick={(e) => { e.stopPropagation(); updateDisplayOrderMutation.mutate({ code: res.code, displayOrder: (res.displayOrder ?? 0) + 1 }); }} className="rounded-lg p-1 text-gray-400 hover:bg-white hover:text-gray-700"><ArrowDown size={14} /></button>
+                    </div>
+                  </td>
+                  <td className="rounded-r-2xl px-4 py-4 text-right">
+                    <div className="flex justify-end gap-1">
+                      <button onClick={(e) => { e.stopPropagation(); updateBookingEnabledMutation.mutate({ code: res.code, bookingEnabled: !res.bookingEnabled }); }} className="rounded-lg p-2 text-gray-400 hover:bg-gray-50 hover:text-gray-700" title="Réservabilité">{res.bookingEnabled ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}</button>
+                      <button onClick={(e) => { e.stopPropagation(); updateActiveMutation.mutate({ code: res.code, active: !res.active }); }} className="rounded-lg p-2 text-gray-400 hover:bg-gray-50 hover:text-gray-700" title="Actif/Inactif">{res.active ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}</button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(res.code); }} className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600" title="Supprimer"><Trash2 size={16} /></button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {filteredResources.length === 0 && !isLoading && (
-        <div className="text-center py-12 bg-white rounded-xl">
-          <Building2 size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500">Aucune ressource trouvée</p>
-          {hasActiveFilters && (
-            <button
-              onClick={handleResetFilters}
-              className="mt-2 text-primary-600 hover:underline text-sm"
-            >
-              Réinitialiser les filtres
-            </button>
-          )}
+      {filteredResources.length === 0 && (
+        <div className="rounded-2xl bg-white p-12 text-center shadow-sm ring-1 ring-gray-100">
+          <Building2 size={42} className="mx-auto mb-3 text-gray-300" />
+          <p className="font-medium text-gray-700">Aucune ressource trouvée</p>
+          <p className="text-sm text-gray-500">Essayez de modifier les filtres ou créez une nouvelle ressource.</p>
         </div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 px-2">
-          <p className="text-sm text-gray-500">
-            {totalElements} ressource{totalElements > 1 ? "s" : ""} au total
-          </p>
+        <div className="mt-6 flex items-center justify-between">
+          <p className="text-sm text-gray-500">{totalElements} ressource(s)</p>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-gray-50"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="text-sm text-gray-600">
-              Page {page + 1} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-gray-50"
-            >
-              <ChevronRight size={16} />
-            </button>
+            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="rounded-xl border border-gray-200 bg-white p-2 text-gray-600 disabled:opacity-50"><ChevronLeft size={16} /></button>
+            <span className="text-sm text-gray-600">Page {page + 1} / {totalPages}</span>
+            <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="rounded-xl border border-gray-200 bg-white p-2 text-gray-600 disabled:opacity-50"><ChevronRight size={16} /></button>
           </div>
         </div>
-      )}
-
-      <ResourceFormModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingResource(null);
-        }}
-        editingResource={editingResource}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["resources"] });
-          setIsModalOpen(false);
-          setEditingResource(null);
-        }}
-      />
-
-      {selectedResource && (
-        <ResourceDetailModal
-          isOpen={isDetailOpen}
-          onClose={() => {
-            setIsDetailOpen(false);
-            setSelectedResource(null);
-          }}
-          resource={selectedResource}
-        />
       )}
     </div>
   );
 };
+
+const Metric: React.FC<{ label: string; value: number }> = ({ label, value }) => (
+  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+    <p className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</p>
+    <p className="mt-1 text-2xl font-bold text-gray-900">{value.toLocaleString("fr-FR")}</p>
+  </div>
+);

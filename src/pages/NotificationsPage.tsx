@@ -1,14 +1,14 @@
-import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import React, { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "../components/layout/AdminLayout";
 import {
-  Bell,
-  CheckCircle,
-  XCircle,
-  Clock,
   AlertCircle,
+  Bell,
   CheckCheck,
+  CheckCircle,
+  Clock,
   Search,
+  XCircle,
 } from "lucide-react";
 import { notificationService } from "../services/notification.service";
 
@@ -23,20 +23,44 @@ const notificationIcons: Record<string, React.ElementType> = {
   INVENTORY_ALERT: AlertCircle,
 };
 
-const notificationColors: Record<string, string> = {
-  BOOKING_CONFIRMATION: "text-green-600 bg-green-50",
-  BOOKING_REMINDER: "text-blue-600 bg-blue-50",
-  BOOKING_CANCELLATION: "text-red-600 bg-red-50",
-  KYC_APPROVED: "text-green-600 bg-green-50",
-  KYC_REJECTED: "text-red-600 bg-red-50",
-  INVOICE_ISSUED: "text-purple-600 bg-purple-50",
-  PAYMENT_RECEIVED: "text-green-600 bg-green-50",
-  INVENTORY_ALERT: "text-orange-600 bg-orange-50",
-  default: "text-gray-600 bg-gray-50",
+const notificationTone: Record<string, string> = {
+  BOOKING_CONFIRMATION: "text-emerald-700 bg-emerald-50 ring-emerald-100",
+  BOOKING_REMINDER: "text-sky-700 bg-sky-50 ring-sky-100",
+  BOOKING_CANCELLATION: "text-rose-700 bg-rose-50 ring-rose-100",
+  KYC_APPROVED: "text-emerald-700 bg-emerald-50 ring-emerald-100",
+  KYC_REJECTED: "text-rose-700 bg-rose-50 ring-rose-100",
+  INVOICE_ISSUED: "text-slate-700 bg-slate-50 ring-slate-100",
+  PAYMENT_RECEIVED: "text-emerald-700 bg-emerald-50 ring-emerald-100",
+  INVENTORY_ALERT: "text-amber-700 bg-amber-50 ring-amber-100",
+  default: "text-slate-700 bg-slate-50 ring-slate-100",
 };
+
+const typeLabels: Record<string, string> = {
+  BOOKING_CONFIRMATION: "Réservation confirmée",
+  BOOKING_REMINDER: "Rappel réservation",
+  BOOKING_CANCELLATION: "Réservation annulée",
+  KYC_APPROVED: "KYC approuvé",
+  KYC_REJECTED: "KYC rejeté",
+  INVOICE_ISSUED: "Facture émise",
+  PAYMENT_RECEIVED: "Paiement reçu",
+  INVENTORY_ALERT: "Alerte stock",
+};
+
+const statusLabels: Record<string, string> = {
+  SENT: "Envoyée",
+  PENDING: "En attente",
+  FAILED: "Échouée",
+};
+
+const formatDate = (dateString: string) =>
+  new Date(dateString).toLocaleString("fr-FR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 
 export const NotificationsPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
@@ -68,20 +92,32 @@ export const NotificationsPage: React.FC = () => {
   });
 
   const notifications = data?.content || [];
+
+  const filteredNotifications = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return notifications;
+    return notifications.filter((n) => {
+      const subject = n.subject || typeLabels[n.type] || n.type;
+      return [subject, n.body, n.type, n.channel, n.notificationNumber]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q));
+    });
+  }, [notifications, search]);
+
   const unreadCount = notifications.filter(
     (n) => n.status === "SENT" && !n.readAt,
   ).length;
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString("fr-FR");
-  };
+  const failedCount = notifications.filter((n) => n.status === "FAILED").length;
+  const sentCount = notifications.filter((n) => n.status === "SENT").length;
 
   if (isLoading) {
     return (
       <AdminLayout>
-        <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="text-gray-500 mt-4">Chargement...</p>
+        <div className="flex min-h-[360px] items-center justify-center">
+          <div className="text-center">
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-primary-600" />
+            <p className="mt-4 text-sm text-slate-500">Chargement...</p>
+          </div>
         </div>
       </AdminLayout>
     );
@@ -89,141 +125,190 @@ export const NotificationsPage: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="max-w-5xl mx-auto py-8">
-        <div className="flex justify-between items-center mb-8">
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
-            <p className="text-gray-500 mt-1">
-              {unreadCount > 0
-                ? `${unreadCount} notification(s) non lue(s)`
-                : "Toutes vos notifications"}
+            <h1 className="text-2xl font-bold text-slate-950">
+              Notifications
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Suivez les messages système, alertes, paiements et réservations.
             </p>
           </div>
+
           {unreadCount > 0 && (
             <button
+              type="button"
               onClick={() => markAllAsReadMutation.mutate()}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
+              disabled={markAllAsReadMutation.isPending}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
             >
-              <CheckCheck size={18} />
+              <CheckCheck size={17} />
               Tout marquer comme lu
             </button>
           )}
         </div>
 
-        {/* Filtres */}
-        <div className="flex flex-col md:flex-row gap-4 mb-8">
-          <div className="flex-1 relative">
-            <Search
-              size={18}
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-            />
-            <input
-              type="text"
-              placeholder="Rechercher une notification..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg"
-            />
-          </div>
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
-          >
-            <option value="">Tous les types</option>
-            <option value="BOOKING_CONFIRMATION">Réservation confirmée</option>
-            <option value="BOOKING_REMINDER">Rappel réservation</option>
-            <option value="BOOKING_CANCELLATION">Réservation annulée</option>
-            <option value="KYC_APPROVED">KYC approuvé</option>
-            <option value="KYC_REJECTED">KYC rejeté</option>
-            <option value="INVOICE_ISSUED">Facture émise</option>
-            <option value="PAYMENT_RECEIVED">Paiement reçu</option>
-            <option value="INVENTORY_ALERT">Alerte stock</option>
-          </select>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
-          >
-            <option value="">Tous les statuts</option>
-            <option value="SENT">Envoyées</option>
-            <option value="PENDING">En attente</option>
-            <option value="FAILED">Échouées</option>
-          </select>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <MetricCard label="Non lues" value={unreadCount} />
+          <MetricCard label="Envoyées" value={sentCount} />
+          <MetricCard label="Échecs" value={failedCount} tone="danger" />
         </div>
 
-        {/* Liste des notifications */}
-        <div className="space-y-3">
-          {notifications.length === 0 ? (
-            <div className="text-center py-16 bg-white rounded-xl">
-              <Bell size={64} className="mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500 text-lg">Aucune notification</p>
+        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+            <div className="relative lg:col-span-6">
+              <Search
+                size={18}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                type="text"
+                placeholder="Rechercher par objet, contenu, canal ou numéro..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-100"
+              />
+            </div>
+
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-100 lg:col-span-3"
+            >
+              <option value="">Tous les types</option>
+              {Object.entries(typeLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-100 lg:col-span-3"
+            >
+              <option value="">Tous les statuts</option>
+              <option value="SENT">Envoyées</option>
+              <option value="PENDING">En attente</option>
+              <option value="FAILED">Échouées</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
+          {filteredNotifications.length === 0 ? (
+            <div className="py-16 text-center">
+              <Bell size={48} className="mx-auto mb-3 text-slate-300" />
+              <p className="font-medium text-slate-700">Aucune notification</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Ajustez les filtres ou réessayez plus tard.
+              </p>
             </div>
           ) : (
-            notifications.map((notification) => {
-              const Icon = notificationIcons[notification.type] || Bell;
-              const colorClass =
-                notificationColors[notification.type] ||
-                notificationColors.default;
-              const isRead =
-                notification.status !== "SENT" || notification.readAt;
+            <div className="space-y-1.5">
+              {filteredNotifications.map((notification) => {
+                const Icon = notificationIcons[notification.type] || Bell;
+                const tone =
+                  notificationTone[notification.type] || notificationTone.default;
+                const isRead =
+                  notification.status !== "SENT" || !!notification.readAt;
 
-              return (
-                <div
-                  key={notification.notificationNumber}
-                  className={`bg-white rounded-xl p-5 shadow-sm hover:shadow-md transition-all ${
-                    !isRead ? "border-l-4 border-primary-500" : ""
-                  }`}
-                >
-                  <div className="flex gap-4">
-                    <div className={`p-3 rounded-lg ${colorClass}`}>
-                      <Icon size={20} />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-semibold text-gray-900">
-                            {notification.subject || notification.type}
-                          </h3>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {notification.body}
-                          </p>
-                        </div>
-                        {!isRead && (
-                          <button
-                            onClick={() =>
-                              markAsReadMutation.mutate(
-                                notification.notificationNumber,
-                              )
-                            }
-                            className="text-xs text-primary-600 hover:text-primary-700"
-                          >
-                            Marquer comme lu
-                          </button>
-                        )}
+                return (
+                  <div
+                    key={notification.notificationNumber}
+                    className="rounded-xl px-4 py-4 transition hover:bg-slate-50"
+                  >
+                    <div className="flex gap-4">
+                      <div
+                        className={`mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ${tone}`}
+                      >
+                        <Icon size={19} />
                       </div>
-                      <div className="flex justify-between items-center mt-3">
-                        <div className="flex gap-3 text-xs text-gray-400">
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h3 className="truncate font-semibold text-slate-950">
+                                {notification.subject ||
+                                  typeLabels[notification.type] ||
+                                  notification.type}
+                              </h3>
+                              {!isRead && (
+                                <span className="h-2 w-2 shrink-0 rounded-full bg-primary-600" />
+                              )}
+                            </div>
+                            <p className="mt-1 text-sm leading-6 text-slate-600">
+                              {notification.body}
+                            </p>
+                          </div>
+
+                          {!isRead && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                markAsReadMutation.mutate(
+                                  notification.notificationNumber,
+                                )
+                              }
+                              disabled={markAsReadMutation.isPending}
+                              className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                            >
+                              Marquer comme lu
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                           <span>{formatDate(notification.createdAt)}</span>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                            {typeLabels[notification.type] || notification.type}
+                          </span>
                           {notification.channel && (
-                            <span className="capitalize">
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 capitalize">
                               {notification.channel}
                             </span>
                           )}
-                          {notification.status === "FAILED" && (
-                            <span className="text-red-600">Échec d'envoi</span>
-                          )}
+                          <span
+                            className={`rounded-full px-2 py-0.5 ${
+                              notification.status === "FAILED"
+                                ? "bg-rose-50 text-rose-700"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {statusLabels[notification.status] ||
+                              notification.status}
+                          </span>
+                          {isRead && <span className="text-slate-400">Lu</span>}
                         </div>
-                        {isRead && (
-                          <span className="text-xs text-gray-400">Lu</span>
-                        )}
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
     </AdminLayout>
   );
 };
+
+const MetricCard: React.FC<{
+  label: string;
+  value: number;
+  tone?: "default" | "danger";
+}> = ({ label, value, tone = "default" }) => (
+  <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <p className="text-sm text-slate-500">{label}</p>
+    <p
+      className={`mt-2 text-2xl font-bold ${
+        tone === "danger" ? "text-rose-600" : "text-slate-950"
+      }`}
+    >
+      {value.toLocaleString("fr-FR")}
+    </p>
+  </div>
+);

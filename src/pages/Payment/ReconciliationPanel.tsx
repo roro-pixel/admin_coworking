@@ -81,7 +81,7 @@ export const ReconciliationPanel: React.FC = () => {
         </div>
       ) : !createdBatch ? (
         /* Étape 1 : créer le lot */
-        <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+        <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-6 space-y-4">
           <h3 className="font-medium text-gray-800">Étape 1 — Créer un lot</h3>
 
           <div>
@@ -122,7 +122,7 @@ export const ReconciliationPanel: React.FC = () => {
         </div>
       ) : (
         /* Étape 2 : clôturer le lot */
-        <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+        <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-6 space-y-4">
           <h3 className="font-medium text-gray-800">
             Étape 2 — Clôturer le lot
           </h3>

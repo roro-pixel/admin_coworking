@@ -112,7 +112,7 @@ export const UsageRecordsList: React.FC = () => {
         </h2>
         <button
           onClick={() => setIsCreateOpen(true)}
-          className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2"
+          className="bg-primary-600 text-white px-4 py-2 rounded-xl shadow-sm hover:bg-primary-700 hover:shadow transition-all flex items-center gap-2"
         >
           <Plus size={18} /> Enregistrer un usage
         </button>
@@ -130,12 +130,12 @@ export const UsageRecordsList: React.FC = () => {
             placeholder="Rechercher par n°, propriétaire ou référence..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg"
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
           />
         </div>
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className={`px-4 py-2 border rounded-lg flex items-center gap-2 ${
+          className={`px-4 py-2 border rounded-xl flex items-center gap-2 ${
             showFilters || hasActiveFilters
               ? "bg-primary-50 border-primary-300 text-primary-700"
               : "bg-white border-gray-200 text-gray-600"
@@ -149,7 +149,7 @@ export const UsageRecordsList: React.FC = () => {
       </div>
 
       {showFilters && (
-        <div className="bg-gray-50 rounded-lg p-4 mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-gray-100 bg-white p-4 mb-6 shadow-sm shadow-gray-100/70 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Type propriétaire
@@ -159,7 +159,7 @@ export const UsageRecordsList: React.FC = () => {
               onChange={(e) =>
                 handleFilterChange(setOwnerTypeFilter, e.target.value)
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
             >
               <option value="">Tous</option>
               <option value="MEMBER">Membre</option>
@@ -175,7 +175,7 @@ export const UsageRecordsList: React.FC = () => {
               onChange={(e) =>
                 handleFilterChange(setEntitlementFilter, e.target.value)
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
             >
               <option value="">Tous les droits</option>
               {entDefs.map((d) => (
@@ -194,7 +194,7 @@ export const UsageRecordsList: React.FC = () => {
               onChange={(e) =>
                 handleFilterChange(setStatusFilter, e.target.value)
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
             >
               <option value="">Tous</option>
               <option value="RECORDED">Enregistré</option>
@@ -215,39 +215,39 @@ export const UsageRecordsList: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm shadow-gray-100/70 overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b">
+          <thead className="bg-gray-50/60 text-gray-500">
             <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 N° Usage
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Propriétaire
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Droit
               </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
+              <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Quantité
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Référence
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Date
               </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
+              <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Facturable
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Statut
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="divide-y divide-gray-100">
             {filtered.map((r: UsageRecord) => (
-              <tr key={r.usageNumber} className="hover:bg-gray-50">
+              <tr key={r.usageNumber} className="hover:bg-primary-50/40 transition-colors">
                 <td className="px-6 py-4 text-sm font-mono">{r.usageNumber}</td>
                 <td className="px-6 py-4 text-sm">
                   <p className="font-mono">{r.ownerCode}</p>
@@ -281,7 +281,7 @@ export const UsageRecordsList: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 text-sm">
                   <span
-                    className={`px-2 py-1 rounded-full text-xs ${
+                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
                       r.status === "RECORDED"
                         ? "bg-blue-100 text-blue-700"
                         : r.status === "BILLABLE"
@@ -301,7 +301,7 @@ export const UsageRecordsList: React.FC = () => {
       </div>
 
       {filtered.length === 0 && !isLoading && (
-        <div className="text-center py-12 bg-white rounded-xl">
+        <div className="text-center py-12 rounded-2xl border border-dashed border-gray-200 bg-white">
           <Activity size={48} className="mx-auto text-gray-300 mb-4" />
           <p className="text-gray-500">Aucun usage enregistré</p>
         </div>
@@ -316,7 +316,7 @@ export const UsageRecordsList: React.FC = () => {
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-gray-50"
+              className="p-1 rounded border disabled:opacity-40 hover:bg-primary-50/40 transition-colors"
             >
               <ChevronLeft size={16} />
             </button>
@@ -326,7 +326,7 @@ export const UsageRecordsList: React.FC = () => {
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-gray-50"
+              className="p-1 rounded border disabled:opacity-40 hover:bg-primary-50/40 transition-colors"
             >
               <ChevronRight size={16} />
             </button>

@@ -322,7 +322,7 @@ export const PaymentIntentDetailPage: React.FC = () => {
         Retour aux intentions
       </button>
 
-      <div className="bg-white rounded-xl shadow-sm">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100">
         {/* ========== HEADER ========== */}
         <div className="border-b p-6">
           <div className="flex justify-between items-start">
@@ -467,7 +467,7 @@ export const PaymentIntentDetailPage: React.FC = () => {
                   return (
                     <div
                       key={txn.transactionNumber}
-                      className="border rounded-xl p-4"
+                      className="ring-1 ring-gray-100 rounded-2xl p-4"
                     >
                       <div className="flex justify-between items-start mb-3">
                         <div>

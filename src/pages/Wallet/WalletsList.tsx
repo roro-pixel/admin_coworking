@@ -9,6 +9,10 @@ import {
   Plus,
   Search,
   Wallet as WalletIcon,
+  Filter,
+  TrendingUp,
+  Lock,
+  Layers,
 } from "lucide-react";
 import {
   walletService,
@@ -25,13 +29,13 @@ interface WalletsListProps {
 const PAGE_SIZE = 20;
 
 const statusConfig: Record<string, { label: string; color: string }> = {
-  ACTIVE: { label: "Actif", color: "bg-green-100 text-green-700" },
-  SUSPENDED: { label: "Suspendu", color: "bg-yellow-100 text-yellow-700" },
-  LOCKED: { label: "Verrouillé", color: "bg-red-100 text-red-700" },
-  CLOSED: { label: "Fermé", color: "bg-gray-100 text-gray-500" },
+  ACTIVE: { label: "Actif", color: "bg-green-50 text-green-700 ring-green-100" },
+  SUSPENDED: { label: "Suspendu", color: "bg-yellow-50 text-yellow-700 ring-yellow-100" },
+  LOCKED: { label: "Verrouillé", color: "bg-red-50 text-red-700 ring-red-100" },
+  CLOSED: { label: "Fermé", color: "bg-gray-50 text-gray-500 ring-gray-100" },
   UNDER_REVIEW: {
     label: "En révision",
-    color: "bg-orange-100 text-orange-700",
+    color: "bg-orange-50 text-orange-700 ring-orange-100",
   },
 };
 
@@ -92,6 +96,15 @@ export const WalletsList: React.FC<WalletsListProps> = ({
     );
   }, [wallets]);
 
+  const statusCount = useMemo(() => {
+    return wallets.reduce<Record<string, number>>((acc, wallet) => {
+      acc[wallet.status] = (acc[wallet.status] || 0) + 1;
+      return acc;
+    }, {});
+  }, [wallets]);
+
+  const maxStatusCount = Math.max(1, ...Object.values(statusCount));
+
   const resetFilters = () => {
     setSearch("");
     setDebouncedSearch("");
@@ -103,7 +116,8 @@ export const WalletsList: React.FC<WalletsListProps> = ({
 
   if (isLoading && wallets.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className="flex items-center justify-center rounded-2xl bg-white py-16 text-gray-500 shadow-sm ring-1 ring-gray-100">
+        <Loader2 size={20} className="mr-2 animate-spin text-primary-600" />
         Chargement des portefeuilles...
       </div>
     );
@@ -111,210 +125,233 @@ export const WalletsList: React.FC<WalletsListProps> = ({
 
   return (
     <div>
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">
-            Liste des portefeuilles
-          </h2>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {totalElements} portefeuille{totalElements > 1 ? "s" : ""}
+          <h2 className="text-xl font-semibold text-gray-900">Liste des portefeuilles</h2>
+          <p className="mt-0.5 text-sm text-gray-500">
+            {totalElements} portefeuille{totalElements > 1 ? "s" : ""} trouvé{totalElements > 1 ? "s" : ""}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={onOpenLookup}
-            className="border border-primary-600 text-primary-600 px-4 py-2 rounded-lg hover:bg-primary-50 flex items-center gap-2 text-sm"
+            className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-primary-700 shadow-sm ring-1 ring-primary-100 transition hover:bg-primary-50"
           >
             <Search size={17} /> Rechercher / créer
           </button>
           <button
             onClick={onOpenTopUp}
-            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2 text-sm"
+            className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700"
           >
             <Plus size={17} /> Top-up
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-4">
         <SummaryCard
-          label="Disponible page"
+          label="Disponible sur la page"
           value={`${formatAmountOnly(totals.available)} XAF`}
           tone="green"
+          icon={TrendingUp}
         />
         <SummaryCard
-          label="Bloqué page"
+          label="Montant bloqué"
           value={`${formatAmountOnly(totals.held)} XAF`}
           tone="orange"
+          icon={Lock}
         />
         <SummaryCard
-          label="Ledger page"
+          label="Ledger total"
           value={`${formatAmountOnly(totals.ledger)} XAF`}
           tone="gray"
+          icon={Layers}
         />
+        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-sm font-medium text-gray-700">Répartition statut</p>
+            <Filter size={16} className="text-gray-400" />
+          </div>
+          <div className="space-y-2">
+            {Object.entries(statusConfig).map(([status, cfg]) => {
+              const count = statusCount[status] || 0;
+              return (
+                <div key={status} className="flex items-center gap-2">
+                  <span className="w-20 text-xs text-gray-500">{cfg.label}</span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
+                    <div
+                      className="h-full rounded-full bg-primary-500"
+                      style={{ width: `${(count / maxStatusCount) * 100}%` }}
+                    />
+                  </div>
+                  <span className="w-5 text-right text-xs font-semibold text-gray-700">{count}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      <div className="bg-white border rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-5 gap-3">
-        <div className="md:col-span-2 relative">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher par propriétaire, email, nom, wallet..."
-            className="w-full pl-10 pr-9 py-2 border border-gray-200 rounded-lg"
-          />
-          {isFetching && (
-            <Loader2
-              size={14}
-              className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400"
+      <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+          <div className="relative md:col-span-2">
+            <Search
+              size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
             />
-          )}
-        </div>
-        <select
-          value={ownerTypeFilter}
-          onChange={(e) => {
-            setOwnerTypeFilter(e.target.value);
-            setPage(0);
-          }}
-          className="px-3 py-2 border border-gray-200 rounded-lg bg-white"
-        >
-          <option value="">Tous les propriétaires</option>
-          <option value="CUSTOMER">Customer</option>
-          <option value="MEMBER">Membre</option>
-          <option value="BUSINESS_ENTITY">Entreprise</option>
-        </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setPage(0);
-          }}
-          className="px-3 py-2 border border-gray-200 rounded-lg bg-white"
-        >
-          <option value="">Tous les statuts</option>
-          {Object.entries(statusConfig).map(([key, value]) => (
-            <option key={key} value={key}>
-              {value.label}
-            </option>
-          ))}
-        </select>
-        <div className="flex gap-2">
-          <input
-            value={currencyFilter}
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher par propriétaire, email, nom, wallet..."
+              className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-9 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
+            />
+            {isFetching && (
+              <Loader2
+                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400"
+              />
+            )}
+          </div>
+          <select
+            value={ownerTypeFilter}
             onChange={(e) => {
-              setCurrencyFilter(e.target.value.toUpperCase());
+              setOwnerTypeFilter(e.target.value);
               setPage(0);
             }}
-            placeholder="XAF"
-            className="min-w-0 flex-1 px-3 py-2 border border-gray-200 rounded-lg font-mono"
-          />
-          {(search || statusFilter || ownerTypeFilter || currencyFilter) && (
-            <button
-              onClick={resetFilters}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
-            >
-              Reset
-            </button>
-          )}
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
+          >
+            <option value="">Tous les propriétaires</option>
+            <option value="CUSTOMER">Customer</option>
+            <option value="MEMBER">Membre</option>
+            <option value="BUSINESS_ENTITY">Entreprise</option>
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(0);
+            }}
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
+          >
+            <option value="">Tous les statuts</option>
+            {Object.entries(statusConfig).map(([key, value]) => (
+              <option key={key} value={key}>
+                {value.label}
+              </option>
+            ))}
+          </select>
+          <div className="flex gap-2">
+            <input
+              value={currencyFilter}
+              onChange={(e) => {
+                setCurrencyFilter(e.target.value.toUpperCase());
+                setPage(0);
+              }}
+              placeholder="XAF"
+              className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 font-mono text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
+            />
+            {(search || statusFilter || ownerTypeFilter || currencyFilter) && (
+              <button
+                onClick={resetFilters}
+                className="rounded-xl bg-gray-100 px-3 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-200"
+              >
+                Reset
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        {wallets.length === 0 ? (
-          <div className="text-center py-12">
-            <WalletIcon size={48} className="mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500">Aucun portefeuille trouvé</p>
-            <button
-              onClick={onOpenLookup}
-              className="mt-3 text-primary-600 text-sm hover:underline"
-            >
-              Rechercher ou créer automatiquement
-            </button>
-          </div>
-        ) : (
+      {wallets.length === 0 ? (
+        <div className="rounded-2xl bg-white py-14 text-center shadow-sm ring-1 ring-gray-100">
+          <WalletIcon size={48} className="mx-auto mb-4 text-gray-300" />
+          <p className="text-gray-500">Aucun portefeuille trouvé</p>
+          <button
+            onClick={onOpenLookup}
+            className="mt-3 text-sm font-medium text-primary-600 hover:underline"
+          >
+            Rechercher ou créer automatiquement
+          </button>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
+            <table className="w-full border-separate border-spacing-y-2 px-3 pb-3">
+              <thead>
                 <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-600">
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
                     Wallet
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-600">
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
                     Propriétaire
                   </th>
-                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-600">
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">
                     Disponible
                   </th>
-                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-600">
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">
                     Bloqué
                   </th>
-                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-600">
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">
                     Ledger
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-600">
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
                     Statut
                   </th>
-                  <th className="px-6 py-3 text-center text-sm font-semibold text-gray-600">
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">
                     Action
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody>
                 {wallets.map((wallet) => {
                   const status = statusConfig[wallet.status] || {
                     label: wallet.status,
-                    color: "bg-gray-100 text-gray-500",
+                    color: "bg-gray-50 text-gray-500 ring-gray-100",
                   };
                   return (
-                    <tr key={wallet.walletNumber} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <p className="font-mono text-sm font-semibold">
+                    <tr
+                      key={wallet.walletNumber}
+                      className="group cursor-pointer rounded-xl bg-white shadow-sm ring-1 ring-gray-100 transition hover:bg-gray-50 hover:shadow-md"
+                      onClick={() => navigate(`/wallets/${wallet.walletNumber}`)}
+                    >
+                      <td className="rounded-l-xl px-4 py-4">
+                        <p className="font-mono text-sm font-semibold text-gray-900">
                           {wallet.walletNumber}
                         </p>
                         <p className="text-xs text-gray-400">
                           Ouvert le{" "}
                           {wallet.openedAt
-                            ? new Date(wallet.openedAt).toLocaleDateString(
-                                "fr-FR",
-                              )
+                            ? new Date(wallet.openedAt).toLocaleDateString("fr-FR")
                             : "—"}
                         </p>
                       </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-medium">
-                          {wallet.ownerCode}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {wallet.ownerType}
-                        </p>
+                      <td className="px-4 py-4">
+                        <p className="text-sm font-medium text-gray-900">{wallet.ownerCode}</p>
+                        <p className="text-xs text-gray-400">{wallet.ownerType}</p>
                       </td>
-                      <td className="px-6 py-4 text-right font-semibold text-green-600">
-                        {formatAmountOnly(wallet.availableBalance)}{" "}
-                        {wallet.currency}
+                      <td className="px-4 py-4 text-right font-semibold text-green-600">
+                        {formatAmountOnly(wallet.availableBalance)} {wallet.currency}
                       </td>
-                      <td className="px-6 py-4 text-right font-semibold text-orange-600">
+                      <td className="px-4 py-4 text-right font-semibold text-orange-600">
                         {formatAmountOnly(wallet.heldBalance)} {wallet.currency}
                       </td>
-                      <td className="px-6 py-4 text-right font-semibold text-gray-900">
-                        {formatAmountOnly(wallet.ledgerBalance)}{" "}
-                        {wallet.currency}
+                      <td className="px-4 py-4 text-right font-semibold text-gray-900">
+                        {formatAmountOnly(wallet.ledgerBalance)} {wallet.currency}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4">
                         <span
-                          className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${status.color}`}
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${status.color}`}
                         >
                           {status.label}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="rounded-r-xl px-4 py-4 text-center">
                         <button
-                          onClick={() =>
-                            navigate(`/wallets/${wallet.walletNumber}`)
-                          }
-                          className="p-1.5 text-gray-500 hover:text-primary-600 rounded-lg hover:bg-primary-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/wallets/${wallet.walletNumber}`);
+                          }}
+                          className="rounded-lg p-2 text-gray-500 transition hover:bg-primary-50 hover:text-primary-600"
                           title="Voir détail"
                         >
                           <Eye size={18} />
@@ -326,11 +363,11 @@ export const WalletsList: React.FC<WalletsListProps> = ({
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-6 px-2">
+        <div className="mt-6 flex items-center justify-between px-2">
           <p className="text-sm text-gray-500">
             Page {page + 1} / {totalPages}
           </p>
@@ -338,14 +375,14 @@ export const WalletsList: React.FC<WalletsListProps> = ({
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="p-2 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
+              className="rounded-xl bg-white p-2 text-gray-600 shadow-sm ring-1 ring-gray-100 transition hover:bg-gray-50 disabled:opacity-50"
             >
               <ChevronLeft size={16} />
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="p-2 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
+              className="rounded-xl bg-white p-2 text-gray-600 shadow-sm ring-1 ring-gray-100 transition hover:bg-gray-50 disabled:opacity-50"
             >
               <ChevronRight size={16} />
             </button>
@@ -360,17 +397,23 @@ const SummaryCard: React.FC<{
   label: string;
   value: string;
   tone: "green" | "orange" | "gray";
-}> = ({ label, value, tone }) => {
-  const color =
+  icon: React.ElementType;
+}> = ({ label, value, tone, icon: Icon }) => {
+  const toneClass =
     tone === "green"
-      ? "text-green-600"
+      ? "bg-green-50 text-green-700"
       : tone === "orange"
-        ? "text-orange-600"
-        : "text-gray-900";
+        ? "bg-orange-50 text-orange-700"
+        : "bg-gray-50 text-gray-700";
   return (
-    <div className="bg-white rounded-xl shadow-sm border p-4">
-      <p className="text-sm text-gray-500 mb-1">{label}</p>
-      <p className={`text-xl font-bold ${color}`}>{value}</p>
+    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-sm text-gray-500">{label}</p>
+        <div className={`rounded-xl p-2 ${toneClass}`}>
+          <Icon size={17} />
+        </div>
+      </div>
+      <p className="text-xl font-bold text-gray-900">{value}</p>
     </div>
   );
 };

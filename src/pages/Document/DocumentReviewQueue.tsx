@@ -31,6 +31,41 @@ const statusConfig: Record<
   string,
   { label: string; color: string; icon: any }
 > = {
+  DRAFT: {
+    label: "Brouillon",
+    color: "bg-gray-100 text-gray-700",
+    icon: Clock,
+  },
+  PENDING_REVIEW: {
+    label: "En attente",
+    color: "bg-yellow-100 text-yellow-700",
+    icon: Clock,
+  },
+  IN_REVIEW: {
+    label: "En revue",
+    color: "bg-orange-100 text-orange-700",
+    icon: AlertCircle,
+  },
+  APPROVED: {
+    label: "Approuvé",
+    color: "bg-green-100 text-green-700",
+    icon: CheckCircle,
+  },
+  REJECTED: {
+    label: "Rejeté",
+    color: "bg-red-100 text-red-700",
+    icon: XCircle,
+  },
+  EXPIRED: {
+    label: "Expiré",
+    color: "bg-gray-100 text-gray-500",
+    icon: XCircle,
+  },
+  CANCELLED: {
+    label: "Annulé",
+    color: "bg-gray-100 text-gray-500",
+    icon: XCircle,
+  },
   NOT_STARTED: {
     label: "Non commencé",
     color: "bg-gray-100 text-gray-700",
@@ -56,25 +91,10 @@ const statusConfig: Record<
     color: "bg-red-100 text-red-700",
     icon: AlertCircle,
   },
-  APPROVED: {
-    label: "Approuvé",
-    color: "bg-green-100 text-green-700",
-    icon: CheckCircle,
-  },
-  REJECTED: {
-    label: "Rejeté",
-    color: "bg-red-100 text-red-700",
-    icon: XCircle,
-  },
   RENEWAL_REQUIRED: {
     label: "Renouvellement requis",
     color: "bg-purple-100 text-purple-700",
     icon: Calendar,
-  },
-  EXPIRED: {
-    label: "Expiré",
-    color: "bg-gray-100 text-gray-500",
-    icon: XCircle,
   },
 };
 
@@ -114,13 +134,7 @@ export const DocumentReviewQueue: React.FC = () => {
     ],
     queryFn: () =>
       showMyQueue
-        ? kycService
-            .getMyQueue(adminId)
-            .then((data) => ({
-              content: data,
-              totalElements: data.length,
-              totalPages: 1,
-            }))
+        ? kycService.getMyQueue(adminId)
         : kycService.getAllKycCases({
             status: statusFilter !== "all" ? statusFilter : undefined,
             ownerType: ownerTypeFilter !== "all" ? ownerTypeFilter : undefined,
@@ -171,7 +185,7 @@ export const DocumentReviewQueue: React.FC = () => {
 
   const handleExportPdf = async (code: string) => {
     try {
-      const blob = await kycService.exportPdf(code, false);
+      const blob = await kycService.exportPdf(code);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -199,8 +213,12 @@ export const DocumentReviewQueue: React.FC = () => {
 
   // Extraire les données du dashboard avec la nouvelle structure
   const totalCases = dashboard?.summary?.totalCases ?? 0;
-  const pendingCount = dashboard?.summary?.SUBMITTED ?? 0;
-  const reviewCount = dashboard?.summary?.UNDER_REVIEW ?? 0;
+  const pendingCount =
+    dashboard?.summary?.PENDING_REVIEW ??
+    dashboard?.summary?.PENDING_REVIEW ??
+    0;
+  const reviewCount =
+    dashboard?.summary?.IN_REVIEW ?? dashboard?.summary?.IN_REVIEW ?? 0;
   const approvedCount = dashboard?.summary?.APPROVED ?? 0;
   const overdueSla = dashboard?.sla?.casesExceeding48h ?? 0;
 
@@ -391,12 +409,10 @@ export const DocumentReviewQueue: React.FC = () => {
                 className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
               >
                 <option value="all">Tous les statuts</option>
-                <option value="SUBMITTED">Soumis</option>
-                <option value="UNDER_REVIEW">En revue</option>
-                <option value="PENDING_CORRECTION">Correction demandée</option>
+                <option value="PENDING_REVIEW">En attente</option>
+                <option value="IN_REVIEW">En revue</option>
                 <option value="APPROVED">Approuvé</option>
                 <option value="REJECTED">Rejeté</option>
-                <option value="RENEWAL_REQUIRED">Renouvellement requis</option>
                 <option value="EXPIRED">Expiré</option>
               </select>
               <select
@@ -418,7 +434,7 @@ export const DocumentReviewQueue: React.FC = () => {
                 <option value="LOW">Faible</option>
                 <option value="MEDIUM">Moyen</option>
                 <option value="HIGH">Élevé</option>
-                <option value="VERY_HIGH">Très élevé</option>
+                <option value="CRITICAL">Critique</option>
               </select>
             </>
           )}

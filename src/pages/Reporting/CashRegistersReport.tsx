@@ -99,8 +99,8 @@ export const CashRegistersReport: React.FC = () => {
               Détail par caisse
             </h3>
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+              <table className="w-full border-separate border-spacing-y-2">
+                <thead className="bg-transparent">
                   <tr>
                     <th className="px-4 py-2 text-left text-sm font-semibold">
                       Caisse
@@ -128,7 +128,7 @@ export const CashRegistersReport: React.FC = () => {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody>
                   {data.registers.map((reg) => (
                     <tr key={reg.registerCode} className="hover:bg-gray-50">
                       <td className="px-4 py-3">

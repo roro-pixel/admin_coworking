@@ -1,90 +1,35 @@
-import React, { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Plus,
-  Edit,
-  Tag,
-  ChevronLeft,
-  ChevronRight,
-  PowerOff,
-  Search,
-} from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { ChevronLeft, ChevronRight, Eye, Loader2, Plus, PowerOff, Search, Tags } from "lucide-react";
 import { subscriptionService } from "../../../services/subscription.service";
 import type { EntitlementDefinition } from "../../../services/subscription.service";
-import { EntitlementDefinitionFormModal } from "./EntitlementDefinitionFormModal";
-
-const entitlementTypeLabels: Record<string, string> = {
-  ACCESS: "Accès",
-  CREDIT: "Crédit",
-  TIME: "Temps",
-  DISCOUNT: "Réduction",
-  QUOTA: "Quota",
-  FEATURE_FLAG: "Fonctionnalité",
-  SERVICE_ALLOWANCE: "Forfait service",
-};
-
-const unitLabels: Record<string, string> = {
-  DAY: "Jour",
-  HOUR: "Heure",
-  CREDIT: "Crédit",
-  BOOKING: "Réservation",
-  VISIT: "Visite",
-  MEMBER: "Membre",
-  PERCENT: "Pourcentage",
-  AMOUNT: "Montant",
-  BOOLEAN: "Booléen",
-};
-
-const consumptionModeLabels: Record<string, string> = {
-  CHECK_ONLY: "Vérification uniquement",
-  RESERVABLE: "Réservable",
-  CONSUMABLE: "Consommable",
-  RESERVE_THEN_CONSUME: "Réservation puis consommation",
-};
-
-const resetPolicyLabels: Record<string, string> = {
-  NEVER: "Jamais",
-  DAILY: "Quotidien",
-  WEEKLY: "Hebdomadaire",
-  MONTHLY: "Mensuel",
-  PER_BILLING_CYCLE: "Par cycle de facturation",
-};
+import {
+  consumptionModeLabels,
+  entitlementTypeLabels,
+  resetPolicyLabels,
+  unitLabels,
+} from "./EntitlementDefinitionFields";
 
 const PAGE_SIZE = 20;
 
 export const EntitlementDefinitionsList: React.FC = () => {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
-
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<"" | "true" | "false">("");
   const [page, setPage] = useState(0);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingDefinition, setEditingDefinition] =
-    useState<EntitlementDefinition | null>(null);
 
-  // Debounce 400 ms — réinitialise la page à chaque nouvelle recherche
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
       setPage(0);
-    }, 400);
-    return () => clearTimeout(timer);
+    }, 350);
+    return () => window.clearTimeout(timer);
   }, [search]);
 
-  const handleActiveFilterChange = (value: "" | "true" | "false") => {
-    setActiveFilter(value);
-    setPage(0);
-  };
-
-  // FIX : le search est envoyé côté API via le param `query` (trigramme pg_trgm)
-  // La doc expose GET /entitlement-definitions?query=... ET /search/basic?query=...
-  // On utilise le filtre principal ici pour avoir la pagination serveur correcte.
-  const {
-    data: definitionsData,
-    isLoading,
-    isFetching,
-  } = useQuery({
+  const { data, isLoading, isFetching } = useQuery({
     queryKey: ["entitlement-definitions", debouncedSearch, activeFilter, page],
     queryFn: () =>
       subscriptionService.getEntitlementDefinitions({
@@ -95,7 +40,6 @@ export const EntitlementDefinitionsList: React.FC = () => {
       }),
   });
 
-  // FIX : désactivation / réactivation via updateEntitlementDefinition (pas d'endpoint DELETE)
   const toggleActiveMutation = useMutation({
     mutationFn: ({ code, active }: { code: string; active: boolean }) =>
       subscriptionService.updateEntitlementDefinition(code, { active }),
@@ -107,223 +51,205 @@ export const EntitlementDefinitionsList: React.FC = () => {
     },
   });
 
-  const definitions = definitionsData?.content ?? [];
-  const totalPages = definitionsData?.totalPages ?? 1;
-  const totalElements = definitionsData?.totalElements ?? definitions.length;
+  const definitions = data?.content ?? [];
+  const totalPages = data?.totalPages ?? 1;
+  const totalElements = data?.totalElements ?? definitions.length;
 
-  // FIX : plus de filtre client-side — le search passe désormais par l'API via `query`
-  // On garde le tableau brut retourné par le serveur.
-
-  const handleToggleActive = (def: EntitlementDefinition) => {
+  const handleToggleActive = (event: React.MouseEvent, def: EntitlementDefinition) => {
+    event.stopPropagation();
     const label = def.active ? "désactiver" : "réactiver";
-    if (confirm(`Êtes-vous sûr de vouloir ${label} "${def.name}" ?`)) {
+    if (confirm(`Êtes-vous sûr de vouloir ${label} “${def.name}” ?`)) {
       toggleActiveMutation.mutate({ code: def.code, active: !def.active });
     }
   };
 
-  const handleOpenCreate = () => {
-    setEditingDefinition(null);
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingDefinition(null);
-  };
-
-  const handleSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ["entitlement-definitions"] });
-    handleCloseModal();
+  const handleOpenDetail = (code: string) => {
+    navigate(`/subscriptions/entitlements/${code}`);
   };
 
   if (isLoading) {
-    return <div className="text-center py-8">Chargement...</div>;
+    return (
+      <div className="flex min-h-[260px] items-center justify-center rounded-2xl bg-white shadow-sm shadow-gray-200/70 ring-1 ring-gray-100">
+        <Loader2 className="animate-spin text-primary-600" size={32} />
+      </div>
+    );
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">
-          Définitions de droits
-        </h2>
-        <button
-          onClick={handleOpenCreate}
-          className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2"
-        >
-          <Plus size={18} />
-          Nouveau droit
-        </button>
-      </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between mb-6">
+  <div>
+    <h1 className="text-2xl font-bold text-gray-900">
+      Définitions de droits
+    </h1>
 
-      {/* Barre de recherche + filtre actif */}
-      <div className="flex gap-3 mb-6">
-        <div className="relative flex-1">
-          {/* FIX : icône Search cohérente avec PlansList */}
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Rechercher par nom ou code..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg"
-          />
-          {isFetching && (
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 animate-pulse">
-              Recherche...
-            </span>
-          )}
+    <p className="text-sm text-gray-500 mt-1">
+      Centralisez les droits utilisés dans vos plans, passes, abonnements et
+      règles de consommation.
+    </p>
+  </div>
+
+  <button
+    onClick={() => navigate("/subscriptions/entitlements/create")}
+    className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
+  >
+    <Plus size={18} />
+    Nouveau droit
+  </button>
+</div>
+
+      <div className="rounded-2xl bg-white p-4 shadow-sm shadow-gray-200/70 ring-1 ring-gray-100">
+        <div className="flex flex-col gap-3 md:flex-row">
+          <div className="relative flex-1">
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Rechercher par nom ou code..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-28 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+            />
+            {isFetching && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">Recherche...</span>
+            )}
+          </div>
+
+          <select
+            value={activeFilter}
+            onChange={(event) => {
+              setActiveFilter(event.target.value as "" | "true" | "false");
+              setPage(0);
+            }}
+            className="rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+          >
+            <option value="">Tous les statuts</option>
+            <option value="true">Actifs</option>
+            <option value="false">Inactifs</option>
+          </select>
         </div>
-        <select
-          value={activeFilter}
-          onChange={(e) =>
-            handleActiveFilterChange(e.target.value as "" | "true" | "false")
-          }
-          className="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm"
-        >
-          <option value="">Tous (actifs + inactifs)</option>
-          <option value="true">Actifs seulement</option>
-          <option value="false">Inactifs seulement</option>
-        </select>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                Code
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Nom</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                Type
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                Unité
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                Mode consommation
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                Reset
-              </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
-                Statut
-              </th>
-              <th className="px-6 py-3 text-right text-sm font-semibold">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {definitions.map((def) => (
-              <tr
-                key={def.code}
-                className={`hover:bg-gray-50 ${!def.active ? "opacity-60" : ""}`}
-              >
-                <td className="px-6 py-4 text-sm font-mono">{def.code}</td>
-                <td className="px-6 py-4 text-sm font-medium">{def.name}</td>
-                <td className="px-6 py-4 text-sm">
-                  {entitlementTypeLabels[def.entitlementType] ??
-                    def.entitlementType}
-                </td>
-                <td className="px-6 py-4 text-sm">
-                  {unitLabels[def.unit] ?? def.unit}
-                </td>
-                <td className="px-6 py-4 text-sm">
-                  {consumptionModeLabels[def.consumptionMode] ??
-                    def.consumptionMode}
-                </td>
-                <td className="px-6 py-4 text-sm">
-                  {resetPolicyLabels[def.resetPolicy] ?? def.resetPolicy}
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs ${
-                      def.active
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {def.active ? "Actif" : "Inactif"}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex justify-end gap-2">
-                    <button
-                      onClick={() => {
-                        setEditingDefinition(def);
-                        setIsModalOpen(true);
-                      }}
-                      className="p-1 text-blue-600 hover:text-blue-800"
-                      title="Modifier"
-                    >
-                      <Edit size={16} />
-                    </button>
-                    {/* FIX : libellé "Désactiver / Réactiver" — pas de DELETE sur ce endpoint */}
-                    <button
-                      onClick={() => handleToggleActive(def)}
-                      disabled={toggleActiveMutation.isPending}
-                      className={`p-1 disabled:opacity-40 ${
-                        def.active
-                          ? "text-red-600 hover:text-red-800"
-                          : "text-green-600 hover:text-green-800"
-                      }`}
-                      title={def.active ? "Désactiver" : "Réactiver"}
-                    >
-                      <PowerOff size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {definitions.length === 0 && !isLoading && (
-        <div className="text-center py-12 bg-white rounded-xl">
-          <Tag size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500">Aucune définition de droit trouvée</p>
-        </div>
-      )}
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 px-2">
-          <p className="text-sm text-gray-500">
-            {totalElements} droit{totalElements > 1 ? "s" : ""} au total
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-gray-50"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="text-sm text-gray-600">
-              Page {page + 1} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-gray-50"
-            >
-              <ChevronRight size={16} />
-            </button>
+      <div className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-gray-200/70 ring-1 ring-gray-100">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <div>
+            <p className="text-sm font-semibold text-gray-900">{totalElements.toLocaleString("fr-FR")} droit{totalElements > 1 ? "s" : ""}</p>
+            <p className="text-xs text-gray-500">Cliquez sur une ligne pour ouvrir le détail.</p>
           </div>
         </div>
-      )}
 
-      <EntitlementDefinitionFormModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        editingDefinition={editingDefinition}
-        onSuccess={handleSuccess}
-      />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] border-separate border-spacing-0">
+            <thead>
+              <tr className="bg-gray-50/80 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
+                <th className="px-5 py-3">Droit</th>
+                <th className="px-5 py-3">Type</th>
+                <th className="px-5 py-3">Unité</th>
+                <th className="px-5 py-3">Consommation</th>
+                <th className="px-5 py-3">Reset</th>
+                <th className="px-5 py-3 text-center">Statut</th>
+                <th className="px-5 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="text-sm">
+              {definitions.map((def) => (
+                <tr
+                  key={def.code}
+                  onClick={() => handleOpenDetail(def.code)}
+                  className={`group cursor-pointer transition hover:bg-primary-50/45 ${!def.active ? "opacity-70" : ""}`}
+                >
+                  <td className="px-5 py-4">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 rounded-xl bg-primary-50 p-2 text-primary-600 ring-1 ring-primary-100">
+                        <Tags size={16} />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900 group-hover:text-primary-700">{def.name}</p>
+                        <p className="mt-0.5 font-mono text-xs text-gray-400">{def.code}</p>
+                        {def.description && <p className="mt-1 line-clamp-1 max-w-md text-xs text-gray-500">{def.description}</p>}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4 text-gray-700">{entitlementTypeLabels[def.entitlementType] ?? def.entitlementType}</td>
+                  <td className="px-5 py-4 text-gray-700">{unitLabels[def.unit] ?? def.unit}</td>
+                  <td className="px-5 py-4 text-gray-700">{consumptionModeLabels[def.consumptionMode] ?? def.consumptionMode}</td>
+                  <td className="px-5 py-4 text-gray-700">{resetPolicyLabels[def.resetPolicy] ?? def.resetPolicy}</td>
+                  <td className="px-5 py-4 text-center">
+                    <span
+                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
+                        def.active ? "bg-green-50 text-green-700 ring-green-100" : "bg-gray-100 text-gray-600 ring-gray-200"
+                      }`}
+                    >
+                      {def.active ? "Actif" : "Inactif"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleOpenDetail(def.code);
+                        }}
+                        className="rounded-lg p-2 text-gray-400 transition hover:bg-white hover:text-primary-600 hover:shadow-sm"
+                        title="Voir le détail"
+                      >
+                        <Eye size={17} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => handleToggleActive(event, def)}
+                        disabled={toggleActiveMutation.isPending}
+                        className={`rounded-lg p-2 transition hover:bg-white hover:shadow-sm ${
+                          def.active ? "text-gray-400 hover:text-red-600" : "text-gray-400 hover:text-green-600"
+                        }`}
+                        title={def.active ? "Désactiver" : "Réactiver"}
+                      >
+                        <PowerOff size={17} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+
+              {definitions.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-5 py-16 text-center">
+                    <div className="mx-auto max-w-sm">
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-50 text-gray-400 ring-1 ring-gray-100">
+                        <Tags size={22} />
+                      </div>
+                      <p className="mt-4 font-semibold text-gray-900">Aucun droit trouvé</p>
+                      <p className="mt-1 text-sm text-gray-500">Créez un nouveau droit ou modifiez vos filtres de recherche.</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-gray-100 px-5 py-4">
+            <button
+              onClick={() => setPage((current) => Math.max(0, current - 1))}
+              disabled={page === 0}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <ChevronLeft size={16} /> Précédent
+            </button>
+            <span className="text-sm text-gray-500">
+              Page <span className="font-semibold text-gray-900">{page + 1}</span> / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((current) => Math.min(totalPages - 1, current + 1))}
+              disabled={page >= totalPages - 1}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Suivant <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

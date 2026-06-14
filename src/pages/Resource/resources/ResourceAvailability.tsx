@@ -11,6 +11,8 @@ import {
   ArrowRight,
   Lock,
   Unlock,
+  List,
+  CalendarDays,
 } from "lucide-react";
 import { resourceService } from "../../../services/resource.service";
 import type {
@@ -38,6 +40,7 @@ export const ResourceAvailability: React.FC = () => {
     new Date().toISOString().slice(0, 7),
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // CORRECTION : formData réinitialisé à chaque ouverture du modal
@@ -274,6 +277,41 @@ export const ResourceAvailability: React.FC = () => {
       </div>
 
       {selectedResource && (
+        <div className="mb-6 flex flex-col gap-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Mode d’affichage</p>
+            <p className="mt-0.5 text-xs text-gray-500">Basculez entre la vue calendrier et la liste détaillée des créneaux.</p>
+          </div>
+          <div className="inline-flex rounded-xl bg-gray-100 p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode("calendar")}
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                viewMode === "calendar"
+                  ? "bg-white text-primary-700 shadow-sm"
+                  : "text-gray-500 hover:text-gray-800"
+              }`}
+            >
+              <CalendarDays size={16} />
+              Calendrier
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("list")}
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                viewMode === "list"
+                  ? "bg-white text-primary-700 shadow-sm"
+                  : "text-gray-500 hover:text-gray-800"
+              }`}
+            >
+              <List size={16} />
+              Liste
+            </button>
+          </div>
+        </div>
+      )}
+
+      {selectedResource && viewMode === "calendar" && (
         <div className="mb-6">
           <ResourceAvailabilityCalendar
             month={calendarMonth}
@@ -285,7 +323,7 @@ export const ResourceAvailability: React.FC = () => {
       )}
 
       {/* Tableau des créneaux */}
-      {selectedResource && (
+      {selectedResource && viewMode === "list" && (
         <>
           {isLoading ? (
             <div className="text-center py-8">Chargement...</div>
@@ -299,16 +337,16 @@ export const ResourceAvailability: React.FC = () => {
               </p>
             </div>
           ) : (
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b bg-gray-50">
+            <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
+              <div className="px-5 py-4 bg-gray-50/70">
                 <p className="text-sm font-medium text-gray-700">
                   {selectedResourceName} — {filteredAvailabilities.length}{" "}
                   créneau{filteredAvailabilities.length > 1 ? "x" : ""}
                 </p>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b">
+                <table className="w-full border-separate border-spacing-0">
+                  <thead className="bg-gray-50/70">
                     <tr>
                       <th className="px-4 py-2 text-left text-sm font-semibold">
                         Début
@@ -331,9 +369,9 @@ export const ResourceAvailability: React.FC = () => {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody>
                     {filteredAvailabilities.map((slot) => (
-                      <tr key={slot.id} className="hover:bg-gray-50">
+                      <tr key={slot.id} className="transition hover:bg-primary-50/40">
                         <td className="px-4 py-2 text-sm">
                           {new Date(slot.startedAt).toLocaleString("fr-FR")}
                         </td>

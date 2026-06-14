@@ -140,7 +140,7 @@ export const TicketCreatePage: React.FC = () => {
     <AdminLayout>
       <div className="mb-6">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate("/operations")}
           className="flex items-center gap-2 text-gray-500 hover:text-gray-700"
         >
           <ArrowLeft size={18} />
@@ -176,7 +176,7 @@ export const TicketCreatePage: React.FC = () => {
                 setFormData((f) => ({ ...f, title: e.target.value }))
               }
               placeholder="Ex: Problème de connexion WiFi"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+              className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500"
             />
           </div>
 
@@ -206,7 +206,7 @@ export const TicketCreatePage: React.FC = () => {
                     priority: e.target.value as TicketPriority,
                   }))
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg bg-white"
               >
                 {(Object.keys(priorityConfig) as TicketPriority[]).map((p) => (
                   <option key={p} value={p}>
@@ -227,7 +227,7 @@ export const TicketCreatePage: React.FC = () => {
                     category: e.target.value as TicketCategory,
                   }))
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg bg-white"
               >
                 {categories.map((c) => (
                   <option key={c} value={c}>
@@ -253,7 +253,7 @@ export const TicketCreatePage: React.FC = () => {
                   }));
                   setOwnerSearch("");
                 }}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg bg-white"
               >
                 <option value="">Aucun</option>
                 <option value="MEMBER">Membre</option>
@@ -281,7 +281,7 @@ export const TicketCreatePage: React.FC = () => {
                     : "Sélectionnez un type"
                 }
                 disabled={!formData.ownerType}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg disabled:bg-gray-100"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg disabled:bg-gray-100"
               />
               {ownerLoading && (
                 <div className="absolute right-3 top-9">
@@ -345,7 +345,7 @@ export const TicketCreatePage: React.FC = () => {
                   setFormData((f) => ({ ...f, contactName: e.target.value }))
                 }
                 placeholder="Nom"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
               />
             </div>
             <div>
@@ -358,7 +358,7 @@ export const TicketCreatePage: React.FC = () => {
                 onChange={(e) =>
                   setFormData((f) => ({ ...f, contactEmail: e.target.value }))
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
               />
             </div>
             <div>
@@ -371,7 +371,7 @@ export const TicketCreatePage: React.FC = () => {
                 onChange={(e) =>
                   setFormData((f) => ({ ...f, contactPhone: e.target.value }))
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
               />
             </div>
           </div>
@@ -379,8 +379,8 @@ export const TicketCreatePage: React.FC = () => {
           <div className="flex gap-4 pt-4 border-t">
             <button
               type="button"
-              onClick={() => navigate(-1)}
-              className="px-6 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50"
+              onClick={() => navigate("/operations")}
+              className="px-6 py-2 ring-1 ring-gray-100 rounded-lg text-gray-700 hover:bg-gray-50"
             >
               Annuler
             </button>

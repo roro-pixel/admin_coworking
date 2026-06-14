@@ -18,7 +18,7 @@ export const KycBulkReviewPage: React.FC = () => {
   const queryClient = useQueryClient();
   const adminId = Number(admin?.id) || 1;
 
-  const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
+  const [selectedDocs, setSelectedDocs] = useState<Array<string | number>>([]);
   const [search, setSearch] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
   const [bulkResult, setBulkResult] = useState<any>(null);
@@ -46,7 +46,11 @@ export const KycBulkReviewPage: React.FC = () => {
   const bulkRejectMutation = useMutation({
     mutationFn: (reason: string) =>
       documentService.bulkRejectDocuments(
-        selectedDocs.map((code) => ({ documentCode: code, reason })),
+        selectedDocs.map((id) =>
+          typeof id === "number"
+            ? { documentId: id, reason }
+            : { documentCode: String(id), reason },
+        ),
         adminId,
       ),
     onSuccess: (data) => {
@@ -62,11 +66,11 @@ export const KycBulkReviewPage: React.FC = () => {
     if (selectedDocs.length === documents.length) {
       setSelectedDocs([]);
     } else {
-      setSelectedDocs(documents.map((d: any) => d.code));
+      setSelectedDocs(documents.map((d: any) => d.id ?? d.code));
     }
   };
 
-  const toggleDoc = (code: string) => {
+  const toggleDoc = (code: string | number) => {
     setSelectedDocs((prev) =>
       prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
     );

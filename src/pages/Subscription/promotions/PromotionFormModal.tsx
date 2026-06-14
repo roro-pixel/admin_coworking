@@ -145,7 +145,7 @@ export const PromotionFormModal: React.FC<PromotionFormModalProps> = ({
 
       <form onSubmit={handleSubmit} className="p-6 space-y-4">
         {errorMessage && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm">
             {errorMessage}
           </div>
         )}
@@ -160,7 +160,7 @@ export const PromotionFormModal: React.FC<PromotionFormModalProps> = ({
               type="text"
               value={editingPromotion.code}
               readOnly
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 font-mono text-sm cursor-not-allowed"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-gray-50 text-gray-500 font-mono text-sm cursor-not-allowed"
             />
           </div>
         )}
@@ -174,7 +174,7 @@ export const PromotionFormModal: React.FC<PromotionFormModalProps> = ({
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             required
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+            className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500"
           />
         </div>
 
@@ -188,7 +188,7 @@ export const PromotionFormModal: React.FC<PromotionFormModalProps> = ({
               setFormData({ ...formData, description: e.target.value })
             }
             rows={2}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none"
+            className="w-full px-3 py-2 border border-slate-200 rounded-xl resize-none"
           />
         </div>
 
@@ -205,7 +205,7 @@ export const PromotionFormModal: React.FC<PromotionFormModalProps> = ({
                   discountType: e.target.value as Promotion["discountType"],
                 })
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl"
             >
               {discountTypes.map((type) => (
                 <option key={type.value} value={type.value}>
@@ -236,7 +236,7 @@ export const PromotionFormModal: React.FC<PromotionFormModalProps> = ({
               min="0"
               step={formData.discountType === "PERCENTAGE" ? "0.1" : "100"}
               max={formData.discountType === "PERCENTAGE" ? 100 : undefined}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl"
             />
           </div>
         </div>
@@ -253,7 +253,7 @@ export const PromotionFormModal: React.FC<PromotionFormModalProps> = ({
                 setFormData({ ...formData, startsAt: e.target.value })
               }
               required
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl"
             />
           </div>
           <div>
@@ -267,7 +267,7 @@ export const PromotionFormModal: React.FC<PromotionFormModalProps> = ({
                 setFormData({ ...formData, endsAt: e.target.value })
               }
               min={formData.startsAt}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl"
             />
           </div>
         </div>
@@ -284,7 +284,7 @@ export const PromotionFormModal: React.FC<PromotionFormModalProps> = ({
             }
             min="1"
             placeholder="Illimité"
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+            className="w-full px-3 py-2 border border-slate-200 rounded-xl"
           />
         </div>
 
@@ -315,14 +315,14 @@ export const PromotionFormModal: React.FC<PromotionFormModalProps> = ({
             type="button"
             onClick={onClose}
             disabled={isPending}
-            className="flex-1 px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="flex-1 px-4 py-2 border rounded-lg text-gray-700 hover:bg-slate-50/80 disabled:opacity-50"
           >
             Annuler
           </button>
           <button
             type="submit"
             disabled={isPending || !isMetadataJsonValid}
-            className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 bg-primary-600 text-white py-2 rounded-xl hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {isPending ? (
               <Loader2 size={16} className="animate-spin" />

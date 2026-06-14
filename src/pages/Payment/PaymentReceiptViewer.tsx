@@ -52,11 +52,11 @@ export const PaymentReceiptViewer: React.FC = () => {
           Recherchez un reçu par numéro de transaction ou par numéro de reçu.
         </p>
       </div>
-      <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col md:flex-row gap-3">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-4 flex flex-col md:flex-row gap-3">
         <select
           value={mode}
           onChange={(e) => setMode(e.target.value as any)}
-          className="px-3 py-2 border rounded-lg bg-white"
+          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
         >
           <option value="transaction">Transaction</option>
           <option value="receipt">Reçu</option>
@@ -88,7 +88,7 @@ export const PaymentReceiptViewer: React.FC = () => {
         </div>
       )}
       {receipt && (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
           <div className="p-5 border-b flex justify-between items-start">
             <div className="flex gap-3 items-center">
               <Receipt className="text-primary-600" />
@@ -103,7 +103,7 @@ export const PaymentReceiptViewer: React.FC = () => {
             </div>
             <button
               onClick={downloadPdf}
-              className="px-3 py-2 border rounded-lg flex items-center gap-2 text-sm"
+              className="px-3 py-2 border border-gray-200 rounded-xl flex items-center gap-2 text-sm"
             >
               <Download size={15} /> PDF
             </button>

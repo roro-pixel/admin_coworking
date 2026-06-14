@@ -262,42 +262,42 @@ export const CashSessionsList: React.FC = () => {
         </select>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+        <table className="w-full border-separate border-spacing-y-2">
+          <thead className="bg-gray-50/70">
             <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Session
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Caisse
               </th>
-              <th className="px-6 py-3 text-right text-sm font-semibold">
+              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Ouverture
               </th>
-              <th className="px-6 py-3 text-right text-sm font-semibold">
+              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Paiements
               </th>
-              <th className="px-6 py-3 text-right text-sm font-semibold">
+              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Attendu
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Statut
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Ouvert par
               </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
+              <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody>
             {filteredSessions.map((session) => {
               const status = statusConfig[session.status];
               const StatusIcon = status?.icon;
               return (
-                <tr key={session.sessionNumber} className="hover:bg-gray-50">
+                <tr key={session.sessionNumber} className="hover:bg-gray-50/80">
                   <td className="px-6 py-4 text-sm font-mono">
                     {session.sessionNumber}
                   </td>

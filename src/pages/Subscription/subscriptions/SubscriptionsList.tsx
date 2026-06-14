@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Search,
@@ -15,7 +16,6 @@ import {
 } from "lucide-react";
 import { subscriptionService } from "../../../services/subscription.service";
 import type { Subscription } from "../../../services/subscription.service";
-import { SubscriptionDetailModal } from "./SubscriptionDetailModal";
 import { CreateSubscriptionModal } from "./CreateSubscriptionModal";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -35,6 +35,7 @@ const PAGE_SIZE = 20;
 
 export const SubscriptionsList: React.FC = () => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Recherche locale (l'API subscriptions n'expose pas d'endpoint search)
   const [search, setSearch] = useState("");
@@ -48,9 +49,6 @@ export const SubscriptionsList: React.FC = () => {
   const [nextBillingBefore, setNextBillingBefore] = useState("");
   const [page, setPage] = useState(0);
 
-  const [selectedSubscription, setSelectedSubscription] =
-    useState<Subscription | null>(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -169,8 +167,7 @@ export const SubscriptionsList: React.FC = () => {
     : subscriptions;
 
   const handleViewDetail = (subscription: Subscription) => {
-    setSelectedSubscription(subscription);
-    setIsDetailOpen(true);
+    navigate(`/subscriptions/${subscription.subscriptionNumber}`);
   };
 
   const handleResetFilters = () => {
@@ -342,47 +339,48 @@ export const SubscriptionsList: React.FC = () => {
       </div>
 
       {/* Tableau */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b">
+      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
+        <div className="overflow-x-auto p-2">
+          <table className="w-full border-separate border-spacing-y-2">
+          <thead className="bg-transparent">
             <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
                 N° Souscription
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
                 Plan
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
                 Souscripteur
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
                 Période
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
                 Statut
               </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
+              <th className="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">
                 Renouvellement
               </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
+              <th className="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody>
             {filteredSubscriptions.map((sub) => (
               <tr
                 key={sub.subscriptionNumber}
-                className="hover:bg-gray-50 cursor-pointer"
+                className="group cursor-pointer rounded-xl transition-colors hover:bg-primary-50/40"
                 onClick={() => handleViewDetail(sub)}
               >
-                <td className="px-6 py-4 text-sm font-mono">
+                <td className="rounded-l-xl px-5 py-4 text-sm font-mono text-gray-700 group-hover:bg-transparent">
                   {sub.subscriptionNumber}
                 </td>
-                <td className="px-6 py-4 text-sm font-medium">
+                <td className="px-5 py-4 text-sm font-semibold text-gray-900">
                   {sub.planName}
                 </td>
-                <td className="px-6 py-4 text-sm">
+                <td className="px-5 py-4 text-sm text-gray-700">
                   <div>
                     <p>{sub.subscriberName ?? sub.subscriberCode}</p>
                     <p className="text-xs text-gray-500">
@@ -390,7 +388,7 @@ export const SubscriptionsList: React.FC = () => {
                     </p>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-sm">
+                <td className="px-5 py-4 text-sm text-gray-700">
                   <div>
                     <p>
                       Début :{" "}
@@ -413,7 +411,7 @@ export const SubscriptionsList: React.FC = () => {
                     )}
                   </div>
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-5 py-4">
                   <span
                     className={`px-2 py-1 rounded-full text-xs ${
                       statusConfig[sub.status]?.color ??
@@ -423,17 +421,17 @@ export const SubscriptionsList: React.FC = () => {
                     {statusConfig[sub.status]?.label ?? sub.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-center text-sm">
+                <td className="px-5 py-4 text-center text-sm text-gray-700">
                   {sub.autoRenew ? "Auto" : "Manuel"}
                 </td>
-                <td className="px-6 py-4 text-center">
+                <td className="rounded-r-xl px-5 py-4 text-center">
                   <div
                     className="flex justify-center gap-2"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
                       onClick={() => handleViewDetail(sub)}
-                      className="p-1 text-gray-600 hover:text-primary-600"
+                      className="rounded-lg p-2 text-gray-500 hover:bg-white hover:text-primary-600"
                       title="Voir détail"
                     >
                       <Eye size={16} />
@@ -444,7 +442,7 @@ export const SubscriptionsList: React.FC = () => {
                           activateMutation.mutate(sub.subscriptionNumber)
                         }
                         disabled={activateMutation.isPending}
-                        className="p-1 text-green-600 hover:text-green-800 disabled:opacity-40"
+                        className="rounded-lg p-2 text-green-600 hover:bg-white hover:text-green-800 disabled:opacity-40"
                         title="Activer"
                       >
                         <Play size={16} />
@@ -457,7 +455,7 @@ export const SubscriptionsList: React.FC = () => {
                           activateMutation.mutate(sub.subscriptionNumber)
                         }
                         disabled={activateMutation.isPending}
-                        className="p-1 text-green-600 hover:text-green-800 disabled:opacity-40"
+                        className="rounded-lg p-2 text-green-600 hover:bg-white hover:text-green-800 disabled:opacity-40"
                         title="Réactiver"
                       >
                         <Play size={16} />
@@ -470,7 +468,7 @@ export const SubscriptionsList: React.FC = () => {
                             suspendMutation.mutate(sub.subscriptionNumber)
                           }
                           disabled={suspendMutation.isPending}
-                          className="p-1 text-orange-600 hover:text-orange-800 disabled:opacity-40"
+                          className="rounded-lg p-2 text-orange-600 hover:bg-white hover:text-orange-800 disabled:opacity-40"
                           title="Suspendre"
                         >
                           <Pause size={16} />
@@ -480,7 +478,7 @@ export const SubscriptionsList: React.FC = () => {
                             renewMutation.mutate(sub.subscriptionNumber)
                           }
                           disabled={renewMutation.isPending}
-                          className="p-1 text-blue-600 hover:text-blue-800 disabled:opacity-40"
+                          className="rounded-lg p-2 text-blue-600 hover:bg-white hover:text-blue-800 disabled:opacity-40"
                           title="Renouveler"
                         >
                           <RefreshCw size={16} />
@@ -497,7 +495,7 @@ export const SubscriptionsList: React.FC = () => {
                           }
                         }}
                         disabled={cancelMutation.isPending}
-                        className="p-1 text-red-600 hover:text-red-800 disabled:opacity-40"
+                        className="rounded-lg p-2 text-red-600 hover:bg-white hover:text-red-800 disabled:opacity-40"
                         title="Annuler"
                       >
                         <XCircle size={16} />
@@ -508,7 +506,8 @@ export const SubscriptionsList: React.FC = () => {
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
 
       {filteredSubscriptions.length === 0 && !isLoading && (
@@ -554,16 +553,6 @@ export const SubscriptionsList: React.FC = () => {
         </div>
       )}
 
-      {selectedSubscription && (
-        <SubscriptionDetailModal
-          isOpen={isDetailOpen}
-          onClose={() => {
-            setIsDetailOpen(false);
-            setSelectedSubscription(null);
-          }}
-          subscription={selectedSubscription}
-        />
-      )}
 
       <CreateSubscriptionModal
         isOpen={isCreateModalOpen}

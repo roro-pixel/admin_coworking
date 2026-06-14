@@ -280,13 +280,13 @@ export const AgingReport: React.FC = () => {
 
       {/* Tableau détaillé */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+        <div className="px-6 py-4 bg-gray-50/70">
           <h3 className="font-semibold text-gray-800">
             Détail des créances par tranche
           </h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full border-separate border-spacing-y-2">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -306,7 +306,7 @@ export const AgingReport: React.FC = () => {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {barData.map((bucket) => (
                 <tr
                   key={bucket.name}

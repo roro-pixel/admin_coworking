@@ -127,14 +127,14 @@ export const CreateUsageRecordModal: React.FC<CreateUsageRecordModalProps> = ({
 
   return (
     <ModalPortal onClose={onClose}>
-      <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-gray-100 p-4 flex justify-between items-center rounded-t-2xl">
         <h3 className="text-xl font-bold">Enregistrer un usage</h3>
         <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
           <X size={20} />
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-6 space-y-4">
+      <form onSubmit={handleSubmit} className="p-6 space-y-5 bg-gray-50/30">
         {errorMessage && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
             {errorMessage}
@@ -156,7 +156,7 @@ export const CreateUsageRecordModal: React.FC<CreateUsageRecordModalProps> = ({
                   ownerCode: "",
                 })
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
             >
               {ownerTypeOptions.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -188,7 +188,7 @@ export const CreateUsageRecordModal: React.FC<CreateUsageRecordModalProps> = ({
                   setFormData({ ...formData, ownerCode: e.target.value })
                 }
                 placeholder="ex: CUS-000001"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
               />
             )}
           </div>
@@ -205,7 +205,7 @@ export const CreateUsageRecordModal: React.FC<CreateUsageRecordModalProps> = ({
               setFormData({ ...formData, entitlementCode: e.target.value })
             }
             required
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+            className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
           >
             <option value="">Sélectionner un droit</option>
             {entDefs.map((d) => (
@@ -234,7 +234,7 @@ export const CreateUsageRecordModal: React.FC<CreateUsageRecordModalProps> = ({
                 })
               }
               required
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
             />
           </div>
           <div>
@@ -247,7 +247,7 @@ export const CreateUsageRecordModal: React.FC<CreateUsageRecordModalProps> = ({
               onChange={(e) =>
                 setFormData({ ...formData, unit: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400 bg-gray-50"
               readOnly={!!selectedDef}
             />
           </div>
@@ -264,7 +264,7 @@ export const CreateUsageRecordModal: React.FC<CreateUsageRecordModalProps> = ({
               onChange={(e) =>
                 setFormData({ ...formData, referenceType: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
             >
               {referenceTypes.map((r) => (
                 <option key={r.value} value={r.value}>
@@ -284,7 +284,7 @@ export const CreateUsageRecordModal: React.FC<CreateUsageRecordModalProps> = ({
                 setFormData({ ...formData, referenceId: e.target.value })
               }
               placeholder="ex: BKG-202604-000001"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
             />
           </div>
         </div>
@@ -301,12 +301,12 @@ export const CreateUsageRecordModal: React.FC<CreateUsageRecordModalProps> = ({
               setFormData({ ...formData, occurredAt: e.target.value })
             }
             required
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+            className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
           />
         </div>
 
         {/* Options */}
-        <div className="flex items-center gap-6 p-3 bg-gray-50 rounded-lg">
+        <div className="flex items-center gap-6 p-4 bg-gray-50/70 border border-gray-100 rounded-xl">
           <label className="flex items-center gap-2 cursor-pointer text-sm">
             <input
               type="checkbox"
@@ -351,7 +351,7 @@ export const CreateUsageRecordModal: React.FC<CreateUsageRecordModalProps> = ({
                     billableAmount: parseFloat(e.target.value) || 0,
                   })
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
               />
             </div>
             <div>
@@ -363,7 +363,7 @@ export const CreateUsageRecordModal: React.FC<CreateUsageRecordModalProps> = ({
                 onChange={(e) =>
                   setFormData({ ...formData, currency: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
               >
                 <option value="XAF">XAF (FCFA)</option>
                 <option value="EUR">EUR</option>
@@ -378,7 +378,7 @@ export const CreateUsageRecordModal: React.FC<CreateUsageRecordModalProps> = ({
             type="button"
             onClick={onClose}
             disabled={createMutation.isPending}
-            className="flex-1 px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="flex-1 px-4 py-2 border rounded-xl text-gray-700 hover:bg-primary-50/40 transition-colors disabled:opacity-50"
           >
             Annuler
           </button>

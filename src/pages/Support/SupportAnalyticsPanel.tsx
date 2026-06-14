@@ -61,7 +61,7 @@ export const SupportAnalyticsPanel: React.FC = () => {
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              className="px-3 py-2 ring-1 ring-gray-100 rounded-lg text-sm"
             />
           </div>
           <div>
@@ -70,7 +70,7 @@ export const SupportAnalyticsPanel: React.FC = () => {
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              className="px-3 py-2 ring-1 ring-gray-100 rounded-lg text-sm"
             />
           </div>
           <button
@@ -81,7 +81,7 @@ export const SupportAnalyticsPanel: React.FC = () => {
           </button>
           <button
             onClick={downloadCsv}
-            className="px-4 py-2 border border-gray-200 rounded-lg text-sm flex items-center gap-2"
+            className="px-4 py-2 ring-1 ring-gray-100 rounded-lg text-sm flex items-center gap-2"
           >
             <Download size={16} /> Export CSV
           </button>
@@ -128,7 +128,7 @@ export const SupportAnalyticsPanel: React.FC = () => {
         </>
       ) : null}
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
         <div className="px-5 py-4 border-b">
           <h3 className="font-semibold">Performance agents</h3>
         </div>
@@ -137,8 +137,8 @@ export const SupportAnalyticsPanel: React.FC = () => {
             Chargement...
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
+          <table className="w-full border-separate border-spacing-y-2 text-sm">
+            <thead className="bg-transparent">
               <tr>
                 <th className="px-4 py-3 text-left">Agent</th>
                 <th className="px-4 py-3 text-right">Assignés</th>
@@ -148,7 +148,7 @@ export const SupportAnalyticsPanel: React.FC = () => {
                 <th className="px-4 py-3 text-right">Breach SLA</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y-0">
               {agents.map((a: any, i: number) => (
                 <tr key={a.agentId || i}>
                   <td className="px-4 py-3 font-medium">

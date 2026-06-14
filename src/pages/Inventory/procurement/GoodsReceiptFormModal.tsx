@@ -30,6 +30,9 @@ export const GoodsReceiptFormModal: React.FC<GoodsReceiptFormModalProps> = ({
   const [formData, setFormData] = useState({
     orderCode: orderCode || "",
     locationCode: "",
+    invoiceDocumentCode: "",
+    deliveryNoteDocumentCode: "",
+    proofDocumentCode: "",
     lines: [] as any[],
   });
   const [orderSearch, setOrderSearch] = useState("");
@@ -55,6 +58,9 @@ export const GoodsReceiptFormModal: React.FC<GoodsReceiptFormModalProps> = ({
         orderCode: formData.orderCode,
         locationCode: formData.locationCode,
         receivedBy: admin?.email || "admin",
+        invoiceDocumentCode: formData.invoiceDocumentCode || undefined,
+        deliveryNoteDocumentCode: formData.deliveryNoteDocumentCode || undefined,
+        proofDocumentCode: formData.proofDocumentCode || undefined,
         lines: formData.lines,
       }),
     onSuccess: () => {
@@ -69,7 +75,14 @@ export const GoodsReceiptFormModal: React.FC<GoodsReceiptFormModalProps> = ({
   });
 
   const resetForm = () => {
-    setFormData({ orderCode: "", locationCode: "", lines: [] });
+    setFormData({
+      orderCode: "",
+      locationCode: "",
+      invoiceDocumentCode: "",
+      deliveryNoteDocumentCode: "",
+      proofDocumentCode: "",
+      lines: [],
+    });
     setSelectedOrder(null);
   };
 
@@ -78,6 +91,9 @@ export const GoodsReceiptFormModal: React.FC<GoodsReceiptFormModalProps> = ({
     setFormData({
       orderCode: order.orderCode,
       locationCode: order.locationCode,
+      invoiceDocumentCode: "",
+      deliveryNoteDocumentCode: "",
+      proofDocumentCode: "",
       lines: order.lines.map((line) => ({
         itemCode: line.itemCode,
         orderedQuantity: line.quantity,
@@ -181,6 +197,49 @@ export const GoodsReceiptFormModal: React.FC<GoodsReceiptFormModalProps> = ({
                 </option>
               ))}
             </select>
+          </div>
+
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">
+                Document facture
+              </label>
+              <input
+                value={formData.invoiceDocumentCode}
+                onChange={(e) =>
+                  setFormData({ ...formData, invoiceDocumentCode: e.target.value })
+                }
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                placeholder="DOC-..."
+              />
+            </div>
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">
+                Bon de livraison
+              </label>
+              <input
+                value={formData.deliveryNoteDocumentCode}
+                onChange={(e) =>
+                  setFormData({ ...formData, deliveryNoteDocumentCode: e.target.value })
+                }
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                placeholder="DOC-..."
+              />
+            </div>
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">
+                Preuve / justificatif
+              </label>
+              <input
+                value={formData.proofDocumentCode}
+                onChange={(e) =>
+                  setFormData({ ...formData, proofDocumentCode: e.target.value })
+                }
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                placeholder="DOC-..."
+              />
+            </div>
           </div>
 
           <div>

@@ -140,146 +140,56 @@ export const ReportingMaster: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">
           Analytiques & Rapports
         </h1>
         <p className="text-gray-500 mt-1">
-          Analysez vos performances financières et opérationnelles
+          Analysez vos performances financières et opérationnelles.
         </p>
       </div>
 
-      {/* Navigation tabs design moderne */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
-        {/* Section Analytics */}
-        <div className="p-4 pb-0">
-          <div className="flex items-center gap-2 mb-3 px-1">
-            <div className="w-1 h-4 bg-primary-500 rounded-full" />
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-              Analytique
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {tabs
-              .filter((t) => t.group === "analytics")
-              .map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => handleTabChange(tab.id)}
-                    className={`
-                    group flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-200
-                    ${
-                      isActive
-                        ? "bg-primary-50 text-primary-700 shadow-sm"
-                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                    }
-                  `}
-                  >
-                    <Icon
-                      size={18}
-                      className={
-                        isActive
-                          ? "text-primary-600"
-                          : "text-gray-400 group-hover:text-gray-500"
-                      }
-                    />
-                    <span className="text-sm font-medium">{tab.label}</span>
-                    {tab.description && (
-                      <span
-                        className={`text-xs ml-1 ${isActive ? "text-primary-400" : "text-gray-400"}`}
-                      >
-                        {tab.description}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-          </div>
-        </div>
-
-        {/* Séparateur */}
-        <div className="border-t border-gray-100 my-2" />
-
-        {/* Section Reporting */}
-        <div className="p-4 pt-2">
-          <div className="flex items-center gap-2 mb-3 px-1">
-            <div className="w-1 h-4 bg-emerald-500 rounded-full" />
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-              Reporting financier
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {tabs
-              .filter((t) => t.group === "reporting")
-              .map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => handleTabChange(tab.id)}
-                    className={`
-                    group flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-200
-                    ${
-                      isActive
-                        ? "bg-emerald-50 text-emerald-700 shadow-sm"
-                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                    }
-                  `}
-                  >
-                    <Icon
-                      size={18}
-                      className={
-                        isActive
-                          ? "text-emerald-600"
-                          : "text-gray-400 group-hover:text-gray-500"
-                      }
-                    />
-                    <span className="text-sm font-medium">{tab.label}</span>
-                  </button>
-                );
-              })}
-          </div>
+      <div className="mb-6 overflow-x-auto rounded-2xl bg-white p-2 shadow-sm ring-1 ring-gray-100">
+        <div className="flex min-w-max items-center gap-1">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all whitespace-nowrap ${
+                  isActive
+                    ? "bg-primary-600 text-white shadow-sm"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                }`}
+                title={tab.description}
+              >
+                <Icon size={17} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Indicateur de section active */}
       {activeTabInfo && (
-        <div className="mb-6 pb-2 border-b border-gray-200">
+        <div className="mb-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
           <div className="flex items-center gap-3">
-            <div
-              className={`
-              p-2 rounded-lg
-              ${activeTabInfo.group === "analytics" ? "bg-primary-100" : "bg-emerald-100"}
-            `}
-            >
-              <activeTabInfo.icon
-                size={20}
-                className={
-                  activeTabInfo.group === "analytics"
-                    ? "text-primary-600"
-                    : "text-emerald-600"
-                }
-              />
+            <div className="rounded-xl bg-gray-50 p-2.5 text-primary-600 ring-1 ring-gray-100">
+              <activeTabInfo.icon size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-800">
+              <h2 className="text-lg font-semibold text-gray-900">
                 {activeTabInfo.label}
               </h2>
-              <p className="text-sm text-gray-500">
-                {activeTabInfo.description}
-              </p>
+              <p className="text-sm text-gray-500">{activeTabInfo.description}</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Contenu dynamique */}
-      <div className="mt-6">
-        {/* Analytics */}
+      <div>
         {visitedTabs.has("live") && (
           <div className={activeTab !== "live" ? "hidden" : ""}>
             <LiveKpiDashboard />
@@ -305,8 +215,6 @@ export const ReportingMaster: React.FC = () => {
             <TopOwnersReport />
           </div>
         )}
-
-        {/* Reporting */}
         {visitedTabs.has("dashboard") && (
           <div className={activeTab !== "dashboard" ? "hidden" : ""}>
             <FinanceDashboard />

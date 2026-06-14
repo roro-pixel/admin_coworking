@@ -286,7 +286,7 @@ export const PlanVersionDetailPage: React.FC<PlanVersionDetailPageProps> = ({
                   return (
                     <div
                       key={i}
-                      className="bg-white rounded-xl border border-gray-100 shadow-sm p-5"
+                      className="rounded-2xl bg-white shadow-[0_18px_45px_rgba(15,23,42,0.06)] ring-1 ring-slate-100 p-5"
                     >
                       {/* En-tête */}
                       <div className="flex items-start justify-between mb-3">
@@ -398,7 +398,7 @@ export const PlanVersionDetailPage: React.FC<PlanVersionDetailPageProps> = ({
               {version.prices.map((price, i) => (
                 <div
                   key={i}
-                  className="bg-white rounded-xl border border-gray-100 shadow-sm p-6"
+                  className="rounded-2xl bg-white shadow-[0_18px_45px_rgba(15,23,42,0.06)] ring-1 ring-slate-100 p-6"
                 >
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
@@ -582,9 +582,9 @@ export const PlanVersionDetailPage: React.FC<PlanVersionDetailPageProps> = ({
                 </p>
               </div>
 
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="rounded-2xl bg-white shadow-[0_18px_45px_rgba(15,23,42,0.06)] ring-1 ring-slate-100 overflow-hidden">
                 <table className="w-full">
-                  <thead className="bg-gray-50 border-b">
+                  <thead className="bg-slate-50/80">
                     <tr>
                       <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
                         N° Billable
@@ -603,9 +603,9 @@ export const PlanVersionDetailPage: React.FC<PlanVersionDetailPageProps> = ({
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="[&>tr+tr]:border-t [&>tr+tr]:border-slate-100">
                     {billableItems.map((item, i) => (
-                      <tr key={i} className="hover:bg-gray-50">
+                      <tr key={i} className="hover:bg-slate-50/80">
                         <td className="px-5 py-3 text-sm font-mono">
                           {item.billableNumber}
                         </td>

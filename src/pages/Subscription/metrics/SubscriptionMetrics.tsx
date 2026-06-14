@@ -242,7 +242,7 @@ export const SubscriptionMetrics: React.FC = () => {
         <button
           onClick={() => refetch()}
           disabled={isFetching}
-          className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400 text-sm text-gray-600 hover:bg-primary-50/40 transition-colors disabled:opacity-50"
         >
           <RefreshCw size={14} className={isFetching ? "animate-spin" : ""} />
           Actualiser
@@ -252,7 +252,7 @@ export const SubscriptionMetrics: React.FC = () => {
       <div className="space-y-8">
         {sections.map((section) => (
           <div key={section.label}>
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.18em] mb-4">
               {section.label}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -261,10 +261,10 @@ export const SubscriptionMetrics: React.FC = () => {
                 return (
                   <div
                     key={index}
-                    className="bg-white rounded-xl p-5 shadow-sm hover:shadow-md transition-all"
+                    className="group rounded-2xl border border-gray-100 bg-white p-5 shadow-sm shadow-gray-100/70 hover:-translate-y-0.5 hover:shadow-md transition-all"
                   >
                     <div className="flex items-center justify-between mb-3">
-                      <div className={`p-2.5 rounded-lg ${card.color}`}>
+                      <div className={`p-2.5 rounded-xl ${card.color} ring-1 ring-black/5`}>
                         <Icon size={20} />
                       </div>
                     </div>

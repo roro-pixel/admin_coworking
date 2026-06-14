@@ -54,11 +54,11 @@ export const PaymentRecoveryPanel: React.FC = () => {
         </p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 grid grid-cols-1 md:grid-cols-5 gap-3">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-4 grid grid-cols-1 md:grid-cols-5 gap-3">
         <select
           value={customerType}
           onChange={(e) => setCustomerType(e.target.value)}
-          className="px-3 py-2 border rounded-lg bg-white"
+          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
         >
           <option value="MEMBER">Membre</option>
           <option value="CUSTOMER">Client</option>
@@ -74,7 +74,7 @@ export const PaymentRecoveryPanel: React.FC = () => {
           value={currency}
           onChange={(e) => setCurrency(e.target.value)}
           placeholder="XAF"
-          className="px-3 py-2 border rounded-lg"
+          className="px-3 py-2 border border-gray-200 rounded-xl"
         />
         <button
           onClick={() => refetch()}
@@ -132,7 +132,7 @@ export const PaymentRecoveryPanel: React.FC = () => {
             />
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-5">
+          <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-5">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold">Documents impayés</h3>
               <button
@@ -178,7 +178,7 @@ export const PaymentRecoveryPanel: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-5">
+          <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-5">
             <h3 className="font-semibold mb-4">
               Éléments facturables en attente
             </h3>
@@ -220,7 +220,7 @@ const Metric: React.FC<{ label: string; value: string; strong?: boolean }> = ({
   strong,
 }) => (
   <div
-    className={`bg-white rounded-xl shadow-sm p-4 ${strong ? "border border-orange-200" : ""}`}
+    className={`bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-4 ${strong ? "border border-orange-200" : ""}`}
   >
     <p className="text-xs text-gray-500">{label}</p>
     <p

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AdminLayout } from "../../components/layout/AdminLayout";
 import {
   Package,
@@ -40,17 +41,42 @@ const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "billable", label: "Items facturables", icon: CreditCard },
 ];
 
+const getTabFromPath = (pathname: string): TabId => {
+  if (pathname.startsWith("/subscriptions/entitlements")) return "entitlements";
+  if (pathname.startsWith("/subscriptions/plans")) return "plans";
+  if (pathname.startsWith("/subscriptions/subscriptions")) return "subscriptions";
+  if (pathname.startsWith("/subscriptions/promotions")) return "promotions";
+  if (pathname.startsWith("/subscriptions/passes")) return "passes";
+  if (pathname.startsWith("/subscriptions/usage")) return "usage";
+  if (pathname.startsWith("/subscriptions/billable")) return "billable";
+  return "metrics";
+};
+
 export const SubscriptionMaster: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabId>("metrics");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const initialTab = getTabFromPath(location.pathname);
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+
   // Lazy mounting : un composant n'est monté qu'à sa première visite,
-  // puis conservé avec display:none pour éviter les re-fetch
+  // puis conservé avec display:none pour éviter les re-fetch.
   const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(
-    new Set(["metrics"]),
+    new Set([initialTab]),
   );
+
+  useEffect(() => {
+    const nextTab = getTabFromPath(location.pathname);
+    setActiveTab(nextTab);
+    setVisitedTabs((prev) => new Set([...prev, nextTab]));
+  }, [location.pathname]);
 
   const handleTabChange = (tabId: TabId) => {
     setActiveTab(tabId);
     setVisitedTabs((prev) => new Set([...prev, tabId]));
+
+    if (location.pathname !== "/subscriptions") {
+      navigate("/subscriptions", { replace: true });
+    }
   };
 
   return (
@@ -62,25 +88,27 @@ export const SubscriptionMaster: React.FC = () => {
         </p>
       </div>
 
-      {/* Onglets — scroll horizontal pour les petits écrans */}
-      <div className="overflow-x-auto">
-        <div className="flex gap-1 border-b border-gray-200 mb-6 min-w-max">
+      {/* Onglets — style nav arrondi comme ResourceMaster */}
+      <div className="mb-8 overflow-x-auto rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100">
+        <div className="flex min-w-max items-center gap-1.5">
           {tabs.map((tab) => {
             const Icon = tab.icon;
+            const active = activeTab === tab.id;
+
             return (
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-t-lg transition-all whitespace-nowrap text-sm
-                  ${
-                    activeTab === tab.id
-                      ? "bg-primary-50 text-primary-600 border-b-2 border-primary-600 font-medium"
-                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                  }
-                `}
+                className={`group flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all whitespace-nowrap ${
+                  active
+                    ? "bg-primary-600 text-white shadow-lg shadow-primary-600/20"
+                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                }`}
               >
-                <Icon size={16} />
+                <Icon
+                  size={18}
+                  className={active ? "text-white" : "text-gray-500 group-hover:text-gray-800"}
+                />
                 {tab.label}
               </button>
             );

@@ -365,7 +365,7 @@ export const TopResourcesReport: React.FC = () => {
 
           {/* Médaille d'or */}
           {resources[0] && (
-            <div className="mt-4 p-4 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl border border-yellow-200 flex items-center justify-between">
+            <div className="mt-4 flex items-center justify-between rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
               <div className="flex items-center gap-3">
                 <Award size={24} className="text-yellow-600" />
                 <div>

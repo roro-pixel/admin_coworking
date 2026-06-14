@@ -1,19 +1,21 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AdminLayout } from "../components/layout/AdminLayout";
 import {
-  Users,
+  Activity,
+  AlertCircle,
+  ArrowDown,
+  ArrowUp,
+  BarChart3,
+  Building,
   Building2,
   Calendar,
   CreditCard,
-  ArrowUp,
-  ArrowDown,
-  User,
-  Building,
-  Package,
-  AlertCircle,
-  Wallet,
   FileText,
+  Package,
+  User,
+  Users,
+  Wallet,
 } from "lucide-react";
 import { customerService } from "../services/customer.service";
 import type { CustomerResponse } from "../services/customer.service";
@@ -21,16 +23,235 @@ import { memberService } from "../services/member.service";
 import { subscriptionService } from "../services/subscription.service";
 import { bookingService } from "../services/booking.service";
 import { inventoryService } from "../services/inventory.service";
-// import { paymentService } from '../services/payment.service';
 import { walletService } from "../services/wallet.service";
 import { billingService } from "../services/billing.service";
 
+type Tone = "blue" | "green" | "purple" | "orange" | "teal" | "red" | "indigo" | "rose" | "slate";
+
+type StatCard = {
+  title: string;
+  value: string;
+  detail: string;
+  trend: "up" | "down";
+  icon: React.ElementType;
+  tone: Tone;
+  progress?: number;
+};
+
+const toneClass: Record<Tone, { soft: string; text: string; ring: string; solid: string }> = {
+  blue: { soft: "bg-blue-50", text: "text-blue-700", ring: "ring-blue-100", solid: "bg-blue-500" },
+  green: { soft: "bg-green-50", text: "text-green-700", ring: "ring-green-100", solid: "bg-green-500" },
+  purple: { soft: "bg-purple-50", text: "text-purple-700", ring: "ring-purple-100", solid: "bg-purple-500" },
+  orange: { soft: "bg-orange-50", text: "text-orange-700", ring: "ring-orange-100", solid: "bg-orange-500" },
+  teal: { soft: "bg-teal-50", text: "text-teal-700", ring: "ring-teal-100", solid: "bg-teal-500" },
+  red: { soft: "bg-red-50", text: "text-red-700", ring: "ring-red-100", solid: "bg-red-500" },
+  indigo: { soft: "bg-indigo-50", text: "text-indigo-700", ring: "ring-indigo-100", solid: "bg-indigo-500" },
+  rose: { soft: "bg-rose-50", text: "text-rose-700", ring: "ring-rose-100", solid: "bg-rose-500" },
+  slate: { soft: "bg-slate-50", text: "text-slate-700", ring: "ring-slate-100", solid: "bg-slate-500" },
+};
+
+const formatMoney = (value: number) =>
+  `${value.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} FCFA`;
+
+const compactMoney = (value: number) => {
+  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M FCFA`;
+  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(0)}k FCFA`;
+  return `${value.toLocaleString("fr-FR")} FCFA`;
+};
+
+const safeNumber = (value: unknown) => {
+  const n = Number(value ?? 0);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const percent = (value: number, total: number) => {
+  if (total <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((value / total) * 100)));
+};
+
+const DonutChart: React.FC<{
+  title: string;
+  subtitle: string;
+  data: { label: string; value: number; className: string; textClass: string }[];
+}> = ({ title, subtitle, data }) => {
+  const total = data.reduce((sum, item) => sum + item.value, 0) || 1;
+  let offset = 25;
+  const radius = 42;
+  const circumference = 2 * Math.PI * radius;
+
+  return (
+    <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-bold text-gray-950">{title}</h2>
+          <p className="mt-1 text-sm text-gray-500">{subtitle}</p>
+        </div>
+        <div className="rounded-2xl bg-primary-50 p-2 text-primary-600">
+          <BarChart3 size={20} />
+        </div>
+      </div>
+
+      <div className="flex flex-col items-center gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="relative h-52 w-52 shrink-0">
+          <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
+            <circle cx="60" cy="60" r={radius} fill="none" stroke="currentColor" strokeWidth="14" className="text-gray-100" />
+            {data.map((item) => {
+              const dash = (item.value / total) * circumference;
+              const gap = circumference - dash;
+              const currentOffset = offset;
+              offset -= dash;
+              return (
+                <circle
+                  key={item.label}
+                  cx="60"
+                  cy="60"
+                  r={radius}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="14"
+                  strokeLinecap="round"
+                  strokeDasharray={`${dash} ${gap}`}
+                  strokeDashoffset={currentOffset}
+                  className={item.className}
+                />
+              );
+            })}
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <span className="text-3xl font-black text-gray-950">{total}</span>
+            <span className="text-xs font-medium text-gray-400">éléments</span>
+          </div>
+        </div>
+
+        <div className="w-full space-y-3">
+          {data.map((item) => (
+            <div key={item.label} className="flex items-center justify-between rounded-2xl bg-gray-50 px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className={`h-2.5 w-2.5 rounded-full ${item.className.replace("text-", "bg-")}`} />
+                <span className="text-sm font-medium text-gray-700">{item.label}</span>
+              </div>
+              <span className={`text-sm font-bold ${item.textClass}`}>{percent(item.value, total)}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const HorizontalBars: React.FC<{
+  title: string;
+  subtitle: string;
+  data: { label: string; value: number; compare?: number; tone: Tone }[];
+}> = ({ title, subtitle, data }) => {
+  const maxValue = Math.max(...data.flatMap((d) => [d.value, d.compare ?? 0]), 1);
+
+  return (
+    <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-bold text-gray-950">{title}</h2>
+          <p className="mt-1 text-sm text-gray-500">{subtitle}</p>
+        </div>
+        <div className="rounded-2xl bg-indigo-50 p-2 text-indigo-600">
+          <Activity size={20} />
+        </div>
+      </div>
+
+      <div className="space-y-5">
+        {data.map((item) => {
+          const tone = toneClass[item.tone];
+          return (
+            <div key={item.label}>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-gray-700">{item.label}</span>
+                <span className="text-sm font-bold text-gray-950">{compactMoney(item.value)}</span>
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 overflow-hidden rounded-full bg-gray-100">
+                  <div className={`h-full rounded-full ${tone.solid}`} style={{ width: `${Math.max(4, (item.value / maxValue) * 100)}%` }} />
+                </div>
+                {item.compare !== undefined && (
+                  <div className="h-3 overflow-hidden rounded-full bg-gray-100">
+                    <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.max(4, (item.compare / maxValue) * 100)}%` }} />
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const MiniTrend: React.FC<{ values: number[]; tone: Tone }> = ({ values, tone }) => {
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = max - min || 1;
+  const points = values
+    .map((value, index) => {
+      const x = (index / Math.max(1, values.length - 1)) * 120;
+      const y = 42 - ((value - min) / range) * 34;
+      return `${x},${y}`;
+    })
+    .join(" ");
+
+  return (
+    <svg viewBox="0 0 120 48" className="h-12 w-full overflow-visible">
+      <polyline points={points} fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className={toneClass[tone].text} />
+    </svg>
+  );
+};
+
+const StatCardView: React.FC<{ stat: StatCard }> = ({ stat }) => {
+  const Icon = stat.icon;
+  const tone = toneClass[stat.tone];
+  const TrendIcon = stat.trend === "up" ? ArrowUp : ArrowDown;
+
+  return (
+    <div className="group relative overflow-hidden rounded-3xl bg-white p-5 shadow-sm ring-1 ring-gray-100 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+      <div className={`absolute -right-10 -top-10 h-28 w-28 rounded-full ${tone.soft}`} />
+      <div className="relative flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-gray-500">{stat.title}</p>
+          <p className="mt-3 text-2xl font-black tracking-tight text-gray-950">{stat.value}</p>
+          <div className={`mt-3 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${tone.soft} ${tone.text}`}>
+            <TrendIcon size={13} />
+            {stat.detail}
+          </div>
+        </div>
+        <div className={`rounded-2xl p-3 ring-1 ${tone.soft} ${tone.text} ${tone.ring}`}>
+          <Icon size={22} />
+        </div>
+      </div>
+      {typeof stat.progress === "number" && (
+        <div className="relative mt-5 h-2 overflow-hidden rounded-full bg-gray-100">
+          <div className={`h-full rounded-full ${tone.solid}`} style={{ width: `${Math.max(4, Math.min(100, stat.progress))}%` }} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const CleanTable: React.FC<{
+  title: string;
+  countLabel: string;
+  children: React.ReactNode;
+}> = ({ title, countLabel, children }) => (
+  <div className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-gray-100">
+    <div className="flex items-center justify-between gap-4 px-6 py-5">
+      <h2 className="text-lg font-bold text-gray-950">{title}</h2>
+      <span className="rounded-full bg-gray-50 px-3 py-1 text-sm font-medium text-gray-500">{countLabel}</span>
+    </div>
+    <div className="overflow-x-auto px-3 pb-3">{children}</div>
+  </div>
+);
+
 export const AdminDashboard: React.FC = () => {
-  // Customers & Members
   const { data: customers, isLoading: customersLoading } = useQuery({
     queryKey: ["dashboard-customers"],
-    queryFn: () =>
-      customerService.getAllCustomers(false) as Promise<CustomerResponse[]>,
+    queryFn: () => customerService.getAllCustomers(false) as Promise<CustomerResponse[]>,
   });
 
   const { data: members, isLoading: membersLoading } = useQuery({
@@ -38,179 +259,187 @@ export const AdminDashboard: React.FC = () => {
     queryFn: () => memberService.getAllMembers(),
   });
 
-  // Subscriptions
   const { data: subscriptionsData } = useQuery({
     queryKey: ["dashboard-subscriptions"],
     queryFn: () => subscriptionService.getSubscriptions({ size: 100 }),
   });
 
-  // Bookings
   const { data: bookingsData } = useQuery({
     queryKey: ["dashboard-bookings"],
     queryFn: () => bookingService.getBookings({ size: 100 }),
   });
 
-  // Inventory
   const { data: inventoryMetrics } = useQuery({
     queryKey: ["dashboard-inventory"],
     queryFn: () => inventoryService.getDashboardMetrics(),
   });
 
-  // Payments
-  // const { data: paymentsData } = useQuery({
-  //   queryKey: ['dashboard-payments'],
-  //   queryFn: () => paymentService.getPaymentIntents({ size: 100 }),
-  // });
-
-  // Wallets
   const { data: walletsData } = useQuery({
     queryKey: ["dashboard-wallets"],
     queryFn: () => walletService.getWallets({ size: 100 }),
   });
 
-  // Billing
   const { data: billingData } = useQuery({
     queryKey: ["dashboard-billing"],
     queryFn: () => billingService.getDocuments({ size: 100 }),
   });
 
-  const isLoading = customersLoading || membersLoading;
+  const dashboard = useMemo(() => {
+    const customerList = customers || [];
+    const memberList = members || [];
+    const subscriptionList = subscriptionsData?.content || [];
+    const bookingList = bookingsData?.data || [];
+    const walletList = walletsData?.content || [];
+    const billingList = billingData?.content || [];
 
-  const recentCustomers =
-    customers
-      ?.slice()
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      )
-      .slice(0, 5) || [];
+    const totalCustomers = customerList.length;
+    const totalMembers = memberList.length;
+    const activeCustomers = customerList.filter((c) => c.status === "ACTIVE").length;
+    const activeMembers = memberList.filter((m: any) => m.status === "ACTIVE").length;
+    const activeSubscriptions = subscriptionList.filter((s: any) => s.status === "ACTIVE").length;
+    const pendingSubscriptions = subscriptionList.filter((s: any) => s.status === "PENDING_ACTIVATION").length;
+    const confirmedBookings = bookingList.filter((b: any) => b.status === "CONFIRMED").length;
+    const pendingBookings = bookingList.filter((b: any) => b.status === "PENDING_APPROVAL").length;
+    const openAlerts = safeNumber((inventoryMetrics as any)?.openAlerts);
+    const lowStockAlerts = safeNumber((inventoryMetrics as any)?.lowStockAlerts);
+    const totalStockValue = safeNumber((inventoryMetrics as any)?.totalStockValue);
+    const totalWallets = walletList.length;
+    const totalWalletBalance = walletList.reduce((sum: number, w: any) => sum + safeNumber(w.availableBalance), 0);
+    const totalHeldBalance = walletList.reduce((sum: number, w: any) => sum + safeNumber(w.heldBalance), 0);
+    const invoices = billingList.filter((d: any) => d.documentType === "INVOICE");
+    const unpaidInvoices = invoices.filter((d: any) => d.status === "ISSUED" || d.status === "PARTIALLY_PAID" || d.status === "OVERDUE").length;
+    const paidInvoices = invoices.filter((d: any) => d.status === "PAID").length;
+    const totalOutstanding = invoices.reduce((sum: number, d: any) => sum + safeNumber(d.balanceDue), 0);
+    const totalBilled = invoices.reduce((sum: number, d: any) => sum + safeNumber(d.totalAmount), 0);
+    const totalCollected = Math.max(0, totalBilled - totalOutstanding);
+    const recoveryRate = percent(totalCollected, totalBilled);
 
-  // Derniers members (5 derniers)
-  const recentMembers =
-    members
-      ?.slice()
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      )
-      .slice(0, 5) || [];
+    return {
+      customerList,
+      memberList,
+      subscriptionList,
+      bookingList,
+      walletList,
+      billingList,
+      totalCustomers,
+      totalMembers,
+      activeCustomers,
+      activeMembers,
+      activeSubscriptions,
+      pendingSubscriptions,
+      confirmedBookings,
+      pendingBookings,
+      openAlerts,
+      lowStockAlerts,
+      totalStockValue,
+      totalWallets,
+      totalWalletBalance,
+      totalHeldBalance,
+      unpaidInvoices,
+      paidInvoices,
+      totalOutstanding,
+      totalBilled,
+      totalCollected,
+      recoveryRate,
+    };
+  }, [customers, members, subscriptionsData, bookingsData, inventoryMetrics, walletsData, billingData]);
 
-  // Calculs
-  const totalCustomers = customers?.length || 0;
-  const totalMembers = members?.length || 0;
-  const activeCustomers =
-    customers?.filter((c) => c.status === "ACTIVE").length || 0;
-  const activeMembers =
-    members?.filter((m) => m.status === "ACTIVE").length || 0;
+  const recentCustomers = useMemo(
+    () =>
+      [...dashboard.customerList]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5),
+    [dashboard.customerList],
+  );
 
-  const activeSubscriptions =
-    subscriptionsData?.content?.filter((s) => s.status === "ACTIVE").length ||
-    0;
-  const pendingSubscriptions =
-    subscriptionsData?.content?.filter((s) => s.status === "PENDING_ACTIVATION")
-      .length || 0;
+  const recentMembers = useMemo(
+    () =>
+      [...dashboard.memberList]
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5),
+    [dashboard.memberList],
+  );
 
-  const confirmedBookings =
-    bookingsData?.data?.filter((b) => b.status === "CONFIRMED").length || 0;
-  const pendingBookings =
-    bookingsData?.data?.filter((b) => b.status === "PENDING_APPROVAL").length ||
-    0;
-
-  const openAlerts = inventoryMetrics?.openAlerts || 0;
-  const lowStockAlerts = inventoryMetrics?.lowStockAlerts || 0;
-  const totalStockValue = inventoryMetrics?.totalStockValue || 0;
-
-  // const pendingPayments = paymentsData?.content?.filter(p => p.status === 'PENDING').length || 0;
-  const totalWallets = walletsData?.content?.length || 0;
-  const totalWalletBalance =
-    walletsData?.content?.reduce(
-      (sum, w: any) => sum + w.availableBalance,
-      0,
-    ) || 0;
-
-  const unpaidInvoices =
-    billingData?.content?.filter(
-      (d) =>
-        d.documentType === "INVOICE" &&
-        (d.status === "ISSUED" || d.status === "PARTIALLY_PAID"),
-    ).length || 0;
-  const totalOutstanding =
-    billingData?.content
-      ?.filter((d) => d.documentType === "INVOICE")
-      .reduce((sum, d) => sum + (d.balanceDue || 0), 0) || 0;
-
-  const stats = [
+  const stats: StatCard[] = [
     {
-      title: "Customers",
-      value: totalCustomers.toString(),
-      change: `${activeCustomers} actifs`,
+      title: "Customers actifs",
+      value: dashboard.totalCustomers.toString(),
+      detail: `${dashboard.activeCustomers} actifs`,
       trend: "up",
       icon: Building2,
-      color: "bg-blue-500",
+      tone: "blue",
+      progress: percent(dashboard.activeCustomers, dashboard.totalCustomers),
     },
     {
-      title: "Members",
-      value: totalMembers.toString(),
-      change: `${activeMembers} actifs`,
+      title: "Membres actifs",
+      value: dashboard.totalMembers.toString(),
+      detail: `${dashboard.activeMembers} actifs`,
       trend: "up",
       icon: Users,
-      color: "bg-green-500",
+      tone: "green",
+      progress: percent(dashboard.activeMembers, dashboard.totalMembers),
     },
     {
-      title: "Abonnements actifs",
-      value: activeSubscriptions.toString(),
-      change: `${pendingSubscriptions} en attente`,
+      title: "Abonnements",
+      value: dashboard.activeSubscriptions.toString(),
+      detail: `${dashboard.pendingSubscriptions} en attente`,
       trend: "up",
       icon: CreditCard,
-      color: "bg-purple-500",
+      tone: "purple",
+      progress: percent(dashboard.activeSubscriptions, dashboard.activeSubscriptions + dashboard.pendingSubscriptions),
     },
     {
       title: "Réservations",
-      value: confirmedBookings.toString(),
-      change: `${pendingBookings} en attente`,
-      trend: confirmedBookings > pendingBookings ? "up" : "down",
+      value: dashboard.confirmedBookings.toString(),
+      detail: `${dashboard.pendingBookings} à valider`,
+      trend: dashboard.pendingBookings > dashboard.confirmedBookings ? "down" : "up",
       icon: Calendar,
-      color: "bg-orange-500",
+      tone: "orange",
+      progress: percent(dashboard.confirmedBookings, dashboard.confirmedBookings + dashboard.pendingBookings),
     },
     {
-      title: "Valeur du stock",
-      value: `${(totalStockValue / 1000000).toFixed(1)}M FCFA`,
-      change: `${lowStockAlerts} alertes stock`,
-      trend: lowStockAlerts > 0 ? "down" : "up",
+      title: "Stock valorisé",
+      value: compactMoney(dashboard.totalStockValue),
+      detail: `${dashboard.lowStockAlerts} alertes stock`,
+      trend: dashboard.lowStockAlerts > 0 ? "down" : "up",
       icon: Package,
-      color: "bg-teal-500",
+      tone: "teal",
+      progress: dashboard.lowStockAlerts > 0 ? 35 : 90,
     },
     {
-      title: "Alertes",
-      value: openAlerts.toString(),
-      change: `${lowStockAlerts} stock bas`,
-      trend: openAlerts > 0 ? "down" : "up",
+      title: "Alertes ouvertes",
+      value: dashboard.openAlerts.toString(),
+      detail: `${dashboard.lowStockAlerts} stock bas`,
+      trend: dashboard.openAlerts > 0 ? "down" : "up",
       icon: AlertCircle,
-      color: "bg-red-500",
+      tone: "red",
+      progress: dashboard.openAlerts > 0 ? 70 : 8,
     },
     {
       title: "Portefeuilles",
-      value: totalWallets.toString(),
-      change: `${(totalWalletBalance / 1000000).toFixed(1)}M FCFA`,
+      value: dashboard.totalWallets.toString(),
+      detail: compactMoney(dashboard.totalWalletBalance),
       trend: "up",
       icon: Wallet,
-      color: "bg-indigo-500",
+      tone: "indigo",
+      progress: percent(dashboard.totalWalletBalance, dashboard.totalWalletBalance + dashboard.totalHeldBalance),
     },
     {
       title: "Factures impayées",
-      value: unpaidInvoices.toString(),
-      change: `${(totalOutstanding / 1000000).toFixed(1)}M FCFA`,
-      trend: unpaidInvoices > 0 ? "down" : "up",
+      value: dashboard.unpaidInvoices.toString(),
+      detail: compactMoney(dashboard.totalOutstanding),
+      trend: dashboard.unpaidInvoices > 0 ? "down" : "up",
       icon: FileText,
-      color: "bg-rose-500",
+      tone: "rose",
+      progress: 100 - dashboard.recoveryRate,
     },
   ];
 
-  if (isLoading) {
+  if (customersLoading || membersLoading) {
     return (
       <AdminLayout>
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="flex h-64 items-center justify-center">
+          <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-primary-600" />
         </div>
       </AdminLayout>
     );
@@ -218,304 +447,218 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <AdminLayout>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Tableau de bord</h1>
-
-      {/* Statistiques */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {stats.map((stat, index) => {
-          const Icon = stat.icon;
-          return (
-            <div
-              key={index}
-              className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`${stat.color} p-3 rounded-lg text-white`}>
-                  <Icon size={24} />
-                </div>
-                <div
-                  className={`flex items-center text-sm ${stat.trend === "up" ? "text-green-600" : "text-red-600"}`}
-                >
-                  {stat.trend === "up" ? (
-                    <ArrowUp size={14} />
-                  ) : (
-                    <ArrowDown size={14} />
-                  )}
-                  <span className="ml-1">{stat.change}</span>
-                </div>
+      <div className="space-y-8">
+        <div className="relative overflow-hidden rounded-[2rem] bg-slate-900 p-6 text-white shadow-sm">
+          <div className="absolute -right-14 -top-14 h-52 w-52 rounded-full bg-primary blur-2xl" />
+          <div className="absolute -bottom-20 left-20 h-56 w-56 rounded-full bg-blue blur-3xl" />
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-sm font-semibold text-white/80 ring-1 ring-white/10">
+                <Activity size={15} /> Vue opérationnelle
               </div>
-              <p className="text-2xl font-bold text-gray-900 mb-1">
-                {stat.value}
+              <h1 className="text-3xl font-black tracking-tight md:text-4xl">Tableau de bord</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-300 md:text-base">
+                Suivi consolidé des clients, abonnements, réservations, stock, portefeuilles et facturation.
               </p>
-              <p className="text-sm text-gray-600">{stat.title}</p>
             </div>
-          );
-        })}
-      </div>
-
-      {/* Derniers customers */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Derniers customers
-          </h2>
-          <span className="text-sm text-gray-500">Total: {totalCustomers}</span>
+            <div className="grid grid-cols-2 gap-3 text-right sm:grid-cols-4 lg:min-w-[540px]">
+              <HeroMetric label="CA facturé" value={compactMoney(dashboard.totalBilled)} />
+              <HeroMetric label="Encaissements" value={compactMoney(dashboard.totalCollected)} />
+              <HeroMetric label="Recouvrement" value={`${dashboard.recoveryRate}%`} />
+              <HeroMetric label="Créances" value={compactMoney(dashboard.totalOutstanding)} danger />
+            </div>
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Customer
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Email
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Type
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Statut
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Créé le
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {recentCustomers.map((customer) => (
-                <tr
-                  key={customer.customerId}
-                  className="hover:bg-gray-50 transition-colors"
-                >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                        {customer.type === "PERSON" ? (
-                          <User size={14} className="text-gray-500" />
-                        ) : (
-                          <Building size={14} className="text-gray-500" />
-                        )}
+
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+          {stats.map((stat) => (
+            <StatCardView key={stat.title} stat={stat} />
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <DonutChart
+            title="Répartition commerciale"
+            subtitle="Poids des clients, membres, souscriptions et réservations."
+            data={[
+              { label: "Customers", value: dashboard.totalCustomers, className: "text-blue-500", textClass: "text-blue-600" },
+              { label: "Members", value: dashboard.totalMembers, className: "text-emerald-500", textClass: "text-emerald-600" },
+              { label: "Abonnements", value: dashboard.activeSubscriptions, className: "text-purple-500", textClass: "text-purple-600" },
+              { label: "Réservations", value: dashboard.confirmedBookings, className: "text-orange-500", textClass: "text-orange-600" },
+            ]}
+          />
+
+          <HorizontalBars
+            title="Revenus et positions financières"
+            subtitle="Comparaison des principaux montants visibles dans les modules financiers."
+            data={[
+              { label: "Facturé", value: dashboard.totalBilled, compare: dashboard.totalCollected, tone: "blue" },
+              { label: "Portefeuilles", value: dashboard.totalWalletBalance, compare: dashboard.totalHeldBalance, tone: "indigo" },
+              { label: "Stock", value: dashboard.totalStockValue, tone: "teal" },
+              { label: "Créances", value: dashboard.totalOutstanding, tone: "rose" },
+            ]}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100 xl:col-span-1">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-gray-950">Tendance synthétique</h2>
+                <p className="mt-1 text-sm text-gray-500">Lecture rapide de l’activité.</p>
+              </div>
+              <div className="rounded-2xl bg-primary-50 p-2 text-primary-600">
+                <TrendingUpIcon />
+              </div>
+            </div>
+            <MiniTrend
+              tone="purple"
+              values={[
+                dashboard.activeCustomers,
+                dashboard.activeMembers,
+                dashboard.activeSubscriptions,
+                dashboard.confirmedBookings,
+                dashboard.totalWallets,
+                dashboard.recoveryRate,
+              ]}
+            />
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <SmallMetric label="Clients + membres" value={(dashboard.totalCustomers + dashboard.totalMembers).toString()} />
+              <SmallMetric label="Alertes" value={dashboard.openAlerts.toString()} danger={dashboard.openAlerts > 0} />
+            </div>
+          </div>
+
+          <CleanTable title="Derniers customers" countLabel={`${dashboard.totalCustomers} au total`}>
+            <table className="w-full border-separate border-spacing-y-2">
+              <thead>
+                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  <th className="px-3 py-2">Customer</th>
+                  <th className="px-3 py-2">Email</th>
+                  <th className="px-3 py-2">Type</th>
+                  <th className="px-3 py-2">Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentCustomers.map((customer) => (
+                  <tr key={customer.customerId} className="rounded-2xl bg-gray-50 transition-colors hover:bg-primary-50/40">
+                    <td className="rounded-l-2xl px-3 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-gray-500 ring-1 ring-gray-100">
+                          {customer.type === "PERSON" ? <User size={15} /> : <Building size={15} />}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {customer.type === "PERSON" ? `${customer.firstname} ${customer.lastname}` : customer.companyName}
+                          </p>
+                          <p className="text-xs text-gray-400">{customer.customerId}</p>
+                        </div>
                       </div>
-                      <span className="text-sm font-medium text-gray-900">
-                        {customer.type === "PERSON"
-                          ? `${customer.firstname} ${customer.lastname}`
-                          : customer.companyName}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {customer.email}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        customer.type === "PERSON"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-purple-100 text-purple-700"
-                      }`}
-                    >
-                      {customer.type === "PERSON" ? "Personne" : "Compagnie"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        customer.status === "ACTIVE"
-                          ? "bg-green-100 text-green-700"
-                          : customer.status === "INACTIVE"
-                            ? "bg-gray-100 text-gray-700"
-                            : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {customer.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {new Date(customer.createdAt).toLocaleDateString("fr-FR")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                    <td className="px-3 py-3 text-sm text-gray-600">{customer.email}</td>
+                    <td className="px-3 py-3"><Badge label={customer.type === "PERSON" ? "Personne" : "Compagnie"} tone={customer.type === "PERSON" ? "blue" : "purple"} /></td>
+                    <td className="rounded-r-2xl px-3 py-3"><StatusBadge status={customer.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CleanTable>
         </div>
-      </div>
 
-      {/* Derniers members */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Derniers members
-          </h2>
-          <span className="text-sm text-gray-500">Total: {totalMembers}</span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Membre
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Email
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Customer ID
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Statut
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Accès portail
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Créé le
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {recentMembers.map((member) => (
-                <tr
-                  key={member.memberId}
-                  className="hover:bg-gray-50 transition-colors"
-                >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                        <User size={14} className="text-primary-600" />
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <CleanTable title="Derniers members" countLabel={`${dashboard.totalMembers} au total`}>
+            <table className="w-full border-separate border-spacing-y-2">
+              <thead>
+                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  <th className="px-3 py-2">Membre</th>
+                  <th className="px-3 py-2">Customer</th>
+                  <th className="px-3 py-2">Statut</th>
+                  <th className="px-3 py-2">Portail</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentMembers.map((member: any) => (
+                  <tr key={member.memberId} className="bg-gray-50 transition-colors hover:bg-primary-50/40">
+                    <td className="rounded-l-2xl px-3 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+                          <User size={15} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{member.fullname}</p>
+                          <p className="text-xs text-gray-400">{member.email}</p>
+                        </div>
                       </div>
-                      <span className="text-sm font-medium text-gray-900">
-                        {member.fullname}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {member.email}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {member.customerId}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        member.status === "ACTIVE"
-                          ? "bg-green-100 text-green-700"
-                          : member.status === "PENDING"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : member.status === "INACTIVE"
-                              ? "bg-gray-100 text-gray-700"
-                              : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {member.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        member.portalAccess
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-gray-100 text-gray-500"
-                      }`}
-                    >
-                      {member.portalAccess ? "Activé" : "Désactivé"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {new Date(member.createdAt).toLocaleDateString("fr-FR")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                    </td>
+                    <td className="px-3 py-3 font-mono text-xs text-gray-500">{member.customerId}</td>
+                    <td className="px-3 py-3"><StatusBadge status={member.status} /></td>
+                    <td className="rounded-r-2xl px-3 py-3"><Badge label={member.portalAccess ? "Activé" : "Désactivé"} tone={member.portalAccess ? "blue" : "slate"} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CleanTable>
 
-      {/* Dernières factures */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Dernières factures
-          </h2>
-          <span className="text-sm text-gray-500">
-            {unpaidInvoices} impayées
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  N° Facture
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Client
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                  Montant
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Statut
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Échéance
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {billingData?.content?.slice(0, 5).map((doc) => (
-                <tr
-                  key={doc.documentNumber}
-                  className="hover:bg-gray-50 transition-colors"
-                >
-                  <td className="px-6 py-4 text-sm font-mono">
-                    {doc.documentNumber}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
-                    {doc.customerName || doc.customerCode || "-"}
-                  </td>
-                  <td className="px-6 py-4 text-right font-semibold">
-                    {doc.totalAmount.toLocaleString()} FCFA
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        doc.status === "PAID"
-                          ? "bg-green-100 text-green-700"
-                          : doc.status === "PARTIALLY_PAID"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : doc.status === "OVERDUE"
-                              ? "bg-red-100 text-red-700"
-                              : "bg-gray-100 text-gray-700"
-                      }`}
-                    >
-                      {doc.status === "PAID"
-                        ? "Payée"
-                        : doc.status === "PARTIALLY_PAID"
-                          ? "Partiellement payée"
-                          : doc.status === "OVERDUE"
-                            ? "En retard"
-                            : "Émise"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {doc.dueDate
-                      ? new Date(doc.dueDate).toLocaleDateString("fr-FR")
-                      : "-"}
-                  </td>
+          <CleanTable title="Dernières factures" countLabel={`${dashboard.unpaidInvoices} impayées`}>
+            <table className="w-full border-separate border-spacing-y-2">
+              <thead>
+                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  <th className="px-3 py-2">Facture</th>
+                  <th className="px-3 py-2">Client</th>
+                  <th className="px-3 py-2 text-right">Montant</th>
+                  <th className="px-3 py-2">Statut</th>
                 </tr>
-              ))}
-              {(!billingData?.content || billingData.content.length === 0) && (
-                <tr>
-                  <td colSpan={5} className="text-center py-8 text-gray-500">
-                    Aucune facture trouvée
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {dashboard.billingList.slice(0, 5).map((doc: any) => (
+                  <tr key={doc.documentNumber} className="bg-gray-50 transition-colors hover:bg-primary-50/40">
+                    <td className="rounded-l-2xl px-3 py-3 font-mono text-xs font-semibold text-gray-700">{doc.documentNumber}</td>
+                    <td className="px-3 py-3 text-sm text-gray-700">{doc.customerName || doc.customerCode || "—"}</td>
+                    <td className="px-3 py-3 text-right text-sm font-bold text-gray-950">{formatMoney(safeNumber(doc.totalAmount))}</td>
+                    <td className="rounded-r-2xl px-3 py-3"><InvoiceStatusBadge status={doc.status} /></td>
+                  </tr>
+                ))}
+                {dashboard.billingList.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="rounded-2xl bg-gray-50 py-8 text-center text-sm text-gray-500">Aucune facture trouvée</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </CleanTable>
         </div>
       </div>
     </AdminLayout>
   );
 };
+
+const HeroMetric: React.FC<{ label: string; value: string; danger?: boolean }> = ({ label, value, danger }) => (
+  <div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/10 backdrop-blur">
+    <p className="text-xs font-medium text-slate-300">{label}</p>
+    <p className={`mt-1 text-sm font-black md:text-base ${danger ? "text-red-200" : "text-white"}`}>{value}</p>
+  </div>
+);
+
+const SmallMetric: React.FC<{ label: string; value: string; danger?: boolean }> = ({ label, value, danger }) => (
+  <div className="rounded-2xl bg-gray-50 p-4">
+    <p className="text-xs font-semibold text-gray-400">{label}</p>
+    <p className={`mt-2 text-xl font-black ${danger ? "text-red-600" : "text-gray-950"}`}>{value}</p>
+  </div>
+);
+
+const Badge: React.FC<{ label: string; tone: Tone }> = ({ label, tone }) => (
+  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${toneClass[tone].soft} ${toneClass[tone].text}`}>{label}</span>
+);
+
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  const tone: Tone = status === "ACTIVE" ? "green" : status === "PENDING" ? "orange" : status === "INACTIVE" ? "slate" : "red";
+  return <Badge label={status} tone={tone} />;
+};
+
+const InvoiceStatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  if (status === "PAID") return <Badge label="Payée" tone="green" />;
+  if (status === "PARTIALLY_PAID") return <Badge label="Partielle" tone="orange" />;
+  if (status === "OVERDUE") return <Badge label="Retard" tone="red" />;
+  return <Badge label="Émise" tone="slate" />;
+};
+
+const TrendingUpIcon: React.FC = () => <ArrowUp size={20} />;

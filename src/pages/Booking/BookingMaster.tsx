@@ -35,34 +35,34 @@ export const BookingMaster: React.FC = () => {
           Gestion des réservations
         </h1>
         <p className="text-gray-600 mt-1">
-          Gérez les réservations, liste d'attente, politiques et dérogations
+          Gérez les réservations, liste d'attente, politiques et dérogations.
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-gray-200 mb-6">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`
-                flex items-center gap-2 px-4 py-2 rounded-t-lg transition-all whitespace-nowrap
-                ${
-                  activeTab === tab.id
-                    ? "bg-primary-50 text-primary-600 border-b-2 border-primary-600"
-                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                }
-              `}
-            >
-              <Icon size={18} />
-              {tab.label}
-            </button>
-          );
-        })}
+      <div className="mb-7 overflow-x-auto rounded-[1.35rem] bg-white p-1.5 shadow-sm ring-1 ring-gray-100">
+        <div className="flex min-w-max gap-1.5">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition-all whitespace-nowrap ${
+                  isActive
+                    ? "bg-primary-600 text-white shadow-md shadow-primary-600/20"
+                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                }`}
+              >
+                <Icon size={18} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="mt-6">
+      <div>
         {visitedTabs.has("metrics") && (
           <div className={activeTab !== "metrics" ? "hidden" : ""}>
             <BookingMetrics />

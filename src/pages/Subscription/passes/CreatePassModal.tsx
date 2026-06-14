@@ -155,7 +155,7 @@ export const CreatePassModal: React.FC<CreatePassModalProps> = ({
 
   return (
     <ModalPortal onClose={onClose} size="xl">
-      <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center rounded-t-2xl">
+      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-gray-100 px-6 py-4 flex justify-between items-center rounded-t-2xl">
         <div>
           <h3 className="text-xl font-bold">Nouveau pass</h3>
           <p className="text-sm text-gray-500 mt-0.5">
@@ -167,7 +167,7 @@ export const CreatePassModal: React.FC<CreatePassModalProps> = ({
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-6 space-y-6">
+      <form onSubmit={handleSubmit} className="p-6 space-y-6 bg-gray-50/30">
         {errorMessage && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
             {errorMessage}
@@ -176,7 +176,7 @@ export const CreatePassModal: React.FC<CreatePassModalProps> = ({
 
         {/* ── Infos générales ── */}
         <section>
-          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 pb-2 border-b">
+          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 pb-2 border-b border-gray-100">
             Informations générales
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -189,7 +189,7 @@ export const CreatePassModal: React.FC<CreatePassModalProps> = ({
                 onChange={(e) =>
                   setFormData({ ...formData, passType: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
               >
                 {passTypes.map((t) => (
                   <option key={t.value} value={t.value}>
@@ -210,7 +210,7 @@ export const CreatePassModal: React.FC<CreatePassModalProps> = ({
                 }
                 required
                 placeholder="ex: Pack 10 heures"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
               />
             </div>
             <div className="md:col-span-2">
@@ -223,7 +223,7 @@ export const CreatePassModal: React.FC<CreatePassModalProps> = ({
                   setFormData({ ...formData, description: e.target.value })
                 }
                 rows={2}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl resize-none shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
               />
             </div>
           </div>
@@ -231,7 +231,7 @@ export const CreatePassModal: React.FC<CreatePassModalProps> = ({
 
         {/* ── Propriétaire ── */}
         <section>
-          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 pb-2 border-b flex items-center gap-2">
+          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 pb-2 border-b border-gray-100 flex items-center gap-2">
             <User size={13} /> Propriétaire
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -242,7 +242,7 @@ export const CreatePassModal: React.FC<CreatePassModalProps> = ({
               <select
                 value={formData.ownerType}
                 onChange={(e) => handleOwnerTypeChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
               >
                 {ownerTypeOptions.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -291,7 +291,7 @@ export const CreatePassModal: React.FC<CreatePassModalProps> = ({
 
         {/* ── Validité ── */}
         <section>
-          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 pb-2 border-b">
+          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 pb-2 border-b border-gray-100">
             Validité
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -306,7 +306,7 @@ export const CreatePassModal: React.FC<CreatePassModalProps> = ({
                   setFormData({ ...formData, validFrom: e.target.value })
                 }
                 required
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
               />
             </div>
             <div>
@@ -320,7 +320,7 @@ export const CreatePassModal: React.FC<CreatePassModalProps> = ({
                   setFormData({ ...formData, validUntil: e.target.value })
                 }
                 min={formData.validFrom}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
               />
             </div>
             <div>
@@ -335,7 +335,7 @@ export const CreatePassModal: React.FC<CreatePassModalProps> = ({
                   setFormData({ ...formData, maxUses: e.target.value })
                 }
                 placeholder="Illimité"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
               />
             </div>
           </div>
@@ -367,7 +367,7 @@ export const CreatePassModal: React.FC<CreatePassModalProps> = ({
 
         {/* ── Droits inclus ── */}
         <section>
-          <div className="flex justify-between items-center mb-3 pb-2 border-b">
+          <div className="flex justify-between items-center mb-3 pb-2 border-b border-gray-100">
             <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
               Droits inclus
             </h4>
@@ -383,7 +383,7 @@ export const CreatePassModal: React.FC<CreatePassModalProps> = ({
             {entitlements.map((ent, i) => (
               <div
                 key={i}
-                className="flex gap-2 items-end p-3 bg-gray-50 rounded-lg flex-wrap"
+                className="flex gap-2 items-end p-4 bg-gray-50/70 border border-gray-100 rounded-xl flex-wrap"
               >
                 <div className="flex-1 min-w-[180px]">
                   <label className="block text-xs text-gray-500 mb-1">
@@ -477,7 +477,7 @@ export const CreatePassModal: React.FC<CreatePassModalProps> = ({
             type="button"
             onClick={onClose}
             disabled={createMutation.isPending}
-            className="flex-1 px-4 py-2.5 border rounded-xl text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="flex-1 px-4 py-2.5 border rounded-xl text-gray-700 hover:bg-primary-50/40 transition-colors disabled:opacity-50"
           >
             Annuler
           </button>

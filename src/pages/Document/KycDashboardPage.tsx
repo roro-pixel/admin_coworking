@@ -34,11 +34,19 @@ export const KycDashboardPage: React.FC = () => {
   if (!data) return null;
 
   // Extraire les données avec des valeurs par défaut
-  const totalCases = data.summary?.totalCases ?? 0;
-  const pendingReview = (data.byOwnerType || []).reduce(
-    (sum, item) => sum + (item.pendingReview || 0),
-    0,
-  );
+  const totalCases =
+    data.summary?.totalCases ??
+    Object.values(data.summary ?? {}).reduce(
+      (sum: number, value: any) =>
+        sum + (typeof value === "number" ? value : 0),
+      0,
+    );
+  const pendingReview =
+    data.summary?.PENDING_REVIEW ??
+    (data.byOwnerType || []).reduce(
+      (sum, item) => sum + (item.pendingReview || 0),
+      0,
+    );
   const overdueSla = data.sla?.casesExceeding48h ?? 0;
   const expiring7Days = data.expiringSoon?.within7Days ?? 0;
   const expiring30Days = data.expiringSoon?.within30Days ?? 0;
@@ -46,12 +54,17 @@ export const KycDashboardPage: React.FC = () => {
 
   // Statuts depuis summary
   const statusMap = {
-    SUBMITTED: data.summary?.SUBMITTED ?? 0,
-    UNDER_REVIEW: data.summary?.UNDER_REVIEW ?? 0,
+    PENDING_REVIEW:
+      data.summary?.PENDING_REVIEW ?? data.summary?.SUBMITTED ?? 0,
+    IN_REVIEW: data.summary?.IN_REVIEW ?? data.summary?.UNDER_REVIEW ?? 0,
     APPROVED: data.summary?.APPROVED ?? 0,
     REJECTED: data.summary?.REJECTED ?? 0,
-    PENDING_CORRECTION: data.summary?.PENDING_CORRECTION ?? 0,
-    RENEWAL_REQUIRED: data.summary?.RENEWAL_REQUIRED ?? 0,
+    CANCELLED: data.summary?.CANCELLED ?? 0,
+    DRAFT:
+      data.summary?.DRAFT ??
+      data.summary?.NOT_STARTED ??
+      data.summary?.IN_PROGRESS ??
+      0,
     EXPIRED: data.summary?.EXPIRED ?? 0,
   };
 
@@ -65,14 +78,14 @@ export const KycDashboardPage: React.FC = () => {
 
   const statusCards = [
     {
-      key: "SUBMITTED",
-      label: "Soumis",
+      key: "PENDING_REVIEW",
+      label: "En attente",
       icon: Clock,
       color: "text-yellow-600",
       bg: "bg-yellow-50",
     },
     {
-      key: "UNDER_REVIEW",
+      key: "IN_REVIEW",
       label: "En revue",
       icon: Eye,
       color: "text-orange-600",
@@ -93,15 +106,15 @@ export const KycDashboardPage: React.FC = () => {
       bg: "bg-red-50",
     },
     {
-      key: "PENDING_CORRECTION",
-      label: "Corrections",
+      key: "CANCELLED",
+      label: "Annulés",
       icon: AlertCircle,
       color: "text-purple-600",
       bg: "bg-purple-50",
     },
     {
-      key: "RENEWAL_REQUIRED",
-      label: "Renouvellement",
+      key: "DRAFT",
+      label: "Brouillons",
       icon: Calendar,
       color: "text-amber-600",
       bg: "bg-amber-50",

@@ -1,216 +1,323 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Loader2, Save } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { paymentService } from "../../services/payment.service";
+import type { CustomerSummaryResponse } from "../../services/customer.service";
+import type { MemberSummaryResponse } from "../../services/member.service";
+import { CustomerAutocomplete } from "../../components/customers/CustomerAutocomplete";
+import { MemberAutocomplete } from "../../components/members/MemberAutocomplete";
 import { useAuth } from "../../contexts/AuthContext";
+
+const customerTypes = [
+  { value: "CUSTOMER", label: "Customer" },
+  { value: "MEMBER", label: "Membre" },
+  { value: "BUSINESS_ENTITY", label: "Entreprise" },
+];
+
+const purposes = [
+  { value: "MANUAL_PAYMENT", label: "Paiement manuel" },
+  { value: "BOOKING", label: "Réservation" },
+  { value: "SUBSCRIPTION", label: "Abonnement" },
+  { value: "PASS", label: "Pass" },
+];
+
+const defaultExpiresAt = (): string => {
+  const d = new Date();
+  d.setHours(d.getHours() + 24);
+  return d.toISOString();
+};
+
+const buildDefaultFormData = () => ({
+  customerType: "CUSTOMER",
+  customerCode: "",
+  amount: 0,
+  currency: "XAF",
+  purpose: "MANUAL_PAYMENT",
+  sourceType: "MANUAL",
+  sourceCode: "",
+  description: "",
+  expiresAt: defaultExpiresAt().slice(0, 16),
+});
 
 export const CreatePaymentIntentPage: React.FC = () => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const { admin } = useAuth();
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    customerType: "MEMBER",
-    customerCode: "",
-    amount: 0,
-    currency: "XAF",
-    purpose: "Paiement",
-    sourceType: "MANUAL",
-    sourceCode: "",
-    description: "",
-    expiresAt: "",
-    metadataJson: "",
-  });
+  const queryClient = useQueryClient();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const mutation = useMutation({
+  const [formData, setFormData] = useState(buildDefaultFormData);
+  const [selectedCustomer, setSelectedCustomer] =
+    useState<CustomerSummaryResponse | null>(null);
+  const [selectedMember, setSelectedMember] =
+    useState<MemberSummaryResponse | null>(null);
+
+  useEffect(() => {
+    setFormData(buildDefaultFormData());
+    setSelectedCustomer(null);
+    setSelectedMember(null);
+    setErrorMessage(null);
+  }, []);
+
+  const handleCustomerTypeChange = (type: string) => {
+    setFormData((prev) => ({ ...prev, customerType: type, customerCode: "" }));
+    setSelectedCustomer(null);
+    setSelectedMember(null);
+  };
+
+  const handleCustomerSelect = (customer: CustomerSummaryResponse | null) => {
+    setSelectedCustomer(customer);
+    setSelectedMember(null);
+    setFormData((prev) => ({
+      ...prev,
+      customerType: "CUSTOMER",
+      customerCode: customer?.customerId || "",
+    }));
+  };
+
+  const handleMemberSelect = (member: MemberSummaryResponse | null) => {
+    setSelectedMember(member);
+    setSelectedCustomer(null);
+    setFormData((prev) => ({
+      ...prev,
+      customerType: "MEMBER",
+      customerCode: member?.memberId || "",
+    }));
+  };
+
+  const createMutation = useMutation({
     mutationFn: () =>
       paymentService.createPaymentIntent({
-        customerType: form.customerType,
-        customerCode: form.customerCode,
-        amount: form.amount,
-        currency: form.currency,
-        purpose: form.purpose,
-        sourceType: form.sourceType,
-        sourceCode: form.sourceCode || undefined,
-        description: form.description || undefined,
-        expiresAt: form.expiresAt || undefined,
-        metadataJson: form.metadataJson || undefined,
-        createdBy: admin?.email || "admin",
-        idempotencyKey: `manual-payment-${Date.now()}`,
+        customerType: formData.customerType,
+        customerCode: formData.customerCode,
+        amount: parseFloat(String(formData.amount)) || 0,
+        currency: formData.currency,
+        purpose: formData.purpose,
+        sourceType: formData.sourceType,
+        sourceCode: formData.sourceCode || undefined,
+        description: formData.description || undefined,
+        idempotencyKey: `intent-${formData.customerCode}-${formData.amount}-${Date.now()}`,
+        expiresAt: formData.expiresAt
+          ? new Date(formData.expiresAt).toISOString()
+          : undefined,
+        createdBy: admin?.email || String(admin?.id) || "admin",
       }),
-    onSuccess: (intent) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["payment-intents"] });
-      navigate(`/payments/${intent.intentNumber}`, { replace: true });
+      navigate(`/payments/${data.intentNumber}`);
     },
-    onError: (e: any) =>
-      setError(
-        e?.response?.data?.message ||
-          "Erreur lors de la création de l’intention.",
-      ),
+    onError: (error: any) => {
+      const msg =
+        error?.response?.data?.message ||
+        "Erreur lors de la création de l'intention.";
+      setErrorMessage(msg);
+    },
   });
 
-  const submit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.customerCode.trim())
-      return setError("Le code client est obligatoire.");
-    if (form.amount <= 0)
-      return setError("Le montant doit être supérieur à 0.");
-    setError(null);
-    mutation.mutate();
+    if (!formData.customerCode) {
+      setErrorMessage("Veuillez sélectionner un client.");
+      return;
+    }
+    if (formData.amount <= 0) {
+      setErrorMessage("Le montant doit être supérieur à 0.");
+      return;
+    }
+    setErrorMessage(null);
+    createMutation.mutate();
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-2xl mx-auto">
       <button
         onClick={() => navigate("/payments")}
         className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
       >
-        <ArrowLeft size={18} /> Retour
+        <ArrowLeft size={18} />
+        Retour aux intentions
       </button>
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Nouvelle intention de paiement
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Création manuelle d’une intention hors facture.
-        </p>
-        {error && (
-          <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-            {error}
-          </div>
-        )}
-        <form onSubmit={submit} className="mt-6 space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="text-sm font-medium">Type client *</label>
-              <select
-                value={form.customerType}
-                onChange={(e) =>
-                  setForm({ ...form, customerType: e.target.value })
-                }
-                className="w-full mt-1 px-3 py-2 border rounded-lg bg-white"
-              >
-                <option value="MEMBER">Membre</option>
-                <option value="CUSTOMER">Client</option>
-                <option value="BUSINESS_ENTITY">Business entity</option>
-                <option value="EXTERNAL">Externe</option>
-              </select>
+
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100">
+        <div className="border-b p-6">
+          <h1 className="text-2xl font-bold text-gray-900">
+            Nouvelle intention de paiement
+          </h1>
+          <p className="text-gray-500 mt-1">
+            Créez une intention pour encaisser un paiement
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {errorMessage && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              {errorMessage}
             </div>
-            <div>
-              <label className="text-sm font-medium">Code client *</label>
-              <input
-                value={form.customerCode}
-                onChange={(e) =>
-                  setForm({ ...form, customerCode: e.target.value })
-                }
-                className="w-full mt-1 px-3 py-2 border rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Montant *</label>
-              <input
-                type="number"
-                min={1}
-                value={form.amount}
-                onChange={(e) =>
-                  setForm({ ...form, amount: Number(e.target.value) || 0 })
-                }
-                className="w-full mt-1 px-3 py-2 border rounded-lg"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="text-sm font-medium">Devise</label>
-              <input
-                value={form.currency}
-                onChange={(e) => setForm({ ...form, currency: e.target.value })}
-                className="w-full mt-1 px-3 py-2 border rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Objet</label>
-              <input
-                value={form.purpose}
-                onChange={(e) => setForm({ ...form, purpose: e.target.value })}
-                className="w-full mt-1 px-3 py-2 border rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Expiration</label>
-              <input
-                type="datetime-local"
-                value={form.expiresAt}
-                onChange={(e) =>
-                  setForm({ ...form, expiresAt: e.target.value })
-                }
-                className="w-full mt-1 px-3 py-2 border rounded-lg"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium">Source type</label>
-              <input
-                value={form.sourceType}
-                onChange={(e) =>
-                  setForm({ ...form, sourceType: e.target.value })
-                }
-                className="w-full mt-1 px-3 py-2 border rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Source code</label>
-              <input
-                value={form.sourceCode}
-                onChange={(e) =>
-                  setForm({ ...form, sourceCode: e.target.value })
-                }
-                className="w-full mt-1 px-3 py-2 border rounded-lg"
-              />
-            </div>
-          </div>
+          )}
+
           <div>
-            <label className="text-sm font-medium">Description</label>
-            <textarea
-              value={form.description}
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Type de client
+            </label>
+            <select
+              value={formData.customerType}
+              onChange={(e) => handleCustomerTypeChange(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+            >
+              {customerTypes.map((type) => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {formData.customerType === "MEMBER"
+                ? "Membre"
+                : formData.customerType === "BUSINESS_ENTITY"
+                  ? "Entreprise"
+                  : "Customer"}
+            </label>
+            {formData.customerType === "MEMBER" ? (
+              <MemberAutocomplete
+                onSelect={handleMemberSelect}
+                selectedMember={selectedMember}
+                placeholder="Rechercher un membre..."
+              />
+            ) : (
+              <CustomerAutocomplete
+                onSelect={handleCustomerSelect}
+                selectedCustomer={selectedCustomer}
+                typeFilter={
+                  formData.customerType === "BUSINESS_ENTITY"
+                    ? "COMPANY"
+                    : undefined
+                }
+                placeholder={
+                  formData.customerType === "BUSINESS_ENTITY"
+                    ? "Rechercher une entreprise..."
+                    : "Rechercher un customer..."
+                }
+              />
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Montant (FCFA)
+            </label>
+            <input
+              type="number"
+              value={formData.amount || ""}
               onChange={(e) =>
-                setForm({ ...form, description: e.target.value })
+                setFormData((prev) => ({
+                  ...prev,
+                  amount: parseFloat(e.target.value) || 0,
+                }))
               }
-              rows={3}
-              className="w-full mt-1 px-3 py-2 border rounded-lg"
+              min="1"
+              step="100"
+              required
+              placeholder="50000"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
             />
           </div>
+
           <div>
-            <label className="text-sm font-medium">Métadonnées JSON</label>
-            <textarea
-              value={form.metadataJson}
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Objectif
+            </label>
+            <select
+              value={formData.purpose}
               onChange={(e) =>
-                setForm({ ...form, metadataJson: e.target.value })
+                setFormData((prev) => ({ ...prev, purpose: e.target.value }))
+              }
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+            >
+              {purposes.map((purpose) => (
+                <option key={purpose.value} value={purpose.value}>
+                  {purpose.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Code source
+            </label>
+            <input
+              type="text"
+              value={formData.sourceCode}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, sourceCode: e.target.value }))
+              }
+              placeholder="Ex: BOOK-001, SUB-001"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Optionnel — lie l'intention à une réservation ou un abonnement
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Expiration
+            </label>
+            <input
+              type="datetime-local"
+              value={formData.expiresAt}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, expiresAt: e.target.value }))
+              }
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+            />
+            <p className="text-xs text-gray-400 mt-1">Par défaut 24h</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Description
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  description: e.target.value,
+                }))
               }
               rows={3}
-              className="w-full mt-1 px-3 py-2 border rounded-lg font-mono text-sm"
+              placeholder="Motif du paiement..."
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none"
             />
           </div>
-          <div className="flex justify-end gap-3 border-t pt-4">
+
+          <div className="flex gap-3 pt-4">
             <button
               type="button"
               onClick={() => navigate("/payments")}
-              className="px-4 py-2 border rounded-lg"
+              disabled={createMutation.isPending}
+              className="flex-1 px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
               Annuler
             </button>
             <button
-              disabled={mutation.isPending}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg flex items-center gap-2 disabled:opacity-50"
+              type="submit"
+              disabled={
+                createMutation.isPending ||
+                !formData.customerCode ||
+                formData.amount <= 0
+              }
+              className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {mutation.isPending ? (
+              {createMutation.isPending ? (
                 <Loader2 size={16} className="animate-spin" />
               ) : (
-                <Save size={16} />
-              )}{" "}
-              Créer
+                "Créer l'intention"
+              )}
             </button>
           </div>
         </form>

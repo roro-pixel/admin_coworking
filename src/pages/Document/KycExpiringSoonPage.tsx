@@ -16,7 +16,7 @@ export const KycExpiringSoonPage: React.FC = () => {
     queryFn: () => kycService.getExpiringSoon(days),
   });
 
-  const cases = data || [];
+  const cases = data?.content || [];
 
   return (
     <div className="space-y-6">

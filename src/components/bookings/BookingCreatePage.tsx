@@ -342,7 +342,7 @@ export const BookingCreatePage: React.FC = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
-      navigate(`/admin/bookings/${data.bookingNumber}`);
+      navigate(`/bookings/${data.bookingNumber}`);
     },
     onError: (error: any) => {
       setErrorMessage(
@@ -392,8 +392,8 @@ export const BookingCreatePage: React.FC = () => {
     <AdminLayout>
       <div className="mb-6 flex items-center gap-4">
         <button
-          onClick={() => navigate("/admin/bookings")}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          onClick={() => navigate("/bookings")}
+          className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
         >
           <ArrowLeft size={20} className="text-gray-600" />
         </button>
@@ -407,10 +407,10 @@ export const BookingCreatePage: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {errorMessage && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm whitespace-pre-line flex items-start gap-2">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm whitespace-pre-line flex items-start gap-2">
               <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
               <span>{errorMessage}</span>
             </div>
@@ -436,7 +436,7 @@ export const BookingCreatePage: React.FC = () => {
                   setAvailabilityResult(null);
                 }}
                 placeholder="Rechercher une ressource (min 2 caractères)..."
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg pr-8 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-200 rounded-xl pr-8 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
               {resourceSearchLoading && (
                 <Loader2
@@ -445,13 +445,13 @@ export const BookingCreatePage: React.FC = () => {
                 />
               )}
               {resourceResults.length > 0 && !selectedResource && (
-                <div className="absolute z-20 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                <div className="absolute z-20 mt-1 w-full bg-white border rounded-xl shadow-lg max-h-60 overflow-y-auto">
                   {resourceResults.map((resource) => (
                     <button
                       key={resource.code}
                       type="button"
                       onClick={() => handleResourceSelect(resource)}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b last:border-0 flex justify-between items-center"
+                      className="w-full px-4 py-3 text-left hover:bg-primary-50/40 border-b last:border-0 flex justify-between items-center"
                     >
                       <div>
                         <p className="font-medium text-sm text-gray-900">
@@ -470,7 +470,7 @@ export const BookingCreatePage: React.FC = () => {
               )}
             </div>
             {selectedResource && (
-              <div className="mt-2 p-3 bg-green-50 border border-green-100 rounded-lg flex justify-between items-center">
+              <div className="mt-2 p-3 bg-green-50 border border-green-100 rounded-xl flex justify-between items-center">
                 <div>
                   <p className="font-medium text-sm text-green-800">
                     {selectedResource.name}
@@ -602,7 +602,7 @@ export const BookingCreatePage: React.FC = () => {
                     }))
                   }
                   required={ownerType === "WALKIN"}
-                  className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
             </div>
@@ -624,7 +624,7 @@ export const BookingCreatePage: React.FC = () => {
                       contactEmail: e.target.value,
                     }))
                   }
-                  className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
             </div>
@@ -646,7 +646,7 @@ export const BookingCreatePage: React.FC = () => {
                       contactPhone: e.target.value,
                     }))
                   }
-                  className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
             </div>
@@ -663,7 +663,7 @@ export const BookingCreatePage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setCalendarOpen((o) => !o)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-left text-sm flex items-center justify-between bg-white hover:border-primary-400 transition-colors"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-left text-sm flex items-center justify-between bg-white hover:border-primary-400 transition-colors"
                   >
                     <span
                       className={
@@ -685,7 +685,7 @@ export const BookingCreatePage: React.FC = () => {
                   </button>
 
                   {calendarOpen && (
-                    <div className="absolute z-50 top-full mt-1 left-0 bg-white border border-gray-200 rounded-xl shadow-xl p-4 w-80">
+                    <div className="absolute z-50 top-full mt-1 left-0 bg-white border border-gray-200 rounded-2xl shadow-xl p-4 w-80">
                       <div className="flex items-center justify-between mb-4">
                         <button
                           type="button"
@@ -698,7 +698,7 @@ export const BookingCreatePage: React.FC = () => {
                               };
                             })
                           }
-                          className="p-1 hover:bg-gray-100 rounded-lg text-gray-600"
+                          className="p-1 hover:bg-gray-100 rounded-xl text-gray-600"
                         >
                           ‹
                         </button>
@@ -723,7 +723,7 @@ export const BookingCreatePage: React.FC = () => {
                               };
                             })
                           }
-                          className="p-1 hover:bg-gray-100 rounded-lg text-gray-600"
+                          className="p-1 hover:bg-gray-100 rounded-xl text-gray-600"
                         >
                           ›
                         </button>
@@ -789,7 +789,7 @@ export const BookingCreatePage: React.FC = () => {
                                   setCalendarOpen(false);
                                 }}
                                 className={[
-                                  "w-full aspect-square rounded-lg text-xs font-medium transition-colors flex items-center justify-center",
+                                  "w-full aspect-square rounded-xl text-xs font-medium transition-colors flex items-center justify-center",
                                   disabled
                                     ? "text-gray-200 cursor-not-allowed"
                                     : isSelected
@@ -825,7 +825,7 @@ export const BookingCreatePage: React.FC = () => {
                       : "00";
                     handleStartDateChange(`${date}T${e.target.value}:${min}`);
                   }}
-                  className="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm"
+                  className="px-3 py-2 border border-gray-200 rounded-xl bg-white text-sm"
                 >
                   {Array.from({ length: 12 }, (_, i) => i + 8).map((h) => (
                     <option key={h} value={String(h).padStart(2, "0")}>
@@ -846,7 +846,7 @@ export const BookingCreatePage: React.FC = () => {
                       : "08";
                     handleStartDateChange(`${date}T${hour}:${e.target.value}`);
                   }}
-                  className="w-20 px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm"
+                  className="w-20 px-3 py-2 border border-gray-200 rounded-xl bg-white text-sm"
                 >
                   <option value="00">:00</option>
                   <option value="30">:30</option>
@@ -867,7 +867,7 @@ export const BookingCreatePage: React.FC = () => {
                   onChange={(e) =>
                     handleDurationChange(parseInt(e.target.value))
                   }
-                  className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
                   {durationOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -902,7 +902,7 @@ export const BookingCreatePage: React.FC = () => {
                   }))
                 }
                 min="1"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
             <div>
@@ -931,7 +931,7 @@ export const BookingCreatePage: React.FC = () => {
                     }))
                   }
                   disabled={ownerType === "WALKIN"}
-                  className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg disabled:bg-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl disabled:bg-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
                   {paymentModes.map((mode) => (
                     <option key={mode.value} value={mode.value}>
@@ -1002,7 +1002,7 @@ export const BookingCreatePage: React.FC = () => {
                 setFormData((prev) => ({ ...prev, notes: e.target.value }))
               }
               rows={3}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl resize-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               placeholder="Informations complémentaires..."
             />
           </div>
@@ -1010,7 +1010,7 @@ export const BookingCreatePage: React.FC = () => {
           {/* Résultat de disponibilité */}
           {availabilityChecked && availabilityResult && (
             <div
-              className={`p-4 rounded-lg border ${
+              className={`p-4 rounded-xl border ${
                 availabilityResult.available
                   ? "bg-green-50 border-green-200"
                   : "bg-red-50 border-red-200"
@@ -1055,7 +1055,7 @@ export const BookingCreatePage: React.FC = () => {
           {availabilityChecked &&
             !availabilityResult?.available &&
             suggestions.length > 0 && (
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
                 <div className="flex items-center gap-2 mb-3">
                   <AlertCircle size={16} className="text-amber-600" />
                   <p className="text-sm font-medium text-amber-700">
@@ -1085,7 +1085,7 @@ export const BookingCreatePage: React.FC = () => {
                         setAvailabilityResult(null);
                         setSuggestions([]);
                       }}
-                      className="w-full text-left p-3 bg-white border border-amber-200 rounded-lg hover:bg-amber-50 transition-colors"
+                      className="w-full text-left p-3 bg-white border border-amber-200 rounded-xl hover:bg-amber-50 transition-colors"
                     >
                       <div className="flex items-center gap-2 text-amber-800 font-medium text-sm">
                         <CalendarIcon size={14} />
@@ -1118,11 +1118,11 @@ export const BookingCreatePage: React.FC = () => {
           <div className="flex gap-3 pt-4 border-t">
             <button
               type="button"
-              onClick={() => navigate("/admin/bookings")}
+              onClick={() => navigate("/bookings")}
               disabled={
                 createMutation.isPending || checkAvailabilityMutation.isPending
               }
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-primary-50/40 disabled:opacity-50 transition-colors"
             >
               Annuler
             </button>
@@ -1136,7 +1136,7 @@ export const BookingCreatePage: React.FC = () => {
                 disabled={
                   !canCheckAvailability || checkAvailabilityMutation.isPending
                 }
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
               >
                 {checkAvailabilityMutation.isPending ? (
                   <Loader2 size={16} className="animate-spin" />
@@ -1154,7 +1154,7 @@ export const BookingCreatePage: React.FC = () => {
                 checkAvailabilityMutation.isPending ||
                 (availabilityChecked && !availabilityResult?.available)
               }
-              className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+              className="flex-1 bg-primary-600 text-white py-2 rounded-xl hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
             >
               {createMutation.isPending ||
               checkAvailabilityMutation.isPending ? (

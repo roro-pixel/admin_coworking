@@ -112,10 +112,20 @@ export const PurchaseRequestsList: React.FC = () => {
   });
 
   const approveMutation = useMutation({
-    mutationFn: ({ code, approvedBy }: { code: string; approvedBy: string }) =>
-      inventoryService.approvePurchaseRequest(code, approvedBy),
-    onSuccess: () => {
+    mutationFn: ({
+      code,
+      approvedBy,
+      supplierCode,
+    }: {
+      code: string;
+      approvedBy: string;
+      supplierCode?: string;
+    }) => inventoryService.approvePurchaseRequest(code, approvedBy, supplierCode),
+    onSuccess: (data: PurchaseRequest) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-requests"] });
+      if (data.autoCreatedOrderCode) {
+        alert(`Demande approuvée. Bon de commande créé : ${data.autoCreatedOrderCode}`);
+      }
     },
   });
 
@@ -290,12 +300,16 @@ export const PurchaseRequestsList: React.FC = () => {
                       {req.status === "SUBMITTED" && (
                         <>
                           <button
-                            onClick={() =>
+                            onClick={() => {
+                              const supplierCode = prompt(
+                                "Code fournisseur pour créer automatiquement le bon de commande (optionnel) :",
+                              );
                               approveMutation.mutate({
                                 code: req.requestCode,
                                 approvedBy: admin?.email || "admin",
-                              })
-                            }
+                                supplierCode: supplierCode || undefined,
+                              });
+                            }}
                             className="p-1.5 text-green-600 hover:text-green-800"
                             title="Approuver"
                           >
@@ -522,6 +536,14 @@ export const PurchaseRequestsList: React.FC = () => {
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm text-gray-500 mb-1">Approuvé par</p>
                   <p className="text-base">{selectedRequest.approvedBy}</p>
+                </div>
+              )}
+              {selectedRequest.autoCreatedOrderCode && (
+                <div className="p-4 bg-green-50 rounded-lg col-span-2">
+                  <p className="text-sm text-green-600 mb-1">Bon de commande créé automatiquement</p>
+                  <p className="text-base font-mono text-green-700">
+                    {selectedRequest.autoCreatedOrderCode}
+                  </p>
                 </div>
               )}
               {selectedRequest.rejectionReason && (

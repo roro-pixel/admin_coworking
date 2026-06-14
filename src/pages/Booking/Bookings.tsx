@@ -411,15 +411,15 @@ export const AdminBookings: React.FC = () => {
           )}
         </div>
         <button
-          onClick={() => navigate("/admin/bookings/create")}
-          className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2"
+          onClick={() => navigate("/bookings/create")}
+          className="bg-primary-600 text-white px-4 py-2 rounded-xl hover:bg-primary-700 flex items-center gap-2"
         >
           <Plus size={18} />
           Nouvelle réservation
         </button>
       </div>
 
-      <div className="bg-white rounded-xl p-4 shadow-sm mb-6">
+      <div className="bg-white rounded-2xl p-4 shadow-sm ring-1 ring-gray-100 mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search
@@ -431,7 +431,7 @@ export const AdminBookings: React.FC = () => {
               placeholder="Rechercher par numéro, membre, contact..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl"
             />
             {isFetching && search && (
               <Loader2
@@ -445,7 +445,7 @@ export const AdminBookings: React.FC = () => {
             onChange={(e) =>
               handleFilterChange(setStatusFilter, e.target.value)
             }
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
+            className="px-4 py-2 border border-gray-200 rounded-xl bg-white"
           >
             <option value="">Tous les statuts</option>
             {Object.entries(statusConfig).map(([value, cfg]) => (
@@ -461,7 +461,7 @@ export const AdminBookings: React.FC = () => {
             onChange={(e) =>
               handleFilterChange(setResourceFilter, e.target.value)
             }
-            className="px-4 py-2 border border-gray-200 rounded-lg w-40"
+            className="px-4 py-2 border border-gray-200 rounded-xl w-40"
           />
           {(statusFilter || resourceFilter || search) && (
             <button
@@ -472,7 +472,7 @@ export const AdminBookings: React.FC = () => {
                 setResourceFilter("");
                 setPage(0);
               }}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 whitespace-nowrap"
+              className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-primary-50/40 whitespace-nowrap"
             >
               Réinitialiser
             </button>
@@ -480,10 +480,10 @@ export const AdminBookings: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1000px]">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-gray-50 ">
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
                   N° Réservation
@@ -517,7 +517,7 @@ export const AdminBookings: React.FC = () => {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody>
               {bookings.map((booking) => {
                 const status = statusConfig[booking.status];
                 const StatusIcon = status?.icon;
@@ -526,12 +526,12 @@ export const AdminBookings: React.FC = () => {
                 return (
                   <tr
                     key={booking.bookingNumber}
-                    className="hover:bg-gray-50 transition-colors"
+                    className="hover:bg-primary-50/40 transition-colors"
                   >
                     <td className="px-6 py-4">
                       <button
                         onClick={() =>
-                          navigate(`/admin/bookings/${booking.bookingNumber}`)
+                          navigate(`/bookings/${booking.bookingNumber}`)
                         }
                         className="font-medium text-primary-600 hover:text-primary-700 hover:underline text-left"
                       >
@@ -645,7 +645,7 @@ export const AdminBookings: React.FC = () => {
                       <div className="flex justify-center gap-1 flex-wrap">
                         <button
                           onClick={() =>
-                            navigate(`/admin/bookings/${booking.bookingNumber}`)
+                            navigate(`/bookings/${booking.bookingNumber}`)
                           }
                           className="p-1 text-primary-600 hover:text-primary-700"
                           title="Voir détail"
@@ -694,14 +694,14 @@ export const AdminBookings: React.FC = () => {
               <button
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                 disabled={page === 0}
-                className="p-1.5 border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50"
+                className="p-1.5 border border-gray-200 rounded-xl disabled:opacity-50 hover:bg-primary-50/40"
               >
                 <ChevronLeft size={16} />
               </button>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                 disabled={page >= totalPages - 1}
-                className="p-1.5 border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50"
+                className="p-1.5 border border-gray-200 rounded-xl disabled:opacity-50 hover:bg-primary-50/40"
               >
                 <ChevronRight size={16} />
               </button>

@@ -33,7 +33,7 @@ export const KycCorrectionPage: React.FC = () => {
     queryKey: ["kyc-cases-pending-correction"],
     queryFn: () =>
       kycService.getAllKycCases({
-        status: "PENDING_CORRECTION",
+        status: "PENDING_CORRECTION", // compat legacy; correction documentaire canonique = document status NEEDS_CORRECTION
         page: 0,
         size: 50,
       }),

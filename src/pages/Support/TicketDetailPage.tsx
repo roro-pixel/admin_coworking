@@ -267,7 +267,7 @@ export const TicketDetailPage: React.FC = () => {
   return (
     <AdminLayout>
       <button
-        onClick={() => navigate(-1)}
+        onClick={() => navigate("/operations")}
         className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-6"
       >
         <ArrowLeft size={18} /> Retour
@@ -342,7 +342,7 @@ export const TicketDetailPage: React.FC = () => {
                 />
                 <button
                   onClick={assignRandom}
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm flex items-center gap-1"
+                  className="px-3 py-2 ring-1 ring-gray-100 rounded-lg text-sm flex items-center gap-1"
                 >
                   <Shuffle size={15} /> Aléatoire
                 </button>
@@ -396,7 +396,7 @@ export const TicketDetailPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
           <div className="flex flex-wrap gap-1 border-b px-4 pt-3">
             <Tab
               id="conversation"
@@ -582,7 +582,7 @@ export const TicketDetailPage: React.FC = () => {
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
                   placeholder="Ajouter un tag"
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  className="px-3 py-2 ring-1 ring-gray-100 rounded-lg text-sm"
                 />
                 <button
                   onClick={() =>
@@ -658,7 +658,7 @@ export const TicketDetailPage: React.FC = () => {
                   setTaskForm((f) => ({ ...f, description: e.target.value }))
                 }
                 rows={4}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
               />
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -684,7 +684,7 @@ export const TicketDetailPage: React.FC = () => {
                       priority: e.target.value as TicketPriority,
                     }))
                   }
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                  className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg bg-white"
                 >
                   <option value="LOW">Faible</option>
                   <option value="MEDIUM">Moyenne</option>
@@ -742,7 +742,7 @@ const Tab = ({
 }) => (
   <button
     onClick={() => setActive(id)}
-    className={`px-4 py-2 text-sm flex items-center gap-2 rounded-t-lg ${active === id ? "bg-primary-50 text-primary-600 border-b-2 border-primary-600" : "text-gray-500 hover:bg-gray-50"}`}
+    className={`px-4 py-2 text-sm flex items-center gap-2 rounded-xl ${active === id ? "bg-primary-600 text-white shadow-sm" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"}`}
   >
     <Icon size={15} />
     {label}
@@ -765,7 +765,7 @@ const Input = ({
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+      className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
     />
   </div>
 );

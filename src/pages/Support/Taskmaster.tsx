@@ -327,12 +327,12 @@ export const TaskMaster: React.FC = () => {
 
   return (
     <div>
-      <div className="flex flex-wrap gap-1 border-b border-gray-200 mb-6">
+      <div className="overflow-x-auto mb-6 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100 flex flex-wrap gap-1">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => switchTab(tab.id)}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-1.5 ${activeTab === tab.id ? "bg-primary-50 text-primary-600 border-b-2 border-primary-600" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
+            className={`px-4 py-2 text-sm font-medium rounded-xl transition-colors flex items-center gap-1.5 ${activeTab === tab.id ? "bg-primary-600 text-white shadow-sm" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"}`}
           >
             <tab.icon size={14} />
             {tab.label}
@@ -387,7 +387,7 @@ export const TaskMaster: React.FC = () => {
                 return (
                   <div key={status} className="flex-shrink-0 w-80">
                     <div
-                      className={`px-3 py-2 rounded-t-lg font-medium text-sm ${statusConfig[status].color}`}
+                      className={`px-3 py-2 rounded-xl font-medium text-sm ${statusConfig[status].color}`}
                     >
                       {statusConfig[status].label} ({col?.count ?? 0})
                     </div>
@@ -850,9 +850,9 @@ const TaskSimpleList = ({
   loading ? (
     <div className="py-12 text-center">Chargement...</div>
   ) : (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-      <table className="w-full text-sm">
-        <tbody className="divide-y">
+    <div className="bg-white rounded-xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+      <table className="w-full border-separate border-spacing-y-2 text-sm">
+        <tbody className="divide-y-0">
           {tasks.map((task) => (
             <tr
               key={task.id}

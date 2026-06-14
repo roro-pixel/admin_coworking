@@ -215,15 +215,15 @@ export const VisitorMaster: React.FC = () => {
         Gestion des visiteurs
       </h2>
 
-      <div className="flex flex-wrap gap-1 border-b border-gray-200 mb-6">
+      <div className="overflow-x-auto mb-6 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100 flex flex-wrap gap-1">
         {visibleTabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => switchTab(tab.id)}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-1.5 ${
+            className={`px-4 py-2 text-sm font-medium rounded-xl transition-colors flex items-center gap-1.5 ${
               activeTab === tab.id
-                ? "bg-primary-50 text-primary-600 border-b-2 border-primary-600"
-                : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                ? "bg-primary-600 text-white shadow-sm"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
             }`}
           >
             <tab.icon size={14} />
@@ -316,7 +316,7 @@ export const VisitorMaster: React.FC = () => {
                 placeholder="Rechercher..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm"
+                className="w-full pl-9 pr-4 py-2 ring-1 ring-gray-100 rounded-lg text-sm"
               />
             </div>
             <select
@@ -325,7 +325,7 @@ export const VisitorMaster: React.FC = () => {
                 setStatusFilter(e.target.value as any);
                 setPage(0);
               }}
-              className="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm"
+              className="px-3 py-2 ring-1 ring-gray-100 rounded-lg bg-white text-sm"
             >
               <option value="">Tous les statuts</option>
               {(Object.keys(statusConfig) as VisitorPassStatus[]).map((s) => (
@@ -338,9 +338,9 @@ export const VisitorMaster: React.FC = () => {
           {allLoading ? (
             <div className="text-center py-8">Chargement...</div>
           ) : (
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+            <div className="bg-white rounded-xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+              <table className="w-full border-separate border-spacing-y-2">
+                <thead className="bg-transparent">
                   <tr>
                     <th className="px-4 py-3 text-left text-sm font-semibold">
                       Pass
@@ -359,9 +359,9 @@ export const VisitorMaster: React.FC = () => {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y-0">
                   {filteredAll.map((pass) => (
-                    <tr key={pass.passNumber} className="hover:bg-gray-50">
+                    <tr key={pass.passNumber} className="bg-gray-50/70 hover:bg-gray-100">
                       <td className="px-4 py-3 text-sm font-mono">
                         {pass.passNumber}
                       </td>
@@ -451,7 +451,7 @@ export const VisitorMaster: React.FC = () => {
                   setCheckResult(null);
                 }}
                 placeholder="VIS-..."
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg font-mono"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg font-mono"
               />
             </div>
             <div>
@@ -463,7 +463,7 @@ export const VisitorMaster: React.FC = () => {
                 value={checkNotes}
                 onChange={(e) => setCheckNotes(e.target.value)}
                 placeholder="Badge remis, observation..."
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -539,7 +539,7 @@ export const VisitorMaster: React.FC = () => {
                 onChange={(e) =>
                   setCreateForm((f) => ({ ...f, fullName: e.target.value }))
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
               />
             </div>
             <div>
@@ -552,7 +552,7 @@ export const VisitorMaster: React.FC = () => {
                 onChange={(e) =>
                   setCreateForm((f) => ({ ...f, email: e.target.value }))
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
               />
             </div>
             <div>
@@ -565,7 +565,7 @@ export const VisitorMaster: React.FC = () => {
                 onChange={(e) =>
                   setCreateForm((f) => ({ ...f, phone: e.target.value }))
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
               />
             </div>
             <div>
@@ -578,7 +578,7 @@ export const VisitorMaster: React.FC = () => {
                 onChange={(e) =>
                   setCreateForm((f) => ({ ...f, company: e.target.value }))
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
               />
             </div>
             <div>
@@ -595,7 +595,7 @@ export const VisitorMaster: React.FC = () => {
                   }))
                 }
                 placeholder="MBR-000001"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
               />
             </div>
             <div className="col-span-2">
@@ -608,7 +608,7 @@ export const VisitorMaster: React.FC = () => {
                 onChange={(e) =>
                   setCreateForm((f) => ({ ...f, hostName: e.target.value }))
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
               />
             </div>
             <div>
@@ -621,7 +621,7 @@ export const VisitorMaster: React.FC = () => {
                 onChange={(e) =>
                   setCreateForm((f) => ({ ...f, validFrom: e.target.value }))
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
               />
             </div>
             <div>
@@ -634,7 +634,7 @@ export const VisitorMaster: React.FC = () => {
                 onChange={(e) =>
                   setCreateForm((f) => ({ ...f, validUntil: e.target.value }))
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
               />
             </div>
             <div className="col-span-2">
@@ -648,7 +648,7 @@ export const VisitorMaster: React.FC = () => {
                   setCreateForm((f) => ({ ...f, purpose: e.target.value }))
                 }
                 placeholder="Rendez-vous commercial, livraison..."
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
               />
             </div>
           </div>
@@ -678,9 +678,9 @@ export const VisitorMaster: React.FC = () => {
           {logLoading ? (
             <div className="text-center py-8">Chargement...</div>
           ) : (
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+            <div className="bg-white rounded-xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+              <table className="w-full border-separate border-spacing-y-2">
+                <thead className="bg-transparent">
                   <tr>
                     <th className="px-4 py-3 text-left text-sm font-semibold">
                       Date/Heure
@@ -699,9 +699,9 @@ export const VisitorMaster: React.FC = () => {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y-0">
                   {logEntries.map((entry) => (
-                    <tr key={entry.id} className="hover:bg-gray-50">
+                    <tr key={entry.id} className="bg-gray-50/70 hover:bg-gray-100">
                       <td className="px-4 py-3 text-sm">
                         {new Date(entry.eventAt).toLocaleString("fr-FR")}
                       </td>

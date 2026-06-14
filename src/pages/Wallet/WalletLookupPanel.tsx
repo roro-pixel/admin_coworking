@@ -8,6 +8,9 @@ import {
   Eye,
   CheckCircle,
   AlertCircle,
+  Sparkles,
+  Building2,
+  User,
 } from "lucide-react";
 import { walletService, formatAmount } from "../../services/wallet.service";
 import type { Wallet } from "../../services/wallet.service";
@@ -85,176 +88,182 @@ export const WalletLookupPanel: React.FC = () => {
   const existing = existingWallets?.content || [];
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-      <div className="xl:col-span-2 bg-white rounded-xl shadow-sm border p-6 space-y-5">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">
-            Recherche et création automatisée
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Sélectionnez un propriétaire. Le backend retrouve le wallet existant
-            ou le crée automatiquement avec ownerType, ownerCode et currency.
-          </p>
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <div className="xl:col-span-2 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <p className="mb-2 inline-flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
+              <Sparkles size={13} /> Automatisation
+            </p>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Recherche et création automatisée
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-gray-500">
+              Sélectionnez un propriétaire. Le backend retrouve le wallet existant ou le crée automatiquement.
+            </p>
+          </div>
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex items-center gap-2">
+          <div className="mb-4 flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
             <AlertCircle size={16} /> {error}
           </div>
         )}
         {message && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-lg text-sm flex items-center gap-2">
+          <div className="mb-4 flex items-center gap-2 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-700 ring-1 ring-green-100">
             <CheckCircle size={16} /> {message}
           </div>
         )}
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Type de propriétaire
-          </label>
-          <div className="flex flex-wrap gap-3">
-            {(["CUSTOMER", "MEMBER", "BUSINESS_ENTITY"] as OwnerType[]).map(
-              (type) => (
-                <label
-                  key={type}
-                  className="flex items-center gap-2 text-sm cursor-pointer"
-                >
-                  <input
-                    type="radio"
-                    checked={ownerType === type}
-                    onChange={() => resetOwner(type)}
-                  />
-                  {ownerTypeLabels[type]}
-                </label>
-              ),
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <input
-            type="checkbox"
-            checked={manualMode}
-            onChange={(e) => setManualMode(e.target.checked)}
-          />
-          Saisie manuelle du code propriétaire
-        </div>
-
-        {!manualMode && ownerType === "MEMBER" && (
+        <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Membre
+            <label className="mb-2 block text-sm font-medium text-gray-700">
+              Type de propriétaire
             </label>
-            <MemberAutocomplete
-              selectedMember={selectedMember}
-              onSelect={(member) => {
-                setSelectedMember(member);
-                setOwnerCode(member?.memberId || "");
-                setResult(null);
-              }}
-              placeholder="Rechercher un membre..."
-            />
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              {(["CUSTOMER", "MEMBER", "BUSINESS_ENTITY"] as OwnerType[]).map((type) => {
+                const selected = ownerType === type;
+                const Icon = type === "MEMBER" ? User : Building2;
+                return (
+                  <button
+                    type="button"
+                    key={type}
+                    onClick={() => resetOwner(type)}
+                    className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${
+                      selected
+                        ? "bg-primary-50 text-primary-700 ring-2 ring-primary-200"
+                        : "bg-gray-50 text-gray-600 ring-1 ring-gray-100 hover:bg-gray-100"
+                    }`}
+                  >
+                    <span className={`rounded-xl p-2 ${selected ? "bg-primary-100" : "bg-white"}`}>
+                      <Icon size={17} />
+                    </span>
+                    <span className="text-sm font-semibold">{ownerTypeLabels[type]}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        )}
 
-        {!manualMode && ownerType !== "MEMBER" && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {ownerType === "BUSINESS_ENTITY" ? "Entreprise" : "Customer"}
-            </label>
-            <CustomerAutocomplete
-              selectedCustomer={selectedCustomer}
-              onSelect={(customer) => {
-                setSelectedCustomer(customer);
-                setOwnerCode(customer?.customerId || "");
-                setResult(null);
-              }}
-              typeFilter={
-                ownerType === "BUSINESS_ENTITY" ? "COMPANY" : undefined
-              }
-              placeholder={
-                ownerType === "BUSINESS_ENTITY"
-                  ? "Rechercher une entreprise..."
-                  : "Rechercher un customer..."
-              }
-            />
-          </div>
-        )}
-
-        {manualMode && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Code propriétaire
-            </label>
+          <label className="inline-flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-600">
             <input
-              value={ownerCode}
-              onChange={(e) => {
-                setOwnerCode(e.target.value);
-                setResult(null);
-              }}
-              placeholder="CUS-000001, MBR-000001..."
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              type="checkbox"
+              checked={manualMode}
+              onChange={(e) => setManualMode(e.target.checked)}
+              className="rounded"
             />
-          </div>
-        )}
-
-        <div className="max-w-xs">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Devise
+            Saisie manuelle du code propriétaire
           </label>
-          <input
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value.toUpperCase())}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg font-mono"
-          />
-        </div>
 
-        <button
-          onClick={() => getOrCreateMutation.mutate()}
-          disabled={!ownerCode || getOrCreateMutation.isPending}
-          className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2"
-        >
-          {getOrCreateMutation.isPending ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <Search size={16} />
+          {!manualMode && ownerType === "MEMBER" && (
+            <Field label="Membre">
+              <MemberAutocomplete
+                selectedMember={selectedMember}
+                onSelect={(member) => {
+                  setSelectedMember(member);
+                  setOwnerCode(member?.memberId || "");
+                  setResult(null);
+                }}
+                placeholder="Rechercher un membre..."
+              />
+            </Field>
           )}
-          Récupérer ou créer le wallet
-        </button>
+
+          {!manualMode && ownerType !== "MEMBER" && (
+            <Field label={ownerType === "BUSINESS_ENTITY" ? "Entreprise" : "Customer"}>
+              <CustomerAutocomplete
+                selectedCustomer={selectedCustomer}
+                onSelect={(customer) => {
+                  setSelectedCustomer(customer);
+                  setOwnerCode(customer?.customerId || "");
+                  setResult(null);
+                }}
+                typeFilter={ownerType === "BUSINESS_ENTITY" ? "COMPANY" : undefined}
+                placeholder={
+                  ownerType === "BUSINESS_ENTITY"
+                    ? "Rechercher une entreprise..."
+                    : "Rechercher un customer..."
+                }
+              />
+            </Field>
+          )}
+
+          {manualMode && (
+            <Field label="Code propriétaire">
+              <input
+                value={ownerCode}
+                onChange={(e) => {
+                  setOwnerCode(e.target.value);
+                  setResult(null);
+                }}
+                placeholder="CUS-000001, MBR-000001..."
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
+              />
+            </Field>
+          )}
+
+          <div className="max-w-xs">
+            <Field label="Devise">
+              <input
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value.toUpperCase())}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 font-mono text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
+              />
+            </Field>
+          </div>
+
+          <button
+            onClick={() => getOrCreateMutation.mutate()}
+            disabled={!ownerCode || getOrCreateMutation.isPending}
+            className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 disabled:opacity-50"
+          >
+            {getOrCreateMutation.isPending ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Search size={16} />
+            )}
+            Récupérer ou créer le wallet
+          </button>
+        </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border p-6 space-y-4">
+      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
         <h3 className="font-semibold text-gray-900">Résultat</h3>
-        {isSearching && ownerCode && !result ? (
-          <div className="flex items-center gap-2 text-gray-500 text-sm">
-            <Loader2 size={16} className="animate-spin" /> Recherche...
-          </div>
-        ) : result ? (
-          <WalletCard
-            wallet={result}
-            onOpen={() => navigate(`/wallets/${result.walletNumber}`)}
-          />
-        ) : existing.length > 0 ? (
-          <div className="space-y-3">
-            {existing.map((wallet) => (
-              <WalletCard
-                key={wallet.walletNumber}
-                wallet={wallet}
-                onOpen={() => navigate(`/wallets/${wallet.walletNumber}`)}
-              />
-            ))}
-          </div>
-        ) : ownerCode ? (
-          <div className="text-center py-8 text-sm text-gray-500">
-            <WalletIcon size={38} className="mx-auto text-gray-300 mb-3" />
-            Aucun wallet trouvé. Utilisez le bouton pour le créer
-            automatiquement.
-          </div>
-        ) : (
-          <div className="text-center py-8 text-sm text-gray-500">
-            Sélectionnez un propriétaire pour vérifier son wallet.
-          </div>
-        )}
+        <p className="mt-1 text-sm text-gray-500">
+          Le wallet trouvé ou créé apparaîtra ici.
+        </p>
+
+        <div className="mt-5">
+          {isSearching && ownerCode && !result ? (
+            <div className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-4 text-sm text-gray-500">
+              <Loader2 size={16} className="animate-spin" /> Recherche...
+            </div>
+          ) : result ? (
+            <WalletCard
+              wallet={result}
+              onOpen={() => navigate(`/wallets/${result.walletNumber}`)}
+            />
+          ) : existing.length > 0 ? (
+            <div className="space-y-3">
+              {existing.map((wallet) => (
+                <WalletCard
+                  key={wallet.walletNumber}
+                  wallet={wallet}
+                  onOpen={() => navigate(`/wallets/${wallet.walletNumber}`)}
+                />
+              ))}
+            </div>
+          ) : ownerCode ? (
+            <div className="rounded-2xl bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+              <WalletIcon size={38} className="mx-auto mb-3 text-gray-300" />
+              Aucun wallet trouvé. Utilisez le bouton pour le créer automatiquement.
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+              Sélectionnez un propriétaire pour vérifier son wallet.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -264,26 +273,26 @@ const WalletCard: React.FC<{ wallet: Wallet; onOpen: () => void }> = ({
   wallet,
   onOpen,
 }) => (
-  <div className="border rounded-xl p-4 bg-gray-50">
-    <div className="flex justify-between gap-3 items-start">
+  <div className="rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-100">
+    <div className="flex items-start justify-between gap-3">
       <div>
-        <p className="font-mono font-semibold text-sm">{wallet.walletNumber}</p>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="font-mono text-sm font-semibold text-gray-900">{wallet.walletNumber}</p>
+        <p className="mt-1 text-xs text-gray-500">
           {wallet.ownerType} · {wallet.ownerCode}
         </p>
       </div>
-      <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">
+      <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 ring-1 ring-green-100">
         {statusLabels[wallet.status] || wallet.status}
       </span>
     </div>
-    <div className="grid grid-cols-2 gap-3 mt-4 text-sm">
-      <div>
+    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+      <div className="rounded-xl bg-white p-3">
         <p className="text-xs text-gray-400">Disponible</p>
         <p className="font-semibold text-green-600">
           {formatAmount(wallet.availableBalance, wallet.currency)}
         </p>
       </div>
-      <div>
+      <div className="rounded-xl bg-white p-3">
         <p className="text-xs text-gray-400">Bloqué</p>
         <p className="font-semibold text-orange-600">
           {formatAmount(wallet.heldBalance, wallet.currency)}
@@ -292,9 +301,16 @@ const WalletCard: React.FC<{ wallet: Wallet; onOpen: () => void }> = ({
     </div>
     <button
       onClick={onOpen}
-      className="mt-4 w-full px-3 py-2 bg-white border rounded-lg text-sm hover:bg-gray-50 flex items-center justify-center gap-2"
+      className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-gray-100 transition hover:bg-gray-50"
     >
       <Eye size={15} /> Voir détail
     </button>
   </div>
+);
+
+const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+  <label className="block">
+    <span className="mb-1.5 block text-sm font-medium text-gray-700">{label}</span>
+    {children}
+  </label>
 );

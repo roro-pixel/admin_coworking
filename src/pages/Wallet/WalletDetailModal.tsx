@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -14,6 +14,9 @@ import {
   XCircle,
   Loader2,
   RefreshCw,
+  Lock,
+  Layers,
+  X,
 } from "lucide-react";
 import {
   walletService,
@@ -42,10 +45,10 @@ const entryTypeLabels: Record<string, string> = {
 };
 
 const holdStatusConfig: Record<string, { label: string; color: string }> = {
-  ACTIVE: { label: "Actif", color: "bg-blue-100 text-blue-700" },
-  CAPTURED: { label: "Capturé", color: "bg-green-100 text-green-700" },
-  RELEASED: { label: "Libéré", color: "bg-gray-100 text-gray-500" },
-  EXPIRED: { label: "Expiré", color: "bg-red-100 text-red-700" },
+  ACTIVE: { label: "Actif", color: "bg-blue-50 text-blue-700 ring-blue-100" },
+  CAPTURED: { label: "Capturé", color: "bg-green-50 text-green-700 ring-green-100" },
+  RELEASED: { label: "Libéré", color: "bg-gray-50 text-gray-500 ring-gray-100" },
+  EXPIRED: { label: "Expiré", color: "bg-red-50 text-red-700 ring-red-100" },
 };
 
 const buildDefaultHoldForm = () => ({
@@ -65,7 +68,6 @@ export const WalletDetailModal: React.FC = () => {
   const { admin } = useAuth();
   const queryClient = useQueryClient();
 
-  // États
   const [activeTab, setActiveTab] = useState<"ledger" | "holds">("ledger");
   const [ledgerPage, setLedgerPage] = useState(0);
   const [isCreateHoldOpen, setIsCreateHoldOpen] = useState(false);
@@ -73,7 +75,6 @@ export const WalletDetailModal: React.FC = () => {
   const [holdError, setHoldError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Chargement du wallet
   const {
     data: wallet,
     isLoading: walletLoading,
@@ -85,7 +86,6 @@ export const WalletDetailModal: React.FC = () => {
     enabled: !!walletNumber,
   });
 
-  // Chargement du ledger
   const { data: ledgerData, isLoading: ledgerLoading } = useQuery({
     queryKey: ["wallet-ledger", walletNumber, ledgerPage],
     queryFn: () =>
@@ -105,21 +105,16 @@ export const WalletDetailModal: React.FC = () => {
 
   const ledgerEntries: LedgerEntry[] = ledgerData?.content || [];
   const totalElements = ledgerData?.totalElements ?? 0;
-  const totalPages =
-    ledgerData?.totalPages ?? Math.ceil(totalElements / PAGE_SIZE);
+  const totalPages = ledgerData?.totalPages ?? Math.ceil(totalElements / PAGE_SIZE);
   const holds: WalletHold[] = holdsData?.content || [];
 
-  // Réinitialiser la page du ledger quand on change d'onglet
   useEffect(() => {
     setLedgerPage(0);
   }, [activeTab]);
 
-  // Mutations
   const invalidateQueries = () => {
     queryClient.invalidateQueries({ queryKey: ["wallet", walletNumber] });
-    queryClient.invalidateQueries({
-      queryKey: ["wallet-ledger", walletNumber],
-    });
+    queryClient.invalidateQueries({ queryKey: ["wallet-ledger", walletNumber] });
     queryClient.invalidateQueries({ queryKey: ["wallet-holds", walletNumber] });
     queryClient.invalidateQueries({ queryKey: ["wallets"] });
   };
@@ -141,9 +136,7 @@ export const WalletDetailModal: React.FC = () => {
       setHoldError(null);
     },
     onError: (error: any) => {
-      setHoldError(
-        error?.response?.data?.message || "Erreur lors de la création du hold.",
-      );
+      setHoldError(error?.response?.data?.message || "Erreur lors de la création du hold.");
     },
   });
 
@@ -155,9 +148,7 @@ export const WalletDetailModal: React.FC = () => {
       setActionError(null);
     },
     onError: (error: any) => {
-      setActionError(
-        error?.response?.data?.message || "Erreur lors de la capture du hold.",
-      );
+      setActionError(error?.response?.data?.message || "Erreur lors de la capture du hold.");
     },
   });
 
@@ -169,20 +160,33 @@ export const WalletDetailModal: React.FC = () => {
       setActionError(null);
     },
     onError: (error: any) => {
-      setActionError(
-        error?.response?.data?.message ||
-          "Erreur lors de la libération du hold.",
-      );
+      setActionError(error?.response?.data?.message || "Erreur lors de la libération du hold.");
     },
   });
 
   const anyPending = captureMutation.isPending || releaseMutation.isPending;
   const availableBalance = safeNumber(wallet?.availableBalance);
+  const heldBalance = safeNumber(wallet?.heldBalance);
+  const ledgerBalance = safeNumber(wallet?.ledgerBalance);
+  const totalForBars = Math.max(availableBalance + heldBalance, ledgerBalance, 1);
+  const availablePct = Math.max(0, Math.min(100, (availableBalance / totalForBars) * 100));
+  const heldPct = Math.max(0, Math.min(100, (heldBalance / totalForBars) * 100));
+
+  const ledgerStats = useMemo(() => {
+    return ledgerEntries.reduce(
+      (acc, entry) => {
+        if (entry.direction === "CREDIT") acc.credit += safeNumber(entry.amount);
+        else acc.debit += safeNumber(entry.amount);
+        return acc;
+      },
+      { credit: 0, debit: 0 },
+    );
+  }, [ledgerEntries]);
 
   if (walletLoading) {
     return (
       <AdminLayout>
-        <div className="flex justify-center items-center h-64">
+        <div className="flex h-64 items-center justify-center">
           <Loader2 size={32} className="animate-spin text-primary-600" />
         </div>
       </AdminLayout>
@@ -192,8 +196,8 @@ export const WalletDetailModal: React.FC = () => {
   if (walletError || !wallet) {
     return (
       <AdminLayout>
-        <div className="text-center py-12">
-          <WalletIcon size={48} className="mx-auto text-gray-300 mb-4" />
+        <div className="rounded-2xl bg-white py-14 text-center shadow-sm ring-1 ring-gray-100">
+          <WalletIcon size={48} className="mx-auto mb-4 text-gray-300" />
           <p className="text-gray-500">Portefeuille introuvable</p>
           <button
             onClick={() => navigate("/wallets")}
@@ -208,165 +212,163 @@ export const WalletDetailModal: React.FC = () => {
 
   return (
     <AdminLayout>
-      {/* Header avec retour */}
       <div className="mb-6">
         <button
           onClick={() => navigate("/wallets")}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
+          className="mb-4 flex items-center gap-2 text-sm font-medium text-gray-500 transition-colors hover:text-gray-900"
         >
-          <ArrowLeft size={20} />
-          <span>Retour aux portefeuilles</span>
+          <ArrowLeft size={17} />
+          Retour aux portefeuilles
         </button>
 
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {wallet.walletNumber}
-            </h1>
-            <p className="text-gray-500 mt-1">
-              {wallet.ownerType} · {wallet.ownerCode}
-            </p>
+        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="mb-2 inline-flex rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
+                Portefeuille
+              </p>
+              <h1 className="font-mono text-2xl font-bold text-gray-900">{wallet.walletNumber}</h1>
+              <p className="mt-1 text-sm text-gray-500">
+                {wallet.ownerType} · {wallet.ownerCode}
+              </p>
+            </div>
+            <button
+              onClick={() => refetchWallet()}
+              className="inline-flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100"
+              title="Actualiser"
+            >
+              <RefreshCw size={17} />
+              Actualiser
+            </button>
           </div>
-          <button
-            onClick={() => refetchWallet()}
-            className="p-2 text-gray-500 hover:text-primary-600 rounded-lg hover:bg-gray-100 transition-colors"
-            title="Actualiser"
-          >
-            <RefreshCw size={18} />
-          </button>
+
+          <div className="mt-6 h-3 overflow-hidden rounded-full bg-gray-100">
+            <div className="flex h-full">
+              <div className="bg-green-500" style={{ width: `${availablePct}%` }} />
+              <div className="bg-orange-400" style={{ width: `${heldPct}%` }} />
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-500">
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+              Disponible
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2.5 w-2.5 rounded-full bg-orange-400" />
+              Bloqué
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Soldes */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-sm border p-4">
-          <p className="text-sm text-gray-500 mb-1">Solde disponible</p>
-          <p className="text-2xl font-bold text-green-600">
-            {formatAmount(wallet.availableBalance, wallet.currency)}
-          </p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border p-4">
-          <p className="text-sm text-gray-500 mb-1">Solde bloqué</p>
-          <p className="text-2xl font-bold text-orange-600">
-            {formatAmount(wallet.heldBalance, wallet.currency)}
-          </p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border p-4">
-          <p className="text-sm text-gray-500 mb-1">Solde ledger</p>
-          <p className="text-2xl font-bold text-gray-900">
-            {formatAmount(wallet.ledgerBalance, wallet.currency)}
-          </p>
-        </div>
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <BalanceCard label="Solde disponible" value={formatAmount(wallet.availableBalance, wallet.currency)} tone="green" icon={TrendingUp} />
+        <BalanceCard label="Solde bloqué" value={formatAmount(wallet.heldBalance, wallet.currency)} tone="orange" icon={Lock} />
+        <BalanceCard label="Solde ledger" value={formatAmount(wallet.ledgerBalance, wallet.currency)} tone="gray" icon={Layers} />
       </div>
 
-      {/* Messages d'erreur */}
       {actionError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-6 flex justify-between items-center">
+        <div className="mb-6 flex items-center justify-between rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100">
           <span>{actionError}</span>
-          <button
-            onClick={() => setActionError(null)}
-            className="text-red-500 hover:text-red-700"
-          >
+          <button onClick={() => setActionError(null)} className="text-red-500 hover:text-red-700">
             <XCircle size={16} />
           </button>
         </div>
       )}
 
-      {/* Onglets */}
-      <div className="border-b border-gray-200 mb-6">
-        <div className="flex space-x-8">
-          <button
-            onClick={() => setActiveTab("ledger")}
-            className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === "ledger"
-                ? "border-primary-600 text-primary-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            Historique ({totalElements})
-          </button>
-          <button
-            onClick={() => setActiveTab("holds")}
-            className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === "holds"
-                ? "border-primary-600 text-primary-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            Holds ({holds.length})
-          </button>
-        </div>
+      <div className="mb-6 inline-flex rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100">
+        <button
+          onClick={() => setActiveTab("ledger")}
+          className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+            activeTab === "ledger"
+              ? "bg-primary-600 text-white shadow-sm"
+              : "text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          Historique ({totalElements})
+        </button>
+        <button
+          onClick={() => setActiveTab("holds")}
+          className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+            activeTab === "holds"
+              ? "bg-primary-600 text-white shadow-sm"
+              : "text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          Holds ({holds.length})
+        </button>
       </div>
 
-      {/* Contenu onglet Ledger */}
       {activeTab === "ledger" && (
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+          <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <MiniStat label="Crédits affichés" value={`${formatAmountOnly(ledgerStats.credit)} ${wallet.currency}`} tone="green" />
+            <MiniStat label="Débits affichés" value={`${formatAmountOnly(ledgerStats.debit)} ${wallet.currency}`} tone="red" />
+          </div>
+
           {ledgerLoading ? (
             <div className="flex justify-center py-12">
               <Loader2 size={24} className="animate-spin text-gray-400" />
             </div>
           ) : ledgerEntries.length === 0 ? (
-            <div className="text-center py-12">
-              <WalletIcon size={48} className="mx-auto text-gray-300 mb-4" />
+            <div className="py-12 text-center">
+              <WalletIcon size={48} className="mx-auto mb-4 text-gray-300" />
               <p className="text-gray-500">Aucune transaction</p>
             </div>
           ) : (
             <>
-              <div className="divide-y divide-gray-100">
+              <div className="space-y-2">
                 {ledgerEntries.map((entry) => (
                   <div
                     key={entry.entryNumber}
-                    className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                    className="flex items-center justify-between rounded-2xl bg-gray-50 p-4 transition hover:bg-gray-100"
                   >
                     <div className="flex items-center gap-3">
-                      {entry.direction === "CREDIT" ? (
-                        <TrendingUp
-                          size={18}
-                          className="text-green-600 flex-shrink-0"
-                        />
-                      ) : (
-                        <TrendingDown
-                          size={18}
-                          className="text-red-600 flex-shrink-0"
-                        />
-                      )}
+                      <div
+                        className={`rounded-xl p-2 ${
+                          entry.direction === "CREDIT"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {entry.direction === "CREDIT" ? (
+                          <TrendingUp size={18} />
+                        ) : (
+                          <TrendingDown size={18} />
+                        )}
+                      </div>
                       <div>
-                        <p className="font-medium text-sm">
+                        <p className="text-sm font-semibold text-gray-900">
                           {entryTypeLabels[entry.entryType] || entry.entryType}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {entry.sourceCode && (
-                            <span className="font-mono">
-                              {entry.sourceCode} ·{" "}
-                            </span>
-                          )}
+                          {entry.sourceCode && <span className="font-mono">{entry.sourceCode} · </span>}
                           {new Date(entry.createdAt).toLocaleString("fr-FR")}
                         </p>
                         {entry.reference && (
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            Réf: {entry.reference}
-                          </p>
+                          <p className="mt-0.5 text-xs text-gray-400">Réf: {entry.reference}</p>
                         )}
                       </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
+                    <div className="flex-shrink-0 text-right">
                       <p
-                        className={`font-semibold text-sm ${entry.direction === "CREDIT" ? "text-green-600" : "text-red-600"}`}
+                        className={`text-sm font-bold ${
+                          entry.direction === "CREDIT" ? "text-green-600" : "text-red-600"
+                        }`}
                       >
                         {entry.direction === "CREDIT" ? "+" : "-"}
                         {formatAmountOnly(entry.amount)} {entry.currency}
                       </p>
                       <p className="text-xs text-gray-400">
-                        {formatAmountOnly(entry.balanceAfter)} {entry.currency}
+                        Solde: {formatAmountOnly(entry.balanceAfter)} {entry.currency}
                       </p>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50">
+                <div className="mt-4 flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-3">
                   <p className="text-sm text-gray-500">
                     Page {ledgerPage + 1} / {totalPages}
                   </p>
@@ -374,16 +376,14 @@ export const WalletDetailModal: React.FC = () => {
                     <button
                       onClick={() => setLedgerPage((p) => Math.max(0, p - 1))}
                       disabled={ledgerPage === 0}
-                      className="p-2 border rounded-lg disabled:opacity-50 hover:bg-white transition-colors"
+                      className="rounded-xl bg-white p-2 shadow-sm ring-1 ring-gray-100 disabled:opacity-50"
                     >
                       <ChevronLeft size={16} />
                     </button>
                     <button
-                      onClick={() =>
-                        setLedgerPage((p) => Math.min(totalPages - 1, p + 1))
-                      }
+                      onClick={() => setLedgerPage((p) => Math.min(totalPages - 1, p + 1))}
                       disabled={ledgerPage >= totalPages - 1}
-                      className="p-2 border rounded-lg disabled:opacity-50 hover:bg-white transition-colors"
+                      className="rounded-xl bg-white p-2 shadow-sm ring-1 ring-gray-100 disabled:opacity-50"
                     >
                       <ChevronRight size={16} />
                     </button>
@@ -395,57 +395,49 @@ export const WalletDetailModal: React.FC = () => {
         </div>
       )}
 
-      {/* Contenu onglet Holds */}
       {activeTab === "holds" && (
         <div>
-          <div className="flex justify-between items-center mb-4">
-            <p className="text-sm text-gray-600">
-              Réservations de fonds sur ce portefeuille
-            </p>
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-sm text-gray-600">Réservations de fonds sur ce portefeuille</p>
             <button
               onClick={() => setIsCreateHoldOpen(true)}
-              className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm flex items-center gap-1 hover:bg-primary-700 transition-colors"
+              className="inline-flex items-center gap-1 rounded-xl bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700"
             >
               <Plus size={14} /> Nouveau hold
             </button>
           </div>
 
           {holdsLoading ? (
-            <div className="flex justify-center py-12 bg-white rounded-xl border">
+            <div className="flex justify-center rounded-2xl bg-white py-12 shadow-sm ring-1 ring-gray-100">
               <Loader2 size={24} className="animate-spin text-gray-400" />
             </div>
           ) : holds.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-xl border">
-              <Clock size={48} className="mx-auto text-gray-300 mb-4" />
+            <div className="rounded-2xl bg-white py-12 text-center shadow-sm ring-1 ring-gray-100">
+              <Clock size={48} className="mx-auto mb-4 text-gray-300" />
               <p className="text-gray-500">Aucun hold actif</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
               {holds.map((hold) => {
                 const hs = holdStatusConfig[hold.status] || {
                   label: hold.status,
-                  color: "bg-gray-100 text-gray-500",
+                  color: "bg-gray-50 text-gray-500 ring-gray-100",
                 };
                 const isActive = hold.status === "ACTIVE";
                 const isExpired = new Date(hold.expiresAt) < new Date();
                 return (
                   <div
                     key={hold.holdNumber}
-                    className={`bg-white rounded-xl border p-4 ${!isActive ? "opacity-60" : ""}`}
+                    className={`rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 ${!isActive ? "opacity-60" : ""}`}
                   >
-                    <div className="flex justify-between items-start">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="font-mono text-sm font-medium">
-                          {hold.holdNumber}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-0.5">
+                        <p className="font-mono text-sm font-semibold text-gray-900">{hold.holdNumber}</p>
+                        <p className="mt-0.5 text-xs text-gray-500">
                           {hold.sourceType} · {hold.sourceCode}
                         </p>
-                        <p
-                          className={`text-xs mt-0.5 ${isExpired && isActive ? "text-red-500" : "text-gray-400"}`}
-                        >
-                          Expire le :{" "}
-                          {new Date(hold.expiresAt).toLocaleString("fr-FR")}
+                        <p className={`mt-0.5 text-xs ${isExpired && isActive ? "text-red-500" : "text-gray-400"}`}>
+                          Expire le : {new Date(hold.expiresAt).toLocaleString("fr-FR")}
                           {isExpired && isActive && " (expiré)"}
                         </p>
                       </div>
@@ -453,31 +445,24 @@ export const WalletDetailModal: React.FC = () => {
                         <p className="font-bold text-orange-600">
                           {formatAmountOnly(hold.amount)} {wallet.currency}
                         </p>
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${hs.color}`}
-                        >
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${hs.color}`}>
                           {hs.label}
                         </span>
                       </div>
                     </div>
 
                     {isActive && (
-                      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                      <div className="mt-4 grid grid-cols-2 gap-2">
                         <button
                           onClick={() => {
-                            if (
-                              confirm(
-                                `Capturer le hold ${hold.holdNumber} (débit définitif de ${formatAmountOnly(hold.amount)} ${wallet.currency}) ?`,
-                              )
-                            ) {
+                            if (confirm(`Capturer le hold ${hold.holdNumber} (débit définitif de ${formatAmountOnly(hold.amount)} ${wallet.currency}) ?`)) {
                               captureMutation.mutate(hold.holdNumber);
                             }
                           }}
                           disabled={anyPending}
-                          className="flex-1 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs flex items-center justify-center gap-1 disabled:opacity-50 hover:bg-green-700 transition-colors"
+                          className="inline-flex items-center justify-center gap-1 rounded-xl bg-green-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-green-700 disabled:opacity-50"
                         >
-                          {captureMutation.isPending &&
-                          captureMutation.variables === hold.holdNumber ? (
+                          {captureMutation.isPending && captureMutation.variables === hold.holdNumber ? (
                             <Loader2 size={12} className="animate-spin" />
                           ) : (
                             <CheckCircle size={12} />
@@ -486,19 +471,14 @@ export const WalletDetailModal: React.FC = () => {
                         </button>
                         <button
                           onClick={() => {
-                            if (
-                              confirm(
-                                `Libérer le hold ${hold.holdNumber} (remettre ${formatAmountOnly(hold.amount)} ${wallet.currency} dans le solde disponible) ?`,
-                              )
-                            ) {
+                            if (confirm(`Libérer le hold ${hold.holdNumber} (remettre ${formatAmountOnly(hold.amount)} ${wallet.currency} dans le solde disponible) ?`)) {
                               releaseMutation.mutate(hold.holdNumber);
                             }
                           }}
                           disabled={anyPending}
-                          className="flex-1 px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs flex items-center justify-center gap-1 disabled:opacity-50 hover:bg-gray-300 transition-colors"
+                          className="inline-flex items-center justify-center gap-1 rounded-xl bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-200 disabled:opacity-50"
                         >
-                          {releaseMutation.isPending &&
-                          releaseMutation.variables === hold.holdNumber ? (
+                          {releaseMutation.isPending && releaseMutation.variables === hold.holdNumber ? (
                             <Loader2 size={12} className="animate-spin" />
                           ) : (
                             <XCircle size={12} />
@@ -513,47 +493,38 @@ export const WalletDetailModal: React.FC = () => {
             </div>
           )}
 
-          {/* Formulaire créer un hold */}
           {isCreateHoldOpen && (
-            <div className="mt-4 border rounded-xl p-4 bg-blue-50 space-y-3">
-              <p className="text-sm font-semibold text-blue-800">
-                Nouveau hold
-              </p>
+            <div className="mt-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-blue-100">
+              <div className="mb-4 flex items-center justify-between">
+                <p className="text-sm font-semibold text-gray-900">Nouveau hold</p>
+                <button onClick={() => setIsCreateHoldOpen(false)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100">
+                  <X size={16} />
+                </button>
+              </div>
               {holdError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
+                <div className="mb-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-100">
                   {holdError}
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">
-                    Montant (FCFA) *
-                  </label>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <Field label="Montant (FCFA) *">
                   <input
                     type="text"
                     inputMode="decimal"
                     value={holdForm.amount === 0 ? "" : holdForm.amount}
                     onChange={(e) => {
                       const val = e.target.value.replace(/[^\d.]/g, "");
-                      setHoldForm({
-                        ...holdForm,
-                        amount: val === "" ? 0 : parseFloat(val),
-                      });
+                      setHoldForm({ ...holdForm, amount: val === "" ? 0 : parseFloat(val) });
                     }}
                     placeholder="0"
-                    className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-500"
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
                   />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">
-                    Type de source
-                  </label>
+                </Field>
+                <Field label="Type de source">
                   <select
                     value={holdForm.sourceType}
-                    onChange={(e) =>
-                      setHoldForm({ ...holdForm, sourceType: e.target.value })
-                    }
-                    className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-500"
+                    onChange={(e) => setHoldForm({ ...holdForm, sourceType: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
                   >
                     <option value="BOOKING">Réservation</option>
                     <option value="PAYMENT">Paiement</option>
@@ -561,40 +532,30 @@ export const WalletDetailModal: React.FC = () => {
                     <option value="SUBSCRIPTION">Abonnement</option>
                     <option value="OTHER">Autre</option>
                   </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">
-                    Code source *
-                  </label>
+                </Field>
+                <Field label="Code source *">
                   <input
                     type="text"
                     value={holdForm.sourceCode}
                     placeholder="BKG-000001"
-                    onChange={(e) =>
-                      setHoldForm({ ...holdForm, sourceCode: e.target.value })
-                    }
-                    className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-500"
+                    onChange={(e) => setHoldForm({ ...holdForm, sourceCode: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
                   />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">
-                    Expiration *
-                  </label>
+                </Field>
+                <Field label="Expiration *">
                   <input
                     type="datetime-local"
                     value={holdForm.expiresAt}
-                    onChange={(e) =>
-                      setHoldForm({ ...holdForm, expiresAt: e.target.value })
-                    }
-                    className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-500"
+                    onChange={(e) => setHoldForm({ ...holdForm, expiresAt: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
                   />
-                </div>
+                </Field>
               </div>
-              <div className="flex gap-2">
+              <div className="mt-4 flex gap-2">
                 <button
                   onClick={() => setIsCreateHoldOpen(false)}
                   disabled={createHoldMutation.isPending}
-                  className="flex-1 px-3 py-1.5 border rounded-lg text-xs text-gray-600 bg-white disabled:opacity-50 hover:bg-gray-50 transition-colors"
+                  className="flex-1 rounded-xl bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 disabled:opacity-50"
                 >
                   Annuler
                 </button>
@@ -605,21 +566,15 @@ export const WalletDetailModal: React.FC = () => {
                       return;
                     }
                     if (holdForm.amount > availableBalance) {
-                      setHoldError(
-                        `Montant supérieur au solde disponible (${formatAmountOnly(availableBalance)} FCFA).`,
-                      );
+                      setHoldError(`Montant supérieur au solde disponible (${formatAmountOnly(availableBalance)} FCFA).`);
                       return;
                     }
                     createHoldMutation.mutate();
                   }}
                   disabled={createHoldMutation.isPending}
-                  className="flex-1 bg-primary-600 text-white px-3 py-1.5 rounded-lg text-xs disabled:opacity-50 flex items-center justify-center gap-1 hover:bg-primary-700 transition-colors"
+                  className="flex-1 rounded-xl bg-primary-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50"
                 >
-                  {createHoldMutation.isPending ? (
-                    <Loader2 size={12} className="animate-spin" />
-                  ) : (
-                    "Créer le hold"
-                  )}
+                  {createHoldMutation.isPending ? <Loader2 size={14} className="mx-auto animate-spin" /> : "Créer le hold"}
                 </button>
               </div>
             </div>
@@ -629,3 +584,48 @@ export const WalletDetailModal: React.FC = () => {
     </AdminLayout>
   );
 };
+
+const BalanceCard: React.FC<{
+  label: string;
+  value: string;
+  tone: "green" | "orange" | "gray";
+  icon: React.ElementType;
+}> = ({ label, value, tone, icon: Icon }) => {
+  const cls =
+    tone === "green"
+      ? "bg-green-50 text-green-700"
+      : tone === "orange"
+        ? "bg-orange-50 text-orange-700"
+        : "bg-gray-50 text-gray-700";
+  return (
+    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-sm text-gray-500">{label}</p>
+        <span className={`rounded-xl p-2 ${cls}`}>
+          <Icon size={17} />
+        </span>
+      </div>
+      <p className="text-xl font-bold text-gray-900">{value}</p>
+    </div>
+  );
+};
+
+const MiniStat: React.FC<{ label: string; value: string; tone: "green" | "red" }> = ({
+  label,
+  value,
+  tone,
+}) => (
+  <div className={`rounded-2xl px-4 py-3 ${tone === "green" ? "bg-green-50" : "bg-red-50"}`}>
+    <p className="text-xs text-gray-500">{label}</p>
+    <p className={`mt-1 font-semibold ${tone === "green" ? "text-green-700" : "text-red-700"}`}>
+      {value}
+    </p>
+  </div>
+);
+
+const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+  <label className="block">
+    <span className="mb-1 block text-xs font-medium text-gray-600">{label}</span>
+    {children}
+  </label>
+);

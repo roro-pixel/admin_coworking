@@ -8,16 +8,12 @@ interface AdminLayoutProps {
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-50">
+      <AdminSidebar />
       <AdminHeader />
-      <div className="flex">
-        <AdminSidebar />
-        <main className="flex-1 p-6 ml-64 mt-16">
-          <div className="opacity-0 animate-[fadeUp_0.6s_ease-out_forwards]">
-            {children}
-          </div>
-        </main>
-      </div>
+      <main className="px-4 pb-28 pt-20 md:pl-24 md:pr-6 md:pb-8 lg:pr-8">
+        {children}
+      </main>
     </div>
   );
 };

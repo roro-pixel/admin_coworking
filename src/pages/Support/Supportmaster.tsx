@@ -120,16 +120,16 @@ export const SupportMaster: React.FC = () => {
 
   return (
     <div>
-      <div className="flex gap-1 border-b border-gray-200 mb-6">
+      <div className="overflow-x-auto mb-6 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100 flex gap-1">
         <button
           onClick={() => switchTab("tickets")}
-          className={`px-4 py-2 text-sm font-medium rounded-t-lg flex items-center gap-2 ${activeTab === "tickets" ? "bg-primary-50 text-primary-600 border-b-2 border-primary-600" : "text-gray-500 hover:bg-gray-50"}`}
+          className={`px-4 py-2 text-sm font-medium rounded-xl flex items-center gap-2 ${activeTab === "tickets" ? "bg-primary-600 text-white shadow-sm" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"}`}
         >
           <ListChecks size={16} /> Tickets
         </button>
         <button
           onClick={() => switchTab("analytics")}
-          className={`px-4 py-2 text-sm font-medium rounded-t-lg flex items-center gap-2 ${activeTab === "analytics" ? "bg-primary-50 text-primary-600 border-b-2 border-primary-600" : "text-gray-500 hover:bg-gray-50"}`}
+          className={`px-4 py-2 text-sm font-medium rounded-xl flex items-center gap-2 ${activeTab === "analytics" ? "bg-primary-600 text-white shadow-sm" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"}`}
         >
           <BarChart3 size={16} /> Analytics
         </button>
@@ -202,7 +202,7 @@ export const SupportMaster: React.FC = () => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Rechercher titre, numéro, contact..."
-                className="w-full pl-10 pr-8 py-2 border border-gray-200 rounded-lg"
+                className="w-full pl-10 pr-8 py-2 ring-1 ring-gray-100 rounded-lg"
               />
               {isFetching && (
                 <Loader2
@@ -217,7 +217,7 @@ export const SupportMaster: React.FC = () => {
                 setStatusFilter(e.target.value as any);
                 setPage(0);
               }}
-              className="px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              className="px-3 py-2 ring-1 ring-gray-100 rounded-lg bg-white"
             >
               <option value="">Tous statuts</option>
               {Object.entries(statusConfig).map(([k, v]) => (
@@ -232,7 +232,7 @@ export const SupportMaster: React.FC = () => {
                 setPriorityFilter(e.target.value as any);
                 setPage(0);
               }}
-              className="px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              className="px-3 py-2 ring-1 ring-gray-100 rounded-lg bg-white"
             >
               <option value="">Toutes priorités</option>
               {Object.entries(priorityConfig).map(([k, v]) => (
@@ -247,7 +247,7 @@ export const SupportMaster: React.FC = () => {
                 setCategoryFilter(e.target.value as any);
                 setPage(0);
               }}
-              className="px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              className="px-3 py-2 ring-1 ring-gray-100 rounded-lg bg-white"
             >
               <option value="">Toutes catégories</option>
               {Object.entries(categoryLabels).map(([k, v]) => (
@@ -263,7 +263,7 @@ export const SupportMaster: React.FC = () => {
                 setPage(0);
               }}
               placeholder="Agent assigné"
-              className="px-3 py-2 border border-gray-200 rounded-lg"
+              className="px-3 py-2 ring-1 ring-gray-100 rounded-lg"
             />
           </div>
           <label className="inline-flex items-center gap-2 text-sm mb-4">
@@ -278,14 +278,14 @@ export const SupportMaster: React.FC = () => {
             Afficher uniquement les tickets SLA en retard
           </label>
 
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-white rounded-xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
             {ticketsLoading ? (
               <div className="py-12 text-center">
                 <Loader2 className="animate-spin mx-auto text-primary-600" />
               </div>
             ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
+              <table className="w-full border-separate border-spacing-y-2 text-sm">
+                <thead className="bg-transparent">
                   <tr>
                     <th className="px-4 py-3 text-left">Ticket</th>
                     <th className="px-4 py-3 text-left">Catégorie</th>
@@ -295,7 +295,7 @@ export const SupportMaster: React.FC = () => {
                     <th className="px-4 py-3 text-right">Mis à jour</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y-0">
                   {tickets.map((ticket) => (
                     <tr
                       key={ticket.ticketNumber}

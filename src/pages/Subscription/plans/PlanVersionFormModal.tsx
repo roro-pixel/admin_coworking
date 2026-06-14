@@ -400,7 +400,7 @@ export const PlanVersionFormModal: React.FC<PlanVersionFormModalProps> = ({
 
       <form onSubmit={handleSubmit} className="p-6 space-y-6 max-w-6xl">
         {errorMessage && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm">
             {errorMessage}
           </div>
         )}
@@ -418,7 +418,7 @@ export const PlanVersionFormModal: React.FC<PlanVersionFormModalProps> = ({
                 setFormData({ ...formData, name: e.target.value })
               }
               required
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl"
             />
           </div>
           <div>
@@ -431,7 +431,7 @@ export const PlanVersionFormModal: React.FC<PlanVersionFormModalProps> = ({
               onChange={(e) =>
                 setFormData({ ...formData, description: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl"
             />
           </div>
         </div>
@@ -448,7 +448,7 @@ export const PlanVersionFormModal: React.FC<PlanVersionFormModalProps> = ({
                 setFormData({ ...formData, effectiveFrom: e.target.value })
               }
               required
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl"
             />
           </div>
           <div>
@@ -461,7 +461,7 @@ export const PlanVersionFormModal: React.FC<PlanVersionFormModalProps> = ({
               onChange={(e) =>
                 setFormData({ ...formData, effectiveTo: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl"
             />
           </div>
         </div>
@@ -506,7 +506,7 @@ export const PlanVersionFormModal: React.FC<PlanVersionFormModalProps> = ({
             {formData.prices.map((price, idx) => (
               <div
                 key={idx}
-                className="flex gap-2 items-end p-2 bg-gray-50 rounded-lg flex-wrap"
+                className="flex gap-2 items-end p-2 bg-slate-50/80 rounded-xl ring-1 ring-slate-100 flex-wrap"
               >
                 <div className="w-28">
                   <label className="block text-xs text-gray-500">Cycle</label>
@@ -659,7 +659,7 @@ export const PlanVersionFormModal: React.FC<PlanVersionFormModalProps> = ({
             {formData.benefits.map((benefit, idx) => (
               <div
                 key={idx}
-                className="flex gap-2 items-center p-2 bg-gray-50 rounded-lg flex-wrap"
+                className="flex gap-2 items-center p-2 bg-slate-50/80 rounded-xl ring-1 ring-slate-100 flex-wrap"
               >
                 <input
                   type="text"
@@ -762,7 +762,7 @@ export const PlanVersionFormModal: React.FC<PlanVersionFormModalProps> = ({
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="[&>tr+tr]:border-t [&>tr+tr]:border-slate-100">
                 {paginatedEntitlements.map((ent, idx) => {
                   const globalIdx =
                     entitlementsPage * ENTITLEMENTS_PER_PAGE + idx;
@@ -898,7 +898,7 @@ export const PlanVersionFormModal: React.FC<PlanVersionFormModalProps> = ({
                   setEntitlementsPage(Math.max(0, entitlementsPage - 1))
                 }
                 disabled={entitlementsPage === 0}
-                className="p-1 rounded border disabled:opacity-50 hover:bg-gray-50"
+                className="p-1 rounded border disabled:opacity-50 hover:bg-slate-50/80"
               >
                 <ChevronLeft size={16} />
               </button>
@@ -913,7 +913,7 @@ export const PlanVersionFormModal: React.FC<PlanVersionFormModalProps> = ({
                   )
                 }
                 disabled={entitlementsPage === totalEntitlementPages - 1}
-                className="p-1 rounded border disabled:opacity-50 hover:bg-gray-50"
+                className="p-1 rounded border disabled:opacity-50 hover:bg-slate-50/80"
               >
                 <ChevronRight size={16} />
               </button>
@@ -927,14 +927,14 @@ export const PlanVersionFormModal: React.FC<PlanVersionFormModalProps> = ({
             type="button"
             onClick={onClose}
             disabled={createMutation.isPending}
-            className="flex-1 px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="flex-1 px-4 py-2 border rounded-lg text-gray-700 hover:bg-slate-50/80 disabled:opacity-50"
           >
             Annuler
           </button>
           <button
             type="submit"
             disabled={createMutation.isPending}
-            className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 bg-primary-600 text-white py-2 rounded-xl hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {createMutation.isPending ? (
               <Loader2 size={16} className="animate-spin" />
@@ -984,7 +984,7 @@ const KeyValueTable: React.FC<KeyValueTableProps> = ({
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y">
+        <tbody className="[&>tr+tr]:border-t [&>tr+tr]:border-slate-100">
           {rows.map((row, idx) => (
             <tr key={idx}>
               <td className="px-4 py-2 text-sm font-mono">{row.key}</td>

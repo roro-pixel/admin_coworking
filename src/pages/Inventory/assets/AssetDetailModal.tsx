@@ -55,6 +55,8 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
   const [assignData, setAssignData] = useState({
     assigneeType: "MEMBER",
     assigneeCode: "",
+    expectedReturnAt: "",
+    purpose: "",
     notes: "",
   });
   const [returnData, setReturnData] = useState({
@@ -68,6 +70,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
     scheduledDate: "",
   });
   const [reserveReason, setReserveReason] = useState("");
+  const [lastAssignment, setLastAssignment] = useState<any>(null);
 
   const { data: locations = [] } = useQuery({
     queryKey: ["inventory-locations"],
@@ -82,29 +85,36 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
 
   const assignMutation = useMutation({
     mutationFn: () =>
-      inventoryService.assignAsset(
-        asset.assetCode,
-        assignData.assigneeType,
-        assignData.assigneeCode,
-        admin?.email || String(admin?.id || "1"),
-        assignData.notes,
-      ),
-    onSuccess: () => {
+      inventoryService.assignAsset(asset.assetCode, {
+        assigneeType: assignData.assigneeType,
+        assigneeCode: assignData.assigneeCode,
+        expectedReturnAt: assignData.expectedReturnAt,
+        assignedBy: admin?.email || String(admin?.id || "1"),
+        purpose: assignData.purpose,
+        notes: assignData.notes || undefined,
+      }),
+    onSuccess: (assignment) => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
+      setLastAssignment(assignment);
       setShowAssignForm(false);
-      setAssignData({ assigneeType: "MEMBER", assigneeCode: "", notes: "" });
+      setAssignData({
+        assigneeType: "MEMBER",
+        assigneeCode: "",
+        expectedReturnAt: "",
+        purpose: "",
+        notes: "",
+      });
     },
   });
 
   const returnMutation = useMutation({
     mutationFn: () =>
-      inventoryService.returnAsset(
-        asset.assetCode,
-        admin?.email || String(admin?.id || "1"),
-        returnData.returnedToLocationCode,
-        returnData.condition,
-        returnData.notes,
-      ),
+      inventoryService.returnAsset(asset.assetCode, {
+        returnedBy: admin?.email || String(admin?.id || "1"),
+        returnedToLocationCode: returnData.returnedToLocationCode,
+        condition: returnData.condition,
+        notes: returnData.notes || undefined,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       setShowReturnForm(false);
@@ -113,11 +123,10 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
 
   const createMaintenanceMutation = useMutation({
     mutationFn: () =>
-      inventoryService.createAssetMaintenance({
-        assetCode: asset.assetCode,
+      inventoryService.createAssetMaintenance(asset.assetCode, {
         maintenanceType: maintenanceData.maintenanceType,
-        description: maintenanceData.description,
-        scheduledDate: maintenanceData.scheduledDate,
+        notes: maintenanceData.description,
+        scheduledAt: maintenanceData.scheduledDate,
         requestedBy: admin?.email || String(admin?.id || "1"),
       }),
     onSuccess: () => {
@@ -166,6 +175,18 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
       setReserveReason("");
     },
   });
+
+  const downloadLoanSheet = async (assignmentId?: number) => {
+    const id = assignmentId ?? lastAssignment?.assignmentId;
+    if (!id) return;
+    const pdf = await inventoryService.getAssetLoanSheetPdf(asset.assetCode, id);
+    const url = window.URL.createObjectURL(pdf);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `fiche_pret_${asset.assetCode}_${id}.pdf`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
 
   const canAssign = asset.status === "AVAILABLE" || asset.status === "RESERVED";
   const canReturn = asset.status === "ASSIGNED" || asset.status === "IN_USE";
@@ -360,6 +381,26 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                   }
                   className="w-full px-4 py-3 border rounded-lg text-base"
                 />
+                <input
+                  type="datetime-local"
+                  value={assignData.expectedReturnAt}
+                  onChange={(e) =>
+                    setAssignData({
+                      ...assignData,
+                      expectedReturnAt: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-3 border rounded-lg text-base"
+                />
+                <input
+                  type="text"
+                  placeholder="Motif du prêt / usage prévu *"
+                  value={assignData.purpose}
+                  onChange={(e) =>
+                    setAssignData({ ...assignData, purpose: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border rounded-lg text-base"
+                />
                 <textarea
                   placeholder="Notes (optionnel)"
                   value={assignData.notes}
@@ -379,7 +420,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                   <button
                     onClick={() => assignMutation.mutate()}
                     disabled={
-                      !assignData.assigneeCode || assignMutation.isPending
+                      !assignData.assigneeCode || !assignData.expectedReturnAt || !assignData.purpose || assignMutation.isPending
                     }
                     className="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 text-base"
                   >
@@ -460,6 +501,21 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                     )}
                   </button>
                 </div>
+              </div>
+            )}
+
+            {lastAssignment?.assignmentId && (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                  <p className="font-medium text-green-800">Actif attribué avec succès</p>
+                  <p className="text-sm text-green-700">Téléchargez la fiche de prêt pour signature immédiate.</p>
+                </div>
+                <button
+                  onClick={() => downloadLoanSheet(lastAssignment.assignmentId)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                >
+                  Télécharger la fiche de prêt
+                </button>
               </div>
             )}
 

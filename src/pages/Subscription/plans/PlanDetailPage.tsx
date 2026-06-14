@@ -201,20 +201,20 @@ export const PlanDetailPage: React.FC<PlanDetailPageProps> = ({
             <button
               onClick={() => toggleVisibilityMutation.mutate()}
               disabled={toggleVisibilityMutation.isPending}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2"
+              className="px-3 py-2 border border-slate-200 rounded-xl text-sm text-gray-700 hover:bg-slate-50/80 disabled:opacity-50 flex items-center gap-2"
             >
               {plan.visible ? <EyeOff size={15} /> : <Eye size={15} />}
               {plan.visible ? "Masquer" : "Rendre visible"}
             </button>
             <button
               onClick={() => setEditModalOpen(true)}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              className="px-3 py-2 border border-slate-200 rounded-xl text-sm text-gray-700 hover:bg-slate-50/80 flex items-center gap-2"
             >
               <Edit size={15} /> Modifier
             </button>
             <button
               onClick={() => onNewVersion(plan.code)}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2 text-sm font-medium"
+              className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 flex items-center gap-2 text-sm font-medium"
             >
               <Plus size={16} /> Nouvelle version
             </button>
@@ -244,7 +244,7 @@ export const PlanDetailPage: React.FC<PlanDetailPageProps> = ({
         ].map((item) => (
           <div
             key={item.label}
-            className="bg-white rounded-xl border border-gray-100 p-4"
+            className="rounded-2xl bg-white ring-1 ring-slate-100 p-4"
           >
             <p className="text-xs text-gray-500 mb-1">{item.label}</p>
             <p className="font-semibold text-gray-900">{item.value}</p>
@@ -267,11 +267,11 @@ export const PlanDetailPage: React.FC<PlanDetailPageProps> = ({
           <Loader2 size={28} className="animate-spin mr-3" /> Chargement...
         </div>
       ) : sortedVersions.length === 0 ? (
-        <div className="bg-white rounded-xl border border-dashed border-gray-200 py-16 text-center">
+        <div className="rounded-2xl bg-white border border-dashed border-gray-200 py-16 text-center">
           <p className="text-gray-500 mb-3">Aucune version pour ce plan.</p>
           <button
             onClick={() => onNewVersion(plan.code)}
-            className="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 text-sm"
+            className="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-xl hover:bg-primary-700 text-sm"
           >
             <Plus size={15} /> Créer la première version
           </button>
@@ -286,7 +286,7 @@ export const PlanDetailPage: React.FC<PlanDetailPageProps> = ({
             return (
               <div
                 key={version.id}
-                className="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow"
+                className="rounded-2xl bg-white shadow-[0_18px_45px_rgba(15,23,42,0.06)] ring-1 ring-slate-100 hover:shadow-md transition-shadow"
               >
                 {/* ── En-tête version ── */}
                 <div className="flex items-start justify-between p-5 border-b border-gray-50">
@@ -357,7 +357,7 @@ export const PlanDetailPage: React.FC<PlanDetailPageProps> = ({
                     )}
                     <button
                       onClick={() => onVersionDetail(plan.code, version)}
-                      className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-1.5"
+                      className="px-3 py-1.5 border border-slate-200 rounded-xl text-sm text-gray-700 hover:bg-slate-50/80 flex items-center gap-1.5"
                     >
                       <Eye size={13} /> Voir détails
                     </button>

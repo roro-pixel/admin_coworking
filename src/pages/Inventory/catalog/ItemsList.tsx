@@ -464,7 +464,7 @@ export const ItemsList: React.FC = () => {
                 >
                   <option value="">Sélectionner</option>
                   {categories.map((cat: InventoryCategory) => (
-                    <option key={cat.code} value={cat.code}>
+                    <option key={cat.categoryCode || cat.code} value={cat.categoryCode || cat.code}>
                       {cat.name}
                     </option>
                   ))}
@@ -484,7 +484,7 @@ export const ItemsList: React.FC = () => {
                 >
                   <option value="">Sélectionner</option>
                   {units.map((unit: InventoryUnit) => (
-                    <option key={unit.code} value={unit.code}>
+                    <option key={unit.unitCode || unit.code} value={unit.unitCode || unit.code}>
                       {unit.name}
                     </option>
                   ))}

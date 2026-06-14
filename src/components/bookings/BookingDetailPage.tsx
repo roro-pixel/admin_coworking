@@ -339,8 +339,8 @@ export const BookingDetailPage: React.FC = () => {
           <XCircle size={48} className="mx-auto text-gray-300 mb-4" />
           <p className="text-gray-500">Réservation non trouvée</p>
           <button
-            onClick={() => navigate("/admin/bookings")}
-            className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+            onClick={() => navigate("/bookings")}
+            className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700"
           >
             Retour à la liste
           </button>
@@ -363,8 +363,8 @@ export const BookingDetailPage: React.FC = () => {
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate("/admin/bookings")}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            onClick={() => navigate("/bookings")}
+            className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
           >
             <ArrowLeft size={20} className="text-gray-600" />
           </button>
@@ -377,7 +377,7 @@ export const BookingDetailPage: React.FC = () => {
         </div>
         <button
           onClick={() => refetchBooking()}
-          className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          className="p-2 border border-gray-200 rounded-xl hover:bg-primary-50/40 transition-colors"
           title="Actualiser"
         >
           <RefreshCw size={18} className="text-gray-500" />
@@ -385,8 +385,8 @@ export const BookingDetailPage: React.FC = () => {
       </div>
 
       {/* Statut et actions */}
-      <div className="bg-white rounded-xl shadow-sm mb-6 overflow-hidden">
-        <div className="px-6 py-4 border-b bg-gray-50 flex items-center justify-between flex-wrap gap-3">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 mb-6 overflow-hidden">
+        <div className="px-6 py-4 bg-gray-50/80 flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
             {status && (
               <span
@@ -402,7 +402,7 @@ export const BookingDetailPage: React.FC = () => {
           </div>
 
           {actionError && (
-            <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-1.5 flex items-center gap-2">
+            <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-1.5 flex items-center gap-2">
               <AlertTriangle size={14} />
               {actionError}
               <button
@@ -420,7 +420,7 @@ export const BookingDetailPage: React.FC = () => {
             <button
               onClick={() => confirmMutation.mutate()}
               disabled={anyStatusPending}
-              className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-green-700 transition-colors"
+              className="px-3 py-1.5 bg-green-600 text-white rounded-xl text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-green-700 transition-colors"
             >
               {confirmMutation.isPending ? (
                 <Loader2 size={14} className="animate-spin" />
@@ -436,7 +436,7 @@ export const BookingDetailPage: React.FC = () => {
               <button
                 onClick={() => approveMutation.mutate()}
                 disabled={anyStatusPending}
-                className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-green-700 transition-colors"
+                className="px-3 py-1.5 bg-green-600 text-white rounded-xl text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-green-700 transition-colors"
               >
                 {approveMutation.isPending ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -451,7 +451,7 @@ export const BookingDetailPage: React.FC = () => {
                     rejectMutation.mutate();
                 }}
                 disabled={anyStatusPending}
-                className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-red-700 transition-colors"
+                className="px-3 py-1.5 bg-red-600 text-white rounded-xl text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-red-700 transition-colors"
               >
                 {rejectMutation.isPending ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -468,7 +468,7 @@ export const BookingDetailPage: React.FC = () => {
               <button
                 onClick={() => startMutation.mutate()}
                 disabled={anyStatusPending}
-                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-blue-700 transition-colors"
+                className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-blue-700 transition-colors"
               >
                 {startMutation.isPending ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -480,7 +480,7 @@ export const BookingDetailPage: React.FC = () => {
               <button
                 onClick={() => checkInMutation.mutate()}
                 disabled={anyStatusPending}
-                className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-indigo-700 transition-colors"
+                className="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-indigo-700 transition-colors"
               >
                 {checkInMutation.isPending ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -495,7 +495,7 @@ export const BookingDetailPage: React.FC = () => {
                     noShowMutation.mutate();
                 }}
                 disabled={anyStatusPending}
-                className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-orange-700 transition-colors"
+                className="px-3 py-1.5 bg-orange-600 text-white rounded-xl text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-orange-700 transition-colors"
               >
                 {noShowMutation.isPending ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -512,7 +512,7 @@ export const BookingDetailPage: React.FC = () => {
               <button
                 onClick={() => checkOutMutation.mutate()}
                 disabled={anyStatusPending}
-                className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-indigo-700 transition-colors"
+                className="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-indigo-700 transition-colors"
               >
                 {checkOutMutation.isPending ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -524,7 +524,7 @@ export const BookingDetailPage: React.FC = () => {
               <button
                 onClick={() => completeMutation.mutate()}
                 disabled={anyStatusPending}
-                className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-green-700 transition-colors"
+                className="px-3 py-1.5 bg-green-600 text-white rounded-xl text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-green-700 transition-colors"
               >
                 {completeMutation.isPending ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -539,7 +539,7 @@ export const BookingDetailPage: React.FC = () => {
                     noShowMutation.mutate();
                 }}
                 disabled={anyStatusPending}
-                className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-orange-700 transition-colors"
+                className="px-3 py-1.5 bg-orange-600 text-white rounded-xl text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-orange-700 transition-colors"
               >
                 {noShowMutation.isPending ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -564,7 +564,7 @@ export const BookingDetailPage: React.FC = () => {
                   cancelMutation.mutate();
               }}
               disabled={anyStatusPending}
-              className="px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg text-sm flex items-center gap-2 disabled:opacity-50 transition-colors"
+              className="px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded-xl text-sm flex items-center gap-2 disabled:opacity-50 transition-colors"
             >
               {cancelMutation.isPending ? (
                 <Loader2 size={14} className="animate-spin" />
@@ -586,7 +586,7 @@ export const BookingDetailPage: React.FC = () => {
                 setIsInvoiceModalOpen(true);
               }}
               disabled={createInvoiceMutation.isPending}
-              className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-primary-700 transition-colors"
+              className="px-3 py-1.5 bg-primary-600 text-white rounded-xl text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-primary-700 transition-colors"
             >
               {createInvoiceMutation.isPending ? (
                 <Loader2 size={14} className="animate-spin" />
@@ -598,7 +598,7 @@ export const BookingDetailPage: React.FC = () => {
           )}
 
           {isAlreadyBilled && (
-            <span className="px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-lg text-sm flex items-center gap-2">
+            <span className="px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-xl text-sm flex items-center gap-2">
               <CheckCircle size={14} />
               Déjà facturée
             </span>
@@ -606,7 +606,7 @@ export const BookingDetailPage: React.FC = () => {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200 px-6">
+        <div className=" px-6">
           <div className="flex space-x-6">
             {(["info", "participants", "history", "events"] as const).map(
               (tab) => (
@@ -641,7 +641,7 @@ export const BookingDetailPage: React.FC = () => {
           {activeTab === "info" && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-xl">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">
                     Client
                   </p>
@@ -669,7 +669,7 @@ export const BookingDetailPage: React.FC = () => {
                   )}
                 </div>
 
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-xl">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">
                     Contact
                   </p>
@@ -690,7 +690,7 @@ export const BookingDetailPage: React.FC = () => {
                   )}
                 </div>
 
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-xl">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">
                     Ressource
                   </p>
@@ -712,7 +712,7 @@ export const BookingDetailPage: React.FC = () => {
                   )}
                 </div>
 
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-xl">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">
                     Période
                   </p>
@@ -727,7 +727,7 @@ export const BookingDetailPage: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-xl">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">
                     Montant
                   </p>
@@ -742,14 +742,14 @@ export const BookingDetailPage: React.FC = () => {
                 </div>
 
                 {booking.checkInQrValue && booking.status === "CONFIRMED" && (
-                  <div className="p-4 bg-gray-50 rounded-lg text-center">
+                  <div className="p-4 bg-gray-50 rounded-xl text-center">
                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">
                       QR Code Check-in
                     </p>
                     <img
                       src={getQrCodeUrl(booking.checkInQrValue)}
                       alt="QR Code check-in"
-                      className="mx-auto w-28 h-28 rounded-lg"
+                      className="mx-auto w-28 h-28 rounded-xl"
                     />
                     <p className="text-xs text-gray-400 mt-2">
                       À présenter à l'accueil
@@ -758,7 +758,7 @@ export const BookingDetailPage: React.FC = () => {
                 )}
 
                 {booking.virtualMeetingUrl && (
-                  <div className="p-4 bg-gray-50 rounded-lg col-span-2">
+                  <div className="p-4 bg-gray-50 rounded-xl col-span-2">
                     <p className="text-xs text-gray-500 uppercase tracking-wide">
                       Lien de réunion virtuelle
                     </p>
@@ -783,7 +783,7 @@ export const BookingDetailPage: React.FC = () => {
                     {booking.lines.map((line) => (
                       <div
                         key={line.id}
-                        className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
+                        className="flex justify-between items-center p-3 bg-gray-50 rounded-xl"
                       >
                         <span className="text-sm text-gray-700">
                           {line.description} × {line.quantity}
@@ -798,7 +798,7 @@ export const BookingDetailPage: React.FC = () => {
               )}
 
               {booking.recurrenceGroupNumber && (
-                <div className="p-4 bg-blue-50 rounded-lg">
+                <div className="p-4 bg-blue-50 rounded-xl">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">
                     Réservation récurrente
                   </p>
@@ -818,7 +818,7 @@ export const BookingDetailPage: React.FC = () => {
               )}
 
               {booking.notes && (
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-xl">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">
                     Notes
                   </p>
@@ -834,7 +834,7 @@ export const BookingDetailPage: React.FC = () => {
                 {booking.participants?.map((participant) => (
                   <div
                     key={participant.id}
-                    className="flex justify-between items-center p-4 bg-gray-50 rounded-lg"
+                    className="flex justify-between items-center p-4 bg-gray-50 rounded-xl"
                   >
                     <div>
                       <p className="font-medium text-gray-900">
@@ -867,7 +867,7 @@ export const BookingDetailPage: React.FC = () => {
                         )
                       }
                       disabled={removeParticipantMutation.isPending}
-                      className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg disabled:opacity-40 transition-colors"
+                      className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-xl disabled:opacity-40 transition-colors"
                       title="Retirer"
                     >
                       <UserMinus size={16} />
@@ -925,7 +925,7 @@ export const BookingDetailPage: React.FC = () => {
                         name: e.target.value,
                       })
                     }
-                    className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                   <select
                     value={newParticipant.role}
@@ -935,7 +935,7 @@ export const BookingDetailPage: React.FC = () => {
                         role: e.target.value as BookingParticipantRole,
                       })
                     }
-                    className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   >
                     {roleOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -953,7 +953,7 @@ export const BookingDetailPage: React.FC = () => {
                         email: e.target.value,
                       })
                     }
-                    className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                   <input
                     type="tel"
@@ -965,7 +965,7 @@ export const BookingDetailPage: React.FC = () => {
                         phone: e.target.value,
                       })
                     }
-                    className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                 </div>
 
@@ -981,7 +981,7 @@ export const BookingDetailPage: React.FC = () => {
                   disabled={
                     !newParticipant.name || addParticipantMutation.isPending
                   }
-                  className="mt-4 w-full py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+                  className="mt-4 w-full py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
                 >
                   {addParticipantMutation.isPending ? (
                     <Loader2 size={16} className="animate-spin" />
@@ -1008,7 +1008,7 @@ export const BookingDetailPage: React.FC = () => {
                 history.map((item: BookingHistory, idx: number) => (
                   <div
                     key={idx}
-                    className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg"
+                    className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl"
                   >
                     <History
                       size={16}
@@ -1059,7 +1059,7 @@ export const BookingDetailPage: React.FC = () => {
                 events.map((event: BookingEvent) => (
                   <div
                     key={event.eventNumber}
-                    className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg"
+                    className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl"
                   >
                     <Calendar
                       size={16}
@@ -1095,13 +1095,13 @@ export const BookingDetailPage: React.FC = () => {
             <h3 className="text-xl font-bold">Facturer la réservation</h3>
             <button
               onClick={() => setIsInvoiceModalOpen(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
+              className="p-1 hover:bg-gray-100 rounded-xl"
             >
               <XCircle size={20} />
             </button>
           </div>
           <div className="p-6 space-y-4">
-            <div className="bg-gray-50 p-3 rounded-lg text-sm">
+            <div className="bg-gray-50 p-3 rounded-xl text-sm">
               <p className="font-mono font-medium">{booking.bookingNumber}</p>
               <p className="text-gray-500">{booking.resourceName}</p>
               <p className="mt-1 font-semibold">
@@ -1122,7 +1122,7 @@ export const BookingDetailPage: React.FC = () => {
                       | "PROFORMA_INVOICE",
                   }))
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl"
               >
                 <option value="INVOICE">Facture</option>
                 <option value="PROFORMA_INVOICE">Proforma</option>
@@ -1139,7 +1139,7 @@ export const BookingDetailPage: React.FC = () => {
                   onChange={(e) =>
                     setInvoiceForm((f) => ({ ...f, issueDate: e.target.value }))
                   }
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl"
                 />
               </div>
               <div>
@@ -1153,7 +1153,7 @@ export const BookingDetailPage: React.FC = () => {
                   onChange={(e) =>
                     setInvoiceForm((f) => ({ ...f, dueDate: e.target.value }))
                   }
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl"
                 />
               </div>
             </div>
@@ -1170,7 +1170,7 @@ export const BookingDetailPage: React.FC = () => {
                   }))
                 }
                 rows={2}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl resize-none"
               />
             </div>
             <div>
@@ -1186,14 +1186,14 @@ export const BookingDetailPage: React.FC = () => {
                   }))
                 }
                 rows={2}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl resize-none"
               />
             </div>
             <div className="flex gap-3 pt-2">
               <button
                 onClick={() => setIsInvoiceModalOpen(false)}
                 disabled={createInvoiceMutation.isPending}
-                className="flex-1 px-4 py-2 border rounded-lg text-gray-700 disabled:opacity-50"
+                className="flex-1 px-4 py-2 border rounded-xl text-gray-700 disabled:opacity-50"
               >
                 Annuler
               </button>
@@ -1202,7 +1202,7 @@ export const BookingDetailPage: React.FC = () => {
                 disabled={
                   createInvoiceMutation.isPending || !invoiceForm.issueDate
                 }
-                className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 bg-primary-600 text-white py-2 rounded-xl hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {createInvoiceMutation.isPending ? (
                   <Loader2 size={16} className="animate-spin" />

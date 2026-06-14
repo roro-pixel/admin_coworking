@@ -15,9 +15,20 @@ import { useAuth } from "../../contexts/AuthContext";
 import type { KycCaseResponse } from "../../services/document.service";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
+  DRAFT: { label: "Brouillon", color: "bg-gray-100 text-gray-700" },
+  PENDING_REVIEW: {
+    label: "En attente",
+    color: "bg-yellow-100 text-yellow-700",
+  },
+  IN_REVIEW: { label: "En revue", color: "bg-orange-100 text-orange-700" },
+  APPROVED: { label: "Approuvé", color: "bg-green-100 text-green-700" },
+  REJECTED: { label: "Rejeté", color: "bg-red-100 text-red-700" },
+  EXPIRED: { label: "Expiré", color: "bg-gray-100 text-gray-500" },
+  CANCELLED: { label: "Annulé", color: "bg-gray-100 text-gray-500" },
   SUBMITTED: { label: "Soumis", color: "bg-yellow-100 text-yellow-700" },
   UNDER_REVIEW: { label: "En revue", color: "bg-orange-100 text-orange-700" },
   PENDING_CORRECTION: { label: "Correction", color: "bg-red-100 text-red-700" },
+  NEEDS_CORRECTION: { label: "Correction", color: "bg-red-100 text-red-700" },
 };
 
 export const KycMyQueuePage: React.FC = () => {
@@ -57,7 +68,7 @@ export const KycMyQueuePage: React.FC = () => {
     );
   }
 
-  const cases = myCases || [];
+  const cases = myCases?.content || [];
 
   return (
     <div className="space-y-6">

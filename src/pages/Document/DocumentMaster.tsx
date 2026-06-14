@@ -10,6 +10,10 @@ import {
   Calendar,
   CheckSquare,
   AlertTriangle,
+  Search,
+  ShieldCheck,
+  Tags,
+  FileSearch,
 } from "lucide-react";
 import { DocumentTypesList } from "./DocumentTypesList";
 import { DocumentRequirementsList } from "./DocumentRequirementsList";
@@ -19,7 +23,12 @@ import { KycDashboardPage } from "./KycDashboardPage";
 import { KycMyQueuePage } from "./KycMyQueuePage";
 import { KycExpiringSoonPage } from "./KycExpiringSoonPage";
 import { KycBulkReviewPage } from "./KycBulkReviewPage";
-import { KycCorrectionPage } from "./KycCorrectionPage"; // NOUVEAU
+import { KycCorrectionPage } from "./KycCorrectionPage";
+import { DocumentGedDashboard } from "./DocumentGedDashboard";
+import { DocumentAdvancedSearchPage } from "./DocumentAdvancedSearchPage";
+import { DocumentOwnerFolderPage } from "./DocumentOwnerFolderPage";
+import { DocumentGovernancePage } from "./DocumentGovernancePage";
+import { DocumentAnalyticsExportPage } from "./DocumentAnalyticsExportPage";
 
 type TabId =
   | "dashboard"
@@ -30,7 +39,12 @@ type TabId =
   | "bulk"
   | "documents"
   | "types"
-  | "requirements";
+  | "requirements"
+  | "gedDashboard"
+  | "advancedSearch"
+  | "folder"
+  | "governance"
+  | "analytics";
 
 const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Dashboard KYC", icon: BarChart3 },
@@ -39,9 +53,14 @@ const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "corrections", label: "Corrections", icon: AlertTriangle }, // NOUVEAU
   { id: "expiring", label: "Expirations", icon: Calendar },
   { id: "bulk", label: "Revue en masse", icon: CheckSquare },
+  { id: "gedDashboard", label: "Dashboard GED", icon: FileSearch },
   { id: "documents", label: "Tous les documents", icon: FolderOpen },
+  { id: "advancedSearch", label: "Recherche avancée", icon: Search },
+  { id: "folder", label: "Dossier propriétaire", icon: FolderOpen },
   { id: "types", label: "Types de documents", icon: FileText },
-  { id: "requirements", label: "Exigences KYC", icon: ListChecks },
+  { id: "requirements", label: "Exigences", icon: ListChecks },
+  { id: "governance", label: "Gouvernance", icon: Tags },
+  { id: "analytics", label: "Analytics GED", icon: ShieldCheck },
 ];
 
 export const DocumentMaster: React.FC = () => {
@@ -121,9 +140,26 @@ export const DocumentMaster: React.FC = () => {
             <KycBulkReviewPage />
           </div>
         )}
+
+        {visitedTabs.has("gedDashboard") && (
+          <div className={activeTab !== "gedDashboard" ? "hidden" : ""}>
+            <DocumentGedDashboard />
+          </div>
+        )}
         {visitedTabs.has("documents") && (
           <div className={activeTab !== "documents" ? "hidden" : ""}>
             <DocumentsList />
+          </div>
+        )}
+
+        {visitedTabs.has("advancedSearch") && (
+          <div className={activeTab !== "advancedSearch" ? "hidden" : ""}>
+            <DocumentAdvancedSearchPage />
+          </div>
+        )}
+        {visitedTabs.has("folder") && (
+          <div className={activeTab !== "folder" ? "hidden" : ""}>
+            <DocumentOwnerFolderPage />
           </div>
         )}
         {visitedTabs.has("types") && (
@@ -134,6 +170,17 @@ export const DocumentMaster: React.FC = () => {
         {visitedTabs.has("requirements") && (
           <div className={activeTab !== "requirements" ? "hidden" : ""}>
             <DocumentRequirementsList />
+          </div>
+        )}
+
+        {visitedTabs.has("governance") && (
+          <div className={activeTab !== "governance" ? "hidden" : ""}>
+            <DocumentGovernancePage />
+          </div>
+        )}
+        {visitedTabs.has("analytics") && (
+          <div className={activeTab !== "analytics" ? "hidden" : ""}>
+            <DocumentAnalyticsExportPage />
           </div>
         )}
       </div>

@@ -87,7 +87,7 @@ export const PromotionDetailModal: React.FC<PromotionDetailModalProps> = ({
 
       <div className="p-6 space-y-4">
         {/* Code */}
-        <div className="bg-gray-50 rounded-lg p-3">
+        <div className="bg-slate-50/80 rounded-xl p-3 ring-1 ring-slate-100">
           <p className="text-xs text-gray-500">Code promotionnel</p>
           <p className="font-mono text-sm font-medium">{promotion.code}</p>
         </div>
@@ -240,7 +240,7 @@ export const PromotionDetailModal: React.FC<PromotionDetailModalProps> = ({
           )}
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50"
+            className="flex-1 px-4 py-2 border rounded-lg text-gray-700 hover:bg-slate-50/80"
           >
             Fermer
           </button>

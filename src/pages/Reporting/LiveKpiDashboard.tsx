@@ -93,35 +93,31 @@ const GaugeChart: React.FC<{ value: number; size?: number }> = ({
   );
 };
 
-// Composant KpiCard réutilisable
+// Composant KpiCard réutilisable — style sobre pour back-office
 const KpiCard: React.FC<{
   title: string;
   value: string | number;
   icon: React.ElementType;
-  color: string;
+  color?: string;
   subtitle?: string;
   trend?: number;
-}> = ({ title, value, icon: Icon, color, subtitle, trend }) => {
+}> = ({ title, value, icon: Icon, subtitle, trend }) => {
   return (
-    <div
-      className={`bg-gradient-to-r ${color} rounded-xl p-5 text-white shadow-lg`}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-medium text-white/80">{title}</span>
-        <Icon size={20} className="text-white/70" />
+    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100 hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium text-gray-500">{title}</p>
+          <p className="mt-3 text-2xl font-bold text-gray-950">{value}</p>
+          {subtitle && <p className="mt-1 text-xs text-gray-400">{subtitle}</p>}
+        </div>
+        <div className="rounded-xl bg-gray-50 p-2.5 text-gray-500 ring-1 ring-gray-100">
+          <Icon size={20} />
+        </div>
       </div>
-      <p className="text-3xl font-bold">{value}</p>
-      {subtitle && <p className="text-xs text-white/70 mt-1">{subtitle}</p>}
       {trend !== undefined && (
-        <div className="flex items-center gap-1 mt-2">
-          {trend >= 0 ? (
-            <TrendingUp size={12} className="text-white/70" />
-          ) : (
-            <TrendingDown size={12} className="text-white/70" />
-          )}
-          <span className="text-xs text-white/70">
-            {Math.abs(trend)}% vs hier
-          </span>
+        <div className="mt-4 inline-flex items-center gap-1 rounded-full bg-gray-50 px-2.5 py-1 text-xs text-gray-500">
+          {trend >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+          {Math.abs(trend)}% vs hier
         </div>
       )}
     </div>

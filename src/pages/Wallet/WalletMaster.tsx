@@ -27,37 +27,36 @@ export const WalletMaster: React.FC = () => {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Portefeuilles</h1>
         <p className="text-gray-600 mt-1">
-          Recherchez, créez automatiquement, créditez et suivez les
-          portefeuilles clients.
+          Recherchez, créez automatiquement, créditez et suivez les portefeuilles clients.
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-gray-200 mb-6">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => switchTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-t-lg transition-all whitespace-nowrap text-sm font-medium ${
-                activeTab === tab.id
-                  ? "bg-primary-50 text-primary-600 border-b-2 border-primary-600"
-                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              <Icon size={17} />
-              {tab.label}
-            </button>
-          );
-        })}
+      <div className="mb-6 overflow-x-auto">
+        <div className="inline-flex min-w-max rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => switchTab(tab.id)}
+                className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all whitespace-nowrap ${
+                  active
+                    ? "bg-primary-600 text-white shadow-sm"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                }`}
+              >
+                <Icon size={17} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {visitedTabs.has("list") && (
         <div className={activeTab !== "list" ? "hidden" : ""}>
-          <WalletsList
-            onOpenLookup={() => switchTab("lookup")}
-            onOpenTopUp={() => switchTab("topup")}
-          />
+          <WalletsList onOpenLookup={() => switchTab("lookup")} onOpenTopUp={() => switchTab("topup")} />
         </div>
       )}
       {visitedTabs.has("lookup") && (

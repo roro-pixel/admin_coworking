@@ -56,8 +56,8 @@ export const StockMovements: React.FC = () => {
     queryFn: () =>
       inventoryService.getStockMovements({
         movementType: movementTypeFilter || undefined,
-        from: fromDate || undefined,
-        to: toDate || undefined,
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
         size: 100,
       }),
   });

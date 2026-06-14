@@ -116,7 +116,7 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({
 
       <div className="p-6">
         {/* Informations du plan */}
-        <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+        <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-slate-50/80 rounded-xl ring-1 ring-slate-100">
           <div>
             <p className="text-xs text-gray-500">Type</p>
             <p className="font-medium">
@@ -157,7 +157,7 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({
               setSelectedVersion(null);
               setIsVersionModalOpen(true);
             }}
-            className="bg-primary-600 text-white px-3 py-1 rounded-lg hover:bg-primary-700 flex items-center gap-1 text-sm"
+            className="bg-primary-600 text-white px-3 py-1 rounded-xl hover:bg-primary-700 flex items-center gap-1 text-sm"
           >
             <Plus size={14} />
             Nouvelle version
@@ -178,7 +178,7 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({
               .map((version) => (
                 <div
                   key={version.id}
-                  className="border rounded-lg p-4 hover:bg-gray-50"
+                  className="border rounded-lg p-4 hover:bg-slate-50/80"
                 >
                   <div className="flex justify-between items-start">
                     <div>
@@ -264,7 +264,7 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({
                           setSelectedVersion(version);
                           setIsVersionModalOpen(true);
                         }}
-                        className="px-3 py-1 border rounded-lg text-gray-700 hover:bg-gray-50 text-sm"
+                        className="px-3 py-1 border rounded-lg text-gray-700 hover:bg-slate-50/80 text-sm"
                       >
                         Voir détails
                       </button>

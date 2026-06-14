@@ -37,10 +37,19 @@ const getMonthDays = (month: string): Date[] => {
   return days;
 };
 
+const monthLabel = (month: string) => {
+  const [year, m] = month.split("-").map(Number);
+  return new Date(year, m - 1, 1).toLocaleDateString("fr-FR", {
+    month: "long",
+    year: "numeric",
+  });
+};
+
 export const ResourceAvailabilityCalendar: React.FC<
   ResourceAvailabilityCalendarProps
 > = ({ month, onMonthChange, slots, closures = [] }) => {
   const days = getMonthDays(month);
+  const todayKey = new Date().toISOString().slice(0, 10);
 
   const slotsByDay = React.useMemo(() => {
     const map: Record<string, ResourceAvailabilityResponse[]> = {};
@@ -49,6 +58,9 @@ export const ResourceAvailabilityCalendar: React.FC<
       map[key] = map[key] || [];
       map[key].push(slot);
     });
+    Object.values(map).forEach((items) =>
+      items.sort((a, b) => a.startedAt.localeCompare(b.startedAt)),
+    );
     return map;
   }, [slots]);
 
@@ -70,14 +82,18 @@ export const ResourceAvailabilityCalendar: React.FC<
     if (dayClosures.length > 0) {
       return {
         label: "Fermé",
-        className: "bg-gray-100 text-gray-600 border-gray-200",
+        dot: "bg-gray-400",
+        badge: "bg-gray-100 text-gray-600",
+        ring: "ring-gray-100",
         count: dayClosures.length,
       };
     }
     if (daySlots.length === 0) {
       return {
-        label: "Aucun créneau",
-        className: "bg-white text-gray-400 border-gray-100",
+        label: "Libre à créer",
+        dot: "bg-gray-200",
+        badge: "bg-gray-50 text-gray-400",
+        ring: "ring-gray-100",
         count: 0,
       };
     }
@@ -94,35 +110,50 @@ export const ResourceAvailabilityCalendar: React.FC<
     if (remainingCapacity <= 0) {
       return {
         label: "Complet",
-        className: "bg-red-50 text-red-700 border-red-200",
+        dot: "bg-red-500",
+        badge: "bg-red-50 text-red-700",
+        ring: "ring-red-100",
         count: daySlots.length,
       };
     }
     if (remainingCapacity < totalCapacity) {
       return {
         label: "Partiel",
-        className: "bg-orange-50 text-orange-700 border-orange-200",
+        dot: "bg-orange-500",
+        badge: "bg-orange-50 text-orange-700",
+        ring: "ring-orange-100",
         count: daySlots.length,
       };
     }
     return {
       label: "Disponible",
-      className: "bg-green-50 text-green-700 border-green-200",
+      dot: "bg-green-500",
+      badge: "bg-green-50 text-green-700",
+      ring: "ring-green-100",
       count: daySlots.length,
     };
   };
 
   return (
-    <div className="bg-white border rounded-xl overflow-hidden">
-      <div className="flex items-center justify-between p-4 border-b">
-        <div className="flex items-center gap-2">
-          <CalendarDays size={18} className="text-primary-600" />
-          <h3 className="font-semibold">Calendrier des disponibilités</h3>
+    <div className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-gray-100">
+      <div className="flex flex-col gap-4 bg-gradient-to-r from-gray-50 to-white p-5 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-600">
+            <CalendarDays size={20} />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold capitalize text-gray-900">
+              {monthLabel(month)}
+            </h3>
+            <p className="text-sm text-gray-500">
+              Vue mensuelle des créneaux, fermetures et capacités restantes.
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => onMonthChange(addMonths(month, -1))}
-            className="p-2 border rounded-lg hover:bg-gray-50"
+            className="rounded-xl border border-gray-200 bg-white p-2 text-gray-600 transition hover:bg-gray-50"
           >
             <ChevronLeft size={16} />
           </button>
@@ -130,79 +161,110 @@ export const ResourceAvailabilityCalendar: React.FC<
             type="month"
             value={month}
             onChange={(e) => onMonthChange(e.target.value)}
-            className="px-3 py-2 border rounded-lg text-sm"
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary-300 focus:ring-2 focus:ring-primary-100"
           />
           <button
             onClick={() => onMonthChange(addMonths(month, 1))}
-            className="p-2 border rounded-lg hover:bg-gray-50"
+            className="rounded-xl border border-gray-200 bg-white p-2 text-gray-600 transition hover:bg-gray-50"
           >
             <ChevronRight size={16} />
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 bg-gray-50 border-b text-xs font-medium text-gray-500">
+      <div className="grid grid-cols-7 bg-gray-50/80 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
         {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((d) => (
-          <div key={d} className="px-3 py-2 text-center">
+          <div key={d} className="text-center">
             {d}
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7">
+      <div className="grid grid-cols-7 gap-px bg-gray-100 p-px">
         {days.map((date) => {
           const key = toDateKey(date);
           const dayStatus = getDayStatus(date);
           const isCurrentMonth = key.startsWith(month);
+          const isToday = key === todayKey;
+          const daySlots = slotsByDay[key] || [];
+          const totalRemaining = daySlots.reduce(
+            (sum, slot) => sum + (slot.remainingCapacity || 0),
+            0,
+          );
+          const totalCapacity = daySlots.reduce(
+            (sum, slot) => sum + (slot.totalCapacity || 0),
+            0,
+          );
+
           return (
             <div
               key={key}
-              className={`min-h-[110px] border-r border-b p-2 ${isCurrentMonth ? "bg-white" : "bg-gray-50 opacity-60"}`}
+              className={`min-h-[132px] bg-white p-2.5 transition hover:bg-primary-50/30 ${
+                !isCurrentMonth ? "opacity-45" : ""
+              }`}
             >
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-sm font-medium">{date.getDate()}</span>
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <span
+                  className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${
+                    isToday
+                      ? "bg-primary-600 text-white"
+                      : "text-gray-800"
+                  }`}
+                >
+                  {date.getDate()}
+                </span>
                 {dayStatus.count > 0 && (
-                  <span className="text-[11px] text-gray-400">
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
                     {dayStatus.count}
                   </span>
                 )}
               </div>
+
               <div
-                className={`border rounded-lg px-2 py-1 text-xs ${dayStatus.className}`}
+                className={`mb-2 inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-medium ring-1 ${dayStatus.badge} ${dayStatus.ring}`}
               >
-                {dayStatus.label}
+                <span className={`h-1.5 w-1.5 rounded-full ${dayStatus.dot}`} />
+                <span className="truncate">{dayStatus.label}</span>
               </div>
-              {(slotsByDay[key] || []).slice(0, 3).map((slot) => (
-                <div
-                  key={slot.id}
-                  className="mt-1 text-[11px] text-gray-500 truncate"
-                >
-                  {slot.startedAt.slice(11, 16)}-{slot.endedAt.slice(11, 16)} ·{" "}
-                  {slot.remainingCapacity}/{slot.totalCapacity}
+
+              {daySlots.length > 0 && (
+                <div className="mb-2 rounded-xl bg-gray-50 px-2 py-1.5 text-[11px] text-gray-600">
+                  Capacité : <span className="font-semibold">{totalRemaining}</span> / {totalCapacity}
                 </div>
-              ))}
+              )}
+
+              <div className="space-y-1">
+                {daySlots.slice(0, 3).map((slot) => (
+                  <div
+                    key={slot.id}
+                    className="truncate rounded-lg bg-white px-2 py-1 text-[11px] text-gray-500 ring-1 ring-gray-100"
+                  >
+                    {slot.startedAt.slice(11, 16)}–{slot.endedAt.slice(11, 16)} · {slot.remainingCapacity}/{slot.totalCapacity}
+                  </div>
+                ))}
+                {daySlots.length > 3 && (
+                  <div className="text-[11px] font-medium text-primary-600">
+                    +{daySlots.length - 3} autre{daySlots.length - 3 > 1 ? "s" : ""}
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
 
-      <div className="flex flex-wrap gap-3 p-4 border-t text-xs">
-        <span className="inline-flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-green-100 border border-green-200" />
-          Disponible
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-orange-100 border border-orange-200" />
-          Partiel
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-red-100 border border-red-200" />
-          Complet
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-gray-100 border border-gray-200" />
-          Fermeture
-        </span>
+      <div className="flex flex-wrap gap-3 bg-gray-50/70 p-4 text-xs text-gray-600">
+        {[
+          ["bg-green-500", "Disponible"],
+          ["bg-orange-500", "Partiel"],
+          ["bg-red-500", "Complet"],
+          ["bg-gray-400", "Fermeture"],
+        ].map(([color, label]) => (
+          <span key={label} className="inline-flex items-center gap-2">
+            <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
+            {label}
+          </span>
+        ))}
       </div>
     </div>
   );

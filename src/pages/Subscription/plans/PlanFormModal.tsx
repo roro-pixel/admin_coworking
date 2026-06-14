@@ -155,7 +155,7 @@ export const PlanFormModal: React.FC<PlanFormModalProps> = ({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {errorMessage && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm">
               {errorMessage}
             </div>
           )}
@@ -170,7 +170,7 @@ export const PlanFormModal: React.FC<PlanFormModalProps> = ({
                 type="text"
                 value={editingPlan.code}
                 readOnly
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 font-mono text-sm cursor-not-allowed"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-gray-50 text-gray-500 font-mono text-sm cursor-not-allowed"
               />
             </div>
           )}
@@ -186,7 +186,7 @@ export const PlanFormModal: React.FC<PlanFormModalProps> = ({
                 setFormData({ ...formData, name: e.target.value })
               }
               required
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             />
           </div>
 
@@ -200,7 +200,7 @@ export const PlanFormModal: React.FC<PlanFormModalProps> = ({
                 setFormData({ ...formData, description: e.target.value })
               }
               rows={2}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
             />
           </div>
 
@@ -217,7 +217,7 @@ export const PlanFormModal: React.FC<PlanFormModalProps> = ({
                     planType: e.target.value as Plan["planType"],
                   })
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               >
                 {planTypes.map((type) => (
                   <option key={type.value} value={type.value}>
@@ -238,7 +238,7 @@ export const PlanFormModal: React.FC<PlanFormModalProps> = ({
                     targetAudience: e.target.value as Plan["targetAudience"],
                   })
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               >
                 {targetAudiences.map((ta) => (
                   <option key={ta.value} value={ta.value}>
@@ -263,7 +263,7 @@ export const PlanFormModal: React.FC<PlanFormModalProps> = ({
                     sortOrder: parseInt(e.target.value) || 0,
                   })
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
             <label className="flex items-center gap-2 cursor-pointer">
@@ -284,14 +284,14 @@ export const PlanFormModal: React.FC<PlanFormModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isPending}
-              className="flex-1 px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2 border rounded-lg text-gray-700 hover:bg-slate-50/80 transition-colors disabled:opacity-50"
             >
               Annuler
             </button>
             <button
               type="submit"
               disabled={isPending}
-              className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 bg-primary-600 text-white py-2 rounded-xl hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {isPending ? (
                 <Loader2 size={16} className="animate-spin" />

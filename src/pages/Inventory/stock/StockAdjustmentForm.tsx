@@ -5,6 +5,7 @@ import { inventoryService } from "../../../services/inventory.service";
 import type {
   InventoryItem,
   StockLevel,
+  StockOutReasonCode,
 } from "../../../services/inventory.service";
 import { useAuth } from "../../../contexts/AuthContext";
 import { ModalPortal } from "../../../components/ui/ModalPortal";
@@ -13,6 +14,14 @@ interface StockAdjustmentFormProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+const reasonOptions: { value: StockOutReasonCode; label: string }[] = [
+  { value: "LOSS", label: "Perte / introuvable" },
+  { value: "DAMAGE", label: "Article endommagé" },
+  { value: "INTERNAL_USE", label: "Usage interne" },
+  { value: "CONSUMPTION", label: "Consommation" },
+  { value: "OTHER", label: "Autre" },
+];
 
 export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
   isOpen,
@@ -24,7 +33,8 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
     itemCode: "",
     locationCode: "",
     quantityDelta: 0,
-    reason: "",
+    reasonCode: "LOSS" as StockOutReasonCode,
+    reasonDetails: "",
     referenceType: "",
     referenceCode: "",
   });
@@ -64,7 +74,8 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
         itemCode: formData.itemCode,
         locationCode: formData.locationCode,
         quantityDelta: formData.quantityDelta,
-        reason: formData.reason,
+        reasonCode: formData.reasonCode,
+        reasonDetails: formData.reasonDetails || undefined,
         referenceType: formData.referenceType || undefined,
         referenceCode: formData.referenceCode || undefined,
         performedBy: admin?.email || "admin",
@@ -85,7 +96,8 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
       itemCode: "",
       locationCode: "",
       quantityDelta: 0,
-      reason: "",
+      reasonCode: "LOSS",
+      reasonDetails: "",
       referenceType: "",
       referenceCode: "",
     });
@@ -99,6 +111,14 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
     e.preventDefault();
     if (formData.quantityDelta === 0) {
       setError("La variation ne peut pas être nulle");
+      return;
+    }
+    if (formData.referenceType && !formData.referenceCode) {
+      setError("Le code de référence est obligatoire quand le type de référence est renseigné.");
+      return;
+    }
+    if (formData.quantityDelta < 0 && formData.reasonCode === "OTHER" && !formData.reasonDetails.trim()) {
+      setError("Le détail du motif est obligatoire pour un ajustement négatif avec motif Autre.");
       return;
     }
     if (
@@ -258,20 +278,41 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
             )}
           </div>
 
-          <div>
-            <label className="block text-base font-medium text-gray-700 mb-2">
-              Motif *
-            </label>
-            <textarea
-              value={formData.reason}
-              onChange={(e) =>
-                setFormData({ ...formData, reason: e.target.value })
-              }
-              rows={3}
-              required
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
-              placeholder="Raison de l'ajustement (comptage, correction, etc.)"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">
+                Motif d'ajustement
+              </label>
+              <select
+                value={formData.reasonCode}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    reasonCode: e.target.value as StockOutReasonCode,
+                  })
+                }
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base bg-white"
+              >
+                {reasonOptions.map((reason) => (
+                  <option key={reason.value} value={reason.value}>
+                    {reason.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">
+                Détail du motif
+              </label>
+              <input
+                value={formData.reasonDetails}
+                onChange={(e) =>
+                  setFormData({ ...formData, reasonDetails: e.target.value })
+                }
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                placeholder="Correction après comptage, perte, casse..."
+              />
+            </div>
           </div>
 
           {error && (
@@ -296,7 +337,7 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
                 !formData.itemCode ||
                 !formData.locationCode ||
                 formData.quantityDelta === 0 ||
-                !formData.reason
+                formData.quantityDelta < 0 && formData.reasonCode === "OTHER" && !formData.reasonDetails
               }
               className="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 text-base font-medium"
             >

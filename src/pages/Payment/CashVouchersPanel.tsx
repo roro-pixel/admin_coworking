@@ -97,7 +97,7 @@ export const CashVouchersPanel: React.FC = () => {
           {error}
         </div>
       )}
-      <div className="bg-white rounded-xl shadow-sm p-6 space-y-5">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-6 space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="text-sm font-medium">Type de bon</label>
@@ -158,13 +158,13 @@ export const CashVouchersPanel: React.FC = () => {
             onChange={(e) =>
               setForm({ ...form, documentNumber: e.target.value })
             }
-            className="px-3 py-2 border rounded-lg"
+            className="px-3 py-2 border border-gray-200 rounded-xl"
           />
           <input
             placeholder="Catégorie flux"
             value={form.flowCategory}
             onChange={(e) => setForm({ ...form, flowCategory: e.target.value })}
-            className="px-3 py-2 border rounded-lg"
+            className="px-3 py-2 border border-gray-200 rounded-xl"
           />
           <input
             placeholder="Type référence"
@@ -172,7 +172,7 @@ export const CashVouchersPanel: React.FC = () => {
             onChange={(e) =>
               setForm({ ...form, referenceType: e.target.value })
             }
-            className="px-3 py-2 border rounded-lg"
+            className="px-3 py-2 border border-gray-200 rounded-xl"
           />
           <input
             placeholder="Code référence"
@@ -180,7 +180,7 @@ export const CashVouchersPanel: React.FC = () => {
             onChange={(e) =>
               setForm({ ...form, referenceCode: e.target.value })
             }
-            className="px-3 py-2 border rounded-lg"
+            className="px-3 py-2 border border-gray-200 rounded-xl"
           />
           <input
             placeholder="Type contrepartie"
@@ -188,7 +188,7 @@ export const CashVouchersPanel: React.FC = () => {
             onChange={(e) =>
               setForm({ ...form, counterpartyType: e.target.value })
             }
-            className="px-3 py-2 border rounded-lg"
+            className="px-3 py-2 border border-gray-200 rounded-xl"
           />
           <input
             placeholder="Nom contrepartie"
@@ -196,7 +196,7 @@ export const CashVouchersPanel: React.FC = () => {
             onChange={(e) =>
               setForm({ ...form, counterpartyName: e.target.value })
             }
-            className="px-3 py-2 border rounded-lg"
+            className="px-3 py-2 border border-gray-200 rounded-xl"
           />
         </div>
         <textarea

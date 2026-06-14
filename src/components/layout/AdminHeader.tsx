@@ -9,6 +9,7 @@ export const AdminHeader: React.FC = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { admin, logout } = useAuth();
   const navigate = useNavigate();
+  const username = admin?.email?.split("@")[0] || "Utilisateur";
 
   const handleLogout = async () => {
     setShowMenu(false);
@@ -24,77 +25,79 @@ export const AdminHeader: React.FC = () => {
   };
 
   return (
-    <header className="fixed top-0 right-0 left-64 bg-white border-b border-gray-200 z-40 h-16">
-      <div className="flex items-center justify-between px-6 h-full">
-        <h2 className="text-lg font-semibold text-gray-800">Tableau de bord</h2>
+    <header className="fixed top-0 right-0 left-20 z-40 h-16 border-b border-gray-100 bg-white/90 backdrop-blur">
+      <div className="flex h-full items-center justify-between px-4 md:px-6">
+        <div>
+          <h2 className="text-base font-bold text-gray-900 md:text-lg">Tableau de bord</h2>
+          <p className="hidden text-xs text-gray-400 sm:block">Pilotage et supervision administrative</p>
+        </div>
 
-        <div className="flex items-center space-x-4">
-          {/* NotificationDropdown intégré */}
+        <div className="flex items-center gap-3">
           <NotificationDropdown />
 
           <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="flex items-center space-x-3 p-2 hover:bg-gray-100 rounded-lg"
+              className="flex items-center gap-2 rounded-2xl px-2 py-1.5 transition-colors hover:bg-gray-50 md:gap-3 md:px-3"
             >
-              <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                <User size={16} className="text-[#C84C9A]" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 ring-1 ring-primary-100">
+                <User size={17} />
               </div>
-              <div className="text-left">
-                <span className="text-sm font-medium text-gray-700 block">
-                  {admin?.email?.split("@")[0] || "Utilisateur"}
-                </span>
-                <span className="text-xs text-gray-400">
-                  Bonjour, {admin?.email?.split("@")[0] || "Utilisateur"}
-                </span>
+              <div className="hidden text-left md:block">
+                <span className="block text-sm font-bold text-gray-800">{username}</span>
+                <span className="block text-xs text-gray-400">Bonjour, {username}</span>
               </div>
-              <ChevronDown size={16} className="text-gray-500" />
+              <ChevronDown
+                size={16}
+                className={`text-gray-400 transition-transform ${showMenu ? "rotate-180" : ""}`}
+              />
             </button>
 
             {showMenu && (
               <>
-                <div
-                  className="fixed inset-0 z-30"
-                  onClick={() => setShowMenu(false)}
-                />
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border py-1 z-40">
-                  <div className="px-4 py-3 border-b">
-                    <p className="text-sm font-medium text-gray-900">
-                      {admin?.email?.split("@")[0] || "Utilisateur"}
-                    </p>
-                    <p className="text-xs text-gray-500">{admin?.email}</p>
+                <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)} />
+                <div className="absolute right-0 z-40 mt-3 w-72 overflow-hidden rounded-3xl bg-white p-2 shadow-xl ring-1 ring-gray-100">
+                  <div className="rounded-2xl bg-gray-50 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-primary-600 shadow-sm ring-1 ring-gray-100">
+                        <User size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-gray-900">{username}</p>
+                        <p className="truncate text-xs text-gray-500">{admin?.email}</p>
+                      </div>
+                    </div>
                     {admin?.roleNames && admin.roleNames.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
+                      <div className="mt-3 flex flex-wrap gap-1.5">
                         {admin.roleNames.map((role) => (
-                          <span
-                            key={role}
-                            className="text-xs px-2 py-0.5 rounded-full bg-primary-50 text-primary-700"
-                          >
+                          <span key={role} className="rounded-full bg-primary-50 px-2 py-1 text-xs font-semibold text-primary-700">
                             {role}
                           </span>
                         ))}
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
-                      navigate("/settings");
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center"
-                  >
-                    <Settings size={16} className="mr-2" />
-                    Paramètres
-                  </button>
-                  <hr className="my-1" />
-                  <button
-                    onClick={handleLogout}
-                    disabled={isLoggingOut}
-                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center disabled:opacity-50"
-                  >
-                    <LogOut size={16} className="mr-2" />
-                    {isLoggingOut ? "Déconnexion..." : "Déconnexion"}
-                  </button>
+
+                  <div className="mt-2 space-y-1">
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        navigate("/settings");
+                      }}
+                      className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                    >
+                      <Settings size={17} />
+                      Paramètres
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      disabled={isLoggingOut}
+                      className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+                    >
+                      <LogOut size={17} />
+                      {isLoggingOut ? "Déconnexion..." : "Déconnexion"}
+                    </button>
+                  </div>
                 </div>
               </>
             )}

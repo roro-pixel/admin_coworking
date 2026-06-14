@@ -17,7 +17,7 @@ export const LotsList: React.FC = () => {
       }),
   });
 
-  const lots = lotsData || [];
+  const lots = lotsData?.content || lotsData?.data || [];
 
   const filteredLots = lots.filter(
     (lot: any) =>

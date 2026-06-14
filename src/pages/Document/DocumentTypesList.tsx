@@ -1,42 +1,118 @@
-import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import {
-  Eye,
-  Plus,
-  Search,
-  FileText,
-  Shield,
-  Calendar,
-  HardDrive,
-} from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Eye, Plus, Search, FileText, Power, Trash2, X } from "lucide-react";
 import { documentService } from "../../services/document.service";
-import type { DocumentType } from "../../services/document.service";
+import type {
+  DocumentCategory,
+  DocumentOwnerType,
+  DocumentType,
+} from "../../services/document.service";
 import { DocumentTypeDetailModal } from "./DocumentTypeDetailModal";
+import { ModalPortal } from "../../components/ui/ModalPortal";
+
+const ownerTypes: DocumentOwnerType[] = [
+  "CUSTOMER",
+  "MEMBER",
+  "BUSINESS",
+  "CONTRACT",
+  "INVOICE",
+  "PAYMENT",
+  "PROPOSAL",
+  "ASSET",
+];
+const categories: DocumentCategory[] = [
+  "KYC",
+  "LEGAL",
+  "SYSTEM",
+  "FINANCIAL",
+  "ASSET",
+  "OTHER",
+];
+const defaultForm = {
+  code: "",
+  name: "",
+  category: "KYC" as DocumentCategory,
+  ownerType: "MEMBER" as DocumentOwnerType,
+  description: "",
+  helpText: "",
+  documentDetails: "",
+  required: true,
+  requiresExpiryDate: false,
+  requiresReview: true,
+  requiresSignature: false,
+  multipleAllowed: false,
+  allowedMimeTypes: "application/pdf,image/jpeg,image/png",
+  maxFileSizeBytes: 10485760,
+  active: true,
+};
 
 export const DocumentTypesList: React.FC = () => {
-  const [ownerType, setOwnerType] = useState("MEMBER");
+  const queryClient = useQueryClient();
+  const [ownerType, setOwnerType] = useState<DocumentOwnerType>("MEMBER");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [selectedDoc, setSelectedDoc] = useState<DocumentType | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editing, setEditing] = useState<DocumentType | null>(null);
+  const [form, setForm] = useState(defaultForm);
+  const [error, setError] = useState<string | null>(null);
 
   const { data: documentTypes, isLoading } = useQuery({
     queryKey: ["documentTypes", ownerType],
     queryFn: () => documentService.getDocumentTypes(ownerType),
   });
 
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
+  useEffect(() => {
+    if (!isFormOpen) return;
+    if (editing)
+      setForm({
+        ...defaultForm,
+        ...editing,
+        description: editing.description || "",
+        helpText: editing.helpText || "",
+        documentDetails: editing.documentDetails || "",
+        requiresSignature: editing.requiresSignature || false,
+      });
+    else setForm({ ...defaultForm, ownerType });
+    setError(null);
+  }, [isFormOpen, editing, ownerType]);
 
-  const handleViewDetail = (doc: DocumentType) => {
-    setSelectedDoc(doc);
-    setIsDetailOpen(true);
-  };
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["documentTypes"] });
+  const createMutation = useMutation({
+    mutationFn: () => documentService.createDocumentType(form),
+    onSuccess: () => {
+      invalidate();
+      setIsFormOpen(false);
+    },
+    onError: (e: any) =>
+      setError(e?.response?.data?.message || "Erreur création type"),
+  });
+  const updateMutation = useMutation({
+    mutationFn: () => documentService.updateDocumentType(editing!.code, form),
+    onSuccess: () => {
+      invalidate();
+      setIsFormOpen(false);
+      setEditing(null);
+    },
+    onError: (e: any) =>
+      setError(e?.response?.data?.message || "Erreur modification type"),
+  });
+  const activateMutation = useMutation({
+    mutationFn: (code: string) => documentService.activateDocumentType(code),
+    onSuccess: invalidate,
+  });
+  const deactivateMutation = useMutation({
+    mutationFn: (code: string) => documentService.deactivateDocumentType(code),
+    onSuccess: invalidate,
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (code: string) => documentService.deleteDocumentType(code),
+    onSuccess: invalidate,
+    onError: () =>
+      alert("Suppression impossible : le type est probablement utilisé."),
+  });
 
   const filteredTypes = (documentTypes || []).filter((dt) => {
     if (
@@ -50,6 +126,9 @@ export const DocumentTypesList: React.FC = () => {
     return true;
   });
 
+  const submit = () =>
+    editing ? updateMutation.mutate() : createMutation.mutate();
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -59,153 +138,324 @@ export const DocumentTypesList: React.FC = () => {
         <div className="flex gap-3">
           <select
             value={ownerType}
-            onChange={(e) => setOwnerType(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg text-sm"
+            onChange={(e) => setOwnerType(e.target.value as DocumentOwnerType)}
+            className="px-4 py-2 border border-gray-200 rounded-lg text-sm bg-white"
           >
-            <option value="MEMBER">Membres</option>
-            <option value="CUSTOMER">Customers</option>
-            <option value="BUSINESS">Business</option>
+            {ownerTypes.map((t) => (
+              <option key={t}>{t}</option>
+            ))}
           </select>
-          <button className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2 text-sm">
-            <Plus size={18} />
-            Nouveau type
+          <button
+            onClick={() => {
+              setEditing(null);
+              setIsFormOpen(true);
+            }}
+            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2 text-sm"
+          >
+            <Plus size={18} /> Nouveau type
           </button>
         </div>
       </div>
-
-      {/* Filtres */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="flex-1 relative">
           <Search
             size={18}
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
           />
           <input
-            type="text"
-            placeholder="Rechercher un type de document..."
+            placeholder="Rechercher un type..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full pl-10 pr-4 py-2 border rounded-lg"
           />
         </div>
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-200 rounded-lg bg-white text-sm"
+          className="px-4 py-2 border rounded-lg bg-white text-sm"
         >
-          <option value="all">Toutes les catégories</option>
-          <option value="KYC">KYC</option>
-          <option value="LEGAL">Légal</option>
+          <option value="all">Toutes catégories</option>
+          {categories.map((c) => (
+            <option key={c}>{c}</option>
+          ))}
         </select>
-        {(search || categoryFilter !== "all") && (
-          <button
-            onClick={() => {
-              setSearch("");
-              setCategoryFilter("all");
-            }}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
-          >
-            Réinitialiser
-          </button>
-        )}
       </div>
-
-      {/* Liste */}
-      <div className="space-y-4">
-        {isLoading ? (
-          <div className="text-center py-8">Chargement...</div>
-        ) : filteredTypes.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl">
-            <FileText size={48} className="mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500">Aucun type de document trouvé</p>
-          </div>
-        ) : (
-          filteredTypes.map((dt) => (
-            <div
-              key={dt.code}
-              className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow"
-            >
-              <div className="p-5">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-gray-900">{dt.name}</h3>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${dt.required ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"}`}
-                      >
-                        {dt.required ? "Obligatoire" : "Optionnel"}
-                      </span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${dt.active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}
-                      >
-                        {dt.active ? "Actif" : "Inactif"}
-                      </span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${dt.category === "KYC" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}
-                      >
-                        {dt.category}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                      {dt.description}
+      {isLoading ? (
+        <div className="py-12 text-center">Chargement...</div>
+      ) : (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm">Type</th>
+                <th className="px-4 py-3 text-left text-sm">Catégorie</th>
+                <th className="px-4 py-3 text-center text-sm">Contraintes</th>
+                <th className="px-4 py-3 text-center text-sm">Actif</th>
+                <th className="px-4 py-3 text-right text-sm">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {filteredTypes.map((dt) => (
+                <tr key={dt.code}>
+                  <td className="px-4 py-3">
+                    <p className="font-medium flex items-center gap-2">
+                      <FileText size={16} />
+                      {dt.name}
                     </p>
-                    <div className="flex flex-wrap gap-4 text-xs text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <FileText size={12} />
-                        Code: {dt.code}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <HardDrive size={12} />
-                        Taille max: {formatBytes(dt.maxFileSizeBytes)}
-                      </span>
-                      {dt.requiresExpiryDate && (
-                        <span className="flex items-center gap-1 text-orange-600">
-                          <Calendar size={12} />
-                          Date d'expiration requise
-                        </span>
-                      )}
-                      {dt.requiresReview && (
-                        <span className="flex items-center gap-1 text-blue-600">
-                          <Shield size={12} />
-                          Revue obligatoire
-                        </span>
-                      )}
-                      {dt.multipleAllowed && (
-                        <span className="flex items-center gap-1 text-gray-400">
-                          Documents multiples autorisés
-                        </span>
-                      )}
+                    <p className="text-xs text-gray-500 font-mono">{dt.code}</p>
+                  </td>
+                  <td className="px-4 py-3 text-sm">{dt.category}</td>
+                  <td className="px-4 py-3 text-center text-xs text-gray-500">
+                    {dt.required ? "Obligatoire" : "Optionnel"} ·{" "}
+                    {dt.requiresReview ? "Revue" : "Sans revue"} ·{" "}
+                    {dt.requiresSignature ? "Signature" : ""}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() =>
+                        dt.active
+                          ? deactivateMutation.mutate(dt.code)
+                          : activateMutation.mutate(dt.code)
+                      }
+                      className={dt.active ? "text-green-600" : "text-gray-400"}
+                    >
+                      <Power size={16} />
+                    </button>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedDoc(dt);
+                          setIsDetailOpen(true);
+                        }}
+                        className="p-1 text-blue-600"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditing(dt);
+                          setIsFormOpen(true);
+                        }}
+                        className="px-2 py-1 text-xs border rounded"
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        onClick={() =>
+                          confirm("Supprimer ce type ?") &&
+                          deleteMutation.mutate(dt.code)
+                        }
+                        className="p-1 text-red-600"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
-                    {dt.allowedMimeTypes && (
-                      <p className="text-xs text-gray-400 mt-2">
-                        Formats: {dt.allowedMimeTypes}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => handleViewDetail(dt)}
-                    className="p-2 text-gray-400 hover:text-primary-600 rounded-lg flex-shrink-0"
-                    title="Voir détail"
-                  >
-                    <Eye size={18} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Modal de détail */}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       {selectedDoc && (
         <DocumentTypeDetailModal
           isOpen={isDetailOpen}
-          onClose={() => {
-            setIsDetailOpen(false);
-            setSelectedDoc(null);
-          }}
+          onClose={() => setIsDetailOpen(false)}
           documentType={selectedDoc}
         />
+      )}
+      {isFormOpen && (
+        <ModalPortal onClose={() => setIsFormOpen(false)} size="3xl">
+          <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
+            <h3 className="text-xl font-bold">
+              {editing ? "Modifier" : "Créer"} un type de document
+            </h3>
+            <button onClick={() => setIsFormOpen(false)}>
+              <X size={22} />
+            </button>
+          </div>
+          <div className="p-6 space-y-4">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input
+                disabled={!!editing}
+                value={form.code}
+                onChange={(e) =>
+                  setForm({ ...form, code: e.target.value.toUpperCase() })
+                }
+                placeholder="Code"
+                className="px-3 py-2 border rounded-lg disabled:bg-gray-50"
+              />
+              <input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Nom"
+                className="px-3 py-2 border rounded-lg"
+              />
+              <select
+                value={form.ownerType}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    ownerType: e.target.value as DocumentOwnerType,
+                  })
+                }
+                className="px-3 py-2 border rounded-lg bg-white"
+              >
+                {ownerTypes.map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
+              </select>
+              <select
+                value={form.category}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    category: e.target.value as DocumentCategory,
+                  })
+                }
+                className="px-3 py-2 border rounded-lg bg-white"
+              >
+                {categories.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+              <input
+                value={form.allowedMimeTypes}
+                onChange={(e) =>
+                  setForm({ ...form, allowedMimeTypes: e.target.value })
+                }
+                placeholder="MIME autorisés"
+                className="md:col-span-2 px-3 py-2 border rounded-lg"
+              />
+              <input
+                type="number"
+                value={form.maxFileSizeBytes}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    maxFileSizeBytes: Number(e.target.value) || 0,
+                  })
+                }
+                placeholder="Taille max"
+                className="px-3 py-2 border rounded-lg"
+              />
+              <textarea
+                value={form.description}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
+                placeholder="Description"
+                rows={2}
+                className="md:col-span-2 px-3 py-2 border rounded-lg"
+              />
+              <textarea
+                value={form.documentDetails}
+                onChange={(e) =>
+                  setForm({ ...form, documentDetails: e.target.value })
+                }
+                placeholder="Détails"
+                rows={2}
+                className="md:col-span-2 px-3 py-2 border rounded-lg"
+              />
+              <textarea
+                value={form.helpText}
+                onChange={(e) => setForm({ ...form, helpText: e.target.value })}
+                placeholder="Aide"
+                rows={2}
+                className="md:col-span-2 px-3 py-2 border rounded-lg"
+              />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-sm">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={form.required}
+                  onChange={(e) =>
+                    setForm({ ...form, required: e.target.checked })
+                  }
+                />{" "}
+                Obligatoire
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={form.requiresExpiryDate}
+                  onChange={(e) =>
+                    setForm({ ...form, requiresExpiryDate: e.target.checked })
+                  }
+                />{" "}
+                Expiration
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={form.requiresReview}
+                  onChange={(e) =>
+                    setForm({ ...form, requiresReview: e.target.checked })
+                  }
+                />{" "}
+                Revue
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={form.requiresSignature}
+                  onChange={(e) =>
+                    setForm({ ...form, requiresSignature: e.target.checked })
+                  }
+                />{" "}
+                Signature
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={form.multipleAllowed}
+                  onChange={(e) =>
+                    setForm({ ...form, multipleAllowed: e.target.checked })
+                  }
+                />{" "}
+                Multiple
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={form.active}
+                  onChange={(e) =>
+                    setForm({ ...form, active: e.target.checked })
+                  }
+                />{" "}
+                Actif
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <button
+                onClick={() => setIsFormOpen(false)}
+                className="px-4 py-2 border rounded-lg"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={submit}
+                disabled={
+                  !form.code ||
+                  !form.name ||
+                  createMutation.isPending ||
+                  updateMutation.isPending
+                }
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </ModalPortal>
       )}
     </div>
   );

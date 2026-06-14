@@ -136,8 +136,8 @@ export const PurchaseOrdersList: React.FC = () => {
   });
 
   const markOrderedMutation = useMutation({
-    mutationFn: ({ code, orderedBy }: { code: string; orderedBy: string }) =>
-      inventoryService.markOrdered(code, orderedBy),
+    mutationFn: ({ code }: { code: string; orderedBy?: string }) =>
+      inventoryService.markOrdered(code),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
     },
@@ -193,7 +193,7 @@ export const PurchaseOrdersList: React.FC = () => {
   const filteredOrders = orders.filter(
     (order: PurchaseOrder) =>
       order.orderCode.toLowerCase().includes(search.toLowerCase()) ||
-      order.supplierName.toLowerCase().includes(search.toLowerCase()),
+      (order.supplierName ?? "").toLowerCase().includes(search.toLowerCase()),
   );
 
   if (isLoading) {

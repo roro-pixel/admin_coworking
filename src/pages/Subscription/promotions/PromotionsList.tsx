@@ -138,7 +138,7 @@ export const PromotionsList: React.FC = () => {
             setEditingPromotion(null);
             setIsModalOpen(true);
           }}
-          className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2"
+          className="bg-primary-600 text-white px-4 py-2 rounded-xl hover:bg-primary-700 flex items-center gap-2"
         >
           <Plus size={18} />
           Nouvelle promotion
@@ -157,13 +157,13 @@ export const PromotionsList: React.FC = () => {
             placeholder="Rechercher par nom..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg"
+            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)}
-          className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
+          className="px-4 py-2 border border-slate-200 rounded-xl bg-white"
         >
           <option value="">Tous les statuts</option>
           <option value="DRAFT">Brouillon</option>
@@ -174,7 +174,7 @@ export const PromotionsList: React.FC = () => {
         {hasActiveFilters && (
           <button
             onClick={handleResetFilters}
-            className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg whitespace-nowrap"
+            className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-slate-200 rounded-xl whitespace-nowrap"
           >
             Effacer les filtres
           </button>
@@ -182,39 +182,39 @@ export const PromotionsList: React.FC = () => {
       </div>
 
       {/* Tableau */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="rounded-2xl bg-white shadow-[0_18px_45px_rgba(15,23,42,0.06)] ring-1 ring-slate-100 overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b">
+          <thead className="bg-slate-50/80">
             <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Code
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Nom</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nom</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Type
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Valeur
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Période
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Utilisations
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Statut
               </th>
-              <th className="px-6 py-3 text-right text-sm font-semibold">
+              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="[&>tr+tr]:border-t [&>tr+tr]:border-slate-100">
             {filteredPromotions.map((promo) => (
               <tr
                 key={promo.code}
-                className="hover:bg-gray-50 cursor-pointer"
+                className="hover:bg-slate-50/80 cursor-pointer"
                 onClick={() => handleViewDetail(promo)}
               >
                 <td className="px-6 py-4 text-sm font-mono">{promo.code}</td>
@@ -301,7 +301,7 @@ export const PromotionsList: React.FC = () => {
       </div>
 
       {filteredPromotions.length === 0 && !isLoading && (
-        <div className="text-center py-12 bg-white rounded-xl">
+        <div className="text-center py-12 rounded-2xl bg-white">
           <Ticket size={48} className="mx-auto text-gray-300 mb-4" />
           <p className="text-gray-500">Aucune promotion trouvée</p>
           {hasActiveFilters && (
@@ -325,7 +325,7 @@ export const PromotionsList: React.FC = () => {
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-gray-50"
+              className="p-1 rounded border disabled:opacity-40 hover:bg-slate-50/80"
             >
               <ChevronLeft size={16} />
             </button>
@@ -335,7 +335,7 @@ export const PromotionsList: React.FC = () => {
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-gray-50"
+              className="p-1 rounded border disabled:opacity-40 hover:bg-slate-50/80"
             >
               <ChevronRight size={16} />
             </button>

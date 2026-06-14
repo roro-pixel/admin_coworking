@@ -55,7 +55,7 @@ export const ReorderRulesList: React.FC = () => {
     queryFn: () => inventoryService.getLocations(true),
   });
 
-  const rules = rulesData || [];
+  const rules = rulesData?.content || [];
   const items = itemsData?.content || [];
   const suggestions = suggestionsData || [];
 
@@ -83,11 +83,24 @@ export const ReorderRulesList: React.FC = () => {
     },
   });
 
+  const createRequestFromSuggestionMutation = useMutation({
+    mutationFn: (suggestion: any) =>
+      inventoryService.createPurchaseRequestFromReorderSuggestions({
+        locationCode: suggestion.locationCode,
+        supplierCode: suggestion.bestSupplierCode || undefined,
+        requestedBy: "admin",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchase-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["reorder-suggestions"] });
+    },
+  });
+
   const filteredRules = rules.filter(
     (rule: ReorderRule) =>
-      rule.itemName.toLowerCase().includes(search.toLowerCase()) ||
+      (rule.itemName || "").toLowerCase().includes(search.toLowerCase()) ||
       rule.itemCode.toLowerCase().includes(search.toLowerCase()) ||
-      rule.locationName.toLowerCase().includes(search.toLowerCase()),
+      (rule.locationName || "").toLowerCase().includes(search.toLowerCase()),
   );
 
   const handleOpenModal = (rule?: ReorderRule) => {
@@ -100,7 +113,7 @@ export const ReorderRulesList: React.FC = () => {
         reorderQuantity: rule.reorderQuantity,
         active: rule.active,
       });
-      setItemSearch(rule.itemName);
+      setItemSearch(rule.itemName ?? rule.itemCode ?? "");
     } else {
       setEditingRule(null);
       setFormData({
@@ -198,24 +211,40 @@ export const ReorderRulesList: React.FC = () => {
                 className="bg-yellow-50 border border-yellow-200 rounded-xl p-5"
               >
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-                  <div>
-                    <p className="font-semibold text-base">
-                      {suggestion.itemName}
-                    </p>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Stock actuel: {suggestion.currentQuantity} / Seuil:{" "}
-                      {suggestion.minimumQuantity}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Quantité suggérée: {suggestion.suggestedOrderQuantity}
-                    </p>
-                    <p className="text-base font-semibold text-primary-600 mt-1">
-                      Coût estimé:{" "}
-                      {suggestion.estimatedOrderCost?.toLocaleString() || 0}{" "}
-                      FCFA
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <p className="font-semibold text-base">{suggestion.itemName}</p>
+                      {suggestion.severity && (
+                        <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-700">
+                          {suggestion.severity}
+                        </span>
+                      )}
+                      {suggestion.priorityScore !== undefined && (
+                        <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700">
+                          Score {suggestion.priorityScore}
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3 text-sm text-gray-600">
+                      <p>Stock actuel : {suggestion.currentQuantity} / seuil {suggestion.minimumQuantity}</p>
+                      <p>Qté suggérée : {suggestion.suggestedOrderQuantity}</p>
+                      <p>En commande : {suggestion.quantityOnOrder ?? 0}</p>
+                      <p>Jours restants : {suggestion.daysOfStockRemaining ?? "—"}</p>
+                      <p>Tendance : {suggestion.consumptionTrend ?? "—"} {suggestion.consumptionTrendPercent !== undefined ? `(${suggestion.consumptionTrendPercent}%)` : ""}</p>
+                      <p>Commander avant : {suggestion.recommendedOrderByDate || "—"}</p>
+                      <p>Fournisseur conseillé : {suggestion.bestSupplierCode || "—"}</p>
+                      <p>Prix fournisseur : {(suggestion.bestSupplierPrice ?? 0).toLocaleString()} FCFA</p>
+                      <p>Délai fournisseur : {suggestion.bestSupplierLeadTimeDays ?? "—"} j</p>
+                    </div>
+                    <p className="text-base font-semibold text-primary-600 mt-2">
+                      Coût estimé : {(suggestion.estimatedOrderCost ?? 0).toLocaleString()} FCFA
                     </p>
                   </div>
-                  <button className="px-5 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-base font-medium">
+                  <button
+                    onClick={() => createRequestFromSuggestionMutation.mutate(suggestion)}
+                    disabled={createRequestFromSuggestionMutation.isPending}
+                    className="px-5 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-base font-medium"
+                  >
                     Créer une demande d'achat
                   </button>
                 </div>

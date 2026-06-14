@@ -113,16 +113,16 @@ export const BookingQuotaOverrides: React.FC = () => {
         </h2>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2"
+          className="bg-primary-600 text-white px-4 py-2 rounded-xl hover:bg-primary-700 flex items-center gap-2"
         >
           <Plus size={18} />
           Nouvelle dérogation
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+        <table className="w-full border-separate border-spacing-y-1">
+          <thead className="bg-gray-50/80">
             <tr>
               <th className="px-6 py-3 text-left text-sm font-semibold">N°</th>
               <th className="px-6 py-3 text-left text-sm font-semibold">
@@ -154,11 +154,11 @@ export const BookingQuotaOverrides: React.FC = () => {
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody>
             {overrides.map((override) => (
               <tr
                 key={override.overrideNumber}
-                className={`hover:bg-gray-50 ${!override.active ? "opacity-60" : ""}`}
+                className={`hover:bg-primary-50/40 ${!override.active ? "opacity-60" : ""}`}
               >
                 <td className="px-6 py-4 text-xs font-mono text-gray-500">
                   {override.overrideNumber}
@@ -220,7 +220,7 @@ export const BookingQuotaOverrides: React.FC = () => {
       </div>
 
       {overrides.length === 0 && !isLoading && (
-        <div className="text-center py-12 bg-white rounded-xl">
+        <div className="text-center py-12 bg-white rounded-2xl">
           <Award size={48} className="mx-auto text-gray-300 mb-4" />
           <p className="text-gray-500">Aucune dérogation</p>
         </div>
@@ -233,7 +233,7 @@ export const BookingQuotaOverrides: React.FC = () => {
             <h3 className="text-xl font-bold">Nouvelle dérogation de quota</h3>
             <button
               onClick={() => setIsModalOpen(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
+              className="p-1 hover:bg-gray-100 rounded-xl"
             >
               <X size={20} />
             </button>
@@ -242,7 +242,7 @@ export const BookingQuotaOverrides: React.FC = () => {
           <div className="overflow-y-auto max-h-[75vh]">
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               {errorMessage && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+                <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm">
                   {errorMessage}
                 </div>
               )}
@@ -285,7 +285,7 @@ export const BookingQuotaOverrides: React.FC = () => {
                   onChange={(e) => setOwnerCode(e.target.value)}
                   placeholder={ownerTypeLabels[ownerType].placeholder}
                   required
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl"
                 />
               </div>
 
@@ -300,7 +300,7 @@ export const BookingQuotaOverrides: React.FC = () => {
                     setFormData({ ...formData, resourceCode: e.target.value })
                   }
                   placeholder="ROOM-001 — laisser vide pour toutes les ressources"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl"
                 />
               </div>
 
@@ -324,7 +324,7 @@ export const BookingQuotaOverrides: React.FC = () => {
                           extraActiveBookings: parseInt(e.target.value) || 0,
                         })
                       }
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
                     />
                   </div>
                   <div>
@@ -341,7 +341,7 @@ export const BookingQuotaOverrides: React.FC = () => {
                           extraBookingsPerDay: parseInt(e.target.value) || 0,
                         })
                       }
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
                     />
                   </div>
                   <div>
@@ -358,7 +358,7 @@ export const BookingQuotaOverrides: React.FC = () => {
                           extraBookingsPerWeek: parseInt(e.target.value) || 0,
                         })
                       }
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
                     />
                   </div>
                   <div>
@@ -375,7 +375,7 @@ export const BookingQuotaOverrides: React.FC = () => {
                           extraBookingsPerMonth: parseInt(e.target.value) || 0,
                         })
                       }
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
                     />
                   </div>
                 </div>
@@ -393,7 +393,7 @@ export const BookingQuotaOverrides: React.FC = () => {
                   rows={2}
                   required
                   placeholder="Ex: Événement exceptionnel, client VIP..."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl resize-none"
                 />
               </div>
 
@@ -409,7 +409,7 @@ export const BookingQuotaOverrides: React.FC = () => {
                       setFormData({ ...formData, validFrom: e.target.value })
                     }
                     required
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl"
                   />
                 </div>
                 <div>
@@ -423,7 +423,7 @@ export const BookingQuotaOverrides: React.FC = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, validUntil: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl"
                   />
                   <p className="text-xs text-gray-400 mt-1">
                     Laisser vide pour une durée illimitée
@@ -436,14 +436,14 @@ export const BookingQuotaOverrides: React.FC = () => {
                   type="button"
                   onClick={() => setIsModalOpen(false)}
                   disabled={createMutation.isPending}
-                  className="flex-1 px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className="flex-1 px-4 py-2 border rounded-xl text-gray-700 hover:bg-primary-50/40 disabled:opacity-50"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
                   disabled={createMutation.isPending}
-                  className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 bg-primary-600 text-white py-2 rounded-xl hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {createMutation.isPending ? (
                     <Loader2 size={16} className="animate-spin" />

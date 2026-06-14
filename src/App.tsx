@@ -16,6 +16,8 @@ import { DocumentMaster } from "./pages/Document/DocumentMaster";
 import { AdminContracts } from "./pages/Contracts";
 import { InventoryMaster } from "./pages/Inventory/InventoryMaster";
 import { SubscriptionMaster } from "./pages/Subscription/SubscriptionMaster";
+import { CreateEntitlementDefinition } from "./pages/Subscription/entitlements/CreateEntitlementDefinition";
+import { EntitlementDefinitionDetail } from "./pages/Subscription/entitlements/EntitlementDefinitionDetail";
 import { PaymentMaster } from "./pages/Payment/PaymentMaster";
 import { WalletMaster } from "./pages/Wallet/WalletMaster";
 import { WalletDetailModal } from "./pages/Wallet/WalletDetailModal";
@@ -36,6 +38,7 @@ import { ContractPreviewPage } from "./components/contracts/ContractPreviewPage"
 import { BookingCreatePage } from "./components/bookings/BookingCreatePage";
 import { BookingDetailPage } from "./components/bookings/BookingDetailPage";
 import { PublicQuoteSignaturePage } from "./pages/Billing/PublicQuoteSignaturePage";
+import { SubscriptionDetailPage } from "./pages/Subscription/subscriptions/SubscriptionDetailPage";
 
 const queryClient = new QueryClient();
 
@@ -95,7 +98,7 @@ function App() {
               }
             />
             <Route
-              path="/admin/bookings/create"
+              path="/bookings/create"
               element={
                 <ProtectedRoute>
                   <BookingCreatePage />
@@ -103,7 +106,7 @@ function App() {
               }
             />
             <Route
-              path="/admin/bookings/:bookingNumber"
+              path="/bookings/:bookingNumber"
               element={
                 <ProtectedRoute>
                   <BookingDetailPage />
@@ -187,6 +190,30 @@ function App() {
               element={
                 <ProtectedRoute>
                   <InventoryMaster />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/entitlements/create"
+              element={
+                <ProtectedRoute>
+                  <CreateEntitlementDefinition />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/entitlements/:code"
+              element={
+                <ProtectedRoute>
+                  <EntitlementDefinitionDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/:subscriptionNumber"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionDetailPage />
                 </ProtectedRoute>
               }
             />

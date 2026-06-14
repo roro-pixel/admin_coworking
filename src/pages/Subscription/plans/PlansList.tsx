@@ -248,7 +248,7 @@ export const PlansList: React.FC = () => {
             setEditingPlan(null);
             setIsFormOpen(true);
           }}
-          className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2"
+          className="bg-primary-600 text-white px-4 py-2 rounded-xl hover:bg-primary-700 flex items-center gap-2"
         >
           <Plus size={18} /> Nouveau plan
         </button>
@@ -266,7 +266,7 @@ export const PlansList: React.FC = () => {
             placeholder="Rechercher un plan par nom ou code..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg"
+            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl"
           />
         </div>
         <button
@@ -286,7 +286,7 @@ export const PlansList: React.FC = () => {
 
       {/* Filtres avancés */}
       {showFilters && (
-        <div className="bg-gray-50 rounded-lg p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="rounded-2xl bg-white p-5 mb-6 shadow-[0_16px_35px_rgba(15,23,42,0.05)] ring-1 ring-slate-100 grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Statut
@@ -296,7 +296,7 @@ export const PlansList: React.FC = () => {
               onChange={(e) =>
                 handleFilterChange(setStatusFilter, e.target.value)
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white"
             >
               <option value="">Tous les statuts</option>
               <option value="DRAFT">Brouillon</option>
@@ -313,7 +313,7 @@ export const PlansList: React.FC = () => {
               onChange={(e) =>
                 handleFilterChange(setPlanTypeFilter, e.target.value)
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white"
             >
               {planTypeOptions.map((t) => (
                 <option key={t.value} value={t.value}>
@@ -331,7 +331,7 @@ export const PlansList: React.FC = () => {
               onChange={(e) =>
                 handleFilterChange(setTargetAudienceFilter, e.target.value)
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white"
             >
               {targetAudienceOptions.map((t) => (
                 <option key={t.value} value={t.value}>
@@ -349,7 +349,7 @@ export const PlansList: React.FC = () => {
               onChange={(e) =>
                 handleFilterChange(setVisibleFilter, e.target.value)
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white"
             >
               {visibleOptions.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -372,39 +372,39 @@ export const PlansList: React.FC = () => {
       )}
 
       {/* Tableau */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="rounded-2xl bg-white shadow-[0_18px_45px_rgba(15,23,42,0.06)] ring-1 ring-slate-100 overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b">
+          <thead className="bg-slate-50/80">
             <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Ordre
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Code
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Nom</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nom</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Type
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Public
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Statut
               </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
+              <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Visible
               </th>
-              <th className="px-6 py-3 text-right text-sm font-semibold">
+              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="[&>tr+tr]:border-t [&>tr+tr]:border-slate-100">
             {sortedPlans.map((plan) => (
               <tr
                 key={plan.code}
-                className="hover:bg-gray-50 cursor-pointer"
+                className="hover:bg-slate-50/80 cursor-pointer"
                 onClick={() => goToPlanDetail(plan)}
               >
                 <td className="px-6 py-4 text-sm text-gray-500">
@@ -496,7 +496,7 @@ export const PlansList: React.FC = () => {
       </div>
 
       {sortedPlans.length === 0 && !isLoading && (
-        <div className="text-center py-12 bg-white rounded-xl">
+        <div className="text-center py-12 rounded-2xl bg-white">
           <Package size={48} className="mx-auto text-gray-300 mb-4" />
           <p className="text-gray-500">Aucun plan trouvé</p>
           {hasActiveFilters && (
@@ -520,7 +520,7 @@ export const PlansList: React.FC = () => {
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-gray-50"
+              className="p-1 rounded border disabled:opacity-40 hover:bg-slate-50/80"
             >
               <ChevronLeft size={16} />
             </button>
@@ -530,7 +530,7 @@ export const PlansList: React.FC = () => {
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-gray-50"
+              className="p-1 rounded border disabled:opacity-40 hover:bg-slate-50/80"
             >
               <ChevronRight size={16} />
             </button>

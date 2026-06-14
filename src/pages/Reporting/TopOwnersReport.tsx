@@ -264,8 +264,8 @@ export const TopOwnersReport: React.FC = () => {
 
           {/* Tableau */}
           <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
+            <table className="w-full border-separate border-spacing-y-2">
+              <thead className="bg-transparent">
                 <tr>
                   <th className="px-6 py-3 text-left text-sm font-semibold">
                     #
@@ -287,7 +287,7 @@ export const TopOwnersReport: React.FC = () => {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody>
                 {owners.map((owner, idx) => (
                   <tr key={owner.ownerCode} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
@@ -354,7 +354,7 @@ export const TopOwnersReport: React.FC = () => {
           {/* Podium */}
           {owners[0] && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-              <div className="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl p-4 border border-yellow-200 text-center">
+              <div className="bg-white rounded-xl p-4 ring-1 ring-gray-100 text-center shadow-sm">
                 <Crown size={20} className="text-yellow-600 mx-auto mb-2" />
                 <Medal size={28} className="mx-auto text-yellow-500 mb-1" />
                 <p className="font-semibold text-gray-900 mt-1">
@@ -368,7 +368,7 @@ export const TopOwnersReport: React.FC = () => {
                 </p>
               </div>
               {owners[1] && (
-                <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200 text-center">
+                <div className="bg-white rounded-xl p-4 ring-1 ring-gray-100 text-center shadow-sm">
                   <Medal size={28} className="mx-auto text-gray-400 mb-1" />
                   <p className="font-semibold text-gray-900 mt-1">
                     {owners[1].ownerName}
@@ -382,7 +382,7 @@ export const TopOwnersReport: React.FC = () => {
                 </div>
               )}
               {owners[2] && (
-                <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-200 text-center">
+                <div className="bg-white rounded-xl p-4 ring-1 ring-gray-100 text-center shadow-sm">
                   <Medal size={28} className="mx-auto text-amber-600 mb-1" />
                   <p className="font-semibold text-gray-900 mt-1">
                     {owners[2].ownerName}

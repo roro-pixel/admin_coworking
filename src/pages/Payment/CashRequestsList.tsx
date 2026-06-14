@@ -161,7 +161,7 @@ export const CashRequestsList: React.FC = () => {
           <Plus size={16} /> Nouvelle demande
         </button>
       </div>
-      <div className="bg-white rounded-xl shadow-sm p-4 grid grid-cols-1 md:grid-cols-5 gap-3">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-4 grid grid-cols-1 md:grid-cols-5 gap-3">
         <input
           value={searchText}
           onChange={(e) => {
@@ -169,7 +169,7 @@ export const CashRequestsList: React.FC = () => {
             setPage(0);
           }}
           placeholder="Recherche"
-          className="px-3 py-2 border rounded-lg"
+          className="px-3 py-2 border border-gray-200 rounded-xl"
         />
         <select
           value={sessionNumber}
@@ -177,7 +177,7 @@ export const CashRequestsList: React.FC = () => {
             setSessionNumber(e.target.value);
             setPage(0);
           }}
-          className="px-3 py-2 border rounded-lg bg-white"
+          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
         >
           <option value="">Toutes sessions</option>
           {sessions.map((s) => (
@@ -192,7 +192,7 @@ export const CashRequestsList: React.FC = () => {
             setRequestType(e.target.value);
             setPage(0);
           }}
-          className="px-3 py-2 border rounded-lg bg-white"
+          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
         >
           <option value="">Tous types</option>
           {Object.entries(typeLabels).map(([k, v]) => (
@@ -207,7 +207,7 @@ export const CashRequestsList: React.FC = () => {
             setStatus(e.target.value);
             setPage(0);
           }}
-          className="px-3 py-2 border rounded-lg bg-white"
+          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
         >
           <option value="">Tous statuts</option>
           {Object.entries(statusLabels).map(([k, v]) => (
@@ -225,19 +225,19 @@ export const CashRequestsList: React.FC = () => {
           <Loader2 className="animate-spin mx-auto" />
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b">
+        <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+          <table className="w-full border-separate border-spacing-y-2">
+            <thead className="bg-gray-50/70">
               <tr>
-                <th className="px-4 py-3 text-left text-sm">Demande</th>
-                <th className="px-4 py-3 text-left text-sm">Session</th>
-                <th className="px-4 py-3 text-left text-sm">Type</th>
-                <th className="px-4 py-3 text-right text-sm">Montant</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Demande</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Session</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Type</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Montant</th>
                 <th className="px-4 py-3 text-center text-sm">Statut</th>
-                <th className="px-4 py-3 text-right text-sm">Actions</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody>
               {requests.map((r) => (
                 <tr key={r.requestNumber}>
                   <td className="px-4 py-3">
@@ -402,7 +402,7 @@ export const CashRequestsList: React.FC = () => {
       <div className="flex justify-end gap-3 pt-4 border-t">
         <button
           onClick={() => setIsFormOpen(false)}
-          className="px-4 py-2 border rounded-lg"
+          className="px-4 py-2 border border-gray-200 rounded-xl"
         >
           Annuler
         </button>

@@ -189,7 +189,7 @@ export const BillableItemsList: React.FC = () => {
                 setInvoiceError(null);
                 setIsInvoiceModalOpen(true);
               }}
-              className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2 text-sm font-medium"
+              className="bg-primary-600 text-white px-4 py-2 rounded-xl shadow-sm hover:bg-primary-700 hover:shadow transition-all flex items-center gap-2 text-sm font-medium"
             >
               <FileText size={15} />
               Facturer ({selected.size})
@@ -209,12 +209,12 @@ export const BillableItemsList: React.FC = () => {
             placeholder="Rechercher par n°, souscripteur ou source..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg"
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
           />
         </div>
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className={`px-4 py-2 border rounded-lg flex items-center gap-2 ${
+          className={`px-4 py-2 border rounded-xl flex items-center gap-2 ${
             showFilters || hasActiveFilters
               ? "bg-primary-50 border-primary-300 text-primary-700"
               : "bg-white border-gray-200 text-gray-600"
@@ -228,7 +228,7 @@ export const BillableItemsList: React.FC = () => {
       </div>
 
       {showFilters && (
-        <div className="bg-gray-50 rounded-lg p-4 mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-gray-100 bg-white p-4 mb-6 shadow-sm shadow-gray-100/70 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Statut
@@ -238,7 +238,7 @@ export const BillableItemsList: React.FC = () => {
               onChange={(e) =>
                 handleFilterChange(setStatusFilter, e.target.value)
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
             >
               <option value="">Tous</option>
               <option value="PENDING">En attente</option>
@@ -255,7 +255,7 @@ export const BillableItemsList: React.FC = () => {
               onChange={(e) =>
                 handleFilterChange(setSubscriberTypeFilter, e.target.value)
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
             >
               <option value="">Tous</option>
               <option value="MEMBER">Membre</option>
@@ -272,7 +272,7 @@ export const BillableItemsList: React.FC = () => {
               onChange={(e) =>
                 handleFilterChange(setSourceTypeFilter, e.target.value)
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
             >
               <option value="">Toutes</option>
               <option value="SUBSCRIPTION">Souscription</option>
@@ -293,9 +293,9 @@ export const BillableItemsList: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm shadow-gray-100/70 overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b">
+          <thead className="bg-gray-50/60 text-gray-500">
             <tr>
               <th className="px-4 py-3 text-left">
                 <input
@@ -307,31 +307,31 @@ export const BillableItemsList: React.FC = () => {
                   className="rounded"
                 />
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 N° Billable
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Souscripteur
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Source
               </th>
-              <th className="px-6 py-3 text-right text-sm font-semibold">
+              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Montant
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Date
               </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
+              <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Statut
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="divide-y divide-gray-100">
             {filtered.map((item: BillableItem) => (
               <tr
                 key={item.billableNumber}
-                className={`hover:bg-gray-50 ${selected.has(item.billableNumber) ? "bg-primary-50/30" : ""}`}
+                className={`transition-colors hover:bg-primary-50/40 ${selected.has(item.billableNumber) ? "bg-primary-50/60" : ""}`}
               >
                 <td className="px-4 py-4">
                   {item.status === "PENDING" ? (
@@ -364,7 +364,7 @@ export const BillableItemsList: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 text-center">
                   <span
-                    className={`px-2 py-1 rounded-full text-xs ${statusConfig[item.status]?.color ?? "bg-gray-100 text-gray-600"}`}
+                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[item.status]?.color ?? "bg-gray-100 text-gray-600"}`}
                   >
                     {statusConfig[item.status]?.label ?? item.status}
                   </span>
@@ -376,7 +376,7 @@ export const BillableItemsList: React.FC = () => {
       </div>
 
       {filtered.length === 0 && !isLoading && (
-        <div className="text-center py-12 bg-white rounded-xl">
+        <div className="text-center py-12 rounded-2xl border border-dashed border-gray-200 bg-white">
           <CreditCard size={48} className="mx-auto text-gray-300 mb-4" />
           <p className="text-gray-500">Aucun item facturable trouvé</p>
         </div>
@@ -391,7 +391,7 @@ export const BillableItemsList: React.FC = () => {
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-gray-50"
+              className="p-1 rounded border disabled:opacity-40 hover:bg-primary-50/40 transition-colors"
             >
               <ChevronLeft size={16} />
             </button>
@@ -401,7 +401,7 @@ export const BillableItemsList: React.FC = () => {
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-gray-50"
+              className="p-1 rounded border disabled:opacity-40 hover:bg-primary-50/40 transition-colors"
             >
               <ChevronRight size={16} />
             </button>
@@ -411,7 +411,7 @@ export const BillableItemsList: React.FC = () => {
 
       {isInvoiceModalOpen && (
         <ModalPortal onClose={() => setIsInvoiceModalOpen(false)}>
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+          <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-gray-100 p-4 flex justify-between items-center rounded-t-2xl">
             <h3 className="text-xl font-bold">Créer une facture</h3>
             <button
               onClick={() => setIsInvoiceModalOpen(false)}
@@ -446,7 +446,7 @@ export const BillableItemsList: React.FC = () => {
                 onChange={(e) =>
                   setInvoiceForm((f) => ({ ...f, title: e.target.value }))
                 }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
               />
             </div>
             <div>
@@ -459,7 +459,7 @@ export const BillableItemsList: React.FC = () => {
                   setInvoiceForm((f) => ({ ...f, description: e.target.value }))
                 }
                 rows={2}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl resize-none shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -473,7 +473,7 @@ export const BillableItemsList: React.FC = () => {
                   onChange={(e) =>
                     setInvoiceForm((f) => ({ ...f, issueDate: e.target.value }))
                   }
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
                 />
               </div>
               <div>
@@ -487,7 +487,7 @@ export const BillableItemsList: React.FC = () => {
                   onChange={(e) =>
                     setInvoiceForm((f) => ({ ...f, dueDate: e.target.value }))
                   }
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
                 />
               </div>
             </div>
@@ -495,7 +495,7 @@ export const BillableItemsList: React.FC = () => {
               <button
                 onClick={() => setIsInvoiceModalOpen(false)}
                 disabled={createInvoiceMutation.isPending}
-                className="flex-1 px-4 py-2 border rounded-lg text-gray-700 disabled:opacity-50"
+                className="flex-1 px-4 py-2 border rounded-xl text-gray-700 disabled:opacity-50"
               >
                 Annuler
               </button>

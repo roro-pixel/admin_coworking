@@ -225,7 +225,7 @@ export const WaitlistManager: React.FC = () => {
           <button
             onClick={() => promoteMutation.mutate(50)}
             disabled={promoteMutation.isPending}
-            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 text-sm disabled:opacity-50"
+            className="px-3 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 flex items-center gap-2 text-sm disabled:opacity-50"
           >
             {promoteMutation.isPending ? (
               <Loader2 size={14} className="animate-spin" />
@@ -237,7 +237,7 @@ export const WaitlistManager: React.FC = () => {
           <button
             onClick={() => expireMutation.mutate(50)}
             disabled={expireMutation.isPending}
-            className="px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 flex items-center gap-2 text-sm disabled:opacity-50"
+            className="px-3 py-2 bg-orange-600 text-white rounded-xl hover:bg-orange-700 flex items-center gap-2 text-sm disabled:opacity-50"
           >
             {expireMutation.isPending ? (
               <Loader2 size={14} className="animate-spin" />
@@ -248,7 +248,7 @@ export const WaitlistManager: React.FC = () => {
           </button>
           <button
             onClick={() => refetch()}
-            className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+            className="p-2 border border-gray-200 rounded-xl hover:bg-primary-50/40"
             title="Actualiser"
           >
             <RefreshCw size={16} className="text-gray-500" />
@@ -256,14 +256,14 @@ export const WaitlistManager: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl p-4 shadow-sm mb-6">
+      <div className="bg-white rounded-2xl p-4 shadow-sm ring-1 ring-gray-100 mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           <select
             value={statusFilter}
             onChange={(e) =>
               setStatusFilter(e.target.value as WaitlistStatus | "")
             }
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
+            className="px-4 py-2 border border-gray-200 rounded-xl bg-white"
           >
             <option value="">Tous les statuts</option>
             {Object.entries(statusConfig).map(([value, cfg]) => (
@@ -277,7 +277,7 @@ export const WaitlistManager: React.FC = () => {
             placeholder="Code ressource..."
             value={resourceFilter}
             onChange={(e) => setResourceFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg w-64"
+            className="px-4 py-2 border border-gray-200 rounded-xl w-64"
           />
           {(statusFilter || resourceFilter) && (
             <button
@@ -285,7 +285,7 @@ export const WaitlistManager: React.FC = () => {
                 setStatusFilter("");
                 setResourceFilter("");
               }}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+              className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-primary-50/40"
             >
               Réinitialiser
             </button>
@@ -293,10 +293,10 @@ export const WaitlistManager: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px]">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-gray-50 ">
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
                   ID
@@ -324,11 +324,11 @@ export const WaitlistManager: React.FC = () => {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody>
               {entries.map((entry) => {
                 const status = statusConfig[entry.status];
                 return (
-                  <tr key={entry.id} className="hover:bg-gray-50">
+                  <tr key={entry.id} className="hover:bg-primary-50/40">
                     <td className="px-6 py-4">
                       <p className="text-sm font-mono text-gray-500">
                         {entry.id}
@@ -462,7 +462,7 @@ export const WaitlistManager: React.FC = () => {
             <h3 className="text-xl font-bold">Créneaux alternatifs</h3>
             <button
               onClick={() => setShowAlternativesModal(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
+              className="p-1 hover:bg-gray-100 rounded-xl"
             >
               <X size={20} />
             </button>
@@ -471,7 +471,7 @@ export const WaitlistManager: React.FC = () => {
           <div className="p-6 overflow-y-auto max-h-[70vh]">
             {bookingResult && (
               <div
-                className={`mb-4 p-3 rounded-lg ${bookingResult.success ? "bg-green-50 border border-green-200 text-green-700" : "bg-red-50 border border-red-200 text-red-700"}`}
+                className={`mb-4 p-3 rounded-xl ${bookingResult.success ? "bg-green-50 border border-green-200 text-green-700" : "bg-red-50 border border-red-200 text-red-700"}`}
               >
                 {bookingResult.success ? (
                   <CheckCircle size={16} className="inline mr-2" />
@@ -482,7 +482,7 @@ export const WaitlistManager: React.FC = () => {
               </div>
             )}
 
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+            <div className="mb-4 p-3 bg-gray-50 rounded-xl">
               <p className="text-sm font-medium text-gray-700">
                 Demande originale
               </p>
@@ -514,7 +514,7 @@ export const WaitlistManager: React.FC = () => {
                 {selectedEntry.alternatives.map((alt, idx) => (
                   <div
                     key={idx}
-                    className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
+                    className="p-3 border border-gray-200 rounded-xl hover:bg-primary-50/40"
                   >
                     <div className="flex justify-between items-start">
                       <div>
@@ -554,7 +554,7 @@ export const WaitlistManager: React.FC = () => {
                       <button
                         onClick={() => handleBookAlternative(alt)}
                         disabled={!!bookingResult}
-                        className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
+                        className="px-3 py-1.5 bg-primary-600 text-white rounded-xl text-sm hover:bg-primary-700 disabled:opacity-50"
                       >
                         Réserver
                       </button>
@@ -581,7 +581,7 @@ export const WaitlistManager: React.FC = () => {
                   }
                 }}
                 disabled={cancelMutation.isPending}
-                className="flex-1 px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                className="flex-1 px-4 py-2 border border-red-300 text-red-700 rounded-xl hover:bg-red-50 disabled:opacity-50"
               >
                 {cancelMutation.isPending ? (
                   <Loader2 size={16} className="animate-spin inline mr-2" />
@@ -592,7 +592,7 @@ export const WaitlistManager: React.FC = () => {
               </button>
               <button
                 onClick={() => setShowAlternativesModal(false)}
-                className="flex-1 px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50"
+                className="flex-1 px-4 py-2 border rounded-xl text-gray-700 hover:bg-primary-50/40"
               >
                 Fermer
               </button>

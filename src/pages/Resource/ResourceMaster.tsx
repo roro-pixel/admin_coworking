@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { Routes, Route, useLocation, useSearchParams } from "react-router-dom";
 import { AdminLayout } from "../../components/layout/AdminLayout";
 import {
   Building2,
@@ -16,8 +17,13 @@ import { ResourceGroupsList } from "./groups/ResourceGroupsList";
 import { ResourcePoliciesList } from "./policies/ResourcePoliciesList";
 import { AmenitiesList } from "./amenities/AmenitiesList";
 import { PricingRulesList } from "./pricing/PricingRulesList";
+import { PricingRuleCreatePage } from "./pricing/PricingRuleCreatePage";
+import { PricingRuleDetailPage } from "./pricing/PricingRuleDetailPage";
 import { ResourceAvailability } from "./resources/ResourceAvailability";
 import { ResourceClosuresList } from "./closures/ResourceClosuresList";
+import { ResourceCreatePage } from "./resources/ResourceCreatePage";
+import { ResourceDetailPage } from "./resources/ResourceDetailPage";
+import { ResourcePolicyDetailPage } from "./policies/ResourcePolicyDetailPage";
 
 type TabId =
   | "resources"
@@ -40,19 +46,52 @@ const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "closures", label: "Fermetures", icon: XCircle },
 ];
 
-export const ResourceMaster: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabId>("resources");
+const isTabId = (value: unknown): value is TabId =>
+  typeof value === "string" && tabs.some((tab) => tab.id === value);
 
-  // CORRECTION : même pattern que SubscriptionMaster
-  // Un composant n'est monté qu'à la première visite de son onglet,
-  // puis reste dans le DOM masqué (display:none) pour éviter les re-fetches
+const RoutedWithLayout: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => <AdminLayout>{children}</AdminLayout>;
+
+const ResourceTabs: React.FC = () => {
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const tabFromQuery = searchParams.get("tab");
+  const tabFromState = (location.state as { activeTab?: string } | null)
+    ?.activeTab;
+
+  const initialTab: TabId = isTabId(tabFromQuery)
+    ? tabFromQuery
+    : isTabId(tabFromState)
+      ? tabFromState
+      : "resources";
+
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(
-    new Set(["resources"]),
+    new Set([initialTab]),
   );
+
+  useEffect(() => {
+    const nextFromQuery = searchParams.get("tab");
+    const nextFromState = (location.state as { activeTab?: string } | null)
+      ?.activeTab;
+    const next = isTabId(nextFromQuery)
+      ? nextFromQuery
+      : isTabId(nextFromState)
+        ? nextFromState
+        : null;
+
+    if (next && next !== activeTab) {
+      setActiveTab(next);
+      setVisitedTabs((prev) => new Set([...prev, next]));
+    }
+  }, [location.state, searchParams, activeTab]);
 
   const handleTabChange = (tabId: TabId) => {
     setActiveTab(tabId);
     setVisitedTabs((prev) => new Set([...prev, tabId]));
+    setSearchParams(tabId === "resources" ? {} : { tab: tabId });
   };
 
   return (
@@ -61,37 +100,36 @@ export const ResourceMaster: React.FC = () => {
         <h1 className="text-2xl font-bold text-gray-900">
           Gestion des espaces
         </h1>
-        <p className="text-gray-600 mt-1">
-          Gérez les ressources, types, groupes, politiques et équipements
+        <p className="mt-1 text-gray-600">
+          Gérez les ressources, types, groupes, politiques, équipements,
+          tarifs, disponibilités et fermetures.
         </p>
       </div>
 
-      {/* Onglets */}
-      <div className="flex flex-wrap gap-1 border-b border-gray-200 mb-6">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`
-                flex items-center gap-2 px-4 py-2 rounded-t-lg transition-all whitespace-nowrap
-                ${
-                  activeTab === tab.id
-                    ? "bg-primary-50 text-primary-600 border-b-2 border-primary-600"
-                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                }
-              `}
-            >
-              <Icon size={18} />
-              {tab.label}
-            </button>
-          );
-        })}
+      <div className="mb-6 overflow-x-auto">
+        <div className="inline-flex min-w-max gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-gray-100">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all whitespace-nowrap ${
+                  active
+                    ? "bg-primary-600 text-white shadow-sm"
+                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                }`}
+              >
+                <Icon size={16} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Contenu — monté à la première visite, masqué ensuite */}
-      <div className="mt-6">
+      <div>
         {visitedTabs.has("resources") && (
           <div className={activeTab !== "resources" ? "hidden" : ""}>
             <ResourcesList />
@@ -134,5 +172,33 @@ export const ResourceMaster: React.FC = () => {
         )}
       </div>
     </AdminLayout>
+  );
+};
+
+export const ResourceMaster: React.FC = () => {
+  return (
+    <Routes>
+      <Route index element={<ResourceTabs />} />
+      <Route path="create" element={<ResourceCreatePage />} />
+      <Route path="policies/:code" element={<ResourcePolicyDetailPage />} />
+      <Route
+        path="pricing/create"
+        element={
+          <RoutedWithLayout>
+            <PricingRuleCreatePage />
+          </RoutedWithLayout>
+        }
+      />
+      <Route
+        path="pricing/:ruleId"
+        element={
+          <RoutedWithLayout>
+            <PricingRuleDetailPage />
+          </RoutedWithLayout>
+        }
+      />
+      <Route path=":code" element={<ResourceDetailPage />} />
+      <Route path="*" element={<ResourceTabs />} />
+    </Routes>
   );
 };

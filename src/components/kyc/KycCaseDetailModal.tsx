@@ -45,6 +45,41 @@ const kycStatusConfig: Record<
   string,
   { label: string; color: string; icon: React.ElementType }
 > = {
+  DRAFT: {
+    label: "Brouillon",
+    color: "bg-gray-100 text-gray-600",
+    icon: Clock,
+  },
+  PENDING_REVIEW: {
+    label: "En attente",
+    color: "bg-purple-100 text-purple-700",
+    icon: FileText,
+  },
+  IN_REVIEW: {
+    label: "En revue",
+    color: "bg-yellow-100 text-yellow-700",
+    icon: Eye,
+  },
+  APPROVED: {
+    label: "Approuvé",
+    color: "bg-green-100 text-green-700",
+    icon: CheckCircle,
+  },
+  REJECTED: {
+    label: "Rejeté",
+    color: "bg-red-100 text-red-700",
+    icon: XCircle,
+  },
+  EXPIRED: {
+    label: "Expiré",
+    color: "bg-gray-100 text-gray-500",
+    icon: XCircle,
+  },
+  CANCELLED: {
+    label: "Annulé",
+    color: "bg-gray-100 text-gray-500",
+    icon: XCircle,
+  },
   NOT_STARTED: {
     label: "Non commencé",
     color: "bg-gray-100 text-gray-600",
@@ -70,25 +105,10 @@ const kycStatusConfig: Record<
     color: "bg-orange-100 text-orange-700",
     icon: AlertCircle,
   },
-  APPROVED: {
-    label: "Approuvé",
-    color: "bg-green-100 text-green-700",
-    icon: CheckCircle,
-  },
-  REJECTED: {
-    label: "Rejeté",
-    color: "bg-red-100 text-red-700",
-    icon: XCircle,
-  },
   RENEWAL_REQUIRED: {
     label: "Renouvel. requis",
     color: "bg-purple-100 text-purple-700",
     icon: Calendar,
-  },
-  EXPIRED: {
-    label: "Expiré",
-    color: "bg-gray-100 text-gray-500",
-    icon: XCircle,
   },
 };
 
@@ -355,10 +375,17 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
   const StatusIcon = sc?.icon || Clock;
 
   const canSubmit =
-    currentCase.status === "IN_PROGRESS" &&
+    currentCase.status === "DRAFT" &&
     (currentCase.missingDocumentTypeCodes?.length ?? 1) === 0;
-  const canDecide = ["SUBMITTED", "UNDER_REVIEW"].includes(currentCase.status);
-  const canAssign = currentCase.status === "SUBMITTED";
+  const canDecide = [
+    "PENDING_REVIEW",
+    "IN_REVIEW",
+    "PENDING_REVIEW",
+    "IN_REVIEW",
+  ].includes(currentCase.status);
+  const canAssign = ["PENDING_REVIEW", "PENDING_REVIEW"].includes(
+    currentCase.status,
+  );
   const hasMissing = (currentCase.missingDocumentTypeCodes?.length ?? 0) > 0;
 
   const docStats = {
@@ -443,7 +470,10 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
             <div className="text-center">
               <p className="text-xs text-gray-500">Commencé</p>
               <p className="font-medium">
-                {new Date(currentCase.startedAt).toLocaleDateString("fr-FR")}
+                {currentCase.startedAt
+                ? new Date(currentCase.startedAt).toLocaleDateString("fr-FR")
+                : "—"
+                }
               </p>
             </div>
             {currentCase.submittedAt && (
@@ -940,7 +970,7 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
                 <option value="LOW">Faible</option>
                 <option value="MEDIUM">Moyen</option>
                 <option value="HIGH">Élevé</option>
-                <option value="VERY_HIGH">Très élevé</option>
+                <option value="CRITICAL">Critique</option>
               </select>
               <button
                 onClick={() => riskLevelMutation.mutate()}
@@ -972,7 +1002,7 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
           <button
             onClick={() => {
               setShowRiskEdit(true);
-              setEditRiskLevel(currentCase.riskLevel || "LOW");
+              setEditRiskLevel((currentCase.riskLevel as KycRiskLevel) || "LOW");
               setEditRiskComment("");
             }}
             className="text-xs text-primary-600 hover:text-primary-800 flex items-center gap-1"

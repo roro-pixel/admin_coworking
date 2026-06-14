@@ -205,34 +205,34 @@ export const CashRegistersList: React.FC = () => {
         />
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+        <table className="w-full border-separate border-spacing-y-2">
+          <thead className="bg-gray-50/70">
             <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Code
               </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Nom</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Nom</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Emplacement
               </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
+              <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Contrôle cash
               </th>
-              <th className="px-6 py-3 text-right text-sm font-semibold">
+              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Montant max
               </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
+              <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Actif
               </th>
-              <th className="px-6 py-3 text-right text-sm font-semibold">
+              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody>
             {filteredRegisters.map((register) => (
-              <tr key={register.registerCode} className="hover:bg-gray-50">
+              <tr key={register.registerCode} className="hover:bg-gray-50/80">
                 <td className="px-6 py-4 text-sm font-mono">
                   {register.registerCode}
                 </td>

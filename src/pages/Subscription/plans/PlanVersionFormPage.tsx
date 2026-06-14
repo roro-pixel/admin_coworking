@@ -365,7 +365,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
               type="button"
               onClick={onBack}
               disabled={createMutation.isPending}
-              className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="px-4 py-2 border border-slate-200 rounded-xl text-gray-700 hover:bg-slate-50/80 disabled:opacity-50"
             >
               Annuler
             </button>
@@ -373,7 +373,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
               form="version-form"
               type="submit"
               disabled={createMutation.isPending}
-              className="px-5 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2 font-medium"
+              className="px-5 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2 font-medium"
             >
               {createMutation.isPending ? (
                 <>
@@ -409,7 +409,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                     setFormData({ ...formData, name: e.target.value })
                   }
                   placeholder="ex: Version mensuelle 2026"
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500"
                 />
               </Field>
               <Field label="Description">
@@ -420,7 +420,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                     setFormData({ ...formData, description: e.target.value })
                   }
                   placeholder="Description courte"
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500"
                 />
               </Field>
               <Field label="Date d'effet *">
@@ -431,7 +431,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                   onChange={(e) =>
                     setFormData({ ...formData, effectiveFrom: e.target.value })
                   }
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl"
                 />
               </Field>
               <Field label="Date de fin">
@@ -442,7 +442,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                   onChange={(e) =>
                     setFormData({ ...formData, effectiveTo: e.target.value })
                   }
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl"
                 />
               </Field>
             </div>
@@ -742,9 +742,9 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
               </button>
             }
           >
-            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            <div className="rounded-2xl bg-white ring-1 ring-slate-100 overflow-hidden">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-slate-50/80">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
                       Droit
@@ -764,11 +764,11 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase w-16"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="[&>tr+tr]:border-t [&>tr+tr]:border-slate-100">
                   {pagedEnts.map((ent, idx) => {
                     const globalIdx = entPage * ENTITLEMENTS_PER_PAGE + idx;
                     return (
-                      <tr key={globalIdx} className="hover:bg-gray-50">
+                      <tr key={globalIdx} className="hover:bg-slate-50/80">
                         <td className="px-4 py-3">
                           <select
                             value={ent.entitlementCode}
@@ -941,7 +941,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
             type="button"
             onClick={onBack}
             disabled={createMutation.isPending}
-            className="flex-1 max-w-xs px-4 py-2.5 border rounded-xl text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="flex-1 max-w-xs px-4 py-2.5 border rounded-xl text-gray-700 hover:bg-slate-50/80 disabled:opacity-50"
           >
             Annuler
           </button>
@@ -972,7 +972,7 @@ const Section: React.FC<{
   action?: React.ReactNode;
   children: React.ReactNode;
 }> = ({ title, subtitle, action, children }) => (
-  <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+  <div className="rounded-2xl bg-white shadow-[0_18px_45px_rgba(15,23,42,0.06)] ring-1 ring-slate-100 overflow-hidden">
     <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
       <div>
         <h3 className="font-semibold text-gray-800">{title}</h3>
@@ -1027,7 +1027,7 @@ const KVTable: React.FC<KVTableProps> = ({
           <th className="w-12" />
         </tr>
       </thead>
-      <tbody className="divide-y divide-gray-50">
+      <tbody className="[&>tr+tr]:border-t [&>tr+tr]:border-slate-100">
         {rows.map((row, i) => (
           <tr key={i}>
             <td className="px-4 py-2 text-sm font-mono">{row.key}</td>
