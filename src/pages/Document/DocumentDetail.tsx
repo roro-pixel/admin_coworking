@@ -206,7 +206,7 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id)}
-              className={`px-3 py-1.5 rounded-lg text-sm ${activeTab === t.id ? "bg-primary-50 text-primary-600" : "text-gray-500 hover:bg-gray-50"}`}
+              className={`px-3 py-1.5 rounded-lg text-sm ${activeTab === t.id ? "bg-gray-950 text-white" : "text-gray-500 hover:bg-gray-100"}`}
             >
               {t.label}
             </button>
@@ -256,13 +256,13 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={preview}
-                className="px-4 py-2 border rounded-lg flex items-center gap-2"
+                className="px-4 py-2 border border-gray-200 rounded-xl flex items-center gap-2"
               >
                 <Eye size={16} /> {previewUrl ? "Masquer aperçu" : "Aperçu API"}
               </button>
               <button
                 onClick={download}
-                className="px-4 py-2 border rounded-lg flex items-center gap-2"
+                className="px-4 py-2 border border-gray-200 rounded-xl flex items-center gap-2"
               >
                 <Download size={16} /> Télécharger API
               </button>
@@ -306,7 +306,7 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({
                 <button
                   disabled={v.current}
                   onClick={() => restoreMutation.mutate(v.versionNumber)}
-                  className="px-3 py-1.5 border rounded-lg text-sm disabled:opacity-40 flex items-center gap-1"
+                  className="px-3 py-1.5 border border-gray-200 rounded-xl text-sm disabled:opacity-40 flex items-center gap-1"
                 >
                   <RotateCcw size={14} /> Restaurer
                 </button>
@@ -321,7 +321,7 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({
               <select
                 value={newTag}
                 onChange={(e) => setNewTag(e.target.value)}
-                className="flex-1 px-3 py-2 border rounded-lg bg-white"
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-xl bg-white"
               >
                 <option value="">Choisir un tag</option>
                 {allTags.map((t) => (
@@ -364,13 +364,13 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({
                 value={metaKey}
                 onChange={(e) => setMetaKey(e.target.value)}
                 placeholder="Clé"
-                className="px-3 py-2 border rounded-lg"
+                className="px-3 py-2 border border-gray-200 rounded-xl"
               />
               <input
                 value={metaValue}
                 onChange={(e) => setMetaValue(e.target.value)}
                 placeholder="Valeur"
-                className="px-3 py-2 border rounded-lg"
+                className="px-3 py-2 border border-gray-200 rounded-xl"
               />
               <button
                 disabled={!metaKey}
@@ -410,7 +410,7 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({
                   })
                 }
                 placeholder="Nom signataire"
-                className="px-3 py-2 border rounded-lg"
+                className="px-3 py-2 border border-gray-200 rounded-xl"
               />
               <input
                 value={signatureForm.signerEmail}
@@ -421,7 +421,7 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({
                   })
                 }
                 placeholder="Email"
-                className="px-3 py-2 border rounded-lg"
+                className="px-3 py-2 border border-gray-200 rounded-xl"
               />
               <input
                 type="datetime-local"
@@ -432,7 +432,7 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({
                     expiresAt: e.target.value,
                   })
                 }
-                className="px-3 py-2 border rounded-lg"
+                className="px-3 py-2 border border-gray-200 rounded-xl"
               />
               <button
                 disabled={!signatureForm.signerName}

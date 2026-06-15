@@ -42,11 +42,11 @@ export const DocumentOwnerFolderPage: React.FC = () => {
           manquantes.
         </p>
       </div>
-      <div className="bg-white rounded-xl shadow-sm p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
         <select
           value={ownerType}
           onChange={(e) => setOwnerType(e.target.value)}
-          className="px-3 py-2 border rounded-lg bg-white"
+          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
         >
           {ownerTypes.map((t) => (
             <option key={t}>{t}</option>
@@ -56,7 +56,7 @@ export const DocumentOwnerFolderPage: React.FC = () => {
           value={ownerCode}
           onChange={(e) => setOwnerCode(e.target.value)}
           placeholder="Code propriétaire"
-          className="md:col-span-2 px-3 py-2 border rounded-lg font-mono"
+          className="md:col-span-2 px-3 py-2 border border-gray-200 rounded-xl font-mono"
         />
         <button
           disabled={!ownerCode}
@@ -70,17 +70,17 @@ export const DocumentOwnerFolderPage: React.FC = () => {
       {data && (
         <div className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white rounded-xl p-5 shadow-sm">
+            <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
               <p className="text-sm text-gray-500">Total documents</p>
               <p className="text-2xl font-bold">{data.totalDocuments}</p>
             </div>
-            <div className="bg-white rounded-xl p-5 shadow-sm">
+            <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
               <p className="text-sm text-gray-500">Complétude</p>
               <p className="text-2xl font-bold">
                 {Math.round((data.completeness ?? 0) * 100)}%
               </p>
             </div>
-            <div className="bg-white rounded-xl p-5 shadow-sm">
+            <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
               <p className="text-sm text-gray-500">Types manquants</p>
               <p className="text-2xl font-bold">
                 {data.missingRequiredTypes?.length ?? 0}
@@ -110,7 +110,7 @@ export const DocumentOwnerFolderPage: React.FC = () => {
                     {documents.length}
                   </span>
                 </div>
-                <div className="divide-y">
+                <div className="divide-y divide-gray-100">
                   {documents.map((doc) => (
                     <div
                       key={doc.code}

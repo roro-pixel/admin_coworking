@@ -109,8 +109,8 @@ export const KycDashboardPage: React.FC = () => {
       key: "CANCELLED",
       label: "Annulés",
       icon: AlertCircle,
-      color: "text-purple-600",
-      bg: "bg-purple-50",
+      color: "text-gray-600",
+      bg: "bg-gray-50",
     },
     {
       key: "DRAFT",
@@ -139,18 +139,18 @@ export const KycDashboardPage: React.FC = () => {
 
       {/* KPIs principaux */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-5 shadow-sm">
+        <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
           <p className="text-sm text-gray-500">Total dossiers</p>
           <p className="text-3xl font-bold text-gray-900">{totalCases}</p>
         </div>
         <div
-          className={`bg-white rounded-xl p-5 shadow-sm ${pendingReview > 0 ? "border-l-4 border-yellow-500" : ""}`}
+          className={`bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100 ${pendingReview > 0 ? "border-l-4 border-yellow-500" : ""}`}
         >
           <p className="text-sm text-gray-500">En attente de revue</p>
           <p className="text-3xl font-bold text-yellow-600">{pendingReview}</p>
         </div>
         <div
-          className={`bg-white rounded-xl p-5 shadow-sm ${overdueSla > 0 ? "border-l-4 border-red-500" : ""}`}
+          className={`bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100 ${overdueSla > 0 ? "border-l-4 border-red-500" : ""}`}
         >
           <p className="text-sm text-gray-500">SLA dépassé</p>
           <p
@@ -159,7 +159,7 @@ export const KycDashboardPage: React.FC = () => {
             {overdueSla}
           </p>
         </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm">
+        <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
           <p className="text-sm text-gray-500">Expirant sous 7 jours</p>
           <p
             className={`text-3xl font-bold ${expiring7Days > 0 ? "text-red-600" : "text-gray-900"}`}
@@ -170,7 +170,7 @@ export const KycDashboardPage: React.FC = () => {
       </div>
 
       {/* Statuts détaillés */}
-      <div className="bg-white rounded-xl p-6 shadow-sm">
+      <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
           Répartition par statut
         </h3>
@@ -193,7 +193,7 @@ export const KycDashboardPage: React.FC = () => {
       {/* Expiration et type de propriétaire */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Expirations */}
-        <div className="bg-white rounded-xl p-6 shadow-sm">
+        <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <Calendar size={20} className="text-amber-500" />
             Expirations à venir
@@ -221,7 +221,7 @@ export const KycDashboardPage: React.FC = () => {
         </div>
 
         {/* Par type de propriétaire */}
-        <div className="bg-white rounded-xl p-6 shadow-sm">
+        <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <TrendingUp size={20} className="text-blue-500" />
             Par type de propriétaire
@@ -245,12 +245,12 @@ export const KycDashboardPage: React.FC = () => {
                 {getOwnerCount("CUSTOMER")}
               </span>
             </div>
-            <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center gap-2">
-                <Building2 size={18} className="text-purple-600" />
+                <Building2 size={18} className="text-gray-600" />
                 <span className="text-sm">Business</span>
               </div>
-              <span className="text-xl font-bold text-purple-600">
+              <span className="text-xl font-bold text-gray-600">
                 {getOwnerCount("BUSINESS")}
               </span>
             </div>
@@ -260,7 +260,7 @@ export const KycDashboardPage: React.FC = () => {
 
       {/* Activité récente (optionnel - à adapter selon ce que le backend retourne) */}
       {data.recentActivity && data.recentActivity.length > 0 && (
-        <div className="bg-white rounded-xl p-6 shadow-sm">
+        <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
             Activité récente (7 jours)
           </h3>

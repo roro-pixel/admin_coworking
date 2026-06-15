@@ -1154,7 +1154,7 @@ const FormSection: React.FC<{
   children: React.ReactNode;
 }> = ({ title, icon, iconBg, action, children }) => (
   <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-    <div className="border-b px-6 py-4 flex items-center justify-between">
+    <div className="border-b border-gray-100 px-6 py-4 flex items-center justify-between">
       <div className="flex items-center gap-3">
         <div
           className={`w-8 h-8 ${iconBg} rounded-full flex items-center justify-center flex-shrink-0`}

@@ -210,7 +210,7 @@ export const ContractDetailPage: React.FC = () => {
           <p className="text-gray-500">Contrat non trouvé</p>
           <button
             onClick={() => navigate("/contracts")}
-            className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg"
+            className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-xl"
           >
             Retour
           </button>
@@ -249,7 +249,7 @@ export const ContractDetailPage: React.FC = () => {
                   <button
                     onClick={() => generateDraftMutation.mutate()}
                     disabled={generateDraftMutation.isPending}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 flex items-center gap-2"
                   >
                     {generateDraftMutation.isPending ? (
                       <Loader2 size={16} className="animate-spin" />
@@ -260,7 +260,7 @@ export const ContractDetailPage: React.FC = () => {
                   </button>
                   <button
                     onClick={() => updateStatusMutation.mutate("UNDER_REVIEW")}
-                    className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 flex items-center gap-2"
+                    className="px-4 py-2 bg-yellow-600 text-white rounded-xl hover:bg-yellow-700 flex items-center gap-2"
                   >
                     <Clock size={16} />
                     Mettre en relecture
@@ -271,7 +271,7 @@ export const ContractDetailPage: React.FC = () => {
                 <>
                   <button
                     onClick={() => updateStatusMutation.mutate("UNDER_REVIEW")}
-                    className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 flex items-center gap-2"
+                    className="px-4 py-2 bg-yellow-600 text-white rounded-xl hover:bg-yellow-700 flex items-center gap-2"
                   >
                     <Clock size={16} />
                     Mettre en relecture
@@ -280,7 +280,7 @@ export const ContractDetailPage: React.FC = () => {
                     onClick={() =>
                       updateStatusMutation.mutate("AWAITING_SIGNATURE")
                     }
-                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 flex items-center gap-2"
+                    className="px-4 py-2 bg-orange-600 text-white rounded-xl hover:bg-orange-700 flex items-center gap-2"
                   >
                     <FileText size={16} />
                     Attente signature
@@ -290,7 +290,7 @@ export const ContractDetailPage: React.FC = () => {
               {contract.status === "AWAITING_SIGNATURE" && (
                 <button
                   onClick={() => setShowAttachModal(true)}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
+                  className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 flex items-center gap-2"
                 >
                   <Upload size={16} />
                   Rattacher signé
@@ -300,7 +300,7 @@ export const ContractDetailPage: React.FC = () => {
                 <button
                   onClick={() => activateMutation.mutate()}
                   disabled={activateMutation.isPending}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                  className="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 flex items-center gap-2"
                 >
                   {activateMutation.isPending ? (
                     <Loader2 size={16} className="animate-spin" />
@@ -314,14 +314,14 @@ export const ContractDetailPage: React.FC = () => {
                 <>
                   <button
                     onClick={() => setShowSuspendModal(true)}
-                    className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 flex items-center gap-2"
+                    className="px-4 py-2 bg-yellow-600 text-white rounded-xl hover:bg-yellow-700 flex items-center gap-2"
                   >
                     <Pause size={16} />
                     Suspendre
                   </button>
                   <button
                     onClick={() => setShowTerminateModal(true)}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+                    className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 flex items-center gap-2"
                   >
                     <StopCircle size={16} />
                     Résilier
@@ -336,7 +336,7 @@ export const ContractDetailPage: React.FC = () => {
               ].includes(contract.status) && (
                 <button
                   onClick={() => setShowCancelModal(true)}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2"
+                  className="px-4 py-2 bg-gray-600 text-white rounded-xl hover:bg-gray-700 flex items-center gap-2"
                 >
                   <Ban size={16} />
                   Annuler
@@ -349,7 +349,7 @@ export const ContractDetailPage: React.FC = () => {
                       deleteMutation.mutate();
                   }}
                   disabled={deleteMutation.isPending}
-                  className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 flex items-center gap-2"
+                  className="px-4 py-2 border border-red-300 text-red-600 rounded-xl hover:bg-red-50 flex items-center gap-2"
                 >
                   {deleteMutation.isPending ? (
                     <Loader2 size={16} className="animate-spin" />
@@ -381,7 +381,7 @@ export const ContractDetailPage: React.FC = () => {
           {/* Left column - Main info */}
           <div className="col-span-2 space-y-6">
             {/* Status */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">Statut</h2>
                 <span
@@ -420,7 +420,7 @@ export const ContractDetailPage: React.FC = () => {
             </div>
 
             {/* Dates */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <Calendar size={18} className="text-primary-600" />
                 Période du contrat
@@ -460,7 +460,7 @@ export const ContractDetailPage: React.FC = () => {
 
             {/* Description */}
             {contract.description && (
-              <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">
                   Description
                 </h2>
@@ -472,14 +472,14 @@ export const ContractDetailPage: React.FC = () => {
           {/* Right column - Parties and documents */}
           <div className="space-y-6">
             {/* Parties */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <User size={18} className="text-primary-600" />
                 Parties prenantes
               </h2>
               <div className="space-y-3">
                 {contract.parties?.map((party, idx) => (
-                  <div key={idx} className="p-3 bg-gray-50 rounded-lg">
+                  <div key={idx} className="p-3 bg-gray-50 rounded-xl">
                     <div className="flex items-center gap-2 mb-1">
                       <span
                         className={`text-xs px-2 py-0.5 rounded-full ${
@@ -529,14 +529,14 @@ export const ContractDetailPage: React.FC = () => {
             </div>
 
             {/* Documents */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <FileText size={18} className="text-primary-600" />
                 Documents
               </h2>
               <div className="space-y-3">
                 {contract.draftDocumentCode && (
-                  <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                  <div className="flex justify-between items-center p-3 bg-blue-50 rounded-xl">
                     <div>
                       <p className="font-medium text-blue-800">Brouillon</p>
                       <p className="text-xs text-blue-600 font-mono">
@@ -552,7 +552,7 @@ export const ContractDetailPage: React.FC = () => {
                   </div>
                 )}
                 {contract.signedDocumentCode && (
-                  <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                  <div className="flex justify-between items-center p-3 bg-green-50 rounded-xl">
                     <div>
                       <p className="font-medium text-green-800">
                         Document signé
@@ -577,7 +577,7 @@ export const ContractDetailPage: React.FC = () => {
                 {!contract.draftDocumentCode && contract.status === "DRAFT" && (
                   <button
                     onClick={() => generateDraftMutation.mutate()}
-                    className="w-full py-2 border border-dashed border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 flex items-center justify-center gap-2"
+                    className="w-full py-2 border border-dashed border-blue-300 text-blue-600 rounded-xl hover:bg-blue-50 flex items-center justify-center gap-2"
                   >
                     <FileText size={16} />
                     Générer le brouillon
@@ -587,7 +587,7 @@ export const ContractDetailPage: React.FC = () => {
                   !contract.signedDocumentCode && (
                     <button
                       onClick={() => setShowAttachModal(true)}
-                      className="w-full py-2 border border-dashed border-purple-300 text-purple-600 rounded-lg hover:bg-purple-50 flex items-center justify-center gap-2"
+                      className="w-full py-2 border border-dashed border-purple-300 text-purple-600 rounded-xl hover:bg-purple-50 flex items-center justify-center gap-2"
                     >
                       <Upload size={16} />
                       Rattacher le document signé
@@ -630,7 +630,7 @@ export const ContractDetailPage: React.FC = () => {
             <h3 className="text-xl font-bold">Suspendre le contrat</h3>
             <button
               onClick={() => setShowSuspendModal(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
+              className="p-1 hover:bg-gray-100 rounded-xl"
             >
               <X size={20} />
             </button>
@@ -647,19 +647,19 @@ export const ContractDetailPage: React.FC = () => {
               onChange={(e) => setSuspendReason(e.target.value)}
               placeholder="Motif de la suspension *"
               rows={3}
-              className="w-full px-3 py-2 border rounded-lg"
+              className="w-full px-3 py-2 border rounded-xl"
             />
             <div className="flex gap-3">
               <button
                 onClick={() => setShowSuspendModal(false)}
-                className="flex-1 px-4 py-2 border rounded-lg"
+                className="flex-1 px-4 py-2 border rounded-xl"
               >
                 Annuler
               </button>
               <button
                 onClick={() => suspendMutation.mutate()}
                 disabled={!suspendReason.trim() || suspendMutation.isPending}
-                className="flex-1 bg-yellow-600 text-white rounded-lg py-2 disabled:opacity-50"
+                className="flex-1 bg-yellow-600 text-white rounded-xl py-2 disabled:opacity-50"
               >
                 {suspendMutation.isPending ? (
                   <Loader2 size={16} className="animate-spin" />
@@ -681,7 +681,7 @@ export const ContractDetailPage: React.FC = () => {
             </h3>
             <button
               onClick={() => setShowTerminateModal(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
+              className="p-1 hover:bg-gray-100 rounded-xl"
             >
               <X size={20} />
             </button>
@@ -698,12 +698,12 @@ export const ContractDetailPage: React.FC = () => {
               onChange={(e) => setTerminateReason(e.target.value)}
               placeholder="Motif de la résiliation *"
               rows={3}
-              className="w-full px-3 py-2 border rounded-lg"
+              className="w-full px-3 py-2 border rounded-xl"
             />
             <div className="flex gap-3">
               <button
                 onClick={() => setShowTerminateModal(false)}
-                className="flex-1 px-4 py-2 border rounded-lg"
+                className="flex-1 px-4 py-2 border rounded-xl"
               >
                 Annuler
               </button>
@@ -712,7 +712,7 @@ export const ContractDetailPage: React.FC = () => {
                 disabled={
                   !terminateReason.trim() || terminateMutation.isPending
                 }
-                className="flex-1 bg-red-600 text-white rounded-lg py-2 disabled:opacity-50"
+                className="flex-1 bg-red-600 text-white rounded-xl py-2 disabled:opacity-50"
               >
                 {terminateMutation.isPending ? (
                   <Loader2 size={16} className="animate-spin" />
@@ -732,7 +732,7 @@ export const ContractDetailPage: React.FC = () => {
             <h3 className="text-xl font-bold">Annuler le contrat</h3>
             <button
               onClick={() => setShowCancelModal(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
+              className="p-1 hover:bg-gray-100 rounded-xl"
             >
               <X size={20} />
             </button>
@@ -749,19 +749,19 @@ export const ContractDetailPage: React.FC = () => {
               onChange={(e) => setCancelReason(e.target.value)}
               placeholder="Motif de l'annulation (optionnel)"
               rows={3}
-              className="w-full px-3 py-2 border rounded-lg"
+              className="w-full px-3 py-2 border rounded-xl"
             />
             <div className="flex gap-3">
               <button
                 onClick={() => setShowCancelModal(false)}
-                className="flex-1 px-4 py-2 border rounded-lg"
+                className="flex-1 px-4 py-2 border rounded-xl"
               >
                 Annuler
               </button>
               <button
                 onClick={() => cancelMutation.mutate()}
                 disabled={cancelMutation.isPending}
-                className="flex-1 bg-gray-700 text-white rounded-lg py-2"
+                className="flex-1 bg-gray-700 text-white rounded-xl py-2"
               >
                 {cancelMutation.isPending ? (
                   <Loader2 size={16} className="animate-spin" />

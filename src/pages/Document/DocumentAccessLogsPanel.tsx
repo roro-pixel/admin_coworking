@@ -23,7 +23,7 @@ export const DocumentAccessLogsPanel: React.FC<{ documentCode: string }> = ({
       ) : logs.length === 0 ? (
         <div className="text-sm text-gray-500">Aucun accès enregistré.</div>
       ) : (
-        <div className="divide-y">
+        <div className="divide-y divide-gray-100">
           {logs.map((log: any, i: number) => (
             <div key={log.id || i} className="py-2 text-sm">
               <p className="font-medium">

@@ -277,19 +277,19 @@ export const BillingCustomerStatement: React.FC = () => {
           {/* Résumé financier */}
           {totalInvoiced > 0 && (
             <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="bg-white rounded-xl p-4 shadow-sm text-center">
+              <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm text-center">
                 <p className="text-xs text-gray-500">Total facturé</p>
                 <p className="text-xl font-bold text-gray-900">
                   {totalInvoiced.toLocaleString("fr-FR")} FCFA
                 </p>
               </div>
-              <div className="bg-white rounded-xl p-4 shadow-sm text-center">
+              <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm text-center">
                 <p className="text-xs text-gray-500">Total payé</p>
                 <p className="text-xl font-bold text-green-600">
                   {totalPaid.toLocaleString("fr-FR")} FCFA
                 </p>
               </div>
-              <div className="bg-white rounded-xl p-4 shadow-sm text-center">
+              <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm text-center">
                 <p className="text-xs text-gray-500">Solde restant</p>
                 <p
                   className={`text-xl font-bold ${totalBalanceDue > 0 ? "text-red-600" : "text-gray-500"}`}
@@ -307,10 +307,10 @@ export const BillingCustomerStatement: React.FC = () => {
             </p>
           )}
 
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-gray-50/80">
                   <tr>
                     <th className="px-6 py-3 text-left text-sm font-semibold">
                       N° Document
@@ -338,7 +338,7 @@ export const BillingCustomerStatement: React.FC = () => {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y divide-gray-100">
                   {documents.map((doc) => (
                     <tr
                       key={doc.documentNumber}

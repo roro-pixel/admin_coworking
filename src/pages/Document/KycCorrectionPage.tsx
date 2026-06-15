@@ -111,7 +111,7 @@ export const KycCorrectionPage: React.FC = () => {
         </div>
         <button
           onClick={() => refetch()}
-          className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+          className="p-2 border border-gray-200 rounded-xl hover:bg-gray-100"
           title="Actualiser"
         >
           <RefreshCw size={16} className="text-gray-500" />
@@ -183,7 +183,7 @@ export const KycCorrectionPage: React.FC = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => setSelectedCase(kycCase)}
-                        className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm"
+                        className="px-4 py-2 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
                       >
                         <Eye size={14} /> Voir détails
                       </button>

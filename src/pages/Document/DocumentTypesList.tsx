@@ -139,7 +139,7 @@ export const DocumentTypesList: React.FC = () => {
           <select
             value={ownerType}
             onChange={(e) => setOwnerType(e.target.value as DocumentOwnerType)}
-            className="px-4 py-2 border border-gray-200 rounded-lg text-sm bg-white"
+            className="px-4 py-2 border border-gray-200 rounded-xl text-sm bg-white"
           >
             {ownerTypes.map((t) => (
               <option key={t}>{t}</option>
@@ -166,13 +166,13 @@ export const DocumentTypesList: React.FC = () => {
             placeholder="Rechercher un type..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border rounded-lg"
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl"
           />
         </div>
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="px-4 py-2 border rounded-lg bg-white text-sm"
+          className="px-4 py-2 border border-gray-200 rounded-xl bg-white text-sm"
         >
           <option value="all">Toutes catégories</option>
           {categories.map((c) => (
@@ -185,7 +185,7 @@ export const DocumentTypesList: React.FC = () => {
       ) : (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-gray-50/70">
               <tr>
                 <th className="px-4 py-3 text-left text-sm">Type</th>
                 <th className="px-4 py-3 text-left text-sm">Catégorie</th>
@@ -194,7 +194,7 @@ export const DocumentTypesList: React.FC = () => {
                 <th className="px-4 py-3 text-right text-sm">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-gray-100">
               {filteredTypes.map((dt) => (
                 <tr key={dt.code}>
                   <td className="px-4 py-3">
@@ -290,13 +290,13 @@ export const DocumentTypesList: React.FC = () => {
                   setForm({ ...form, code: e.target.value.toUpperCase() })
                 }
                 placeholder="Code"
-                className="px-3 py-2 border rounded-lg disabled:bg-gray-50"
+                className="px-3 py-2 border border-gray-200 rounded-xl disabled:bg-gray-50"
               />
               <input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Nom"
-                className="px-3 py-2 border rounded-lg"
+                className="px-3 py-2 border border-gray-200 rounded-xl"
               />
               <select
                 value={form.ownerType}
@@ -306,7 +306,7 @@ export const DocumentTypesList: React.FC = () => {
                     ownerType: e.target.value as DocumentOwnerType,
                   })
                 }
-                className="px-3 py-2 border rounded-lg bg-white"
+                className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
               >
                 {ownerTypes.map((t) => (
                   <option key={t}>{t}</option>
@@ -320,7 +320,7 @@ export const DocumentTypesList: React.FC = () => {
                     category: e.target.value as DocumentCategory,
                   })
                 }
-                className="px-3 py-2 border rounded-lg bg-white"
+                className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
               >
                 {categories.map((c) => (
                   <option key={c}>{c}</option>
@@ -332,7 +332,7 @@ export const DocumentTypesList: React.FC = () => {
                   setForm({ ...form, allowedMimeTypes: e.target.value })
                 }
                 placeholder="MIME autorisés"
-                className="md:col-span-2 px-3 py-2 border rounded-lg"
+                className="md:col-span-2 px-3 py-2 border border-gray-200 rounded-xl"
               />
               <input
                 type="number"
@@ -344,7 +344,7 @@ export const DocumentTypesList: React.FC = () => {
                   })
                 }
                 placeholder="Taille max"
-                className="px-3 py-2 border rounded-lg"
+                className="px-3 py-2 border border-gray-200 rounded-xl"
               />
               <textarea
                 value={form.description}
@@ -353,7 +353,7 @@ export const DocumentTypesList: React.FC = () => {
                 }
                 placeholder="Description"
                 rows={2}
-                className="md:col-span-2 px-3 py-2 border rounded-lg"
+                className="md:col-span-2 px-3 py-2 border border-gray-200 rounded-xl"
               />
               <textarea
                 value={form.documentDetails}
@@ -362,14 +362,14 @@ export const DocumentTypesList: React.FC = () => {
                 }
                 placeholder="Détails"
                 rows={2}
-                className="md:col-span-2 px-3 py-2 border rounded-lg"
+                className="md:col-span-2 px-3 py-2 border border-gray-200 rounded-xl"
               />
               <textarea
                 value={form.helpText}
                 onChange={(e) => setForm({ ...form, helpText: e.target.value })}
                 placeholder="Aide"
                 rows={2}
-                className="md:col-span-2 px-3 py-2 border rounded-lg"
+                className="md:col-span-2 px-3 py-2 border border-gray-200 rounded-xl"
               />
             </div>
             <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-sm">
@@ -437,7 +437,7 @@ export const DocumentTypesList: React.FC = () => {
             <div className="flex justify-end gap-2 pt-4 border-t">
               <button
                 onClick={() => setIsFormOpen(false)}
-                className="px-4 py-2 border rounded-lg"
+                className="px-4 py-2 border border-gray-200 rounded-xl"
               >
                 Annuler
               </button>

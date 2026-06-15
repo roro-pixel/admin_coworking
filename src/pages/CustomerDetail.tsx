@@ -49,7 +49,7 @@ export const CustomerDetail: React.FC = () => {
     return (
       <AdminLayout>
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+          <div className="animate-spin rounded-full h-12 w-12 -2 border-primary-600"></div>
         </div>
       </AdminLayout>
     );
@@ -58,7 +58,7 @@ export const CustomerDetail: React.FC = () => {
   if (error || !customer) {
     return (
       <AdminLayout>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-600">
           Customer non trouvé
         </div>
       </AdminLayout>
@@ -117,11 +117,11 @@ export const CustomerDetail: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white rounded-2xl p-4 shadow-sm ring-1 ring-gray-100">
         <div className="flex items-center">
           <button
             onClick={() => navigate("/customers")}
-            className="mr-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="mr-4 p-2 hover:bg-gray-100 rounded-xl transition-colors"
           >
             <ArrowLeft size={20} className="text-gray-600" />
           </button>
@@ -151,7 +151,7 @@ export const CustomerDetail: React.FC = () => {
             <>
               <button
                 onClick={() => setIsEditing(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50/70"
               >
                 <X size={16} className="inline mr-1" />
                 Annuler
@@ -159,7 +159,7 @@ export const CustomerDetail: React.FC = () => {
               <button
                 onClick={handleSave}
                 disabled={updateMutation.isPending}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50"
               >
                 <Save size={16} className="inline mr-1" />
                 {updateMutation.isPending ? "Sauvegarde..." : "Enregistrer"}
@@ -171,7 +171,7 @@ export const CustomerDetail: React.FC = () => {
                 onClick={() =>
                   navigate(`/members/create?customerId=${customer.customerId}`)
                 }
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center"
+                className="px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50/70 flex items-center"
               >
                 <UserPlus size={16} className="mr-1" />
                 Créer un member
@@ -181,7 +181,7 @@ export const CustomerDetail: React.FC = () => {
                   setFormData(customer);
                   setIsEditing(true);
                 }}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700"
               >
                 <Edit size={16} className="inline mr-1" />
                 Modifier
@@ -192,7 +192,7 @@ export const CustomerDetail: React.FC = () => {
       </div>
 
       {/* Informations générales */}
-      <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
+      <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
           Informations générales
         </h2>
@@ -209,7 +209,7 @@ export const CustomerDetail: React.FC = () => {
                     name="firstname"
                     value={formData.firstname || ""}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
                   />
                 ) : (
                   <p className="text-gray-900">{customer.firstname}</p>
@@ -225,7 +225,7 @@ export const CustomerDetail: React.FC = () => {
                     name="lastname"
                     value={formData.lastname || ""}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
                   />
                 ) : (
                   <p className="text-gray-900">{customer.lastname}</p>
@@ -243,7 +243,7 @@ export const CustomerDetail: React.FC = () => {
                   name="companyName"
                   value={formData.companyName || ""}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
                 />
               ) : (
                 <p className="text-gray-900">{customer.companyName}</p>
@@ -254,7 +254,7 @@ export const CustomerDetail: React.FC = () => {
       </div>
 
       {/* Contact */}
-      <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
+      <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Contact</h2>
         <div className="grid md:grid-cols-2 gap-6">
           <div>
@@ -267,7 +267,7 @@ export const CustomerDetail: React.FC = () => {
                 name="email"
                 value={formData.email || ""}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             ) : (
               <p className="text-gray-900">{customer.email}</p>
@@ -283,7 +283,7 @@ export const CustomerDetail: React.FC = () => {
                 name="billingEmail"
                 value={formData.billingEmail || ""}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             ) : (
               <p className="text-gray-900">{customer.billingEmail || "-"}</p>
@@ -299,7 +299,7 @@ export const CustomerDetail: React.FC = () => {
                 name="phone"
                 value={formData.phone || ""}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             ) : (
               <p className="text-gray-900">{customer.phone || "-"}</p>
@@ -315,7 +315,7 @@ export const CustomerDetail: React.FC = () => {
                 name="whatsappPhone"
                 value={formData.whatsappPhone || ""}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             ) : (
               <p className="text-gray-900">{customer.whatsappPhone || "-"}</p>
@@ -325,7 +325,7 @@ export const CustomerDetail: React.FC = () => {
       </div>
 
       {/* Adresse */}
-      <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
+      <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
           <MapPin size={16} className="inline mr-1" /> Adresse
         </h2>
@@ -340,7 +340,7 @@ export const CustomerDetail: React.FC = () => {
                 name="streetName"
                 value={formData.address?.streetName || ""}
                 onChange={handleAddressChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             ) : (
               <p className="text-gray-900">
@@ -358,7 +358,7 @@ export const CustomerDetail: React.FC = () => {
                 name="city"
                 value={formData.address?.city || ""}
                 onChange={handleAddressChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             ) : (
               <p className="text-gray-900">{customer.address?.city || "-"}</p>
@@ -374,7 +374,7 @@ export const CustomerDetail: React.FC = () => {
                 name="countryCode"
                 value={formData.address?.country || ""}
                 onChange={handleAddressChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             ) : (
               <p className="text-gray-900">
@@ -386,7 +386,7 @@ export const CustomerDetail: React.FC = () => {
       </div>
 
       {/* Métadonnées */}
-      <div className="bg-white rounded-xl p-6 shadow-sm">
+      <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
           Métadonnées
         </h2>
@@ -416,7 +416,7 @@ export const CustomerDetail: React.FC = () => {
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
-                className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               >
                 <option value="ACTIVE">Actif</option>
                 <option value="INACTIVE">Inactif</option>

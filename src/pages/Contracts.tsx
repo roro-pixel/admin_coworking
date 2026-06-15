@@ -183,6 +183,13 @@ export const AdminContracts: React.FC = () => {
       )
     : contracts;
 
+  const activeContracts = filteredContracts.filter((c) => c.status === "ACTIVE").length;
+  const awaitingSignatureContracts = filteredContracts.filter(
+    (c) => c.status === "AWAITING_SIGNATURE",
+  ).length;
+  const draftContracts = filteredContracts.filter((c) => c.status === "DRAFT").length;
+  const signedContracts = filteredContracts.filter((c) => c.status === "SIGNED").length;
+
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["contracts"] });
 
@@ -469,19 +476,21 @@ export const AdminContracts: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Contrats</h1>
-          <p className="text-gray-600 mt-1">
-            Gérez tous les contrats et leur workflow
-            {totalElements > 0 && (
-              <span className="ml-2 text-sm">
-                · {totalElements} contrat{totalElements > 1 ? "s" : ""}
-              </span>
-            )}
-          </p>
-        </div>
-        <div className="flex gap-3">
+      <div className="mb-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-600">Contrathèque</p>
+            <h1 className="mt-2 text-2xl font-bold text-gray-950">Contrats</h1>
+            <p className="mt-1 max-w-2xl text-sm text-gray-500">
+              Gérez le cycle de vie contractuel, la génération, la signature et les actions de suivi.
+              {totalElements > 0 && (
+                <span className="ml-2 text-sm">
+                  · {totalElements} contrat{totalElements > 1 ? "s" : ""}
+                </span>
+              )}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
           {/* Bouton création rapide (modal) */}
           <button
             onClick={() => {
@@ -489,7 +498,7 @@ export const AdminContracts: React.FC = () => {
               setIsEditing(false);
               setIsModalOpen(true);
             }}
-            className="border border-primary-600 text-primary-600 px-4 py-2 rounded-lg hover:bg-primary-50 flex items-center gap-2"
+            className="border border-primary-600 text-primary-600 px-4 py-2 rounded-xl hover:bg-primary-50 flex items-center gap-2"
           >
             <FileText size={18} />
             Création rapide
@@ -497,12 +506,28 @@ export const AdminContracts: React.FC = () => {
           {/* Bouton création avancée (page dédiée) */}
           <button
             onClick={() => navigate("/contracts/new")}
-            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2"
+            className="bg-primary-600 text-white px-4 py-2 rounded-xl hover:bg-primary-700 flex items-center gap-2"
           >
             <Plus size={18} />
             Création avancée
           </button>
+          </div>
         </div>
+      </div>
+
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: "Actifs", value: activeContracts, helper: "Contrats en cours" },
+          { label: "À signer", value: awaitingSignatureContracts, helper: "En attente de signature" },
+          { label: "Brouillons", value: draftContracts, helper: "À finaliser" },
+          { label: "Signés", value: signedContracts, helper: "Prêts à activer" },
+        ].map((stat) => (
+          <div key={stat.label} className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
+            <p className="text-sm text-gray-500">{stat.label}</p>
+            <p className="mt-1 text-2xl font-bold text-gray-950">{stat.value}</p>
+            <p className="mt-1 text-xs text-gray-400">{stat.helper}</p>
+          </div>
+        ))}
       </div>
 
       {actionError && (
@@ -518,7 +543,7 @@ export const AdminContracts: React.FC = () => {
       )}
 
       {/* Filters */}
-      <div className="bg-white rounded-xl p-4 shadow-sm mb-6">
+      <div className="mb-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search
@@ -530,7 +555,7 @@ export const AdminContracts: React.FC = () => {
               placeholder="Rechercher un contrat..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg"
+              className="w-full pl-10 pr-4 py-2 ring-1 ring-gray-100 rounded-xl"
             />
             {isFetching && (
               <Loader2
@@ -544,7 +569,7 @@ export const AdminContracts: React.FC = () => {
             onChange={(e) =>
               handleFilterChange(setStatusFilter, e.target.value)
             }
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
+            className="px-4 py-2 ring-1 ring-gray-100 rounded-xl bg-white"
           >
             <option value="all">Tous les statuts</option>
             {Object.entries(statusConfig).map(([key, value]) => (
@@ -558,7 +583,7 @@ export const AdminContracts: React.FC = () => {
             onChange={(e) =>
               handleFilterChange(setOwnerTypeFilter, e.target.value)
             }
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
+            className="px-4 py-2 ring-1 ring-gray-100 rounded-xl bg-white"
           >
             <option value="all">Tous les propriétaires</option>
             <option value="MEMBER">Membres</option>
@@ -574,7 +599,7 @@ export const AdminContracts: React.FC = () => {
                 setOwnerTypeFilter("all");
                 setPage(0);
               }}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 whitespace-nowrap"
+              className="px-3 py-2 ring-1 ring-gray-100 rounded-xl text-sm text-gray-600 hover:bg-gray-50 whitespace-nowrap"
             >
               Réinitialiser
             </button>
@@ -583,10 +608,10 @@ export const AdminContracts: React.FC = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 ring-1 ring-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+          <table className="w-full border-separate border-spacing-y-1">
+            <thead className="bg-gray-50 border-b gray-100">
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
                   Contrat
@@ -611,7 +636,7 @@ export const AdminContracts: React.FC = () => {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="[&>tr+tr]:border-t [&>tr+tr]:border-gray-50">
               {filteredContracts.map((contract) => {
                 const sc = statusConfig[contract.status];
                 const StatusIcon = sc?.icon || FileText;
@@ -620,7 +645,7 @@ export const AdminContracts: React.FC = () => {
                 return (
                   <tr
                     key={contract.contractCode}
-                    className="hover:bg-gray-50 transition-colors cursor-pointer"
+                    className="cursor-pointer transition-colors hover:bg-gray-50/80"
                     onClick={() => handleRowClick(contract.contractCode)}
                   >
                     <td className="px-6 py-4">
@@ -815,7 +840,7 @@ export const AdminContracts: React.FC = () => {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+          <div className="px-6 py-4 border-t gray-100 flex items-center justify-between">
             <p className="text-sm text-gray-500">
               {totalElements} contrat{totalElements > 1 ? "s" : ""} — Page{" "}
               {page + 1} / {totalPages}
@@ -824,14 +849,14 @@ export const AdminContracts: React.FC = () => {
               <button
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                 disabled={page === 0}
-                className="p-1.5 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
+                className="p-1.5 border rounded-xl disabled:opacity-50 hover:bg-gray-50"
               >
                 <ChevronLeft size={16} />
               </button>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                 disabled={page >= totalPages - 1}
-                className="p-1.5 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
+                className="p-1.5 border rounded-xl disabled:opacity-50 hover:bg-gray-50"
               >
                 <ChevronRight size={16} />
               </button>
@@ -894,13 +919,13 @@ export const AdminContracts: React.FC = () => {
             </h3>
             <button
               onClick={() => setShowTerminateModal(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
+              className="p-1 hover:bg-gray-100 rounded-xl"
             >
               <XCircle size={20} />
             </button>
           </div>
           <div className="p-6 space-y-4">
-            <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-sm text-red-700">
+            <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-sm text-red-700">
               Contrat :{" "}
               <span className="font-mono font-medium">
                 {contractToTerminate}
@@ -915,14 +940,14 @@ export const AdminContracts: React.FC = () => {
                 onChange={(e) => setTerminateReason(e.target.value)}
                 rows={3}
                 placeholder="Indiquez le motif de résiliation..."
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-xl resize-none"
               />
             </div>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowTerminateModal(false)}
                 disabled={terminateMutation.isPending}
-                className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                className="flex-1 px-4 py-2 ring-1 ring-gray-100 rounded-xl text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
                 Annuler
               </button>
@@ -936,7 +961,7 @@ export const AdminContracts: React.FC = () => {
                 disabled={
                   terminateMutation.isPending || !terminateReason.trim()
                 }
-                className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 bg-red-600 text-white px-4 py-2 rounded-xl hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {terminateMutation.isPending ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -956,13 +981,13 @@ export const AdminContracts: React.FC = () => {
             <h3 className="text-xl font-bold">Suspendre le contrat</h3>
             <button
               onClick={() => setShowSuspendModal(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
+              className="p-1 hover:bg-gray-100 rounded-xl"
             >
               <X size={20} />
             </button>
           </div>
           <div className="p-6 space-y-4">
-            <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-3 text-sm text-yellow-700">
+            <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-3 text-sm text-yellow-700">
               Contrat :{" "}
               <span className="font-mono font-medium">{contractToSuspend}</span>
             </div>
@@ -975,14 +1000,14 @@ export const AdminContracts: React.FC = () => {
                 onChange={(e) => setSuspendReason(e.target.value)}
                 rows={3}
                 placeholder="Indiquez le motif de suspension..."
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-xl resize-none"
               />
             </div>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowSuspendModal(false)}
                 disabled={suspendMutation.isPending}
-                className="flex-1 px-4 py-2 border rounded-lg text-gray-700 disabled:opacity-50"
+                className="flex-1 px-4 py-2 border rounded-xl text-gray-700 disabled:opacity-50"
               >
                 Annuler
               </button>
@@ -994,7 +1019,7 @@ export const AdminContracts: React.FC = () => {
                   })
                 }
                 disabled={suspendMutation.isPending || !suspendReason.trim()}
-                className="flex-1 bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 bg-yellow-600 text-white px-4 py-2 rounded-xl hover:bg-yellow-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {suspendMutation.isPending ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -1014,13 +1039,13 @@ export const AdminContracts: React.FC = () => {
             <h3 className="text-xl font-bold">Annuler le contrat</h3>
             <button
               onClick={() => setShowCancelModal(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
+              className="p-1 hover:bg-gray-100 rounded-xl"
             >
               <X size={20} />
             </button>
           </div>
           <div className="p-6 space-y-4">
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-700">
+            <div className="bg-gray-50 ring-1 ring-gray-100 rounded-xl p-3 text-sm text-gray-700">
               Contrat :{" "}
               <span className="font-mono font-medium">{contractToCancel}</span>
             </div>
@@ -1033,14 +1058,14 @@ export const AdminContracts: React.FC = () => {
                 onChange={(e) => setCancelReason(e.target.value)}
                 rows={2}
                 placeholder="Motif optionnel..."
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-xl resize-none"
               />
             </div>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowCancelModal(false)}
                 disabled={cancelMutation.isPending}
-                className="flex-1 px-4 py-2 border rounded-lg text-gray-700 disabled:opacity-50"
+                className="flex-1 px-4 py-2 border rounded-xl text-gray-700 disabled:opacity-50"
               >
                 Annuler
               </button>
@@ -1052,7 +1077,7 @@ export const AdminContracts: React.FC = () => {
                   })
                 }
                 disabled={cancelMutation.isPending}
-                className="flex-1 bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 bg-gray-700 text-white px-4 py-2 rounded-xl hover:bg-gray-800 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {cancelMutation.isPending ? (
                   <Loader2 size={14} className="animate-spin" />

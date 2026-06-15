@@ -103,7 +103,7 @@ export const ContractPreviewPage: React.FC = () => {
         <p className="text-gray-500">Contrat non trouvé</p>
         <button
           onClick={() => navigate("/contracts")}
-          className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700"
         >
           Retour aux contrats
         </button>
@@ -114,7 +114,7 @@ export const ContractPreviewPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-white">
       {/* Barre supérieure simple */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm">
+      <div className="sticky top-0 z-10 bg-white border-b gray-100 px-6 py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate(`/contracts/${contract.contractCode}`)}
@@ -135,7 +135,7 @@ export const ContractPreviewPage: React.FC = () => {
           <button
             onClick={handlePreviewHtml}
             disabled={isLoadingHtml}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+            className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
           >
             {isLoadingHtml ? (
               <Loader2 size={16} className="animate-spin" />
@@ -147,7 +147,7 @@ export const ContractPreviewPage: React.FC = () => {
           <button
             onClick={handleDownloadPdf}
             disabled={isLoadingPdf}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+            className="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
           >
             {isLoadingPdf ? (
               <Loader2 size={16} className="animate-spin" />
@@ -162,13 +162,13 @@ export const ContractPreviewPage: React.FC = () => {
       {/* Contenu principal */}
       <div className="p-6">
         {error && (
-          <div className="max-w-4xl mx-auto mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          <div className="max-w-4xl mx-auto mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
             {error}
           </div>
         )}
 
         {html ? (
-          <div className="max-w-5xl mx-auto bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+          <div className="max-w-5xl mx-auto bg-white ring-1 ring-gray-100 rounded-xl shadow-lg overflow-hidden">
             <div className="bg-gray-50 px-6 py-3 border-b">
               <h2 className="text-sm font-medium text-gray-700">
                 Aperçu du document
@@ -195,7 +195,7 @@ export const ContractPreviewPage: React.FC = () => {
           </div>
         ) : (
           <div className="max-w-2xl mx-auto mt-20 text-center">
-            <div className="bg-gray-50 rounded-2xl p-12 border border-gray-200">
+            <div className="bg-gray-50 rounded-2xl p-12 ring-1 ring-gray-100">
               <FileText size={64} className="mx-auto text-gray-300 mb-4" />
               <h2 className="text-xl font-semibold text-gray-700 mb-2">
                 Prévisualisation du contrat
@@ -204,14 +204,14 @@ export const ContractPreviewPage: React.FC = () => {
               <div className="flex justify-center gap-4">
                 <button
                   onClick={handlePreviewHtml}
-                  className="px-5 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
+                  className="px-5 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 flex items-center gap-2"
                 >
                   <Eye size={18} />
                   Voir l'aperçu HTML
                 </button>
                 <button
                   onClick={handleDownloadPdf}
-                  className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                  className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 flex items-center gap-2"
                 >
                   <Download size={18} />
                   Télécharger PDF

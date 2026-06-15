@@ -46,22 +46,46 @@ type TabId =
   | "governance"
   | "analytics";
 
-const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
-  { id: "dashboard", label: "Dashboard KYC", icon: BarChart3 },
-  { id: "review", label: "Revue KYC", icon: Eye },
-  { id: "myqueue", label: "Mes dossiers", icon: Clock },
-  { id: "corrections", label: "Corrections", icon: AlertTriangle }, // NOUVEAU
-  { id: "expiring", label: "Expirations", icon: Calendar },
-  { id: "bulk", label: "Revue en masse", icon: CheckSquare },
-  { id: "gedDashboard", label: "Dashboard GED", icon: FileSearch },
-  { id: "documents", label: "Tous les documents", icon: FolderOpen },
-  { id: "advancedSearch", label: "Recherche avancée", icon: Search },
-  { id: "folder", label: "Dossier propriétaire", icon: FolderOpen },
-  { id: "types", label: "Types de documents", icon: FileText },
-  { id: "requirements", label: "Exigences", icon: ListChecks },
-  { id: "governance", label: "Gouvernance", icon: Tags },
-  { id: "analytics", label: "Analytics GED", icon: ShieldCheck },
+const groups: {
+  title: string;
+  description: string;
+  items: { id: TabId; label: string; icon: React.ElementType }[];
+}[] = [
+  {
+    title: "KYC",
+    description: "Traitement, revue et conformité",
+    items: [
+      { id: "dashboard", label: "Dashboard", icon: BarChart3 },
+      { id: "review", label: "Revue", icon: Eye },
+      { id: "myqueue", label: "Mes dossiers", icon: Clock },
+      { id: "corrections", label: "Corrections", icon: AlertTriangle },
+      { id: "expiring", label: "Expirations", icon: Calendar },
+      { id: "bulk", label: "Revue masse", icon: CheckSquare },
+    ],
+  },
+  {
+    title: "GED",
+    description: "Documents, recherche et dossiers",
+    items: [
+      { id: "gedDashboard", label: "Dashboard", icon: FileSearch },
+      { id: "documents", label: "Documents", icon: FolderOpen },
+      { id: "advancedSearch", label: "Recherche", icon: Search },
+      { id: "folder", label: "Dossier", icon: FolderOpen },
+    ],
+  },
+  {
+    title: "Administration",
+    description: "Règles, types et gouvernance",
+    items: [
+      { id: "types", label: "Types", icon: FileText },
+      { id: "requirements", label: "Exigences", icon: ListChecks },
+      { id: "governance", label: "Gouvernance", icon: Tags },
+      { id: "analytics", label: "Analytics", icon: ShieldCheck },
+    ],
+  },
 ];
+
+const allTabs = groups.flatMap((group) => group.items);
 
 export const DocumentMaster: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>("dashboard");
@@ -74,39 +98,63 @@ export const DocumentMaster: React.FC = () => {
     setVisitedTabs((prev) => new Set([...prev, tabId]));
   };
 
+  const activeTabInfo = allTabs.find((tab) => tab.id === activeTab);
+
   return (
     <AdminLayout>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Gestion documentaire & KYC
-        </h1>
-        <p className="text-gray-600 mt-1">
-          Gérez les types de documents, les exigences KYC, la revue et le
-          dashboard conformité
-        </p>
+      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="mt-1 text-2xl font-bold text-gray-950">
+            Gestion documentaire & conformité
+          </h1>
+          <p className="mt-1 max-w-3xl text-sm text-gray-500">
+            Pilotez les dossiers KYC, la revue documentaire, les exigences et la
+            gouvernance des documents depuis un seul espace.
+          </p>
+        </div>
+        {activeTabInfo && (
+          <div className="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-gray-100">
+            <p className="text-xs text-gray-400">Section active</p>
+            <p className="text-sm font-semibold text-gray-900">
+              {activeTabInfo.label}
+            </p>
+          </div>
+        )}
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-gray-200 mb-6">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`
-                flex items-center gap-2 px-4 py-2 rounded-t-lg transition-all whitespace-nowrap text-sm
-                ${
-                  activeTab === tab.id
-                    ? "bg-primary-50 text-primary-600 border-b-2 border-primary-600"
-                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                }
-              `}
-            >
-              <Icon size={16} />
-              {tab.label}
-            </button>
-          );
-        })}
+      <div className="mb-6 space-y-3 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
+        {groups.map((group) => (
+          <div key={group.title} className="grid gap-3 lg:grid-cols-[180px_1fr]">
+            <div className="px-2 py-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                {group.title}
+              </p>
+              <p className="mt-0.5 text-xs text-gray-400">
+                {group.description}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {group.items.map((tab) => {
+                const Icon = tab.icon;
+                const active = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabChange(tab.id)}
+                    className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition-all ${
+                      active
+                        ? "bg-gray-950 text-white shadow-sm"
+                        : "bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    }`}
+                  >
+                    <Icon size={16} />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="mt-6">
@@ -140,7 +188,6 @@ export const DocumentMaster: React.FC = () => {
             <KycBulkReviewPage />
           </div>
         )}
-
         {visitedTabs.has("gedDashboard") && (
           <div className={activeTab !== "gedDashboard" ? "hidden" : ""}>
             <DocumentGedDashboard />
@@ -151,7 +198,6 @@ export const DocumentMaster: React.FC = () => {
             <DocumentsList />
           </div>
         )}
-
         {visitedTabs.has("advancedSearch") && (
           <div className={activeTab !== "advancedSearch" ? "hidden" : ""}>
             <DocumentAdvancedSearchPage />
@@ -172,7 +218,6 @@ export const DocumentMaster: React.FC = () => {
             <DocumentRequirementsList />
           </div>
         )}
-
         {visitedTabs.has("governance") && (
           <div className={activeTab !== "governance" ? "hidden" : ""}>
             <DocumentGovernancePage />

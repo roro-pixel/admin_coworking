@@ -32,7 +32,7 @@ export const KycExpiringSoonPage: React.FC = () => {
         <select
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
-          className="px-4 py-2 border border-gray-200 rounded-lg bg-white text-sm"
+          className="px-4 py-2 border border-gray-200 rounded-xl bg-white text-sm"
         >
           <option value={7}>7 jours</option>
           <option value={30}>30 jours</option>
@@ -57,7 +57,7 @@ export const KycExpiringSoonPage: React.FC = () => {
           {cases.map((kycCase) => (
             <div
               key={kycCase.code}
-              className="bg-white rounded-xl p-5 shadow-sm"
+              className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100"
             >
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div className="flex-1">

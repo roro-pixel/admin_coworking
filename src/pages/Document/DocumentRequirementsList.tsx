@@ -129,7 +129,7 @@ export const DocumentRequirementsList: React.FC = () => {
           <select
             value={ownerType}
             onChange={(e) => setOwnerType(e.target.value as DocumentOwnerType)}
-            className="px-4 py-2 border border-gray-200 rounded-lg text-sm bg-white"
+            className="px-4 py-2 border border-gray-200 rounded-xl text-sm bg-white"
           >
             {ownerTypes.map((t) => (
               <option key={t}>{t}</option>
@@ -156,13 +156,13 @@ export const DocumentRequirementsList: React.FC = () => {
             placeholder="Rechercher une exigence..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border rounded-lg"
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl"
           />
         </div>
         <select
           value={requiredFilter}
           onChange={(e) => setRequiredFilter(e.target.value)}
-          className="px-4 py-2 border rounded-lg bg-white text-sm"
+          className="px-4 py-2 border border-gray-200 rounded-xl bg-white text-sm"
         >
           <option value="all">Toutes</option>
           <option value="required">Obligatoires</option>
@@ -174,7 +174,7 @@ export const DocumentRequirementsList: React.FC = () => {
       ) : (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-gray-50/70">
               <tr>
                 <th className="px-6 py-3 text-left text-sm font-semibold">
                   Document
@@ -193,9 +193,9 @@ export const DocumentRequirementsList: React.FC = () => {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-gray-100">
               {filteredRequirements.map((req) => (
-                <tr key={req.id} className="hover:bg-gray-50">
+                <tr key={req.id} className="hover:bg-gray-100">
                   <td className="px-6 py-4">
                     <p className="font-medium">{req.documentTypeName}</p>
                     <p className="text-xs text-gray-500 font-mono">
@@ -292,7 +292,7 @@ export const DocumentRequirementsList: React.FC = () => {
                   ownerType: e.target.value as DocumentOwnerType,
                 })
               }
-              className="w-full px-3 py-2 border rounded-lg bg-white"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white"
             >
               {ownerTypes.map((t) => (
                 <option key={t}>{t}</option>
@@ -303,7 +303,7 @@ export const DocumentRequirementsList: React.FC = () => {
               onChange={(e) =>
                 setForm({ ...form, documentTypeCode: e.target.value })
               }
-              className="w-full px-3 py-2 border rounded-lg bg-white"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white"
             >
               <option value="">Type de document</option>
               {(documentTypes as DocumentType[]).map((dt) => (
@@ -337,7 +337,7 @@ export const DocumentRequirementsList: React.FC = () => {
             <div className="flex justify-end gap-2 pt-4 border-t">
               <button
                 onClick={() => setIsFormOpen(false)}
-                className="px-4 py-2 border rounded-lg"
+                className="px-4 py-2 border border-gray-200 rounded-xl"
               >
                 Annuler
               </button>

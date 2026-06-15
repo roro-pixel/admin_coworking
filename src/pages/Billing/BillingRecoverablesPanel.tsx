@@ -62,7 +62,7 @@ export const PaymentRecoveryPanel: React.FC = () => {
         </p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 grid grid-cols-1 md:grid-cols-5 gap-3">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 grid grid-cols-1 md:grid-cols-5 gap-3">
         <select
           value={customerType}
           onChange={(e) => {
@@ -257,7 +257,7 @@ const Metric: React.FC<{ label: string; value: string; strong?: boolean }> = ({
   strong,
 }) => (
   <div
-    className={`bg-white rounded-xl shadow-sm p-4 ${strong ? "border border-orange-200" : ""}`}
+    className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 ${strong ? "border border-orange-200" : ""}`}
   >
     <p className="text-xs text-gray-500">{label}</p>
     <p

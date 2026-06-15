@@ -304,7 +304,7 @@ export const ContractCreatePage: React.FC = () => {
               <button
                 onClick={handleSubmit}
                 disabled={createMutation.isPending}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
+                className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 flex items-center gap-2"
               >
                 {createMutation.isPending ? (
                   <Loader2 size={18} className="animate-spin" />
@@ -326,7 +326,7 @@ export const ContractCreatePage: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Section 1: Template */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 ring-1 ring-gray-100 overflow-hidden">
             <div className="border-b bg-gray-50 px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <FileText size={18} className="text-primary-600" />
@@ -354,7 +354,7 @@ export const ContractCreatePage: React.FC = () => {
                         className={`p-4 rounded-xl border-2 text-left transition-all ${
                           formData.templateCode === t.code
                             ? "border-primary-500 bg-primary-50"
-                            : "border-gray-200 hover:border-gray-300"
+                            : "gray-100 hover:border-gray-300"
                         }`}
                       >
                         <p className="font-medium text-gray-900">{t.name}</p>
@@ -384,7 +384,7 @@ export const ContractCreatePage: React.FC = () => {
                       setFormData({ ...formData, title: e.target.value })
                     }
                     placeholder="ex: Contrat d'abonnement Mensuel"
-                    className={`w-full px-4 py-3 border rounded-xl ${errors.title ? "border-red-500" : "border-gray-200"}`}
+                    className={`w-full px-4 py-3 border rounded-xl ${errors.title ? "border-red-500" : "gray-100"}`}
                   />
                   {errors.title && (
                     <p className="text-sm text-red-600 mt-1">{errors.title}</p>
@@ -401,7 +401,7 @@ export const ContractCreatePage: React.FC = () => {
                       setFormData({ ...formData, description: e.target.value })
                     }
                     placeholder="Description optionnelle"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl"
+                    className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-xl"
                   />
                 </div>
               </div>
@@ -409,7 +409,7 @@ export const ContractCreatePage: React.FC = () => {
           </div>
 
           {/* Section 2: Propriétaire */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 ring-1 ring-gray-100 overflow-hidden">
             <div className="border-b bg-gray-50 px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <User size={18} className="text-primary-600" />
@@ -437,7 +437,7 @@ export const ContractCreatePage: React.FC = () => {
                         className={`p-3 rounded-xl text-center transition-all ${
                           formData.ownerType === type.value
                             ? "bg-primary-50 border-2 border-primary-500"
-                            : "bg-gray-50 border border-gray-200 hover:bg-gray-100"
+                            : "bg-gray-50 ring-1 ring-gray-100 hover:bg-gray-100"
                         }`}
                       >
                         <div className="text-lg mb-1">{type.label}</div>
@@ -500,7 +500,7 @@ export const ContractCreatePage: React.FC = () => {
           </div>
 
           {/* Section 3: Dates */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 ring-1 ring-gray-100 overflow-hidden">
             <div className="border-b bg-gray-50 px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <Calendar size={18} className="text-primary-600" />
@@ -522,7 +522,7 @@ export const ContractCreatePage: React.FC = () => {
                         effectiveDate: e.target.value,
                       })
                     }
-                    className={`w-full px-4 py-3 border rounded-xl ${errors.effectiveDate ? "border-red-500" : "border-gray-200"}`}
+                    className={`w-full px-4 py-3 border rounded-xl ${errors.effectiveDate ? "border-red-500" : "gray-100"}`}
                   />
                   {errors.effectiveDate && (
                     <p className="text-sm text-red-600 mt-1">
@@ -540,7 +540,7 @@ export const ContractCreatePage: React.FC = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, startDate: e.target.value })
                     }
-                    className={`w-full px-4 py-3 border rounded-xl ${errors.startDate ? "border-red-500" : "border-gray-200"}`}
+                    className={`w-full px-4 py-3 border rounded-xl ${errors.startDate ? "border-red-500" : "gray-100"}`}
                   />
                   {errors.startDate && (
                     <p className="text-sm text-red-600 mt-1">
@@ -562,7 +562,7 @@ export const ContractCreatePage: React.FC = () => {
                       setFormData({ ...formData, endDate: e.target.value })
                     }
                     min={formData.startDate}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl"
+                    className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-xl"
                   />
                   <p className="text-xs text-gray-400 mt-1">
                     Laisser vide si durée indéterminée
@@ -586,7 +586,7 @@ export const ContractCreatePage: React.FC = () => {
                         className={`p-2 rounded-xl text-center transition-all ${
                           formData.renewalType === type.value
                             ? "bg-primary-50 border border-primary-500"
-                            : "bg-gray-50 border border-gray-200 hover:bg-gray-100"
+                            : "bg-gray-50 ring-1 ring-gray-100 hover:bg-gray-100"
                         }`}
                       >
                         <div className="text-xs font-medium">{type.label}</div>
@@ -602,7 +602,7 @@ export const ContractCreatePage: React.FC = () => {
           </div>
 
           {/* Section 4: Parties prenantes */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 ring-1 ring-gray-100 overflow-hidden">
             <div className="border-b bg-gray-50 px-6 py-4 flex justify-between items-center">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <Users size={18} className="text-primary-600" />
@@ -611,7 +611,7 @@ export const ContractCreatePage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowPartyForm(!showPartyForm)}
-                className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-1"
+                className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-xl hover:bg-primary-700 flex items-center gap-1"
               >
                 <Plus size={14} />
                 Ajouter une partie
@@ -619,7 +619,7 @@ export const ContractCreatePage: React.FC = () => {
             </div>
             <div className="p-6 space-y-6">
               {(signatoryCount > 0 || beneficiaryCount > 0) && (
-                <div className="flex gap-4 p-3 bg-gray-50 rounded-lg">
+                <div className="flex gap-4 p-3 bg-gray-50 rounded-xl">
                   <div className="flex items-center gap-2">
                     <CheckCircle size={16} className="text-green-600" />
                     <span className="text-sm">
@@ -671,7 +671,7 @@ export const ContractCreatePage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => removeParty(idx)}
-                          className="p-2 text-red-500 hover:text-red-700 rounded-lg hover:bg-red-50"
+                          className="p-2 text-red-500 hover:text-red-700 rounded-xl hover:bg-red-50"
                         >
                           <Trash2 size={18} />
                         </button>
@@ -708,7 +708,7 @@ export const ContractCreatePage: React.FC = () => {
                                     email: "",
                                   })
                                 }
-                                className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-2 transition-all ${
+                                className={`flex-1 py-2 rounded-xl flex items-center justify-center gap-2 transition-all ${
                                   newParty.partyType === type.value
                                     ? "bg-primary-100 text-primary-700 border border-primary-300"
                                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -734,7 +734,7 @@ export const ContractCreatePage: React.FC = () => {
                               mustSign: e.target.value === "SIGNATORY",
                             })
                           }
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                          className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-xl"
                         >
                           {partyRoles.map((role) => (
                             <option key={role.value} value={role.value}>
@@ -779,7 +779,7 @@ export const ContractCreatePage: React.FC = () => {
                           onChange={(e) =>
                             setNewParty({ ...newParty, email: e.target.value })
                           }
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                          className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-xl"
                           readOnly={
                             !!(selectedPartyCustomer || selectedPartyMember)
                           }
@@ -795,7 +795,7 @@ export const ContractCreatePage: React.FC = () => {
                           onChange={(e) =>
                             setNewParty({ ...newParty, phone: e.target.value })
                           }
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                          className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-xl"
                         />
                       </div>
                     </div>
@@ -821,14 +821,14 @@ export const ContractCreatePage: React.FC = () => {
                           setSelectedPartyCustomer(null);
                           setSelectedPartyMember(null);
                         }}
-                        className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50"
+                        className="flex-1 px-4 py-2 ring-1 ring-gray-100 rounded-xl text-gray-700 hover:bg-gray-50"
                       >
                         Annuler
                       </button>
                       <button
                         type="button"
                         onClick={addParty}
-                        className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center justify-center gap-2"
+                        className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 flex items-center justify-center gap-2"
                       >
                         <Plus size={16} />
                         Ajouter
@@ -839,7 +839,7 @@ export const ContractCreatePage: React.FC = () => {
               )}
 
               {errors.parties && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center gap-2">
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center gap-2">
                   <AlertCircle size={14} />
                   {errors.parties}
                 </div>

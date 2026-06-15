@@ -60,27 +60,28 @@ export const BillingMaster: React.FC = () => {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-gray-200 mb-6">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`
-                flex items-center gap-2 px-4 py-2 rounded-t-lg transition-all whitespace-nowrap
-                ${
-                  activeTab === tab.id
-                    ? "bg-primary-50 text-primary-600 border-b-2 border-primary-600"
-                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                }
-              `}
-            >
-              <Icon size={18} />
-              {tab.label}
-            </button>
-          );
-        })}
+      <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-2 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all whitespace-nowrap ${
+                  isActive
+                    ? "bg-primary-600 text-white shadow-sm"
+                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
+                }`}
+              >
+                <Icon size={17} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="mt-6">

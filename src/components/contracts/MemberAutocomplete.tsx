@@ -88,7 +88,7 @@ export const MemberAutocomplete: React.FC<MemberAutocompleteProps> = ({
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => query.length >= 2 && setShowResults(true)}
           placeholder={placeholder}
-          className="w-full pl-10 pr-10 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="w-full pl-10 pr-10 py-2 ring-1 ring-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
         {query && (
           <button
@@ -103,7 +103,7 @@ export const MemberAutocomplete: React.FC<MemberAutocompleteProps> = ({
 
       {/* Indicateur de chargement */}
       {isLoading && (
-        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg p-4">
+        <div className="absolute z-20 mt-1 w-full bg-white ring-1 ring-gray-100 rounded-xl shadow-lg p-4">
           <div className="flex justify-center">
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600"></div>
           </div>
@@ -111,7 +111,7 @@ export const MemberAutocomplete: React.FC<MemberAutocompleteProps> = ({
       )}
 
       {!isLoading && showResults && results.length > 0 && (
-        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-20 mt-1 w-full bg-white ring-1 ring-gray-100 rounded-xl shadow-lg max-h-60 overflow-y-auto">
           {results.map((member) => (
             <button
               key={member.memberId}

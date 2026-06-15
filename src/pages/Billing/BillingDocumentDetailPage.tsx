@@ -1036,15 +1036,15 @@ export const BillingDocumentDetailPage: React.FC = () => {
 
             {/* Lignes */}
             {document.lines && document.lines.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="border-b px-6 py-4 bg-gray-50">
+              <div className="bg-white rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+                <div className="border-b border-gray-100 px-6 py-4 bg-gray-50">
                   <h2 className="text-lg font-semibold text-gray-900">
                     Lignes du document
                   </h2>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50 border-b">
+                    <thead className="bg-gray-50/80">
                       <tr>
                         <th className="px-6 py-3 text-left text-sm font-semibold">
                           Description
@@ -1060,7 +1060,7 @@ export const BillingDocumentDetailPage: React.FC = () => {
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y">
+                    <tbody className="divide-y divide-gray-100">
                       {document.lines.map((line, idx) => (
                         <tr
                           key={idx}
@@ -1384,7 +1384,7 @@ export const BillingDocumentDetailPage: React.FC = () => {
       {/* Modal signature */}
       {isSignatureOpen && (
         <ModalPortal onClose={() => setIsSignatureOpen(false)}>
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+          <div className="sticky top-0 bg-white/95 backdrop-blur border-b border-gray-100 p-4 flex justify-between items-center rounded-t-2xl">
             <h3 className="text-xl font-bold">
               Demander une signature électronique
             </h3>
@@ -1467,7 +1467,7 @@ export const BillingDocumentDetailPage: React.FC = () => {
       {/* Modal paiement */}
       {isPayModalOpen && (
         <ModalPortal onClose={() => setIsPayModalOpen(false)}>
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+          <div className="sticky top-0 bg-white/95 backdrop-blur border-b border-gray-100 p-4 flex justify-between items-center rounded-t-2xl">
             <h3 className="text-xl font-bold">Payer la facture</h3>
             <button
               onClick={() => setIsPayModalOpen(false)}
@@ -1647,7 +1647,7 @@ export const BillingDocumentDetailPage: React.FC = () => {
       {/* Modal échéancier */}
       {isScheduleOpen && (
         <ModalPortal onClose={() => setIsScheduleOpen(false)} size="lg">
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+          <div className="sticky top-0 bg-white/95 backdrop-blur border-b border-gray-100 p-4 flex justify-between items-center rounded-t-2xl">
             <h3 className="text-xl font-bold">Échéancier de paiement</h3>
             <button
               onClick={() => setIsScheduleOpen(false)}

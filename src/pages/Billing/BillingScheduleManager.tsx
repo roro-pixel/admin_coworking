@@ -232,7 +232,7 @@ export const BillingScheduleManager: React.FC = () => {
           />
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+        <div className="bg-white rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden border border-gray-100">
           {invoicesLoading ? (
             <div className="py-10 flex justify-center">
               <Loader2 className="animate-spin text-primary-600" />
@@ -375,7 +375,7 @@ export const BillingScheduleManager: React.FC = () => {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b">
+                    <thead className="bg-gray-50/80">
                       <tr>
                         <th className="px-4 py-2 text-left">Échéance</th>
                         <th className="px-4 py-2 text-left">Date</th>
@@ -384,7 +384,7 @@ export const BillingScheduleManager: React.FC = () => {
                         <th className="px-4 py-2 text-right">Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y">
+                    <tbody className="divide-y divide-gray-100">
                       {currentSchedule.installments.map((inst) => (
                         <tr key={inst.installmentNumber}>
                           <td className="px-4 py-3 font-mono">

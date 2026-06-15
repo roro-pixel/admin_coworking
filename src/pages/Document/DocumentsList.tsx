@@ -93,7 +93,7 @@ export const DocumentsList: React.FC = () => {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 "></div>
       </div>
     );
   }
@@ -134,7 +134,7 @@ export const DocumentsList: React.FC = () => {
               placeholder="Rechercher un document..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
           <select
@@ -143,7 +143,7 @@ export const DocumentsList: React.FC = () => {
               setOwnerTypeFilter(e.target.value);
               setPage(0);
             }}
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
+            className="px-4 py-2 border border-gray-200 rounded-xl bg-white"
           >
             <option value="all">Tous les propriétaires</option>
             <option value="MEMBER">Membres</option>
@@ -156,7 +156,7 @@ export const DocumentsList: React.FC = () => {
               setStatusFilter(e.target.value);
               setPage(0);
             }}
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
+            className="px-4 py-2 border border-gray-200 rounded-xl bg-white"
           >
             <option value="all">Tous les statuts</option>
             <option value="PENDING_REVIEW">En attente</option>
@@ -170,7 +170,7 @@ export const DocumentsList: React.FC = () => {
               setCategoryFilter(e.target.value);
               setPage(0);
             }}
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
+            className="px-4 py-2 border border-gray-200 rounded-xl bg-white"
           >
             <option value="all">Toutes les catégories</option>
             <option value="KYC">KYC</option>
@@ -183,7 +183,7 @@ export const DocumentsList: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-gray-50/70">
               <tr>
                 <th className="px-4 py-3 text-left text-sm font-semibold">
                   Code
@@ -214,14 +214,14 @@ export const DocumentsList: React.FC = () => {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-gray-100">
               {filteredDocuments.map((doc) => {
                 const sc = statusConfig[doc.status];
                 const StatusIcon = sc?.icon;
                 const isExpired =
                   doc.expiryDate && new Date(doc.expiryDate) < new Date();
                 return (
-                  <tr key={doc.code} className="hover:bg-gray-50">
+                  <tr key={doc.code} className="hover:bg-gray-100">
                     <td className="px-4 py-3 text-sm font-mono">{doc.code}</td>
                     <td className="px-4 py-3 text-sm font-medium max-w-xs truncate">
                       {doc.title}
@@ -235,7 +235,7 @@ export const DocumentsList: React.FC = () => {
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`text-xs px-2 py-1 rounded-full ${doc.category === "KYC" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}
+                        className={`text-xs px-2 py-1 rounded-full ${doc.category === "KYC" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"}`}
                       >
                         {doc.category}
                       </span>
@@ -311,14 +311,14 @@ export const DocumentsList: React.FC = () => {
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="p-1.5 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
+              className="p-1.5 border border-gray-200 rounded-xl disabled:opacity-50 hover:bg-gray-100"
             >
               <ChevronLeft size={16} />
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="p-1.5 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
+              className="p-1.5 border border-gray-200 rounded-xl disabled:opacity-50 hover:bg-gray-100"
             >
               <ChevronRight size={16} />
             </button>

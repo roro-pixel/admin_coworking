@@ -93,7 +93,7 @@ export const ContractPreviewModal: React.FC<ContractPreviewModalProps> = ({
             Template : <span className="font-mono">{templateCode}</span>
           </p>
         </div>
-        <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
+        <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-xl">
           <X size={20} />
         </button>
       </div>
@@ -111,7 +111,7 @@ export const ContractPreviewModal: React.FC<ContractPreviewModalProps> = ({
             </p>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm mb-4 flex items-center gap-2">
+              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm mb-4 flex items-center gap-2">
                 <AlertCircle size={14} />
                 {error}
               </div>
@@ -120,14 +120,14 @@ export const ContractPreviewModal: React.FC<ContractPreviewModalProps> = ({
             <div className="flex justify-center gap-3">
               <button
                 onClick={handlePreview}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
+                className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 flex items-center gap-2"
               >
                 <Eye size={16} /> Aperçu HTML
               </button>
               <button
                 onClick={handleGeneratePdf}
                 disabled={isGeneratingPdf}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
               >
                 {isGeneratingPdf ? (
                   <Loader2 size={16} className="animate-spin" />
@@ -139,7 +139,7 @@ export const ContractPreviewModal: React.FC<ContractPreviewModalProps> = ({
             </div>
 
             {pdfError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm mt-4 flex items-center gap-2">
+              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm mt-4 flex items-center gap-2">
                 <AlertCircle size={14} />
                 {pdfError}
               </div>
@@ -166,7 +166,7 @@ export const ContractPreviewModal: React.FC<ContractPreviewModalProps> = ({
                   setError(null);
                   setPdfError(null);
                 }}
-                className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+                className="px-3 py-1.5 ring-1 ring-gray-100 rounded-xl text-sm text-gray-600 hover:bg-gray-50"
               >
                 ← Retour
               </button>
@@ -179,7 +179,7 @@ export const ContractPreviewModal: React.FC<ContractPreviewModalProps> = ({
                 <button
                   onClick={handleGeneratePdf}
                   disabled={isGeneratingPdf}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm"
+                  className="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm"
                 >
                   {isGeneratingPdf ? (
                     <Loader2 size={14} className="animate-spin" />

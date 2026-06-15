@@ -124,13 +124,13 @@ export const DocumentGovernancePage: React.FC = () => {
                 setTagForm({ ...tagForm, code: e.target.value.toUpperCase() })
               }
               placeholder="Code"
-              className="px-3 py-2 border rounded-lg"
+              className="px-3 py-2 border border-gray-200 rounded-xl"
             />
             <input
               value={tagForm.name}
               onChange={(e) => setTagForm({ ...tagForm, name: e.target.value })}
               placeholder="Nom"
-              className="px-3 py-2 border rounded-lg"
+              className="px-3 py-2 border border-gray-200 rounded-xl"
             />
             <input
               value={tagForm.color}
@@ -138,14 +138,14 @@ export const DocumentGovernancePage: React.FC = () => {
                 setTagForm({ ...tagForm, color: e.target.value })
               }
               placeholder="#f97316"
-              className="px-3 py-2 border rounded-lg"
+              className="px-3 py-2 border border-gray-200 rounded-xl"
             />
             <select
               value={tagForm.space}
               onChange={(e) =>
                 setTagForm({ ...tagForm, space: e.target.value })
               }
-              className="px-3 py-2 border rounded-lg bg-white"
+              className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
             >
               {spaces.map((s) => (
                 <option key={s}>{s}</option>
@@ -162,7 +162,7 @@ export const DocumentGovernancePage: React.FC = () => {
           {tagsLoading ? (
             <Loader2 className="animate-spin" />
           ) : (
-            <div className="divide-y border rounded-lg">
+            <div className="divide-y border border-gray-200 rounded-xl">
               {tags.map((tag) => (
                 <div key={tag.code} className="p-3 flex justify-between">
                   <div>
@@ -196,7 +196,7 @@ export const DocumentGovernancePage: React.FC = () => {
                 })
               }
               placeholder="Code"
-              className="px-3 py-2 border rounded-lg"
+              className="px-3 py-2 border border-gray-200 rounded-xl"
             />
             <input
               value={policyForm.name}
@@ -204,14 +204,14 @@ export const DocumentGovernancePage: React.FC = () => {
                 setPolicyForm({ ...policyForm, name: e.target.value })
               }
               placeholder="Nom"
-              className="px-3 py-2 border rounded-lg"
+              className="px-3 py-2 border border-gray-200 rounded-xl"
             />
             <select
               value={policyForm.space}
               onChange={(e) =>
                 setPolicyForm({ ...policyForm, space: e.target.value })
               }
-              className="px-3 py-2 border rounded-lg bg-white"
+              className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
             >
               {spaces.map((s) => (
                 <option key={s}>{s}</option>
@@ -222,7 +222,7 @@ export const DocumentGovernancePage: React.FC = () => {
               onChange={(e) =>
                 setPolicyForm({ ...policyForm, category: e.target.value })
               }
-              className="px-3 py-2 border rounded-lg bg-white"
+              className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
             >
               <option value="">Toutes catégories</option>
               {categories.map((s) => (
@@ -238,7 +238,7 @@ export const DocumentGovernancePage: React.FC = () => {
                 })
               }
               placeholder="Type document optionnel"
-              className="px-3 py-2 border rounded-lg"
+              className="px-3 py-2 border border-gray-200 rounded-xl"
             />
             <input
               type="number"
@@ -250,7 +250,7 @@ export const DocumentGovernancePage: React.FC = () => {
                 })
               }
               placeholder="Jours"
-              className="px-3 py-2 border rounded-lg"
+              className="px-3 py-2 border border-gray-200 rounded-xl"
             />
             <select
               value={policyForm.retentionReference}
@@ -261,7 +261,7 @@ export const DocumentGovernancePage: React.FC = () => {
                     .value as DocumentRetentionReference,
                 })
               }
-              className="px-3 py-2 border rounded-lg bg-white"
+              className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
             >
               <option value="UPLOAD_DATE">Date upload</option>
               <option value="EXPIRY_DATE">Date expiration</option>
@@ -274,7 +274,7 @@ export const DocumentGovernancePage: React.FC = () => {
                   action: e.target.value as DocumentRetentionAction,
                 })
               }
-              className="px-3 py-2 border rounded-lg bg-white"
+              className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
             >
               <option value="ARCHIVE">Archiver</option>
               <option value="PURGE_FLAG">Marquer purge</option>
@@ -292,7 +292,7 @@ export const DocumentGovernancePage: React.FC = () => {
           {policiesLoading ? (
             <Loader2 className="animate-spin" />
           ) : (
-            <div className="divide-y border rounded-lg">
+            <div className="divide-y border border-gray-200 rounded-xl">
               {policies.map((p) => (
                 <div key={p.code} className="p-3 flex justify-between">
                   <div>

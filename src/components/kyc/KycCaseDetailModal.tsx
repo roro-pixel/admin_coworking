@@ -52,7 +52,7 @@ const kycStatusConfig: Record<
   },
   PENDING_REVIEW: {
     label: "En attente",
-    color: "bg-purple-100 text-purple-700",
+    color: "bg-gray-100 text-gray-700",
     icon: FileText,
   },
   IN_REVIEW: {
@@ -92,7 +92,7 @@ const kycStatusConfig: Record<
   },
   SUBMITTED: {
     label: "Soumis",
-    color: "bg-purple-100 text-purple-700",
+    color: "bg-gray-100 text-gray-700",
     icon: FileText,
   },
   UNDER_REVIEW: {
@@ -107,7 +107,7 @@ const kycStatusConfig: Record<
   },
   RENEWAL_REQUIRED: {
     label: "Renouvel. requis",
-    color: "bg-purple-100 text-purple-700",
+    color: "bg-gray-100 text-gray-700",
     icon: Calendar,
   },
 };
@@ -740,7 +740,7 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
                 onChange={(e) => setNewNote(e.target.value)}
                 placeholder="Ajouter une note..."
                 rows={2}
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none"
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm resize-none"
               />
               <div className="flex flex-col gap-2">
                 <label className="flex items-center gap-1 text-xs cursor-pointer">
@@ -804,7 +804,7 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
             {timeline.map((event) => (
               <div
                 key={event.id}
-                className="flex gap-3 p-3 hover:bg-gray-50 rounded-lg"
+                className="flex gap-3 p-3 hover:bg-gray-100 rounded-lg"
               >
                 <div className="w-2 h-2 mt-1.5 rounded-full bg-primary-400 flex-shrink-0" />
                 <div className="flex-1">
@@ -884,7 +884,7 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
               <select
                 value={selectedOcrDoc || ""}
                 onChange={(e) => setSelectedOcrDoc(e.target.value || null)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
               >
                 <option value="">— Choisir un document —</option>
                 {currentCase.documents?.map((doc) => (
@@ -965,7 +965,7 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
                 onChange={(e) =>
                   setEditRiskLevel(e.target.value as KycRiskLevel)
                 }
-                className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm"
+                className="flex-1 px-3 py-1.5 border border-gray-200 rounded-xl text-sm"
               >
                 <option value="LOW">Faible</option>
                 <option value="MEDIUM">Moyen</option>
@@ -985,7 +985,7 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
               </button>
               <button
                 onClick={() => setShowRiskEdit(false)}
-                className="px-3 py-1.5 border rounded-lg text-sm"
+                className="px-3 py-1.5 border border-gray-200 rounded-xl text-sm"
               >
                 Annuler
               </button>
@@ -995,7 +995,7 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
               value={editRiskComment}
               onChange={(e) => setEditRiskComment(e.target.value)}
               placeholder="Commentaire (optionnel)"
-              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm"
+              className="w-full px-3 py-1.5 border border-gray-200 rounded-xl text-sm"
             />
           </div>
         ) : (
@@ -1061,7 +1061,7 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
                   onChange={(e) => setComment(e.target.value)}
                   rows={2}
                   placeholder="Commentaire de décision..."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm resize-none"
                 />
                 <div className="flex gap-2">
                   <button

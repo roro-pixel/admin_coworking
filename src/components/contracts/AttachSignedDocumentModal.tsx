@@ -106,13 +106,13 @@ export const AttachSignedDocumentModal: React.FC<
     <ModalPortal onClose={onClose}>
       <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
         <h3 className="text-xl font-bold">Rattacher le document signé</h3>
-        <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
+        <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-xl">
           <X size={20} />
         </button>
       </div>
 
       <div className="p-6 space-y-4">
-        <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-700">
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
           Contrat :{" "}
           <span className="font-mono font-medium">{contractCode}</span>
         </div>
@@ -142,7 +142,7 @@ export const AttachSignedDocumentModal: React.FC<
               <p className="text-xs text-gray-400 mb-4">
                 PDF uniquement · max 10 Mo
               </p>
-              <label className="inline-block px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 cursor-pointer text-sm">
+              <label className="inline-block px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 cursor-pointer text-sm">
                 Sélectionner un fichier
                 <input
                   type="file"
@@ -156,7 +156,7 @@ export const AttachSignedDocumentModal: React.FC<
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm">
             {error}
           </div>
         )}
@@ -165,14 +165,14 @@ export const AttachSignedDocumentModal: React.FC<
           <button
             onClick={onClose}
             disabled={isUploading}
-            className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="flex-1 px-4 py-2 ring-1 ring-gray-100 rounded-xl text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
             Annuler
           </button>
           <button
             onClick={handleUpload}
             disabled={!file || isUploading}
-            className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 bg-primary-600 text-white py-2 rounded-xl hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {isUploading ? (
               <Loader2 size={16} className="animate-spin" />

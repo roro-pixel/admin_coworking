@@ -448,27 +448,27 @@ export const AdminDashboard: React.FC = () => {
   return (
     <AdminLayout>
       <div className="space-y-8">
-        <div className="relative overflow-hidden rounded-[2rem] bg-slate-900 p-6 text-white shadow-sm">
-          <div className="absolute -right-14 -top-14 h-52 w-52 rounded-full bg-primary blur-2xl" />
-          <div className="absolute -bottom-20 left-20 h-56 w-56 rounded-full bg-blue blur-3xl" />
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-sm font-semibold text-white/80 ring-1 ring-white/10">
-                <Activity size={15} /> Vue opérationnelle
-              </div>
-              <h1 className="text-3xl font-black tracking-tight md:text-4xl">Tableau de bord</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-300 md:text-base">
-                Suivi consolidé des clients, abonnements, réservations, stock, portefeuilles et facturation.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3 text-right sm:grid-cols-4 lg:min-w-[540px]">
-              <HeroMetric label="CA facturé" value={compactMoney(dashboard.totalBilled)} />
-              <HeroMetric label="Encaissements" value={compactMoney(dashboard.totalCollected)} />
-              <HeroMetric label="Recouvrement" value={`${dashboard.recoveryRate}%`} />
-              <HeroMetric label="Créances" value={compactMoney(dashboard.totalOutstanding)} danger />
-            </div>
-          </div>
-        </div>
+        <div className="relative overflow-hidden rounded-[1.75rem] bg-slate-900 px-6 py-5 text-white shadow-sm">
+  <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
+
+  <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+    <div>
+      <h1 className="text-2xl font-black tracking-tight md:text-3xl">
+        Tableau de bord
+      </h1>
+      <p className="mt-1 max-w-2xl text-sm text-slate-300">
+        Suivi consolidé de l’activité.
+      </p>
+    </div>
+
+    <div className="grid grid-cols-2 gap-x-8 gap-y-3 md:grid-cols-4 xl:min-w-[620px]">
+      <HeroMetric label="CA facturé" value={compactMoney(dashboard.totalBilled)} />
+      <HeroMetric label="Encaissements" value={compactMoney(dashboard.totalCollected)} />
+      <HeroMetric label="Recouvrement" value={`${dashboard.recoveryRate}%`} />
+      <HeroMetric label="Créances" value={compactMoney(dashboard.totalOutstanding)} danger />
+    </div>
+  </div>
+</div>
 
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
           {stats.map((stat) => (
@@ -631,10 +631,20 @@ export const AdminDashboard: React.FC = () => {
   );
 };
 
-const HeroMetric: React.FC<{ label: string; value: string; danger?: boolean }> = ({ label, value, danger }) => (
-  <div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/10 backdrop-blur">
-    <p className="text-xs font-medium text-slate-300">{label}</p>
-    <p className={`mt-1 text-sm font-black md:text-base ${danger ? "text-red-200" : "text-white"}`}>{value}</p>
+const HeroMetric: React.FC<{
+  label: string;
+  value: string;
+  danger?: boolean;
+}> = ({ label, value, danger }) => (
+  <div className="min-w-0">
+    <p className="text-xs font-medium text-slate-400">{label}</p>
+    <p
+      className={`mt-1 truncate text-base font-black md:text-lg ${
+        danger ? "text-red-200" : "text-white"
+      }`}
+    >
+      {value}
+    </p>
   </div>
 );
 

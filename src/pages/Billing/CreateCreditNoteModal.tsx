@@ -75,7 +75,7 @@ export const CreateCreditNoteModal: React.FC<CreateCreditNoteModalProps> = ({
   return (
     // CORRECTION : ModalPortal au lieu du fixed interne
     <ModalPortal onClose={onClose}>
-      <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+      <div className="sticky top-0 bg-white/95 backdrop-blur border-b border-gray-100 p-4 flex justify-between items-center rounded-t-2xl">
         <h3 className="text-xl font-bold">Créer un avoir</h3>
         <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
           <X size={20} />

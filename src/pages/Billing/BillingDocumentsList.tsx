@@ -361,10 +361,10 @@ export const BillingDocumentsList: React.FC = () => {
       )}
 
       {/* Tableau */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-gray-50/80">
               <tr>
                 <th className="px-5 py-3 text-left text-sm font-semibold">
                   N° Document
@@ -392,7 +392,7 @@ export const BillingDocumentsList: React.FC = () => {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-gray-100">
               {documents.map((doc) => {
                 const isOverdue = doc.status === "OVERDUE";
                 const hasBalance = doc.balanceDue > 0;

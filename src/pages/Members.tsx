@@ -252,15 +252,34 @@ export const AdminMembers: React.FC = () => {
           </div>
           <button
             onClick={() => navigate("/members/create")}
-            className="mt-4 md:mt-0 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2"
+            className="mt-4 md:mt-0 bg-primary-600 text-white px-4 py-2 rounded-xl hover:bg-primary-700 flex items-center gap-2"
           >
             <Plus size={18} /> Créer un membre
           </button>
         </div>
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
+          <p className="text-sm text-gray-500">Total affiché</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{members.length}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
+          <p className="text-sm text-gray-500">Actifs</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{members.filter((m) => m.status === "ACTIVE").length}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
+          <p className="text-sm text-gray-500">Portail activé</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{members.filter((m) => m.portalAccess).length}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
+          <p className="text-sm text-gray-500">Résultats</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{totalElements || members.length}</p>
+        </div>
+      </div>
+
       {/* Filtres */}
-      <div className="bg-white rounded-xl p-4 shadow-sm mb-6">
+      <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100 mb-6">
         <div className="flex flex-col md:flex-row gap-3">
           {/* Recherche texte */}
           <div className="flex-1 relative">
@@ -273,7 +292,7 @@ export const AdminMembers: React.FC = () => {
               placeholder="Nom, email, téléphone, ID membre..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-8 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full pl-10 pr-8 py-2 ring-1 ring-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
             {isFetching && (
               <Loader2
@@ -289,7 +308,7 @@ export const AdminMembers: React.FC = () => {
             onChange={(e) =>
               handleFilterChange(setStatusFilter, e.target.value)
             }
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
+            className="px-4 py-2 ring-1 ring-gray-100 rounded-2xl bg-white"
           >
             <option value="">Tous les statuts</option>
             <option value="ACTIVE">Actif</option>
@@ -304,7 +323,7 @@ export const AdminMembers: React.FC = () => {
             onChange={(e) =>
               handleFilterChange(setPortalFilter, e.target.value)
             }
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
+            className="px-4 py-2 ring-1 ring-gray-100 rounded-2xl bg-white"
           >
             <option value="">Accès portail (tous)</option>
             <option value="active">Avec accès</option>
@@ -319,13 +338,13 @@ export const AdminMembers: React.FC = () => {
             onChange={(e) =>
               handleFilterChange(setCustomerIdFilter, e.target.value)
             }
-            className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 w-44"
+            className="px-4 py-2 ring-1 ring-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 w-44"
           />
 
           {hasAnyFilter && (
             <button
               onClick={handleClearFilters}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 whitespace-nowrap"
+              className="px-3 py-2 ring-1 ring-gray-100 rounded-2xl text-sm text-gray-600 hover:bg-gray-50/70 whitespace-nowrap"
             >
               Réinitialiser
             </button>
@@ -347,10 +366,10 @@ export const AdminMembers: React.FC = () => {
       </div>
 
       {/* Tableau */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+          <table className="w-full border-separate border-spacing-y-1">
+            <thead className="bg-gray-50/70 text-gray-500">
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
                   Membre
@@ -372,12 +391,12 @@ export const AdminMembers: React.FC = () => {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="[&>tr+tr]:border-t [&>tr+tr]:border-gray-50">
               {members.map((member) => (
                 <tr
                   key={member.memberId}
                   onClick={() => navigate(`/members/${member.memberId}`)}
-                  className="hover:bg-gray-50 transition-colors cursor-pointer"
+                  className="hover:bg-gray-50/70/80 transition-colors cursor-pointer"
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -458,7 +477,7 @@ export const AdminMembers: React.FC = () => {
 
         {/* Skeleton pendant chargement initial */}
         {isFetching && members.length === 0 && (
-          <div className="divide-y divide-gray-100">
+          <div className="[&>tr+tr]:border-t [&>tr+tr]:border-gray-50 divide-gray-100">
             {Array.from({ length: 5 }).map((_, i) => (
               <div
                 key={i}
@@ -488,7 +507,7 @@ export const AdminMembers: React.FC = () => {
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
                 disabled={page === 0}
-                className="p-1.5 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
+                className="p-1.5 border rounded-xl disabled:opacity-50 hover:bg-gray-50/70"
               >
                 <ChevronLeft size={16} />
               </button>
@@ -498,7 +517,7 @@ export const AdminMembers: React.FC = () => {
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
                 disabled={page >= totalPages - 1}
-                className="p-1.5 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
+                className="p-1.5 border rounded-xl disabled:opacity-50 hover:bg-gray-50/70"
               >
                 <ChevronRight size={16} />
               </button>

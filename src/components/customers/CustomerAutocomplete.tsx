@@ -88,7 +88,7 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => query.length >= 2 && setShowResults(true)}
           placeholder={placeholder}
-          className={`w-full pl-10 pr-10 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+          className={`w-full pl-10 pr-10 py-2 ring-1 ring-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 ${
             required && !selectedCustomer ? "border-red-300" : ""
           }`}
         />
@@ -104,20 +104,20 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
       </div>
 
       {isLoading && (
-        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg p-4">
+        <div className="absolute z-10 mt-1 w-full bg-white ring-1 ring-gray-100 rounded-2xl shadow-xl p-4">
           <div className="flex justify-center">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600"></div>
+            <div className="animate-spin rounded-full h-5 w-5 -2 border-primary-600"></div>
           </div>
         </div>
       )}
 
       {showResults && results.length > 0 && (
-        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-10 mt-1 w-full bg-white ring-1 ring-gray-100 rounded-2xl shadow-xl max-h-60 overflow-y-auto">
           {results.map((customer) => (
             <button
               key={customer.customerId}
               onClick={() => handleSelect(customer)}
-              className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center space-x-3 border-b border-gray-100 last:border-0"
+              className="w-full px-4 py-3 text-left hover:bg-gray-50/70 transition-colors flex items-center space-x-3  border-gray-100 last:border-0"
             >
               <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
                 {typeFilter === "COMPANY" ? (
@@ -150,7 +150,7 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
       )}
 
       {selectedCustomer && (
-        <div className="mt-2 p-3 bg-primary-50 rounded-lg">
+        <div className="mt-2 p-3 bg-primary-50 rounded-xl">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-900">

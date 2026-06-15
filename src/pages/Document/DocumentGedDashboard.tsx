@@ -54,7 +54,7 @@ export const DocumentGedDashboard: React.FC = () => {
           <select
             value={space}
             onChange={(e) => setSpace(e.target.value)}
-            className="px-3 py-2 border rounded-lg bg-white text-sm"
+            className="px-3 py-2 border border-gray-200 rounded-xl bg-white text-sm"
           >
             <option value="">Tous les espaces</option>
             {spaces.filter(Boolean).map((s) => (
@@ -65,7 +65,7 @@ export const DocumentGedDashboard: React.FC = () => {
           </select>
           <button
             onClick={() => refetch()}
-            className="px-3 py-2 border rounded-lg text-sm flex items-center gap-2"
+            className="px-3 py-2 border border-gray-200 rounded-xl text-sm flex items-center gap-2"
           >
             <RefreshCw size={15} /> Actualiser
           </button>

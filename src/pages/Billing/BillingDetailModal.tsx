@@ -1100,7 +1100,7 @@ export const BillingDetailModal: React.FC<BillingDetailModalProps> = ({
       {/* Modal paiement */}
       {isPayModalOpen && (
         <ModalPortal onClose={() => setIsPayModalOpen(false)}>
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+          <div className="sticky top-0 bg-white/95 backdrop-blur border-b border-gray-100 p-4 flex justify-between items-center rounded-t-2xl">
             <h3 className="text-xl font-bold">Payer la facture</h3>
             <button
               onClick={() => setIsPayModalOpen(false)}
@@ -1327,7 +1327,7 @@ export const BillingDetailModal: React.FC<BillingDetailModalProps> = ({
       {/* Modal signature (Sprint 3) */}
       {isSignatureOpen && (
         <ModalPortal onClose={() => setIsSignatureOpen(false)}>
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+          <div className="sticky top-0 bg-white/95 backdrop-blur border-b border-gray-100 p-4 flex justify-between items-center rounded-t-2xl">
             <h3 className="text-xl font-bold">
               Demander une signature électronique
             </h3>
@@ -1436,7 +1436,7 @@ export const BillingDetailModal: React.FC<BillingDetailModalProps> = ({
       {/* Modal échéancier */}
       {isScheduleOpen && (
         <ModalPortal onClose={() => setIsScheduleOpen(false)} size="lg">
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+          <div className="sticky top-0 bg-white/95 backdrop-blur border-b border-gray-100 p-4 flex justify-between items-center rounded-t-2xl">
             <h3 className="text-xl font-bold">Échéancier de paiement</h3>
             <button
               onClick={() => setIsScheduleOpen(false)}
@@ -1620,7 +1620,7 @@ export const BillingDetailModal: React.FC<BillingDetailModalProps> = ({
       {/* Modal reçu */}
       {isReceiptOpen && (
         <ModalPortal onClose={() => setIsReceiptOpen(false)} size="lg">
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+          <div className="sticky top-0 bg-white/95 backdrop-blur border-b border-gray-100 p-4 flex justify-between items-center rounded-t-2xl">
             <h3 className="text-xl font-bold">Reçu de paiement</h3>
             <button
               onClick={() => setIsReceiptOpen(false)}

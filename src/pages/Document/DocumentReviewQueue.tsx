@@ -93,7 +93,7 @@ const statusConfig: Record<
   },
   RENEWAL_REQUIRED: {
     label: "Renouvellement requis",
-    color: "bg-purple-100 text-purple-700",
+    color: "bg-gray-100 text-gray-700",
     icon: Calendar,
   },
 };
@@ -398,7 +398,7 @@ export const DocumentReviewQueue: React.FC = () => {
               placeholder="Rechercher un dossier..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
           {!showMyQueue && (
@@ -406,7 +406,7 @@ export const DocumentReviewQueue: React.FC = () => {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
+                className="px-4 py-2 border border-gray-200 rounded-xl bg-white"
               >
                 <option value="all">Tous les statuts</option>
                 <option value="PENDING_REVIEW">En attente</option>
@@ -418,7 +418,7 @@ export const DocumentReviewQueue: React.FC = () => {
               <select
                 value={ownerTypeFilter}
                 onChange={(e) => setOwnerTypeFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
+                className="px-4 py-2 border border-gray-200 rounded-xl bg-white"
               >
                 <option value="all">Tous les types</option>
                 <option value="MEMBER">Membres</option>
@@ -428,7 +428,7 @@ export const DocumentReviewQueue: React.FC = () => {
               <select
                 value={riskLevelFilter}
                 onChange={(e) => setRiskLevelFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
+                className="px-4 py-2 border border-gray-200 rounded-xl bg-white"
               >
                 <option value="all">Tous les risques</option>
                 <option value="LOW">Faible</option>
@@ -445,7 +445,7 @@ export const DocumentReviewQueue: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-gray-50/70">
               <tr>
                 {bulkMode && (
                   <th className="px-4 py-3 text-center text-sm font-semibold w-10">
@@ -481,7 +481,7 @@ export const DocumentReviewQueue: React.FC = () => {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-gray-100">
               {filteredCases.map((kycCase) => {
                 const statusKey = kycCase.status as keyof typeof statusConfig;
                 const StatusIcon = statusConfig[statusKey]?.icon || Clock;
@@ -495,7 +495,7 @@ export const DocumentReviewQueue: React.FC = () => {
                   new Date(kycCase.slaDeadline) < new Date();
 
                 return (
-                  <tr key={kycCase.code} className="hover:bg-gray-50">
+                  <tr key={kycCase.code} className="hover:bg-gray-100">
                     {bulkMode && (
                       <td className="px-4 py-3 text-center">
                         <input

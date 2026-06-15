@@ -113,17 +113,17 @@ export const DocumentAdvancedSearchPage: React.FC = () => {
           métadonnées.
         </p>
       </div>
-      <div className="bg-white rounded-xl shadow-sm p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
         <input
           value={form.q}
           onChange={(e) => setForm({ ...form, q: e.target.value })}
           placeholder="Recherche texte"
-          className="px-3 py-2 border rounded-lg"
+          className="px-3 py-2 border border-gray-200 rounded-xl"
         />
         <select
           value={form.space}
           onChange={(e) => setForm({ ...form, space: e.target.value })}
-          className="px-3 py-2 border rounded-lg bg-white"
+          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
         >
           <option value="">Tous espaces</option>
           {spaces.map((s) => (
@@ -133,7 +133,7 @@ export const DocumentAdvancedSearchPage: React.FC = () => {
         <select
           value={form.category}
           onChange={(e) => setForm({ ...form, category: e.target.value })}
-          className="px-3 py-2 border rounded-lg bg-white"
+          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
         >
           <option value="">Toutes catégories</option>
           {categories.map((s) => (
@@ -143,7 +143,7 @@ export const DocumentAdvancedSearchPage: React.FC = () => {
         <select
           value={form.status}
           onChange={(e) => setForm({ ...form, status: e.target.value })}
-          className="px-3 py-2 border rounded-lg bg-white"
+          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
         >
           <option value="">Tous statuts</option>
           {statuses.map((s) => (
@@ -153,7 +153,7 @@ export const DocumentAdvancedSearchPage: React.FC = () => {
         <select
           value={form.ownerType}
           onChange={(e) => setForm({ ...form, ownerType: e.target.value })}
-          className="px-3 py-2 border rounded-lg bg-white"
+          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
         >
           <option value="">Tous propriétaires</option>
           {ownerTypes.map((s) => (
@@ -164,19 +164,19 @@ export const DocumentAdvancedSearchPage: React.FC = () => {
           value={form.ownerCode}
           onChange={(e) => setForm({ ...form, ownerCode: e.target.value })}
           placeholder="Code propriétaire"
-          className="px-3 py-2 border rounded-lg font-mono"
+          className="px-3 py-2 border border-gray-200 rounded-xl font-mono"
         />
         <input
           type="number"
           value={form.expiresInDays}
           onChange={(e) => setForm({ ...form, expiresInDays: e.target.value })}
           placeholder="Expire dans N jours"
-          className="px-3 py-2 border rounded-lg"
+          className="px-3 py-2 border border-gray-200 rounded-xl"
         />
         <select
           value={form.isExpired}
           onChange={(e) => setForm({ ...form, isExpired: e.target.value })}
-          className="px-3 py-2 border rounded-lg bg-white"
+          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
         >
           <option value="">Expiration</option>
           <option value="true">Expirés</option>
@@ -186,25 +186,25 @@ export const DocumentAdvancedSearchPage: React.FC = () => {
           type="date"
           value={form.uploadedAfter}
           onChange={(e) => setForm({ ...form, uploadedAfter: e.target.value })}
-          className="px-3 py-2 border rounded-lg"
+          className="px-3 py-2 border border-gray-200 rounded-xl"
         />
         <input
           type="date"
           value={form.uploadedBefore}
           onChange={(e) => setForm({ ...form, uploadedBefore: e.target.value })}
-          className="px-3 py-2 border rounded-lg"
+          className="px-3 py-2 border border-gray-200 rounded-xl"
         />
         <input
           value={form.metaKey}
           onChange={(e) => setForm({ ...form, metaKey: e.target.value })}
           placeholder="Meta key"
-          className="px-3 py-2 border rounded-lg"
+          className="px-3 py-2 border border-gray-200 rounded-xl"
         />
         <input
           value={form.metaValue}
           onChange={(e) => setForm({ ...form, metaValue: e.target.value })}
           placeholder="Meta value"
-          className="px-3 py-2 border rounded-lg"
+          className="px-3 py-2 border border-gray-200 rounded-xl"
         />
         <button
           onClick={() => {
@@ -223,7 +223,7 @@ export const DocumentAdvancedSearchPage: React.FC = () => {
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-gray-50/70">
               <tr>
                 <th className="px-4 py-3 text-left">Document</th>
                 <th className="px-4 py-3 text-left">Propriétaire</th>
@@ -231,7 +231,7 @@ export const DocumentAdvancedSearchPage: React.FC = () => {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-gray-100">
               {documents.map((doc) => (
                 <tr key={doc.code}>
                   <td className="px-4 py-3">

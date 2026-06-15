@@ -225,17 +225,15 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <ModalPortal onClose={onClose}>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-        <div className="relative bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto mt-16">
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+    <ModalPortal onClose={onClose} size="2xl">
+      <div className="max-h-[85vh] overflow-y-auto rounded-2xl bg-white">
+        <div className="sticky top-0 z-10 flex items-center justify-between bg-white/95 p-5 backdrop-blur ring-1 ring-gray-100">
             <h3 className="text-xl font-bold">
               {isEditing ? "Modifier le contrat" : "Nouveau contrat"}
             </h3>
             <button
               onClick={onClose}
-              className="p-1 hover:bg-gray-100 rounded-lg"
+              className="p-1 hover:bg-gray-100 rounded-xl"
             >
               <X size={20} />
             </button>
@@ -244,7 +242,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             {/* Informations générales */}
             <div>
-              <h4 className="font-semibold mb-4">Informations générales</h4>
+              <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">Informations générales</h4>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">
@@ -256,7 +254,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
                     value={formData.title}
                     onChange={handleChange}
                     required
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
+                    className="w-full rounded-2xl bg-gray-50/60 px-3 py-2.5 ring-1 ring-gray-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
@@ -268,7 +266,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
                     value={formData.description}
                     onChange={handleChange}
                     rows={2}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
+                    className="w-full rounded-2xl bg-gray-50/60 px-3 py-2.5 ring-1 ring-gray-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -281,7 +279,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
                       value={formData.templateCode}
                       onChange={handleChange}
                       required
-                      className="w-full px-3 py-2 border rounded-lg"
+                      className="w-full px-3 py-2 border rounded-xl"
                     >
                       <option value="">Sélectionner</option>
                       {templates.map((t) => (
@@ -299,7 +297,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
                       name="ownerType"
                       value={formData.ownerType}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 border rounded-lg"
+                      className="w-full px-3 py-2 border rounded-xl"
                     >
                       {ownerTypes.map((t) => (
                         <option key={t.value} value={t.value}>
@@ -350,7 +348,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
 
             {/* Dates */}
             <div>
-              <h4 className="font-semibold mb-4">Dates</h4>
+              <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">Dates</h4>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">
@@ -362,7 +360,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
                     value={formData.effectiveDate}
                     onChange={handleChange}
                     required
-                    className="w-full px-3 py-2 border rounded-lg"
+                    className="w-full px-3 py-2 border rounded-xl"
                   />
                 </div>
                 <div>
@@ -375,7 +373,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
                     value={formData.startDate}
                     onChange={handleChange}
                     required
-                    className="w-full px-3 py-2 border rounded-lg"
+                    className="w-full px-3 py-2 border rounded-xl"
                   />
                 </div>
                 <div>
@@ -387,7 +385,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
                     name="endDate"
                     value={formData.endDate}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-lg"
+                    className="w-full px-3 py-2 border rounded-xl"
                   />
                 </div>
                 <div>
@@ -398,7 +396,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
                     name="renewalType"
                     value={formData.renewalType}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-lg"
+                    className="w-full px-3 py-2 border rounded-xl"
                   >
                     {renewalTypes.map((t) => (
                       <option key={t.value} value={t.value}>
@@ -412,12 +410,12 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
 
             {/* Parties */}
             <div>
-              <h4 className="font-semibold mb-4">Parties prenantes</h4>
+              <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">Parties prenantes</h4>
               <div className="space-y-3 mb-4">
                 {formData.parties.map((party, index) => (
                   <div
                     key={index}
-                    className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
+                    className="flex justify-between items-center p-3 bg-gray-50 rounded-xl"
                   >
                     <div>
                       <p className="font-medium">{party.displayName}</p>
@@ -444,7 +442,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
                   <select
                     value={newParty.partyType}
                     onChange={(e) => handlePartyTypeChange(e.target.value)}
-                    className="px-3 py-2 border rounded-lg"
+                    className="px-3 py-2 border rounded-xl"
                   >
                     <option value="MEMBER">Membre</option>
                     <option value="CUSTOMER">Customer</option>
@@ -455,7 +453,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
                     onChange={(e) =>
                       setNewParty({ ...newParty, role: e.target.value })
                     }
-                    className="px-3 py-2 border rounded-lg"
+                    className="px-3 py-2 border rounded-xl"
                   >
                     <option value="SIGNATORY">Signataire</option>
                     <option value="BENEFICIARY">Bénéficiaire</option>
@@ -486,7 +484,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
                   onChange={(e) =>
                     setNewParty({ ...newParty, phone: e.target.value })
                   }
-                  className="w-full mt-3 px-3 py-2 border rounded-lg"
+                  className="w-full mt-3 px-3 py-2 border rounded-xl"
                 />
 
                 <button
@@ -497,7 +495,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
                     !newParty.displayName ||
                     !newParty.email
                   }
-                  className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 disabled:opacity-50"
+                  className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2 border border-primary-600 text-primary-600 rounded-xl hover:bg-primary-50 disabled:opacity-50"
                 >
                   <Plus size={16} />
                   Ajouter
@@ -516,7 +514,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border rounded-xl text-gray-700 hover:bg-gray-50"
               >
                 Annuler
               </button>
@@ -527,13 +525,12 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
                   !formData.templateCode ||
                   !formData.ownerCode
                 }
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50"
               >
                 {isEditing ? "Mettre à jour" : "Créer le contrat"}
               </button>
             </div>
-          </form>
-        </div>
+        </form>
       </div>
     </ModalPortal>
   );

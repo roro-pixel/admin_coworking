@@ -59,23 +59,23 @@ export const DocumentAnalyticsExportPage: React.FC = () => {
           <Download size={16} /> Export CSV
         </button>
       </div>
-      <div className="bg-white rounded-xl shadow-sm p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
         <input
           type="date"
           value={from}
           onChange={(e) => setFrom(e.target.value)}
-          className="px-3 py-2 border rounded-lg"
+          className="px-3 py-2 border border-gray-200 rounded-xl"
         />
         <input
           type="date"
           value={to}
           onChange={(e) => setTo(e.target.value)}
-          className="px-3 py-2 border rounded-lg"
+          className="px-3 py-2 border border-gray-200 rounded-xl"
         />
         <select
           value={space}
           onChange={(e) => setSpace(e.target.value)}
-          className="px-3 py-2 border rounded-lg bg-white"
+          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
         >
           <option value="">Tous espaces</option>
           {spaces.filter(Boolean).map((s) => (
@@ -84,7 +84,7 @@ export const DocumentAnalyticsExportPage: React.FC = () => {
         </select>
         <button
           onClick={() => refetch()}
-          className="px-4 py-2 border rounded-lg flex items-center justify-center gap-2"
+          className="px-4 py-2 border border-gray-200 rounded-xl flex items-center justify-center gap-2"
         >
           <RefreshCw size={16} /> Actualiser
         </button>

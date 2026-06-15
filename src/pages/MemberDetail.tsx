@@ -72,7 +72,7 @@ export const MemberDetail: React.FC = () => {
     return (
       <AdminLayout>
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+          <div className="animate-spin rounded-full h-12 w-12 -2 border-primary-600"></div>
         </div>
       </AdminLayout>
     );
@@ -81,7 +81,7 @@ export const MemberDetail: React.FC = () => {
   if (error || !member) {
     return (
       <AdminLayout>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-600">
           Member non trouvé
         </div>
       </AdminLayout>
@@ -141,11 +141,11 @@ export const MemberDetail: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white rounded-2xl p-4 shadow-sm ring-1 ring-gray-100">
         <div className="flex items-center">
           <button
             onClick={() => navigate("/members")}
-            className="mr-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="mr-4 p-2 hover:bg-gray-100 rounded-xl transition-colors"
           >
             <ArrowLeft size={20} className="text-gray-600" />
           </button>
@@ -169,7 +169,7 @@ export const MemberDetail: React.FC = () => {
             <>
               <button
                 onClick={() => setIsEditing(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50/70"
               >
                 <X size={16} className="inline mr-1" />
                 Annuler
@@ -177,7 +177,7 @@ export const MemberDetail: React.FC = () => {
               <button
                 onClick={handleSave}
                 disabled={updateMutation.isPending}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50"
               >
                 <Save size={16} className="inline mr-1" />
                 {updateMutation.isPending ? "Sauvegarde..." : "Enregistrer"}
@@ -187,7 +187,7 @@ export const MemberDetail: React.FC = () => {
             <>
               <button
                 onClick={() => setShowResetPassword(true)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50/70"
               >
                 <Key size={16} className="inline mr-1" />
                 Réinitialiser mot de passe
@@ -197,7 +197,7 @@ export const MemberDetail: React.FC = () => {
                   setFormData(member);
                   setIsEditing(true);
                 }}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700"
               >
                 <Edit size={16} className="inline mr-1" />
                 Modifier
@@ -208,7 +208,7 @@ export const MemberDetail: React.FC = () => {
       </div>
 
       {/* Informations personnelles */}
-      <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
+      <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
           Informations personnelles
         </h2>
@@ -223,7 +223,7 @@ export const MemberDetail: React.FC = () => {
                 name="firstname"
                 value={formData.firstname}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             ) : (
               <p className="text-gray-900">{member.firstname}</p>
@@ -239,7 +239,7 @@ export const MemberDetail: React.FC = () => {
                 name="lastname"
                 value={formData.lastname}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             ) : (
               <p className="text-gray-900">{member.lastname}</p>
@@ -249,7 +249,7 @@ export const MemberDetail: React.FC = () => {
       </div>
 
       {/* Contact */}
-      <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
+      <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Contact</h2>
         <div className="grid md:grid-cols-2 gap-6">
           <div>
@@ -262,7 +262,7 @@ export const MemberDetail: React.FC = () => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             ) : (
               <p className="text-gray-900">{member.email}</p>
@@ -278,7 +278,7 @@ export const MemberDetail: React.FC = () => {
                 name="phone"
                 value={formData.phone || ""}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             ) : (
               <p className="text-gray-900">{member.phone || "-"}</p>
@@ -294,7 +294,7 @@ export const MemberDetail: React.FC = () => {
                 name="whatsappPhone"
                 value={formData.whatsappPhone || ""}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             ) : (
               <p className="text-gray-900">{member.whatsappPhone || "-"}</p>
@@ -304,7 +304,7 @@ export const MemberDetail: React.FC = () => {
       </div>
 
       {/* Accès et statut */}
-      <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
+      <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
           Accès et statut
         </h2>
@@ -369,7 +369,7 @@ export const MemberDetail: React.FC = () => {
       </div>
 
       {/* Métadonnées */}
-      <div className="bg-white rounded-xl p-6 shadow-sm">
+      <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
           Métadonnées
         </h2>
@@ -411,13 +411,13 @@ export const MemberDetail: React.FC = () => {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowResetPassword(false)}
-                className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-700"
+                className="flex-1 px-4 py-2 ring-1 ring-gray-100 rounded-2xl text-gray-700"
               >
                 Annuler
               </button>
               <button
                 onClick={handleResetPassword}
-                className="flex-1 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700"
+                className="flex-1 bg-primary-600 text-white px-4 py-2 rounded-xl hover:bg-primary-700"
               >
                 Envoyer
               </button>

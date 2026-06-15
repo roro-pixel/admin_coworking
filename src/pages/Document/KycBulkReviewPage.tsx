@@ -186,14 +186,14 @@ export const KycBulkReviewPage: React.FC = () => {
           placeholder="Rechercher un document..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg"
+          className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl"
         />
       </div>
 
       {/* Liste des documents */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b">
+          <thead className="bg-gray-50/70">
             <tr>
               <th className="px-4 py-3 text-center w-12">
                 <button onClick={toggleSelectAll} className="p-1">
@@ -222,11 +222,11 @@ export const KycBulkReviewPage: React.FC = () => {
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="divide-y divide-gray-100">
             {filteredDocs.map((doc: any) => (
               <tr
                 key={doc.code}
-                className={`hover:bg-gray-50 cursor-pointer ${selectedDocs.includes(doc.code) ? "bg-blue-50" : ""}`}
+                className={`hover:bg-gray-100 cursor-pointer ${selectedDocs.includes(doc.code) ? "bg-blue-50" : ""}`}
                 onClick={() => toggleDoc(doc.code)}
               >
                 <td className="px-4 py-3 text-center">

@@ -336,14 +336,14 @@ export const BillingCatalogManager: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="py-12 flex justify-center">
             <Loader2 className="animate-spin text-primary-600" />
           </div>
         ) : (
           <table className="w-full">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-gray-50/80">
               <tr>
                 <th className="px-5 py-3 text-left text-sm font-semibold">
                   Code
@@ -365,7 +365,7 @@ export const BillingCatalogManager: React.FC = () => {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-gray-100">
               {items.map((item) => (
                 <tr key={item.itemCode} className="hover:bg-gray-50">
                   <td className="px-5 py-4 text-sm font-mono">

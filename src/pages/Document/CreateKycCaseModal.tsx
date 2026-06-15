@@ -268,13 +268,13 @@ export const CreateKycCaseModal: React.FC<CreateKycCaseModalProps> = ({
 
           {/* Résultats de recherche */}
           {searchResults.length > 0 && (
-            <div className="mt-2 border border-gray-200 rounded-xl overflow-hidden bg-white shadow-lg max-h-60 overflow-y-auto">
+            <div className="mt-2 border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm max-h-60 overflow-y-auto">
               {searchResults.map((result) => (
                 <button
                   key={result.code}
                   type="button"
                   onClick={() => handleSelectOwner(result)}
-                  className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b last:border-0 transition-colors flex items-center justify-between"
+                  className="w-full px-4 py-3 text-left hover:bg-gray-100 border-b last:border-0 transition-colors flex items-center justify-between"
                 >
                   <div>
                     <p className="font-medium text-gray-900">{result.name}</p>
@@ -359,7 +359,7 @@ export const CreateKycCaseModal: React.FC<CreateKycCaseModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-5 py-3 border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-colors text-base"
+            className="flex-1 px-5 py-3 border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-100 transition-colors text-base"
           >
             Annuler
           </button>

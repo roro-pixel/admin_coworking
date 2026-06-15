@@ -102,7 +102,7 @@ export const KycMyQueuePage: React.FC = () => {
             return (
               <div
                 key={kycCase.code}
-                className="bg-white rounded-xl p-5 shadow-sm hover:shadow-md transition-all"
+                className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100 hover:shadow-sm transition-all"
               >
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div className="flex-1">
@@ -150,7 +150,7 @@ export const KycMyQueuePage: React.FC = () => {
                   <div className="flex gap-2">
                     <button
                       onClick={() => setSelectedCase(kycCase)}
-                      className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm"
+                      className="px-4 py-2 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
                     >
                       <Eye size={14} /> Examiner
                     </button>

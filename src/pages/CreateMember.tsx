@@ -237,19 +237,19 @@ export const CreateMember: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="mb-6 flex items-center">
+      <div className="mb-6 flex items-center bg-white rounded-2xl p-4 shadow-sm ring-1 ring-gray-100">
         <button
           onClick={() => navigate("/members")}
-          className="mr-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          className="mr-4 p-2 hover:bg-gray-100 rounded-xl transition-colors"
         >
           <ArrowLeft size={20} className="text-gray-600" />
         </button>
         <h1 className="text-2xl font-bold text-gray-900">Créer un member</h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="max-w-3xl">
+      <form onSubmit={handleSubmit} className="max-w-5xl space-y-6">
         {/* Choix du mode */}
-        <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
+        <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
             Rattachement customer
           </h2>
@@ -257,7 +257,7 @@ export const CreateMember: React.FC = () => {
             <button
               type="button"
               onClick={() => setMode("new")}
-              className={`flex-1 p-4 border-2 rounded-lg text-center transition-all ${
+              className={`flex-1 p-4 border-2 rounded-xl text-center transition-all ${
                 mode === "new"
                   ? "border-primary-600 bg-primary-50 text-primary-700"
                   : "border-gray-200 hover:border-primary-200"
@@ -275,7 +275,7 @@ export const CreateMember: React.FC = () => {
             <button
               type="button"
               onClick={() => setMode("existing")}
-              className={`flex-1 p-4 border-2 rounded-lg text-center transition-all ${
+              className={`flex-1 p-4 border-2 rounded-xl text-center transition-all ${
                 mode === "existing"
                   ? "border-primary-600 bg-primary-50 text-primary-700"
                   : "border-gray-200 hover:border-primary-200"
@@ -312,7 +312,7 @@ export const CreateMember: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setCustomerType("PERSON")}
-                  className={`flex-1 p-3 border rounded-lg text-center transition-all ${
+                  className={`flex-1 p-3 border rounded-xl text-center transition-all ${
                     customerType === "PERSON"
                       ? "border-primary-600 bg-primary-50 text-primary-700"
                       : "border-gray-200 hover:border-primary-200"
@@ -324,7 +324,7 @@ export const CreateMember: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setCustomerType("COMPANY")}
-                  className={`flex-1 p-3 border rounded-lg text-center transition-all ${
+                  className={`flex-1 p-3 border rounded-xl text-center transition-all ${
                     customerType === "COMPANY"
                       ? "border-primary-600 bg-primary-50 text-primary-700"
                       : "border-gray-200 hover:border-primary-200"
@@ -336,7 +336,7 @@ export const CreateMember: React.FC = () => {
               </div>
 
               {customerType === "COMPANY" && mode === "new" && (
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                <div className="mt-4 p-4 bg-gray-50/70 rounded-xl">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Nom de l'entreprise *
                   </label>
@@ -345,7 +345,7 @@ export const CreateMember: React.FC = () => {
                     name="companyName"
                     value={newCustomerData.companyName}
                     onChange={handleNewCustomerChange}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
                   />
                   <label className="block text-sm font-medium text-gray-700 mt-3 mb-1">
                     Email de facturation
@@ -355,7 +355,7 @@ export const CreateMember: React.FC = () => {
                     name="billingEmail"
                     value={newCustomerData.billingEmail}
                     onChange={handleNewCustomerChange}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
               )}
@@ -364,7 +364,7 @@ export const CreateMember: React.FC = () => {
         </div>
 
         {/* Informations du member */}
-        <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
+        <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
             Informations du member
           </h2>
@@ -378,7 +378,7 @@ export const CreateMember: React.FC = () => {
                 name="firstname"
                 value={formData.firstname}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
@@ -390,7 +390,7 @@ export const CreateMember: React.FC = () => {
                 name="lastname"
                 value={formData.lastname}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
@@ -402,7 +402,7 @@ export const CreateMember: React.FC = () => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
@@ -414,7 +414,7 @@ export const CreateMember: React.FC = () => {
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
@@ -427,14 +427,14 @@ export const CreateMember: React.FC = () => {
                 value={formData.whatsappPhone}
                 onChange={handleChange}
                 placeholder="Laissez vide = téléphone"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             </div>
           </div>
         </div>
 
         {/* Accès portail */}
-        <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
+        <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
             Accès portail
           </h2>
@@ -479,7 +479,7 @@ export const CreateMember: React.FC = () => {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
               />
             </div>
           )}
@@ -487,7 +487,7 @@ export const CreateMember: React.FC = () => {
 
         {/* Adresse (si nouveau customer) */}
         {mode === "new" && (
-          <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
+          <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               Adresse du customer
             </h2>
@@ -501,7 +501,7 @@ export const CreateMember: React.FC = () => {
                   name="streetNumber"
                   value={newCustomerData.address.streetNumber}
                   onChange={handleAddressChange}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
                 />
               </div>
               <div>
@@ -513,7 +513,7 @@ export const CreateMember: React.FC = () => {
                   name="streetName"
                   value={newCustomerData.address.streetName}
                   onChange={handleAddressChange}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
                 />
               </div>
               <div>
@@ -525,7 +525,7 @@ export const CreateMember: React.FC = () => {
                   name="district"
                   value={newCustomerData.address.district}
                   onChange={handleAddressChange}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
                 />
               </div>
               <div>
@@ -537,7 +537,7 @@ export const CreateMember: React.FC = () => {
                   name="city"
                   value={newCustomerData.address.city}
                   onChange={handleAddressChange}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
                 />
               </div>
               <div>
@@ -548,7 +548,7 @@ export const CreateMember: React.FC = () => {
                   name="countryCode"
                   value={newCustomerData.address.countryCode}
                   onChange={handleAddressChange}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
                 >
                   <option value="">Sélectionner un pays</option>
                   {countries.map((country) => (
@@ -564,12 +564,12 @@ export const CreateMember: React.FC = () => {
 
         {/* Messages */}
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
             {error}
           </div>
         )}
         {success && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-600 text-sm">
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl text-green-600 text-sm">
             {success}
           </div>
         )}
@@ -579,17 +579,17 @@ export const CreateMember: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate("/members")}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+            className="px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50/70"
           >
             Annuler
           </button>
           <button
             type="submit"
             disabled={isLoading}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center"
+            className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 flex items-center"
           >
             {isLoading ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+              <div className="animate-spin rounded-full h-5 w-5 -2 border-white mr-2"></div>
             ) : (
               <Save size={16} className="mr-2" />
             )}

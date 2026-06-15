@@ -80,9 +80,9 @@ export const BillingCatalogLookupPanel: React.FC = () => {
           <Loader2 className="animate-spin text-primary-600" />
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-gray-50/80">
               <tr>
                 <th className="px-4 py-3 text-left text-sm font-semibold">
                   Code
@@ -101,7 +101,7 @@ export const BillingCatalogLookupPanel: React.FC = () => {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-gray-100">
               {items.map((item: any, index) => (
                 <tr
                   key={item.itemCode || item.code || index}
