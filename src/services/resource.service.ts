@@ -6,12 +6,14 @@ export type ResourceStatus =
   | "MAINTENANCE"
   | "OUT_OF_SERVICE"
   | "ARCHIVED";
+
 export type ResourceBookingUnit =
   | "HOUR"
   | "HALF_DAY"
   | "DAY"
   | "WEEK"
   | "MONTH";
+
 export type AdjustmentType = "FIXED_PRICE" | "AMOUNT_DELTA" | "PERCENT_DELTA";
 
 export interface PageResponse<T> {
@@ -19,24 +21,40 @@ export interface PageResponse<T> {
   totalElements: number;
   totalPages: number;
 }
+
 const page = <T>(raw: any): PageResponse<T> => {
-  if (Array.isArray(raw?.content))
+  if (Array.isArray(raw?.content)) {
     return {
       content: raw.content,
       totalElements: raw.totalElements ?? raw.content.length,
       totalPages: raw.totalPages ?? 1,
     };
-  if (Array.isArray(raw?.data))
+  }
+
+  if (Array.isArray(raw?.data)) {
     return {
       content: raw.data,
       totalElements:
         raw.totalElements ?? raw.pageable?.totalElements ?? raw.data.length,
       totalPages: raw.totalPages ?? raw.pageable?.totalPages ?? 1,
     };
-  if (Array.isArray(raw))
-    return { content: raw, totalElements: raw.length, totalPages: 1 };
-  return { content: [], totalElements: 0, totalPages: 0 };
+  }
+
+  if (Array.isArray(raw)) {
+    return {
+      content: raw,
+      totalElements: raw.length,
+      totalPages: 1,
+    };
+  }
+
+  return {
+    content: [],
+    totalElements: 0,
+    totalPages: 0,
+  };
 };
+
 const arr = <T>(raw: any): T[] =>
   Array.isArray(raw)
     ? raw
@@ -62,6 +80,7 @@ export interface ResourceResponse {
   displayOrder: number | null;
   active: boolean;
 }
+
 export interface ResourceSummaryResponse {
   code: string;
   typeCode: string | null;
@@ -71,6 +90,7 @@ export interface ResourceSummaryResponse {
   portalVisible: boolean;
   active: boolean;
 }
+
 export interface ResourceRequest {
   typeId: number;
   groupId?: number;
@@ -84,6 +104,7 @@ export interface ResourceRequest {
   bookingEnabled?: boolean;
   portalVisible?: boolean;
 }
+
 export interface UpdateResourceRequest {
   name?: string;
   description?: string;
@@ -94,6 +115,7 @@ export interface UpdateResourceRequest {
   bookingEnabled?: boolean;
   portalVisible?: boolean;
 }
+
 export interface ResourceSearchCriteria {
   code?: string;
   typeId?: number;
@@ -113,19 +135,27 @@ export interface ResourceSearchCriteria {
 }
 
 export interface ResourceTypeResponse {
+  id?: number;
+  typeId?: number;
   code: string;
   name: string;
   description: string | null;
   active: boolean;
 }
+
 export interface ResourceGroupResponse {
+  id?: number;
+  groupId?: number;
   code: string;
   name: string;
   description: string | null;
   portalVisible: boolean;
   active: boolean;
 }
+
 export interface ResourcePolicyResponse {
+  id?: number;
+  policyId?: number;
   code: string;
   name: string;
   description: string | null;
@@ -136,6 +166,7 @@ export interface ResourcePolicyResponse {
   allowCancellation: boolean;
   active: boolean;
 }
+
 export interface AmenityResponse {
   code: string;
   name: string;
@@ -145,6 +176,7 @@ export interface AmenityResponse {
   optional: boolean | null;
   extraPrice: number | null;
 }
+
 export interface ResourceAvailabilityResponse {
   id: number;
   resourceCode: string;
@@ -156,6 +188,7 @@ export interface ResourceAvailabilityResponse {
   available: boolean;
   active: boolean;
 }
+
 export interface ResourceAvailabilityWindowResponse {
   resourceCode: string;
   startedAt: string;
@@ -164,6 +197,7 @@ export interface ResourceAvailabilityWindowResponse {
   remainingCapacity: number;
   slotCount: number;
 }
+
 export interface ResourceClosureResponse {
   id: number;
   resourceCode: string;
@@ -172,23 +206,25 @@ export interface ResourceClosureResponse {
   reason?: string;
   active: boolean;
 }
+
 export interface ResourcePricingRuleResponse {
   id: number;
   resourceCode: string;
   bookingUnit: ResourceBookingUnit;
   price: number;
-  label?: string;
-  dayOfWeek?: number;
-  startsAt?: string;
-  endsAt?: string;
-  adjustmentType?: AdjustmentType;
-  adjustmentValue?: number;
+  label?: string | null;
+  dayOfWeek?: string | number | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  adjustmentType?: AdjustmentType | null;
+  adjustmentValue?: number | null;
   lastMinuteMinutes?: number | null;
-  priority?: number;
-  validFrom?: string;
-  validUntil?: string;
+  priority?: number | null;
+  validFrom?: string | null;
+  validUntil?: string | null;
   active: boolean;
 }
+
 export interface PricingRuleQuote {
   resourceCode: string;
   bookingUnit: string;
@@ -196,20 +232,22 @@ export interface PricingRuleQuote {
   endedAt: string;
   basePrice: number;
   finalPrice: number;
-  appliedRuleId?: number;
-  appliedRuleLabel?: string;
-  adjustmentType?: string;
-  adjustmentValue?: number;
+  appliedRuleId?: number | null;
+  appliedRuleLabel?: string | null;
+  adjustmentType?: string | null;
+  adjustmentValue?: number | null;
 }
+
 export interface ResourcePhoto {
   id: number;
   resourceCode: string;
   documentCode: string;
-  caption?: string;
+  caption?: string | null;
   cover: boolean;
   displayOrder: number;
   active: boolean;
 }
+
 export interface PublicCalendarDay {
   date: string;
   totalSlots: number;
@@ -218,6 +256,7 @@ export interface PublicCalendarDay {
   remainingCapacity: number;
   status: "AVAILABLE" | "PARTIAL" | "FULL";
 }
+
 export interface PublicResourceCalendar {
   resourceCode: string;
   resourceName: string;
@@ -226,13 +265,22 @@ export interface PublicResourceCalendar {
   days: PublicCalendarDay[];
 }
 
+export interface ResourceAvailabilityGroupResponse {
+  resourceCode: string;
+  resourceName: string;
+  availabilities: ResourceAvailabilityResponse[];
+}
+
 export const resourceService = {
-  // Resources
   getResources: async (params?: {
     summary?: boolean;
     typeCode?: string;
     groupCode?: string;
     policyCode?: string;
+    status?: ResourceStatus;
+    portalVisible?: boolean;
+    bookingEnabled?: boolean;
+    active?: boolean;
     page?: number;
     size?: number;
     sort?: string;
@@ -240,8 +288,10 @@ export const resourceService = {
     page<ResourceResponse | ResourceSummaryResponse>(
       (await apiClient.get("/sni/api/v1/resources", { params })).data,
     ),
+
   getResource: async (code: string): Promise<ResourceResponse> =>
     (await apiClient.get(`/sni/api/v1/resources/${code}`)).data,
+
   searchResources: async (query: string): Promise<ResourceSummaryResponse[]> =>
     arr<ResourceSummaryResponse>(
       (
@@ -250,6 +300,7 @@ export const resourceService = {
         })
       ).data,
     ),
+
   advancedSearchResources: async (
     criteria?: ResourceSearchCriteria,
   ): Promise<PageResponse<ResourceSummaryResponse>> =>
@@ -257,21 +308,25 @@ export const resourceService = {
       (await apiClient.post("/sni/api/v1/resources/search", criteria ?? null))
         .data,
     ),
+
   createResource: async (data: ResourceRequest): Promise<void> => {
     await apiClient.post("/sni/api/v1/resources", data);
   },
+
   updateResource: async (
     code: string,
     data: UpdateResourceRequest,
   ): Promise<void> => {
     await apiClient.put(`/sni/api/v1/resources/${code}`, data);
   },
+
   updateResourceClassification: async (
     code: string,
     data: { typeId: number; groupId?: number; policyId?: number },
   ): Promise<void> => {
     await apiClient.patch(`/sni/api/v1/resources/${code}/classification`, data);
   },
+
   updateResourceStatus: async (
     code: string,
     status: ResourceStatus,
@@ -280,6 +335,7 @@ export const resourceService = {
       params: { status },
     });
   },
+
   updateResourceBookingEnabled: async (
     code: string,
     bookingEnabled: boolean,
@@ -288,6 +344,7 @@ export const resourceService = {
       bookingEnabled,
     });
   },
+
   updateResourcePortalVisible: async (
     code: string,
     portalVisible: boolean,
@@ -296,12 +353,14 @@ export const resourceService = {
       visible: portalVisible,
     });
   },
+
   updateResourceActive: async (
     code: string,
     active: boolean,
   ): Promise<void> => {
     await apiClient.patch(`/sni/api/v1/resources/${code}/active`, { active });
   },
+
   updateResourceDisplayOrder: async (
     code: string,
     displayOrder: number,
@@ -310,11 +369,11 @@ export const resourceService = {
       displayOrder,
     });
   },
+
   deleteResource: async (code: string): Promise<void> => {
     await apiClient.delete(`/sni/api/v1/resources/${code}`);
   },
 
-  // Amenity links
   linkAmenity: async (
     resourceCode: string,
     amenityCode: string,
@@ -326,6 +385,7 @@ export const resourceService = {
       ...data,
     });
   },
+
   linkAmenityToResource: async (
     resourceCode: string,
     data: {
@@ -340,6 +400,7 @@ export const resourceService = {
       ...data,
     });
   },
+
   getResourceAmenities: async (
     resourceCode: string,
   ): Promise<AmenityResponse[]> =>
@@ -347,6 +408,7 @@ export const resourceService = {
       (await apiClient.get(`/sni/api/v1/resources/${resourceCode}/amenities`))
         .data,
     ),
+
   unlinkAmenity: async (
     resourceCode: string,
     amenityCode: string,
@@ -356,7 +418,6 @@ export const resourceService = {
     );
   },
 
-  // Resource Types
   getResourceTypes: async (params?: {
     page?: number;
     size?: number;
@@ -365,8 +426,10 @@ export const resourceService = {
     page<ResourceTypeResponse>(
       (await apiClient.get("/sni/api/v1/resource-types", { params })).data,
     ),
+
   getResourceType: async (code: string): Promise<ResourceTypeResponse> =>
     (await apiClient.get(`/sni/api/v1/resource-types/${code}`)).data,
+
   searchResourceTypes: async (
     query: string,
   ): Promise<PageResponse<ResourceTypeResponse>> =>
@@ -377,6 +440,7 @@ export const resourceService = {
         })
       ).data,
     ),
+
   createResourceType: async (data: {
     name: string;
     description?: string;
@@ -384,23 +448,30 @@ export const resourceService = {
   }): Promise<void> => {
     await apiClient.post("/sni/api/v1/resource-types", data);
   },
+
   updateResourceType: async (
     code: string,
     data: { name?: string; description?: string; active?: boolean },
   ): Promise<void> => {
     await apiClient.put(`/sni/api/v1/resource-types/${code}`, data);
   },
+
   deleteResourceType: async (code: string): Promise<void> => {
     await apiClient.delete(`/sni/api/v1/resource-types/${code}`);
   },
 
-  // Resource Groups
-  getResourceGroups: async (): Promise<PageResponse<ResourceGroupResponse>> =>
+  getResourceGroups: async (_params?: {
+    page?: number;
+    size?: number;
+    sort?: string;
+  }): Promise<PageResponse<ResourceGroupResponse>> =>
     page<ResourceGroupResponse>(
       (await apiClient.get("/sni/api/v1/resource-groups")).data,
     ),
+
   getResourceGroup: async (code: string): Promise<ResourceGroupResponse> =>
     (await apiClient.get(`/sni/api/v1/resource-groups/${code}`)).data,
+
   searchResourceGroups: async (
     query: string,
   ): Promise<PageResponse<ResourceGroupResponse>> =>
@@ -411,6 +482,7 @@ export const resourceService = {
         })
       ).data,
     ),
+
   createResourceGroup: async (data: {
     name: string;
     description?: string;
@@ -419,6 +491,7 @@ export const resourceService = {
   }): Promise<void> => {
     await apiClient.post("/sni/api/v1/resource-groups", data);
   },
+
   updateResourceGroup: async (
     code: string,
     data: {
@@ -430,11 +503,11 @@ export const resourceService = {
   ): Promise<void> => {
     await apiClient.put(`/sni/api/v1/resource-groups/${code}`, data);
   },
+
   deleteResourceGroup: async (code: string): Promise<void> => {
     await apiClient.delete(`/sni/api/v1/resource-groups/${code}`);
   },
 
-  // Policies
   getResourcePolicies: async (params?: {
     page?: number;
     size?: number;
@@ -443,8 +516,10 @@ export const resourceService = {
     page<ResourcePolicyResponse>(
       (await apiClient.get("/sni/api/v1/resource-policies", { params })).data,
     ),
+
   getResourcePolicy: async (code: string): Promise<ResourcePolicyResponse> =>
     (await apiClient.get(`/sni/api/v1/resource-policies/${code}`)).data,
+
   searchResourcePolicies: async (
     query: string,
   ): Promise<PageResponse<ResourcePolicyResponse>> =>
@@ -455,6 +530,7 @@ export const resourceService = {
         })
       ).data,
     ),
+
   createResourcePolicy: async (data: {
     name: string;
     description?: string;
@@ -467,12 +543,14 @@ export const resourceService = {
   }): Promise<void> => {
     await apiClient.post("/sni/api/v1/resource-policies", data);
   },
+
   updateResourcePolicy: async (
     code: string,
     data: Partial<ResourcePolicyResponse>,
   ): Promise<void> => {
     await apiClient.put(`/sni/api/v1/resource-policies/${code}`, data);
   },
+
   updateResourcePolicyStatus: async (
     code: string,
     active: boolean,
@@ -483,6 +561,7 @@ export const resourceService = {
       { params: { active } },
     );
   },
+
   updateResourcePolicyAllowCancellation: async (
     code: string,
     allowed: boolean,
@@ -493,11 +572,11 @@ export const resourceService = {
       { params: { allowed } },
     );
   },
+
   deleteResourcePolicy: async (code: string): Promise<void> => {
     await apiClient.delete(`/sni/api/v1/resource-policies/${code}`);
   },
 
-  // Amenities référentiel
   getAmenities: async (params?: {
     page?: number;
     size?: number;
@@ -506,8 +585,10 @@ export const resourceService = {
     page<AmenityResponse>(
       (await apiClient.get("/sni/api/v1/resource-amenities", { params })).data,
     ),
+
   getAmenity: async (code: string): Promise<AmenityResponse> =>
     (await apiClient.get(`/sni/api/v1/resource-amenities/${code}`)).data,
+
   searchAmenities: async (
     query: string,
   ): Promise<PageResponse<AmenityResponse>> =>
@@ -518,6 +599,7 @@ export const resourceService = {
         })
       ).data,
     ),
+
   createAmenity: async (data: {
     name: string;
     description?: string;
@@ -525,19 +607,22 @@ export const resourceService = {
   }): Promise<void> => {
     await apiClient.post("/sni/api/v1/resource-amenities", data);
   },
+
   updateAmenity: async (
     code: string,
     data: { name?: string; description?: string; active?: boolean },
   ): Promise<void> => {
     await apiClient.put(`/sni/api/v1/resource-amenities/${code}`, data);
   },
+
   deleteAmenity: async (code: string): Promise<void> => {
     await apiClient.delete(`/sni/api/v1/resource-amenities/${code}`);
   },
 
-  // Availability
   getResourceAvailabilities: async (params?: {
     resourceCode?: string;
+    startedAt?: string;
+    endedAt?: string;
     fromDate?: string;
     toDate?: string;
     available?: boolean;
@@ -549,20 +634,39 @@ export const resourceService = {
       (await apiClient.get("/sni/api/v1/resource-availabilities", { params }))
         .data,
     ),
+
+  getGroupedResourceAvailabilities: async (): Promise<
+    ResourceAvailabilityGroupResponse[]
+  > =>
+    arr<ResourceAvailabilityGroupResponse>(
+      (await apiClient.get("/sni/api/v1/resource-availabilities/grouped")).data,
+    ),
+
   createResourceAvailability: async (data: {
     resourceCode: string;
     startedAt: string;
     endedAt: string;
-    slotDurationMinutes?: number;
+    capacity?: number;
     totalCapacity?: number;
     active?: boolean;
-  }): Promise<ResourceAvailabilityResponse[]> =>
-    arr<ResourceAvailabilityResponse>(
-      (await apiClient.post("/sni/api/v1/resource-availabilities", data)).data,
-    ),
+  }): Promise<void> => {
+    await apiClient.post("/sni/api/v1/resource-availabilities", {
+      resourceCode: data.resourceCode,
+      startedAt: data.startedAt,
+      endedAt: data.endedAt,
+      capacity: data.capacity ?? data.totalCapacity,
+      active: data.active,
+    });
+  },
+
   getRemainingAvailabilities: async (
     resourceCode: string,
-    params?: { fromDate?: string; toDate?: string },
+    params?: {
+      startedAt?: string;
+      endedAt?: string;
+      durationMinutes?: number;
+      quantity?: number;
+    },
   ): Promise<ResourceAvailabilityWindowResponse[]> =>
     arr<ResourceAvailabilityWindowResponse>(
       (
@@ -571,6 +675,7 @@ export const resourceService = {
         })
       ).data,
     ),
+
   reserveAvailability: async (data: {
     resourceCode: string;
     startedAt: string;
@@ -579,6 +684,7 @@ export const resourceService = {
   }): Promise<void> => {
     await apiClient.post("/sni/api/v1/resource-availabilities/reserve", data);
   },
+
   releaseAvailability: async (data: {
     resourceCode: string;
     startedAt: string;
@@ -588,9 +694,10 @@ export const resourceService = {
     await apiClient.patch("/sni/api/v1/resource-availabilities/release", data);
   },
 
-  // Closures
   getResourceClosures: async (params?: {
     resourceCode?: string;
+    startedAt?: string;
+    endedAt?: string;
     fromDate?: string;
     toDate?: string;
     active?: boolean;
@@ -601,8 +708,10 @@ export const resourceService = {
     page<ResourceClosureResponse>(
       (await apiClient.get("/sni/api/v1/resource-closures", { params })).data,
     ),
+
   getResourceClosure: async (id: number): Promise<ResourceClosureResponse> =>
     (await apiClient.get(`/sni/api/v1/resource-closures/${id}`)).data,
+
   createResourceClosure: async (data: {
     resourceCode: string;
     startedAt: string;
@@ -612,6 +721,7 @@ export const resourceService = {
   }): Promise<void> => {
     await apiClient.post("/sni/api/v1/resource-closures", data);
   },
+
   updateResourceClosureActive: async (
     id: number,
     active: boolean,
@@ -620,11 +730,11 @@ export const resourceService = {
       active,
     });
   },
+
   deleteResourceClosure: async (id: number): Promise<void> => {
     await apiClient.delete(`/sni/api/v1/resource-closures/${id}`);
   },
 
-  // Pricing rules
   getPricingRules: async (params?: {
     resourceCode?: string;
     bookingUnit?: ResourceBookingUnit;
@@ -637,14 +747,16 @@ export const resourceService = {
       (await apiClient.get("/sni/api/v1/resource-pricing-rules", { params }))
         .data,
     ),
+
   getPricingRule: async (id: number): Promise<ResourcePricingRuleResponse> =>
     (await apiClient.get(`/sni/api/v1/resource-pricing-rules/${id}`)).data,
+
   createPricingRule: async (data: {
     resourceCode: string;
     bookingUnit: ResourceBookingUnit;
     price: number;
     label?: string;
-    dayOfWeek?: number;
+    dayOfWeek?: string | number;
     startsAt?: string;
     endsAt?: string;
     adjustmentType?: AdjustmentType;
@@ -657,23 +769,36 @@ export const resourceService = {
   }): Promise<void> => {
     await apiClient.post("/sni/api/v1/resource-pricing-rules", data);
   },
+
   updatePricingRule: async (
     id: number,
     data: Partial<ResourcePricingRuleResponse>,
   ): Promise<ResourcePricingRuleResponse> =>
     (await apiClient.put(`/sni/api/v1/resource-pricing-rules/${id}`, data))
       .data,
+
+  patchPricingRule: async (
+    id: number,
+    data: Partial<ResourcePricingRuleResponse>,
+  ): Promise<ResourcePricingRuleResponse> =>
+    (await apiClient.patch(`/sni/api/v1/resource-pricing-rules/${id}`, data))
+      .data,
+
   updatePricingRuleActive: async (
     id: number,
     active: boolean,
   ): Promise<void> => {
-    await apiClient.patch(`/sni/api/v1/resource-pricing-rules/${id}/active`, {
-      active,
-    });
+    await apiClient.patch(
+      `/sni/api/v1/resource-pricing-rules/${id}/active`,
+      null,
+      { params: { active } },
+    );
   },
+
   deletePricingRule: async (id: number): Promise<void> => {
     await apiClient.delete(`/sni/api/v1/resource-pricing-rules/${id}`);
   },
+
   getPricingRuleQuote: async (params: {
     resourceCode: string;
     bookingUnit: ResourceBookingUnit;
@@ -686,12 +811,12 @@ export const resourceService = {
       })
     ).data,
 
-  // Photos + public calendar
   getResourcePhotos: async (resourceCode: string): Promise<ResourcePhoto[]> =>
     arr<ResourcePhoto>(
       (await apiClient.get(`/sni/api/v1/resources/${resourceCode}/photos`))
         .data,
     ),
+
   addResourcePhoto: async (
     resourceCode: string,
     data: {
@@ -704,10 +829,12 @@ export const resourceService = {
   ): Promise<ResourcePhoto> =>
     (await apiClient.post(`/sni/api/v1/resources/${resourceCode}/photos`, data))
       .data,
+
   updateResourcePhoto: async (
     resourceCode: string,
     photoId: number,
     data: {
+      documentCode?: string;
       caption?: string;
       cover?: boolean;
       displayOrder?: number;
@@ -720,6 +847,7 @@ export const resourceService = {
         data,
       )
     ).data,
+
   deleteResourcePhoto: async (
     resourceCode: string,
     photoId: number,
@@ -728,10 +856,11 @@ export const resourceService = {
       `/sni/api/v1/resources/${resourceCode}/photos/${photoId}`,
     );
   },
+
   getPublicCalendar: async (
     resourceCode: string,
-    fromDate: string,
-    toDate: string,
+    fromDate?: string,
+    toDate?: string,
   ): Promise<PublicResourceCalendar> =>
     (
       await apiClient.get(

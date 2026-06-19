@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X, Loader2 } from "lucide-react";
 import { resourceService } from "../../../services/resource.service";
 import type {
+  AdjustmentType,
   ResourcePricingRuleResponse,
   ResourceBookingUnit,
   ResourceSummaryResponse,
@@ -25,7 +26,7 @@ const bookingUnits: { value: ResourceBookingUnit; label: string }[] = [
   { value: "MONTH", label: "Mois" },
 ];
 
-const adjustmentTypes = [
+const adjustmentTypes: { value: AdjustmentType; label: string }[] = [
   { value: "FIXED_PRICE", label: "Prix fixe" },
   { value: "AMOUNT_DELTA", label: "Montant delta (±FCFA)" },
   { value: "PERCENT_DELTA", label: "Pourcentage delta (±%)" },
@@ -41,24 +42,48 @@ const daysOfWeek = [
   { value: 7, label: "Dimanche" },
 ];
 
+const dateOnly = (value?: string | null) => value?.slice(0, 10) ?? "";
+const timeOnly = (value?: string | null) => value?.slice(0, 5) ?? "";
+
+const toDayNumber = (value?: string | number | null): number => {
+  if (typeof value === "number") return value;
+  if (!value) return 0;
+
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) return parsed;
+
+  const days: Record<string, number> = {
+    MONDAY: 1,
+    TUESDAY: 2,
+    WEDNESDAY: 3,
+    THURSDAY: 4,
+    FRIDAY: 5,
+    SATURDAY: 6,
+    SUNDAY: 7,
+  };
+
+  return days[value.toUpperCase()] ?? 0;
+};
+
+const toTimePayload = (value: string) => {
+  if (!value) return undefined;
+  return value.length === 5 ? `${value}:00` : value;
+};
+
 const buildDefaultFormData = (rule: ResourcePricingRuleResponse | null) => ({
   resourceCode: rule?.resourceCode || "",
   bookingUnit: (rule?.bookingUnit || "HOUR") as ResourceBookingUnit,
   price: rule?.price ?? 0,
   label: rule?.label || "",
-  dayOfWeek: rule?.dayOfWeek ?? 0,
-  startsAt: rule?.startsAt || "",
-  endsAt: rule?.endsAt || "",
-  adjustmentType: (rule?.adjustmentType || "") as
-    | ""
-    | "FIXED_PRICE"
-    | "AMOUNT_DELTA"
-    | "PERCENT_DELTA",
+  dayOfWeek: toDayNumber(rule?.dayOfWeek),
+  startsAt: timeOnly(rule?.startsAt),
+  endsAt: timeOnly(rule?.endsAt),
+  adjustmentType: (rule?.adjustmentType || "") as "" | AdjustmentType,
   adjustmentValue: rule?.adjustmentValue ?? 0,
   lastMinuteMinutes: rule?.lastMinuteMinutes ?? null,
   priority: rule?.priority ?? 0,
-  validFrom: rule?.validFrom || "",
-  validUntil: rule?.validUntil || "",
+  validFrom: dateOnly(rule?.validFrom),
+  validUntil: dateOnly(rule?.validUntil),
   active: rule?.active ?? true,
 });
 
@@ -69,19 +94,20 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
   onSuccess,
 }) => {
   const queryClient = useQueryClient();
+
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState(() =>
     buildDefaultFormData(editingRule),
   );
 
-  // CORRECTION : resynchronisation à chaque ouverture ou changement de règle
-  useEffect(() => {
-    setFormData(buildDefaultFormData(editingRule));
-    setErrorMessage(null);
-  }, [editingRule, isOpen]);
-
   const [selectedResourceSummary, setSelectedResourceSummary] =
     useState<ResourceSummaryResponse | null>(null);
+
+  useEffect(() => {
+    setFormData(buildDefaultFormData(editingRule));
+    setSelectedResourceSummary(null);
+    setErrorMessage(null);
+  }, [editingRule, isOpen]);
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -90,11 +116,16 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
         bookingUnit: formData.bookingUnit,
         price: parseFloat(String(formData.price)) || 0,
         label: formData.label || undefined,
-        dayOfWeek: formData.dayOfWeek > 0 ? formData.dayOfWeek : undefined,
-        startsAt: formData.startsAt || undefined,
-        endsAt: formData.endsAt || undefined,
+        dayOfWeek:
+          Number(formData.dayOfWeek) > 0
+            ? Number(formData.dayOfWeek)
+            : undefined,
+        startsAt: toTimePayload(formData.startsAt),
+        endsAt: toTimePayload(formData.endsAt),
         adjustmentType: formData.adjustmentType || undefined,
-        adjustmentValue: formData.adjustmentValue || undefined,
+        adjustmentValue: formData.adjustmentType
+          ? Number(formData.adjustmentValue) || 0
+          : undefined,
         lastMinuteMinutes: formData.lastMinuteMinutes,
         priority: formData.priority || undefined,
         validFrom: formData.validFrom || undefined,
@@ -119,11 +150,16 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
         bookingUnit: formData.bookingUnit,
         price: parseFloat(String(formData.price)) || 0,
         label: formData.label || undefined,
-        dayOfWeek: formData.dayOfWeek > 0 ? formData.dayOfWeek : undefined,
-        startsAt: formData.startsAt || undefined,
-        endsAt: formData.endsAt || undefined,
+        dayOfWeek:
+          Number(formData.dayOfWeek) > 0
+            ? Number(formData.dayOfWeek)
+            : undefined,
+        startsAt: toTimePayload(formData.startsAt),
+        endsAt: toTimePayload(formData.endsAt),
         adjustmentType: formData.adjustmentType || undefined,
-        adjustmentValue: formData.adjustmentValue || undefined,
+        adjustmentValue: formData.adjustmentType
+          ? Number(formData.adjustmentValue) || 0
+          : undefined,
         lastMinuteMinutes: formData.lastMinuteMinutes,
         priority: formData.priority || undefined,
         validFrom: formData.validFrom || undefined,
@@ -144,11 +180,14 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
     if (formData.price <= 0) {
       setErrorMessage("Le prix doit être supérieur à 0.");
       return;
     }
+
     setErrorMessage(null);
+
     if (editingRule) {
       updateMutation.mutate();
     } else {
@@ -160,29 +199,34 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
 
   if (!isOpen) return null;
 
-  // CORRECTION : suppression du double overlay
   return (
     <ModalPortal onClose={onClose}>
-      <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+      <div className="sticky top-0 flex items-center justify-between rounded-t-2xl border-b bg-white p-4">
         <h3 className="text-xl font-bold">
           {editingRule ? "Modifier la règle" : "Nouvelle règle de tarification"}
         </h3>
-        <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg p-1 hover:bg-gray-100"
+        >
           <X size={20} />
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-6 space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4 p-6">
         {errorMessage && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {errorMessage}
           </div>
         )}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
             Ressource *
           </label>
+
           <ResourceAutocomplete
             selectedResource={selectedResourceSummary}
             selectedCode={formData.resourceCode}
@@ -193,23 +237,19 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
             placeholder="Rechercher une ressource..."
             required
           />
-          {false && (
-            <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-              <Loader2 size={10} className="animate-spin" /> Chargement des
-              ressources...
-            </p>
-          )}
+
           {editingRule && (
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="mt-1 text-xs text-gray-400">
               La ressource ne peut pas être modifiée
             </p>
           )}
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
             Unité de réservation *
           </label>
+
           <select
             value={formData.bookingUnit}
             onChange={(e) =>
@@ -218,7 +258,7 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
                 bookingUnit: e.target.value as ResourceBookingUnit,
               })
             }
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2"
           >
             {bookingUnits.map((unit) => (
               <option key={unit.value} value={unit.value}>
@@ -229,31 +269,32 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
             Prix (FCFA) *
           </label>
+
           <input
             type="text"
             inputMode="numeric"
             value={formData.price === 0 ? "" : formData.price}
             onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, "");
+              const value = e.target.value.replace(/\D/g, "");
               setFormData({
                 ...formData,
-                price: val === "" ? 0 : parseFloat(val),
+                price: value === "" ? 0 : parseFloat(value),
               });
             }}
             required
             placeholder="0"
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2"
           />
         </div>
 
-        {/* === Champs MD 2.5 : tarification dynamique === */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
             Label
           </label>
+
           <input
             type="text"
             value={formData.label}
@@ -261,34 +302,40 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
               setFormData({ ...formData, label: e.target.value })
             }
             placeholder="ex: Off-peak matin, Weekend, Last minute..."
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               Jour de la semaine
             </label>
+
             <select
               value={formData.dayOfWeek}
               onChange={(e) =>
-                setFormData({ ...formData, dayOfWeek: Number(e.target.value) })
+                setFormData({
+                  ...formData,
+                  dayOfWeek: Number(e.target.value),
+                })
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2"
             >
               <option value={0}>Tous les jours</option>
-              {daysOfWeek.map((d) => (
-                <option key={d.value} value={d.value}>
-                  {d.label}
+              {daysOfWeek.map((day) => (
+                <option key={day.value} value={day.value}>
+                  {day.label}
                 </option>
               ))}
             </select>
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               Priorité
             </label>
+
             <input
               type="number"
               value={formData.priority}
@@ -300,64 +347,68 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
               }
               min="0"
               placeholder="0 = plus bas"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2"
             />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               Heure début
             </label>
+
             <input
               type="time"
               value={formData.startsAt}
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  startsAt: e.target.value ? e.target.value + ":00" : "",
+                  startsAt: e.target.value,
                 })
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2"
             />
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               Heure fin
             </label>
+
             <input
               type="time"
               value={formData.endsAt}
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  endsAt: e.target.value ? e.target.value + ":00" : "",
+                  endsAt: e.target.value,
                 })
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
             Type d'ajustement
           </label>
+
           <select
             value={formData.adjustmentType}
             onChange={(e) =>
               setFormData({
                 ...formData,
-                adjustmentType: e.target.value as any,
+                adjustmentType: e.target.value as "" | AdjustmentType,
               })
             }
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
+            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2"
           >
             <option value="">Aucun ajustement</option>
-            {adjustmentTypes.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
+            {adjustmentTypes.map((type) => (
+              <option key={type.value} value={type.value}>
+                {type.label}
               </option>
             ))}
           </select>
@@ -365,10 +416,11 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
 
         {formData.adjustmentType && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               Valeur d'ajustement{" "}
               {formData.adjustmentType === "PERCENT_DELTA" ? "(%)" : "(FCFA)"}
             </label>
+
             <input
               type="number"
               value={formData.adjustmentValue}
@@ -383,44 +435,48 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
                   ? "-20 = -20%"
                   : "-5000 = -5000 FCFA"
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2"
             />
           </div>
         )}
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               Valide du
             </label>
+
             <input
               type="date"
               value={formData.validFrom}
               onChange={(e) =>
                 setFormData({ ...formData, validFrom: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2"
             />
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               Valide jusqu'au
             </label>
+
             <input
               type="date"
               value={formData.validUntil}
               onChange={(e) =>
                 setFormData({ ...formData, validUntil: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
             Last minute (minutes avant réservation)
           </label>
+
           <input
             type="number"
             value={formData.lastMinuteMinutes ?? ""}
@@ -433,11 +489,11 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
               })
             }
             placeholder="ex: 60 = applicable si réservé < 1h avant"
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2"
           />
         </div>
 
-        <label className="flex items-center gap-2 cursor-pointer">
+        <label className="flex cursor-pointer items-center gap-2">
           <input
             type="checkbox"
             checked={formData.active}
@@ -454,14 +510,15 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
             type="button"
             onClick={onClose}
             disabled={isPending}
-            className="flex-1 px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="flex-1 rounded-lg border px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
             Annuler
           </button>
+
           <button
             type="submit"
             disabled={isPending || !formData.resourceCode}
-            className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary-600 py-2 text-white hover:bg-primary-700 disabled:opacity-50"
           >
             {isPending ? (
               <Loader2 size={16} className="animate-spin" />
