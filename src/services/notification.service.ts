@@ -25,7 +25,19 @@ export type NotificationType =
   | "CONTRACT_SIGNATURE_REQUEST"
   | "CONTRACT_SIGNED"
   | "INVENTORY_ALERT"
-  | "TASK_ASSIGNED";
+  | "TASK_ASSIGNED"
+  | "SUPPORT_CLIENT_REPLY"
+  | "CASH_ANOMALY"
+  | "BILLING_OVERDUE"
+  | "BOOKING_CONFIRMED"
+  | "BOOKING_CANCELLED"
+  | "BOOKING_COMPLETED"
+  | "BOOKING_NO_SHOW"
+  | "SUBSCRIPTION_CANCELLED"
+  | "SUBSCRIPTION_RENEWED"
+  | "BILLING_DOCUMENT_ISSUED"
+  | "CONTRACT_SIGNING_REQUESTED"
+  | "CONTRACT_SIGNED_VIA_ESIGN";
 
 export interface Notification {
   notificationNumber: string;
@@ -47,6 +59,56 @@ export interface Notification {
   createdAt: string;
 }
 
+export interface ClientNotificationPayload {
+  notificationNumber: string;
+  title: string;
+  eventType: string;
+  aggregateType: string;
+  aggregateId: string;
+  payloadJson: string;
+  createdAt: string;
+  read: boolean;
+}
+
+export interface AdminAlertEvent {
+  alertType: string;
+  module: string;
+  title: string;
+  message: string;
+  severity: "INFO" | "WARNING" | "CRITICAL";
+  payloadJson: string | null;
+  createdAt: string;
+}
+
+export interface InventoryAlertEvent {
+  alertCode: string;
+  alertType: string;
+  itemCode: string | null;
+  locationCode: string | null;
+  assetCode: string | null;
+  message: string;
+  createdAt: string;
+}
+
+export interface UnreadCountSignal {
+  action: "INCREMENT";
+}
+
+export const normalizeRealtimeNotification = (
+  payload: ClientNotificationPayload,
+): Notification => ({
+  notificationNumber: payload.notificationNumber,
+  type: payload.eventType as NotificationType,
+  channel: "IN_APP",
+  recipient: "",
+  subject: payload.title,
+  body: payload.title,
+  status: "SENT",
+  retryCount: 0,
+  readAt: payload.read ? payload.createdAt : undefined,
+  createdAt: payload.createdAt,
+});
+
 export interface NotificationTemplate {
   code: string;
   name: string;
@@ -64,7 +126,7 @@ export const notificationService = {
   getUnreadNotifications: async (params?: {
     limit?: number;
   }): Promise<Notification[]> => {
-    const response = await apiClient.get("/sni/api/v1/notifications/unread", {
+    const response = await apiClient.get("/sni/api/v1/admin/notifications/unread", {
       params,
     });
     if (Array.isArray(response.data)) return response.data;
@@ -73,16 +135,21 @@ export const notificationService = {
     return [];
   },
 
+  getUnreadCount: async (): Promise<number> => {
+    const response = await apiClient.get("/sni/api/v1/admin/notifications/unread-count");
+    return Number(response.data?.count ?? response.data ?? 0);
+  },
+
   // Marquer une notification comme lue
   markAsRead: async (notificationNumber: string): Promise<void> => {
     await apiClient.patch(
-      `/sni/api/v1/notifications/${notificationNumber}/read`,
+      `/sni/api/v1/admin/notifications/${notificationNumber}/read`,
     );
   },
 
   // Marquer toutes les notifications comme lues
   markAllAsRead: async (): Promise<void> => {
-    await apiClient.patch("/sni/api/v1/notifications/mark-all-read");
+    await apiClient.patch("/sni/api/v1/admin/notifications/read-all");
   },
 
   // Récupérer toutes les notifications (page dédiée)

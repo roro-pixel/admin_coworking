@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -24,6 +24,7 @@ import { RichTextEditor } from "../../components/ui/RichTextEditor";
 import { ModalPortal } from "../../components/ui/ModalPortal";
 import { AgentAutocomplete } from "../../components/auth/AgentAutocomplete";
 import type { AdminUser } from "../../services/auth.service";
+import { useTicketRealtime } from "../../hooks/useTicketRealtime";
 
 const statusConfig: Record<TicketStatus, { label: string; color: string }> = {
   OPEN: { label: "Ouvert", color: "bg-red-100 text-red-700" },
@@ -113,6 +114,20 @@ export const TicketDetailPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ["support-tickets"] });
     refetch();
   };
+
+  const handleRealtimeTicketMessage = useCallback(() => {
+    refetch();
+    queryClient.invalidateQueries({
+      queryKey: ["support-ticket", ticketNumber],
+    });
+    queryClient.invalidateQueries({ queryKey: ["support-tickets"] });
+  }, [queryClient, refetch, ticketNumber]);
+
+  useTicketRealtime(ticketNumber, {
+    enabled: activeTab === "conversation",
+    onMessage: handleRealtimeTicketMessage,
+  });
+
 
   const assignMutation = useMutation({
     mutationFn: (agent: string) =>

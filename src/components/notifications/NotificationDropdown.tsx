@@ -21,6 +21,12 @@ const notificationIcons: Record<string, React.ElementType> = {
   INVOICE_ISSUED: Bell,
   PAYMENT_RECEIVED: CheckCircle,
   INVENTORY_ALERT: AlertCircle,
+  SUPPORT_CLIENT_REPLY: Bell,
+  CASH_ANOMALY: AlertCircle,
+  BILLING_OVERDUE: AlertCircle,
+  BILLING_DOCUMENT_ISSUED: Bell,
+  CONTRACT_SIGNING_REQUESTED: Bell,
+  CONTRACT_SIGNED_VIA_ESIGN: CheckCircle,
 };
 
 const notificationTone: Record<string, string> = {
@@ -32,6 +38,12 @@ const notificationTone: Record<string, string> = {
   INVOICE_ISSUED: "text-slate-700 bg-slate-50 ring-slate-100",
   PAYMENT_RECEIVED: "text-emerald-700 bg-emerald-50 ring-emerald-100",
   INVENTORY_ALERT: "text-amber-700 bg-amber-50 ring-amber-100",
+  SUPPORT_CLIENT_REPLY: "text-sky-700 bg-sky-50 ring-sky-100",
+  CASH_ANOMALY: "text-rose-700 bg-rose-50 ring-rose-100",
+  BILLING_OVERDUE: "text-amber-700 bg-amber-50 ring-amber-100",
+  BILLING_DOCUMENT_ISSUED: "text-slate-700 bg-slate-50 ring-slate-100",
+  CONTRACT_SIGNING_REQUESTED: "text-violet-700 bg-violet-50 ring-violet-100",
+  CONTRACT_SIGNED_VIA_ESIGN: "text-emerald-700 bg-emerald-50 ring-emerald-100",
   default: "text-slate-700 bg-slate-50 ring-slate-100",
 };
 
@@ -44,6 +56,12 @@ const typeLabels: Record<string, string> = {
   INVOICE_ISSUED: "Facture émise",
   PAYMENT_RECEIVED: "Paiement reçu",
   INVENTORY_ALERT: "Alerte stock",
+  SUPPORT_CLIENT_REPLY: "Réponse client support",
+  CASH_ANOMALY: "Anomalie caisse",
+  BILLING_OVERDUE: "Factures en retard",
+  BILLING_DOCUMENT_ISSUED: "Facture émise",
+  CONTRACT_SIGNING_REQUESTED: "Signature contrat requise",
+  CONTRACT_SIGNED_VIA_ESIGN: "Contrat signé",
 };
 
 const formatDate = (dateString: string) => {
@@ -69,7 +87,12 @@ export const NotificationDropdown: React.FC = () => {
   const { data: notifications = [] } = useQuery({
     queryKey: ["unread-notifications"],
     queryFn: () => notificationService.getUnreadNotifications({ limit: 10 }),
-    refetchInterval: 30000,
+  });
+
+  const { data: unreadCount = notifications.length } = useQuery({
+    queryKey: ["unread-notifications-count"],
+    queryFn: () => notificationService.getUnreadCount(),
+    initialData: notifications.length,
   });
 
   const markAsReadMutation = useMutation({
@@ -102,10 +125,6 @@ export const NotificationDropdown: React.FC = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const unreadCount = notifications.filter(
-    (n) => n.status === "SENT" && !n.readAt,
-  ).length;
 
   const handleNotificationClick = (notification: Notification) => {
     if (notification.status === "SENT" && !notification.readAt) {
