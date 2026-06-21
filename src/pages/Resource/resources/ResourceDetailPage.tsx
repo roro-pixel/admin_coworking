@@ -57,16 +57,7 @@ const statusOptions: { value: ResourceStatus; label: string }[] = [
   { value: "ARCHIVED", label: "Archivé" },
 ];
 
-const getEntityId = (entity: any): string => {
-  const value = entity?.id ?? entity?.typeId ?? entity?.groupId ?? entity?.policyId;
-  return value !== undefined && value !== null ? String(value) : "";
-};
-
-const toNumberOrUndefined = (value: string): number | undefined => {
-  if (!value) return undefined;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : undefined;
-};
+const getEntityId = (entity: any): string => entity?.code ? String(entity.code) : "";
 
 type Tab = "info" | "amenities" | "pricing" | "availability" | "gallery" | "calendar";
 
@@ -141,7 +132,7 @@ export const ResourceDetailPage: React.FC = () => {
       capacity: resource.capacity ?? 1,
       zone: resource.zone || "",
       locationLabel: resource.locationLabel || "",
-      status: resource.status,
+      status: resource.status as ResourceStatus,
       bookingEnabled: resource.bookingEnabled,
       portalVisible: resource.portalVisible,
       active: resource.active,
@@ -178,7 +169,7 @@ export const ResourceDetailPage: React.FC = () => {
 
   const { data: availabilitiesData, isLoading: availabilityLoading } = useQuery({
     queryKey: ["resource-availabilities", code],
-    queryFn: () => resourceService.getResourceAvailabilities({ resourceCode: code!, size: 100 }),
+    queryFn: () => resourceService.getAvailabilities({ resourceCode: code!, size: 100 }),
     enabled: !!code && tabEnabled("availability"),
   });
   const availabilities: ResourceAvailabilityResponse[] = availabilitiesData?.content || [];
@@ -195,7 +186,10 @@ export const ResourceDetailPage: React.FC = () => {
     queryFn: () => {
       const [year, month] = calMonth.split("-");
       const lastDay = new Date(Number(year), Number(month), 0).getDate();
-      return resourceService.getPublicCalendar(code!, `${calMonth}-01`, `${calMonth}-${String(lastDay).padStart(2, "0")}`);
+      return resourceService.getPublicCalendar(code!, {
+        fromDate: `${calMonth}-01`,
+        toDate: `${calMonth}-${String(lastDay).padStart(2, "0")}`,
+      });
     },
     enabled: !!code && tabEnabled("calendar"),
   });
@@ -218,12 +212,13 @@ export const ResourceDetailPage: React.FC = () => {
         portalVisible: formData.portalVisible,
       });
 
-      const typeId = toNumberOrUndefined(formData.typeId);
-      const groupId = toNumberOrUndefined(formData.groupId);
-      const policyId = toNumberOrUndefined(formData.policyId);
-      if (typeId || groupId || policyId) {
-        if (!typeId) throw new Error("Le type est requis pour modifier la classification.");
-        await resourceService.updateResourceClassification(code, { typeId, groupId, policyId });
+      if (formData.typeId || formData.groupId || formData.policyId) {
+        if (!formData.typeId) throw new Error("Le type est requis pour modifier la classification.");
+        await resourceService.updateResourceClassification(code, {
+          typeId: formData.typeId,
+          groupId: formData.groupId || undefined,
+          policyId: formData.policyId || undefined,
+        });
       }
 
       await resourceService.updateResourceStatus(code, formData.status);
@@ -263,7 +258,7 @@ export const ResourceDetailPage: React.FC = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["resource-amenities", code] }),
   });
   const quoteMutation = useMutation({
-    mutationFn: () => resourceService.getPricingRuleQuote({ resourceCode: code!, ...quoteForm }),
+    mutationFn: () => resourceService.quotePrice({ resourceCode: code!, ...quoteForm }),
     onSuccess: (data) => {
       setQuoteResult(data);
       setQuoteError(null);

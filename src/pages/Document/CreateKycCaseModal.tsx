@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X, Loader2, Search, User, Building2, Users } from "lucide-react";
 import { ModalPortal } from "../../components/ui/ModalPortal";
 import { kycService } from "../../services/document.service";
+import { apiClient } from "../../services/api";
 import { memberService } from "../../services/member.service";
 import { customerService } from "../../services/customer.service";
 import type { MemberSummaryResponse } from "../../services/member.service";
@@ -74,7 +75,7 @@ export const CreateKycCaseModal: React.FC<CreateKycCaseModalProps> = ({
         if (ownerType === "MEMBER") {
           const members = await memberService.searchMembers(debouncedQuery);
           results = (members || []).map((m: MemberSummaryResponse) => ({
-            code: m.memberId,
+            code: String(m.memberId),
             name: m.fullName,
             email: m.email,
             phone: m.phone,
@@ -84,7 +85,7 @@ export const CreateKycCaseModal: React.FC<CreateKycCaseModalProps> = ({
           const customers =
             await customerService.searchCustomers(debouncedQuery);
           results = (customers || []).map((c: CustomerSummaryResponse) => ({
-            code: c.customerId,
+            code: String(c.customerId),
             name: c.displayName,
             email: c.email,
             phone: c.phone,
@@ -94,24 +95,24 @@ export const CreateKycCaseModal: React.FC<CreateKycCaseModalProps> = ({
           // Pour BUSINESS, utiliser l'endpoint de recherche business
           // Si l'endpoint n'existe pas encore, on peut faire une recherche par code
           // À adapter selon ton API business
-          const response = await fetch(
-            `/sni/api/v1/business/search/basic?query=${encodeURIComponent(debouncedQuery)}`,
-            {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-              },
-            },
-          );
-          if (response.ok) {
-            const data = await response.json();
-            results = (data || []).map((b: any) => ({
-              code: b.code || b.businessCode,
-              name: b.name || b.businessName,
-              email: b.email,
-              phone: b.phone,
-              type: "BUSINESS",
-            }));
-          }
+          const response = await apiClient.get("/sni/api/v1/business/search/basic", {
+            params: { query: debouncedQuery },
+          });
+          const raw = response.data;
+          const businesses = Array.isArray(raw)
+            ? raw
+            : Array.isArray(raw?.content)
+              ? raw.content
+              : Array.isArray(raw?.data)
+                ? raw.data
+                : [];
+          results = businesses.map((b: any) => ({
+            code: String(b.code || b.businessCode || b.id || ""),
+            name: b.name || b.businessName || b.displayName || b.code || "Entreprise",
+            email: b.email,
+            phone: b.phone,
+            type: "BUSINESS",
+          }));
         }
 
         setSearchResults(results);

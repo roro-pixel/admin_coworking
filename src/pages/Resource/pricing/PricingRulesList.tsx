@@ -387,7 +387,7 @@ export const PricingRulesList: React.FC = () => {
                 setQuoteError(null);
                 setQuoteResult(null);
                 try {
-                  const result = await resourceService.getPricingRuleQuote(quoteForm);
+                  const result = await resourceService.quotePrice(quoteForm);
                   setQuoteResult(result);
                 } catch (e: any) {
                   setQuoteError(e?.response?.data?.message || "Erreur");

@@ -10,6 +10,8 @@ import {
   DollarSign,
   Calendar,
   XCircle,
+  CalendarDays,
+  Search,
 } from "lucide-react";
 import { ResourcesList } from "./resources/ResourcesList";
 import { ResourceTypesList } from "./types/ResourceTypesList";
@@ -24,6 +26,8 @@ import { ResourceClosuresList } from "./closures/ResourceClosuresList";
 import { ResourceCreatePage } from "./resources/ResourceCreatePage";
 import { ResourceDetailPage } from "./resources/ResourceDetailPage";
 import { ResourcePolicyDetailPage } from "./policies/ResourcePolicyDetailPage";
+import { ResourcePlanningAdminPage } from "./resources/ResourcePlanningAdminPage";
+import { ResourceAdvancedSearchPage } from "./resources/ResourceAdvancedSearchPage";
 
 type TabId =
   | "resources"
@@ -33,7 +37,9 @@ type TabId =
   | "amenities"
   | "pricing"
   | "availability"
-  | "closures";
+  | "closures"
+  | "planning"
+  | "advancedSearch";
 
 const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "resources", label: "Ressources", icon: Building2 },
@@ -43,6 +49,8 @@ const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "amenities", label: "Équipements", icon: Package },
   { id: "pricing", label: "Tarifs", icon: DollarSign },
   { id: "availability", label: "Disponibilités", icon: Calendar },
+  { id: "planning", label: "Planning admin", icon: CalendarDays },
+  { id: "advancedSearch", label: "Recherche avancée", icon: Search },
   { id: "closures", label: "Fermetures", icon: XCircle },
 ];
 
@@ -163,6 +171,16 @@ const ResourceTabs: React.FC = () => {
         {visitedTabs.has("availability") && (
           <div className={activeTab !== "availability" ? "hidden" : ""}>
             <ResourceAvailability />
+          </div>
+        )}
+        {visitedTabs.has("planning") && (
+          <div className={activeTab !== "planning" ? "hidden" : ""}>
+            <ResourcePlanningAdminPage />
+          </div>
+        )}
+        {visitedTabs.has("advancedSearch") && (
+          <div className={activeTab !== "advancedSearch" ? "hidden" : ""}>
+            <ResourceAdvancedSearchPage />
           </div>
         )}
         {visitedTabs.has("closures") && (

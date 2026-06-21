@@ -21,6 +21,7 @@ import type {
   ResourceResponse,
   ResourceTypeResponse,
   ResourceGroupResponse,
+  ResourceStatus,
 } from "../../../services/resource.service";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -54,6 +55,7 @@ export const ResourcesList: React.FC = () => {
       resourceService.getResources({
         typeCode: typeFilter || undefined,
         groupCode: groupFilter || undefined,
+        status: (statusFilter || undefined) as ResourceStatus | undefined,
         page,
         size: PAGE_SIZE,
       }),

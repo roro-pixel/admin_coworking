@@ -16,9 +16,6 @@ const buildDefaultFormData = (amenity: AmenityResponse | null) => ({
   name: amenity?.name || "",
   description: amenity?.description || "",
   active: amenity?.active ?? true,
-  quantity: amenity?.quantity ?? 1,
-  optional: amenity?.optional ?? false,
-  extraPrice: amenity?.extraPrice ?? 0,
 });
 
 export const AmenityFormModal: React.FC<AmenityFormModalProps> = ({
@@ -139,67 +136,8 @@ export const AmenityFormModal: React.FC<AmenityFormModalProps> = ({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Quantité
-            </label>
-            <input
-              type="number"
-              value={formData.quantity}
-              min="1"
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  quantity: Number(e.target.value) || 1,
-                })
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Supplément (FCFA)
-            </label>
-            <input
-              type="number"
-              value={formData.extraPrice || ""}
-              min="0"
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  extraPrice: Number(e.target.value) || 0,
-                })
-              }
-              placeholder="0 = inclus"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-6">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={formData.optional}
-              onChange={(e) =>
-                setFormData({ ...formData, optional: e.target.checked })
-              }
-              className="rounded"
-            />
-            <span className="text-sm">Optionnel</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={formData.active}
-              onChange={(e) =>
-                setFormData({ ...formData, active: e.target.checked })
-              }
-              className="rounded"
-            />
-            <span className="text-sm">Actif</span>
-          </label>
+        <div className="rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-700 ring-1 ring-blue-100">
+          Ici vous gérez uniquement le référentiel global de l'équipement. La quantité, le caractère optionnel et le supplément FCFA se renseignent dans la liaison équipement-ressource depuis le détail d'une ressource ou la recherche avancée.
         </div>
 
         <div className="flex gap-3 pt-4">

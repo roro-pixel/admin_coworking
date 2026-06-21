@@ -20,6 +20,7 @@ import {
   Mail,
   Phone,
   X,
+  Send,
 } from "lucide-react";
 import { contractService } from "../../services/contract.service";
 import { AttachSignedDocumentModal } from "../../components/contracts/AttachSignedDocumentModal";
@@ -79,10 +80,13 @@ const statusConfig: Record<
   CANCELLED: { label: "Annulé", color: "bg-gray-100 text-gray-700", icon: Ban },
 };
 
+const formatNullableDate = (value?: string | null) =>
+  value ? new Date(value).toLocaleDateString("fr-FR") : "—";
+
 const renewalTypeLabels: Record<string, string> = {
   FIXED_TERM: "Durée déterminée",
   AUTO_RENEW: "Renouvellement automatique",
-  INDEFINITE: "Durée indéterminée",
+  NONE: "Aucun renouvellement",
 };
 
 export const ContractDetailPage: React.FC = () => {
@@ -100,6 +104,17 @@ export const ContractDetailPage: React.FC = () => {
   const [suspendReason, setSuspendReason] = useState("");
   const [cancelReason, setCancelReason] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showReviewRejectModal, setShowReviewRejectModal] = useState(false);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewRejectReason, setReviewRejectReason] = useState("");
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [signatureForm, setSignatureForm] = useState({
+    signerName: "",
+    signerEmail: "",
+    message: "",
+    expiresAt: "",
+  });
+  const [signatureResult, setSignatureResult] = useState<any>(null);
 
   const { data: contract, isLoading } = useQuery({
     queryKey: ["contract", contractCode],
@@ -114,7 +129,7 @@ export const ContractDetailPage: React.FC = () => {
 
   const generateDraftMutation = useMutation({
     mutationFn: () =>
-      contractService.generateDraft(contractCode!, admin?.id || 1),
+      contractService.generateDraft(contractCode!, admin?.id ? Number(admin.id) : 1),
     onSuccess: invalidate,
     onError: (err: any) =>
       setActionError(
@@ -189,6 +204,63 @@ export const ContractDetailPage: React.FC = () => {
     onError: (err: any) =>
       setActionError(
         err?.response?.data?.message || "Erreur lors du changement de statut",
+      ),
+  });
+
+  const approveReviewMutation = useMutation({
+    mutationFn: () =>
+      contractService.approveReview(
+        contractCode!,
+        admin?.id ? Number(admin.id) : 1,
+        reviewComment || undefined,
+      ),
+    onSuccess: () => {
+      invalidate();
+      setReviewComment("");
+      setActionError(null);
+    },
+    onError: (err: any) =>
+      setActionError(
+        err?.response?.data?.message || "Erreur lors de l'approbation de revue",
+      ),
+  });
+
+  const rejectReviewMutation = useMutation({
+    mutationFn: () =>
+      contractService.rejectReview(
+        contractCode!,
+        admin?.id ? Number(admin.id) : 1,
+        reviewRejectReason || reviewComment || "Revue rejetée",
+      ),
+    onSuccess: () => {
+      invalidate();
+      setShowReviewRejectModal(false);
+      setReviewComment("");
+      setReviewRejectReason("");
+      setActionError(null);
+    },
+    onError: (err: any) =>
+      setActionError(
+        err?.response?.data?.message || "Erreur lors du rejet de revue",
+      ),
+  });
+
+  const requestSignatureMutation = useMutation({
+    mutationFn: () =>
+      contractService.requestSignature(contractCode!, {
+        signerName: signatureForm.signerName,
+        signerEmail: signatureForm.signerEmail,
+        message: signatureForm.message || undefined,
+        expiresAt: signatureForm.expiresAt || undefined,
+      }),
+    onSuccess: (result) => {
+      invalidate();
+      setSignatureResult(result);
+      setActionError(null);
+    },
+    onError: (err: any) =>
+      setActionError(
+        err?.response?.data?.message || "Erreur lors de la demande de signature",
       ),
   });
 
@@ -287,7 +359,38 @@ export const ContractDetailPage: React.FC = () => {
                   </button>
                 </>
               )}
+              {contract.status === "UNDER_REVIEW" && (
+                <>
+                  <button
+                    onClick={() => approveReviewMutation.mutate()}
+                    disabled={approveReviewMutation.isPending}
+                    className="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {approveReviewMutation.isPending ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <CheckCircle size={16} />
+                    )}
+                    Approuver revue
+                  </button>
+                  <button
+                    onClick={() => setShowReviewRejectModal(true)}
+                    className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 flex items-center gap-2"
+                  >
+                    <Ban size={16} />
+                    Rejeter revue
+                  </button>
+                </>
+              )}
               {contract.status === "AWAITING_SIGNATURE" && (
+                <>
+                <button
+                  onClick={() => setShowSignatureModal(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 flex items-center gap-2"
+                >
+                  <Send size={16} />
+                  Demander signature
+                </button>
                 <button
                   onClick={() => setShowAttachModal(true)}
                   className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 flex items-center gap-2"
@@ -295,6 +398,7 @@ export const ContractDetailPage: React.FC = () => {
                   <Upload size={16} />
                   Rattacher signé
                 </button>
+                </>
               )}
               {contract.status === "SIGNED" && (
                 <button
@@ -429,15 +533,13 @@ export const ContractDetailPage: React.FC = () => {
                 <div>
                   <p className="text-sm text-gray-500">Date d'effet</p>
                   <p className="font-medium">
-                    {new Date(contract.effectiveDate).toLocaleDateString(
-                      "fr-FR",
-                    )}
+                    {formatNullableDate(contract.effectiveDate)}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Date de début</p>
                   <p className="font-medium">
-                    {new Date(contract.startDate).toLocaleDateString("fr-FR")}
+                    {formatNullableDate(contract.startDate)}
                   </p>
                 </div>
                 {contract.endDate && (
@@ -451,8 +553,9 @@ export const ContractDetailPage: React.FC = () => {
                 <div>
                   <p className="text-sm text-gray-500">Renouvellement</p>
                   <p className="font-medium">
-                    {renewalTypeLabels[contract.renewalType] ||
-                      contract.renewalType}
+                    {contract.renewalType
+                      ? renewalTypeLabels[contract.renewalType] || contract.renewalType
+                      : "—"}
                   </p>
                 </div>
               </div>
@@ -494,7 +597,7 @@ export const ContractDetailPage: React.FC = () => {
                           ? "Signataire"
                           : party.role === "BENEFICIARY"
                             ? "Bénéficiaire"
-                            : "Témoin"}
+                            : "Opérateur"}
                       </span>
                       <span className="text-xs text-gray-400">
                         {party.partyType}
@@ -768,6 +871,92 @@ export const ContractDetailPage: React.FC = () => {
                 ) : (
                   "Confirmer l'annulation"
                 )}
+              </button>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {showReviewRejectModal && (
+        <ModalPortal onClose={() => setShowReviewRejectModal(false)} size="lg">
+          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+            <h3 className="text-xl font-bold">Rejeter la revue interne</h3>
+            <button onClick={() => setShowReviewRejectModal(false)} className="p-1 hover:bg-gray-100 rounded-xl">
+              <X size={20} />
+            </button>
+          </div>
+          <div className="p-6 space-y-4">
+            <textarea
+              value={reviewRejectReason}
+              onChange={(e) => setReviewRejectReason(e.target.value)}
+              rows={4}
+              placeholder="Motif du rejet de revue..."
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl resize-none focus:ring-2 focus:ring-primary-500"
+            />
+            <div className="flex gap-3">
+              <button onClick={() => setShowReviewRejectModal(false)} className="flex-1 px-4 py-2 border rounded-xl text-gray-700 hover:bg-gray-50">Annuler</button>
+              <button
+                onClick={() => rejectReviewMutation.mutate()}
+                disabled={rejectReviewMutation.isPending || !reviewRejectReason.trim()}
+                className="flex-1 bg-red-600 text-white py-2 rounded-xl hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {rejectReviewMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : "Rejeter"}
+              </button>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {showSignatureModal && (
+        <ModalPortal onClose={() => setShowSignatureModal(false)} size="lg">
+          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+            <h3 className="text-xl font-bold">Demande de signature</h3>
+            <button onClick={() => setShowSignatureModal(false)} className="p-1 hover:bg-gray-100 rounded-xl">
+              <X size={20} />
+            </button>
+          </div>
+          <div className="p-6 space-y-4">
+            {signatureResult && (
+              <div className="bg-green-50 border border-green-100 text-green-700 rounded-xl p-3 text-sm">
+                Demande envoyée. {signatureResult.publicUrl || signatureResult.signatureUrl || signatureResult.url ? (
+                  <a className="underline" href={signatureResult.publicUrl || signatureResult.signatureUrl || signatureResult.url} target="_blank" rel="noreferrer">Ouvrir le lien public</a>
+                ) : null}
+              </div>
+            )}
+            <input
+              value={signatureForm.signerName}
+              onChange={(e) => setSignatureForm({ ...signatureForm, signerName: e.target.value })}
+              placeholder="Nom du signataire"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500"
+            />
+            <input
+              type="email"
+              value={signatureForm.signerEmail}
+              onChange={(e) => setSignatureForm({ ...signatureForm, signerEmail: e.target.value })}
+              placeholder="Email du signataire"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500"
+            />
+            <input
+              type="datetime-local"
+              value={signatureForm.expiresAt}
+              onChange={(e) => setSignatureForm({ ...signatureForm, expiresAt: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500"
+            />
+            <textarea
+              value={signatureForm.message}
+              onChange={(e) => setSignatureForm({ ...signatureForm, message: e.target.value })}
+              rows={3}
+              placeholder="Message au signataire"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl resize-none focus:ring-2 focus:ring-primary-500"
+            />
+            <div className="flex gap-3">
+              <button onClick={() => setShowSignatureModal(false)} className="flex-1 px-4 py-2 border rounded-xl text-gray-700 hover:bg-gray-50">Fermer</button>
+              <button
+                onClick={() => requestSignatureMutation.mutate()}
+                disabled={requestSignatureMutation.isPending || !signatureForm.signerName || !signatureForm.signerEmail}
+                className="flex-1 bg-primary-600 text-white py-2 rounded-xl hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {requestSignatureMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <><Send size={16} /> Envoyer</>}
               </button>
             </div>
           </div>

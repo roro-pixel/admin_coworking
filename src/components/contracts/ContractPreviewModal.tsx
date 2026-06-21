@@ -40,7 +40,7 @@ export const ContractPreviewModal: React.FC<ContractPreviewModalProps> = ({
     signatoryRole:
       contractData.parties?.find((p: any) => p.role === "SIGNATORY")
         ?.partyType || "Signataire",
-    uploadedBy: admin?.id || 1,
+    uploadedBy: admin?.id ? Number(admin.id) : 1,
     variables: {},
   });
 
@@ -68,8 +68,9 @@ export const ContractPreviewModal: React.FC<ContractPreviewModalProps> = ({
       const documentResponse = await contractService.generateContract({
         ...buildPayload(),
       });
-      if (documentResponse && documentResponse.fileUrl) {
-        window.open(documentResponse.fileUrl, "_blank");
+      const documentUrl = documentResponse.previewUrl || documentResponse.downloadUrl || documentResponse.fileUrl;
+      if (documentResponse && documentUrl) {
+        window.open(documentUrl, "_blank");
       } else {
         setPdfError("Erreur: document non généré");
       }

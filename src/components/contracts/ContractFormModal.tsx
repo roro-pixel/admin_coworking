@@ -29,7 +29,7 @@ const ownerTypes = [
 const renewalTypes = [
   { value: "FIXED_TERM", label: "Durée déterminée" },
   { value: "AUTO_RENEW", label: "Renouvellement automatique" },
-  { value: "INDEFINITE", label: "Durée indéterminée" },
+  { value: "NONE", label: "Aucun renouvellement" },
 ];
 
 export const ContractFormModal: React.FC<ContractFormModalProps> = ({
@@ -103,16 +103,19 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
   };
 
   const handleOwnerSelect = (
-    customer: CustomerSummaryResponse | null,
+    item: CustomerSummaryResponse | MemberSummaryResponse | null,
     type: string,
   ) => {
-    if (customer) {
+    if (item) {
       setFormData({
         ...formData,
         ownerType: type as any,
-        ownerCode: customer.customerId,
+        ownerCode: (item as any).customerId || (item as any).memberId || (item as any).code,
       });
-      setSelectedOwner(customer);
+      setSelectedOwner(item);
+    } else {
+      setFormData({ ...formData, ownerCode: "" });
+      setSelectedOwner(null);
     }
   };
 
@@ -207,7 +210,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
       effectiveDate: formData.effectiveDate,
       startDate: formData.startDate,
       endDate: formData.endDate || undefined,
-      createdBy: parseInt(localStorage.getItem("admin_id") || "1"),
+      createdBy: admin?.id ? Number(admin.id) : 1,
       parties: formData.parties.map((party, idx) => ({
         partyType: party.partyType,
         partyCode: party.partyCode,
@@ -216,7 +219,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
         phone: party.phone || undefined,
         role: party.role,
         signOrder: idx + 1,
-        mustSign: party.role === "SIGNATORY",
+        mustSign: party.mustSign ?? party.role === "SIGNATORY",
       })),
     };
     onSave(payload);
@@ -457,7 +460,7 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
                   >
                     <option value="SIGNATORY">Signataire</option>
                     <option value="BENEFICIARY">Bénéficiaire</option>
-                    <option value="WITNESS">Témoin</option>
+                    <option value="OPERATOR">Opérateur</option>
                   </select>
                 </div>
 

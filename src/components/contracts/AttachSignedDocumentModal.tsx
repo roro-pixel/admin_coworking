@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Upload, Loader2, FileCheck } from "lucide-react";
 import { contractService } from "../../services/contract.service";
+import { documentService } from "../../services/document.service";
 import { ModalPortal } from "../ui/ModalPortal";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -58,32 +59,17 @@ export const AttachSignedDocumentModal: React.FC<
     setError("");
 
     try {
-      // 1. Upload du document via l'API document
-      const formData = new FormData();
-      // CORRECTION : utiliser les props ownerType/ownerCode
-      formData.append("ownerType", ownerType);
-      formData.append("ownerCode", ownerCode);
-      formData.append("documentTypeCode", "SIGNED_CONTRACT");
-      formData.append("title", `Contrat signé — ${contractCode}`);
-      // CORRECTION : admin?.email au lieu du hardcode '1'
-      formData.append(
-        "uploadedBy",
-        admin?.email || admin?.id?.toString() || "1",
-      );
-      formData.append("file", file);
-
-      const response = await fetch("/sni/api/v1/documents/upload", {
-        method: "POST",
-        body: formData,
+      // 1. Upload du document via le service GED (multipart/form-data)
+      const docResponse = await documentService.uploadDocument({
+        ownerType,
+        ownerCode: ownerCode || contractCode,
+        documentTypeCode: "SIGNED_CONTRACT",
+        title: `Contrat signé — ${contractCode}`,
+        uploadedBy: admin?.email || admin?.id?.toString() || "1",
+        file,
       });
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err?.message || `Erreur upload (${response.status})`);
-      }
-
-      const docResponse = await response.json();
-      const documentCode = docResponse.code || docResponse.documentCode;
+      const documentCode = docResponse.code || (docResponse as any).documentCode;
       if (!documentCode)
         throw new Error("Code document manquant dans la réponse.");
 

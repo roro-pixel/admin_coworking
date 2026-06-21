@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Tags,
   FileSearch,
+  GitBranch,
 } from "lucide-react";
 import { DocumentTypesList } from "./DocumentTypesList";
 import { DocumentRequirementsList } from "./DocumentRequirementsList";
@@ -29,6 +30,7 @@ import { DocumentAdvancedSearchPage } from "./DocumentAdvancedSearchPage";
 import { DocumentOwnerFolderPage } from "./DocumentOwnerFolderPage";
 import { DocumentGovernancePage } from "./DocumentGovernancePage";
 import { DocumentAnalyticsExportPage } from "./DocumentAnalyticsExportPage";
+import { DocumentOperationsHub } from "./DocumentOperationsHub";
 
 type TabId =
   | "dashboard"
@@ -44,7 +46,8 @@ type TabId =
   | "advancedSearch"
   | "folder"
   | "governance"
-  | "analytics";
+  | "analytics"
+  | "operations";
 
 const groups: {
   title: string;
@@ -71,6 +74,7 @@ const groups: {
       { id: "documents", label: "Documents", icon: FolderOpen },
       { id: "advancedSearch", label: "Recherche", icon: Search },
       { id: "folder", label: "Dossier", icon: FolderOpen },
+      { id: "operations", label: "Opérations", icon: GitBranch },
     ],
   },
   {
@@ -206,6 +210,11 @@ export const DocumentMaster: React.FC = () => {
         {visitedTabs.has("folder") && (
           <div className={activeTab !== "folder" ? "hidden" : ""}>
             <DocumentOwnerFolderPage />
+          </div>
+        )}
+        {visitedTabs.has("operations") && (
+          <div className={activeTab !== "operations" ? "hidden" : ""}>
+            <DocumentOperationsHub />
           </div>
         )}
         {visitedTabs.has("types") && (

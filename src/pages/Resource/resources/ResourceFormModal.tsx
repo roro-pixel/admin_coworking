@@ -87,9 +87,9 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
       resourceService.createResource({
         name: formData.name,
         description: formData.description || undefined,
-        typeId: Number(formData.typeId),
-        groupId: formData.groupId ? Number(formData.groupId) : undefined,
-        policyId: formData.policyId ? Number(formData.policyId) : undefined,
+        typeId: formData.typeId,
+        groupId: formData.groupId || undefined,
+        policyId: formData.policyId || undefined,
         capacity: formData.capacity,
         zone: formData.zone || undefined,
         locationLabel: formData.locationLabel || undefined,
@@ -126,9 +126,9 @@ export const ResourceFormModal: React.FC<ResourceFormModalProps> = ({
         await resourceService.updateResourceClassification(
           editingResource!.code,
           {
-            typeId: Number(formData.typeId),
-            groupId: formData.groupId ? Number(formData.groupId) : undefined,
-            policyId: formData.policyId ? Number(formData.policyId) : undefined,
+            typeId: formData.typeId,
+            groupId: formData.groupId || undefined,
+            policyId: formData.policyId || undefined,
           },
         );
       } catch (err: any) {

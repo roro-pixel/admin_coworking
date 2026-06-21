@@ -80,7 +80,7 @@ const buildDefaultFormData = (rule: ResourcePricingRuleResponse | null) => ({
   endsAt: timeOnly(rule?.endsAt),
   adjustmentType: (rule?.adjustmentType || "") as "" | AdjustmentType,
   adjustmentValue: rule?.adjustmentValue ?? 0,
-  lastMinuteMinutes: rule?.lastMinuteMinutes ?? null,
+  lastMinuteMinutes: rule?.lastMinuteMinutes?.toString() ?? "",
   priority: rule?.priority ?? 0,
   validFrom: dateOnly(rule?.validFrom),
   validUntil: dateOnly(rule?.validUntil),
@@ -126,7 +126,7 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
         adjustmentValue: formData.adjustmentType
           ? Number(formData.adjustmentValue) || 0
           : undefined,
-        lastMinuteMinutes: formData.lastMinuteMinutes,
+        lastMinuteMinutes: formData.lastMinuteMinutes ? Number(formData.lastMinuteMinutes) : null,
         priority: formData.priority || undefined,
         validFrom: formData.validFrom || undefined,
         validUntil: formData.validUntil || undefined,
@@ -160,7 +160,7 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
         adjustmentValue: formData.adjustmentType
           ? Number(formData.adjustmentValue) || 0
           : undefined,
-        lastMinuteMinutes: formData.lastMinuteMinutes,
+        lastMinuteMinutes: formData.lastMinuteMinutes ? Number(formData.lastMinuteMinutes) : null,
         priority: formData.priority || undefined,
         validFrom: formData.validFrom || undefined,
         validUntil: formData.validUntil || undefined,
@@ -483,9 +483,7 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
             onChange={(e) =>
               setFormData({
                 ...formData,
-                lastMinuteMinutes: e.target.value
-                  ? Number(e.target.value)
-                  : null,
+                lastMinuteMinutes: e.target.value,
               })
             }
             placeholder="ex: 60 = applicable si réservé < 1h avant"

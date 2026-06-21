@@ -38,6 +38,11 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   APPROVED: { label: "Approuvé", color: "bg-green-100 text-green-700" },
   REJECTED: { label: "Rejeté", color: "bg-red-100 text-red-700" },
   EXPIRED: { label: "Expiré", color: "bg-gray-100 text-gray-500" },
+  NEEDS_CORRECTION: {
+    label: "Correction demandée",
+    color: "bg-orange-100 text-orange-700",
+  },
+  UPLOADED: { label: "Uploadé", color: "bg-blue-100 text-blue-700" },
 };
 
 export const DocumentReviewModal: React.FC<DocumentReviewModalProps> = ({
@@ -65,6 +70,8 @@ export const DocumentReviewModal: React.FC<DocumentReviewModalProps> = ({
   if (!document) return null;
 
   const sc = statusConfig[document.status];
+  const filePreviewUrl = document.previewUrl || document.fileUrl || document.downloadUrl;
+  const fileDownloadUrl = document.downloadUrl || document.fileUrl || document.previewUrl;
   const isPdf = document.mimeType?.includes("pdf");
   const isImage = document.mimeType?.startsWith("image/");
   const isExpired =
@@ -115,7 +122,7 @@ export const DocumentReviewModal: React.FC<DocumentReviewModalProps> = ({
                 <Eye size={16} /> {showPreview ? "Masquer" : "Aperçu"}
               </button>
               <a
-                href={document.fileUrl}
+                href={fileDownloadUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 download
@@ -129,13 +136,13 @@ export const DocumentReviewModal: React.FC<DocumentReviewModalProps> = ({
             <div className="bg-gray-50 p-3">
               {isPdf ? (
                 <iframe
-                  src={document.fileUrl}
+                  src={filePreviewUrl}
                   className="w-full h-96 rounded"
                   title={document.title}
                 />
               ) : isImage ? (
                 <img
-                  src={document.fileUrl}
+                  src={filePreviewUrl}
                   alt={document.title}
                   className="max-w-full max-h-96 mx-auto rounded"
                 />
@@ -143,7 +150,7 @@ export const DocumentReviewModal: React.FC<DocumentReviewModalProps> = ({
                 <div className="text-center py-12 text-gray-400 text-base">
                   Aperçu non disponible —{" "}
                   <a
-                    href={document.fileUrl}
+                    href={fileDownloadUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-primary-600 hover:underline"
@@ -316,7 +323,7 @@ export const DocumentReviewModal: React.FC<DocumentReviewModalProps> = ({
                     )}
                   </div>
                   <a
-                    href={v.storagePath}
+                    href={v.fileUrl || v.storagePath}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm text-primary-600 hover:underline flex items-center gap-1.5"

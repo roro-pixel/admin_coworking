@@ -67,7 +67,7 @@ export const ResourceClosuresList: React.FC = () => {
   const { data: closuresData, isLoading } = useQuery({
     queryKey: ["resource-closures", resourceFilter],
     queryFn: () =>
-      resourceService.getResourceClosures({
+      resourceService.getClosures({
         resourceCode: resourceFilter || undefined,
         size: 200,
       }),
@@ -77,7 +77,7 @@ export const ResourceClosuresList: React.FC = () => {
 
   const createMutation = useMutation({
     mutationFn: () =>
-      resourceService.createResourceClosure({
+      resourceService.createClosure({
         resourceCode: formData.resourceCode,
         startedAt: formData.startedAt,
         endedAt: formData.endedAt,
@@ -98,14 +98,14 @@ export const ResourceClosuresList: React.FC = () => {
 
   const updateActiveMutation = useMutation({
     mutationFn: ({ id, active }: { id: number; active: boolean }) =>
-      resourceService.updateResourceClosureActive(id, active),
+      resourceService.updateClosureActive(id, active),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["resource-closures"] }),
     onError: () => alert("Erreur lors de la mise à jour du statut."),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => resourceService.deleteResourceClosure(id),
+    mutationFn: (id: number) => resourceService.deleteClosure(id),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["resource-closures"] }),
     onError: () => alert("Erreur lors de la suppression de la fermeture."),

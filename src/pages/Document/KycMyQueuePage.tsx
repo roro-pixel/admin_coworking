@@ -12,6 +12,7 @@ import {
 import { kycService } from "../../services/document.service";
 import { KycCaseDetailModal } from "../../components/kyc/KycCaseDetailModal";
 import { useAuth } from "../../contexts/AuthContext";
+import { ModalPortal } from "../../components/ui/ModalPortal";
 import type { KycCaseResponse } from "../../services/document.service";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -37,6 +38,11 @@ export const KycMyQueuePage: React.FC = () => {
   const [selectedCase, setSelectedCase] = useState<KycCaseResponse | null>(
     null,
   );
+  const [decisionModal, setDecisionModal] = useState<{
+    action: "approve" | "reject";
+    code: string;
+  } | null>(null);
+  const [decisionComment, setDecisionComment] = useState("");
   const adminId = Number(admin?.id) || 1;
 
   const { data: myCases, isLoading } = useQuery({
@@ -47,16 +53,26 @@ export const KycMyQueuePage: React.FC = () => {
 
   const approveMutation = useMutation({
     mutationFn: (code: string) =>
-      kycService.approveKycCase(code, adminId, "Approuvé depuis ma file"),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["kyc-my-queue"] }),
+      kycService.approveKycCase(
+        code,
+        adminId,
+        decisionComment || "Approuvé depuis ma file",
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["kyc-my-queue"] });
+      setDecisionModal(null);
+      setDecisionComment("");
+    },
   });
 
   const rejectMutation = useMutation({
     mutationFn: (code: string) =>
-      kycService.rejectKycCase(code, adminId, "Rejeté depuis ma file"),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["kyc-my-queue"] }),
+      kycService.rejectKycCase(code, adminId, decisionComment),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["kyc-my-queue"] });
+      setDecisionModal(null);
+      setDecisionComment("");
+    },
   });
 
   if (isLoading) {
@@ -156,9 +172,11 @@ export const KycMyQueuePage: React.FC = () => {
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm(`Approuver le dossier ${kycCase.code} ?`)) {
-                          approveMutation.mutate(kycCase.code);
-                        }
+                        setDecisionComment("");
+                        setDecisionModal({
+                          action: "approve",
+                          code: kycCase.code,
+                        });
                       }}
                       disabled={approveMutation.isPending}
                       className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm"
@@ -172,9 +190,11 @@ export const KycMyQueuePage: React.FC = () => {
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm(`Rejeter le dossier ${kycCase.code} ?`)) {
-                          rejectMutation.mutate(kycCase.code);
-                        }
+                        setDecisionComment("");
+                        setDecisionModal({
+                          action: "reject",
+                          code: kycCase.code,
+                        });
                       }}
                       disabled={rejectMutation.isPending}
                       className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 text-sm"
@@ -192,6 +212,61 @@ export const KycMyQueuePage: React.FC = () => {
             );
           })}
         </div>
+      )}
+
+      {decisionModal && (
+        <ModalPortal onClose={() => setDecisionModal(null)} size="lg">
+          <div className="sticky top-0 bg-white border-b p-5 rounded-t-2xl">
+            <h3 className="text-xl font-bold">
+              {decisionModal.action === "approve"
+                ? "Approuver le dossier"
+                : "Rejeter le dossier"}
+            </h3>
+            <p className="mt-1 font-mono text-sm text-gray-500">
+              {decisionModal.code}
+            </p>
+          </div>
+          <div className="p-6 space-y-4">
+            <textarea
+              value={decisionComment}
+              onChange={(e) => setDecisionComment(e.target.value)}
+              rows={4}
+              placeholder={
+                decisionModal.action === "approve"
+                  ? "Commentaire d'approbation..."
+                  : "Motif de rejet obligatoire..."
+              }
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm resize-none"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDecisionModal(null)}
+                className="flex-1 rounded-xl border border-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() =>
+                  decisionModal.action === "approve"
+                    ? approveMutation.mutate(decisionModal.code)
+                    : rejectMutation.mutate(decisionModal.code)
+                }
+                disabled={
+                  approveMutation.isPending ||
+                  rejectMutation.isPending ||
+                  (decisionModal.action === "reject" && !decisionComment.trim())
+                }
+                className={`flex-1 rounded-xl px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
+                  decisionModal.action === "approve"
+                    ? "bg-green-600 hover:bg-green-700"
+                    : "bg-red-600 hover:bg-red-700"
+                }`}
+              >
+                Confirmer
+              </button>
+            </div>
+          </div>
+        </ModalPortal>
       )}
 
       {selectedCase && (

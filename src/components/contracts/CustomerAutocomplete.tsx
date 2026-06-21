@@ -42,7 +42,7 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
       setIsLoading(true);
       try {
         const data = await customerService.searchCustomers(query);
-        setResults(data);
+        setResults(Array.isArray(data) ? data : ((data as any)?.content || (data as any)?.data || []));
         setShowResults(true);
       } catch (error) {
         console.error(error);

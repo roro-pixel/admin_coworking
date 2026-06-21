@@ -56,7 +56,7 @@ export const ResourceAvailability: React.FC = () => {
   const { data: availabilitiesData, isLoading } = useQuery({
     queryKey: ["resource-availabilities", selectedResource],
     queryFn: () =>
-      resourceService.getResourceAvailabilities({
+      resourceService.getAvailabilities({
         resourceCode: selectedResource,
         size: 100,
       }),
@@ -69,10 +69,10 @@ export const ResourceAvailability: React.FC = () => {
   const { data: closuresData } = useQuery({
     queryKey: ["resource-closures-calendar", selectedResource, calendarMonth],
     queryFn: () =>
-      resourceService.getResourceClosures({
+      resourceService.getClosures({
         resourceCode: selectedResource,
-        fromDate: `${calendarMonth}-01`,
-        toDate: `${calendarMonth}-31`,
+        from: `${calendarMonth}-01`,
+        to: `${calendarMonth}-31`,
         size: 200,
       }),
     enabled: !!selectedResource,
@@ -81,10 +81,11 @@ export const ResourceAvailability: React.FC = () => {
 
   const createMutation = useMutation({
     mutationFn: () =>
-      resourceService.createResourceAvailability({
+      resourceService.createAvailability({
         resourceCode: formData.resourceCode,
         startedAt: formData.startedAt,
         endedAt: formData.endedAt,
+        slotDurationMinutes: 30,
         totalCapacity: formData.capacity,
         active: formData.active,
       }),
@@ -106,8 +107,12 @@ export const ResourceAvailability: React.FC = () => {
     isLoading: remainingLoading,
     refetch: refetchRemaining,
   } = useQuery({
-    queryKey: ["resource-availabilities-remaining", selectedResource],
-    queryFn: () => resourceService.getRemainingAvailabilities(selectedResource),
+    queryKey: ["resource-availabilities-remaining", selectedResource, calendarMonth],
+    queryFn: () => resourceService.searchRemainingSlots({
+      resourceCode: selectedResource,
+      from: `${calendarMonth}-01T00:00:00`,
+      to: `${calendarMonth}-31T23:59:59`,
+    }),
     enabled: !!selectedResource,
   });
 
@@ -124,12 +129,13 @@ export const ResourceAvailability: React.FC = () => {
 
   const reserveMutation = useMutation({
     mutationFn: () =>
-      resourceService.reserveAvailability({
-        resourceCode: selectedResource,
-        startedAt: reserveForm.startedAt,
-        endedAt: reserveForm.endedAt,
-        quantity: reserveForm.quantity,
-      }),
+      {
+        const slot = availabilities.find((item) =>
+          item.startedAt === reserveForm.startedAt && item.endedAt === reserveForm.endedAt,
+        );
+        if (!slot) throw new Error("Créneau introuvable pour la réservation.");
+        return resourceService.reserveAvailabilitySlot(slot.id, reserveForm.quantity);
+      },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["resource-availabilities", selectedResource],
@@ -159,12 +165,13 @@ export const ResourceAvailability: React.FC = () => {
 
   const releaseMutation = useMutation({
     mutationFn: () =>
-      resourceService.releaseAvailability({
-        resourceCode: selectedResource,
-        startedAt: releaseForm.startedAt,
-        endedAt: releaseForm.endedAt,
-        quantity: releaseForm.quantity,
-      }),
+      {
+        const slot = availabilities.find((item) =>
+          item.startedAt === releaseForm.startedAt && item.endedAt === releaseForm.endedAt,
+        );
+        if (!slot) throw new Error("Créneau introuvable pour la libération.");
+        return resourceService.releaseAvailabilitySlot(slot.id, releaseForm.quantity);
+      },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["resource-availabilities", selectedResource],

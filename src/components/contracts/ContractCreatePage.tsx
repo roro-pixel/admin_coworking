@@ -57,9 +57,9 @@ const renewalTypes = [
     description: "Se renouvelle automatiquement",
   },
   {
-    value: "INDEFINITE",
-    label: "Durée indéterminée",
-    description: "Pas de date de fin",
+    value: "NONE",
+    label: "Aucun renouvellement",
+    description: "Pas de renouvellement automatique",
   },
 ];
 
@@ -77,9 +77,9 @@ const partyRoles = [
     color: "bg-blue-100 text-blue-700",
   },
   {
-    value: "WITNESS",
-    label: "Témoin",
-    description: "Témoin de la signature",
+    value: "OPERATOR",
+    label: "Opérateur",
+    description: "Opérateur de la signature",
     color: "bg-gray-100 text-gray-600",
   },
 ];
@@ -106,7 +106,7 @@ export const ContractCreatePage: React.FC = () => {
     ownerType: "MEMBER" as "MEMBER" | "CUSTOMER" | "BUSINESS",
     ownerCode: "",
     businessCode: "",
-    renewalType: "FIXED_TERM" as "FIXED_TERM" | "AUTO_RENEW" | "INDEFINITE",
+    renewalType: "FIXED_TERM" as "NONE" | "FIXED_TERM" | "AUTO_RENEW",
     effectiveDate: new Date().toISOString().split("T")[0],
     startDate: new Date().toISOString().split("T")[0],
     endDate: "",
@@ -253,7 +253,7 @@ export const ContractCreatePage: React.FC = () => {
           phone: p.phone || undefined,
           role: p.role as any,
           signOrder: idx + 1,
-          mustSign: p.role === "SIGNATORY",
+          mustSign: p.mustSign,
         })),
       };
       return contractService.createContract(payload);

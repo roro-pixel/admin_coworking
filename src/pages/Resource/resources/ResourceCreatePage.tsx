@@ -12,12 +12,7 @@ import {
 } from "lucide-react";
 import { AdminLayout } from "../../../components/layout/AdminLayout";
 import { resourceService } from "../../../services/resource.service";
-import type {
-  ResourceStatus,
-  ResourceTypeResponse,
-  ResourceGroupResponse,
-  ResourcePolicyResponse,
-} from "../../../services/resource.service";
+import type { ResourceStatus } from "../../../services/resource.service";
 
 const statusOptions: { value: ResourceStatus; label: string }[] = [
   { value: "ACTIVE", label: "Actif" },
@@ -27,26 +22,6 @@ const statusOptions: { value: ResourceStatus; label: string }[] = [
   { value: "ARCHIVED", label: "Archivé" },
 ];
 
-const getTypeId = (type: ResourceTypeResponse): string => {
-  const value = type.id ?? type.typeId;
-  return value !== undefined && value !== null ? String(value) : "";
-};
-
-const getGroupId = (group: ResourceGroupResponse): string => {
-  const value = group.id ?? group.groupId;
-  return value !== undefined && value !== null ? String(value) : "";
-};
-
-const getPolicyId = (policy: ResourcePolicyResponse): string => {
-  const value = policy.id ?? policy.policyId;
-  return value !== undefined && value !== null ? String(value) : "";
-};
-
-const toNumberOrUndefined = (value: string): number | undefined => {
-  if (!value) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-};
 
 export const ResourceCreatePage: React.FC = () => {
   const navigate = useNavigate();
@@ -57,9 +32,9 @@ export const ResourceCreatePage: React.FC = () => {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    typeId: "",
-    groupId: "",
-    policyId: "",
+    typeCode: "",
+    groupCode: "",
+    policyCode: "",
     capacity: 1,
     zone: "",
     locationLabel: "",
@@ -83,43 +58,34 @@ export const ResourceCreatePage: React.FC = () => {
     queryFn: () => resourceService.getResourcePolicies({ size: 500 }),
   });
 
-  const types = useMemo(
-    () => (typesData?.content || []).filter((type) => getTypeId(type)),
-    [typesData],
-  );
-
-  const groups = useMemo(
-    () => (groupsData?.content || []).filter((group) => getGroupId(group)),
-    [groupsData],
-  );
-
-  const policies = useMemo(
-    () =>
-      (policiesData?.content || []).filter((policy) => getPolicyId(policy)),
-    [policiesData],
-  );
+  const types = useMemo(() => typesData?.content || [], [typesData]);
+  const groups = useMemo(() => groupsData?.content || [], [groupsData]);
+  const policies = useMemo(() => policiesData?.content || [], [policiesData]);
 
   const isLoading = typesLoading || groupsLoading || policiesLoading;
 
-  const selectedTypeName = useMemo(
-    () => types.find((type) => getTypeId(type) === formData.typeId)?.name,
-    [types, formData.typeId],
+  const selectedType = useMemo(
+    () => types.find((type) => type.code === formData.typeCode),
+    [types, formData.typeCode],
   );
+
+  const selectedGroup = useMemo(
+    () => groups.find((group) => group.code === formData.groupCode),
+    [groups, formData.groupCode],
+  );
+
+  const selectedPolicy = useMemo(
+    () => policies.find((policy) => policy.code === formData.policyCode),
+    [policies, formData.policyCode],
+  );
+
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const typeId = toNumberOrUndefined(formData.typeId);
-
-      if (!typeId) {
-        throw new Error(
-          "Le type de ressource est obligatoire. Vérifie que les types exposent bien un id numérique.",
-        );
-      }
-
       await resourceService.createResource({
-        typeId,
-        groupId: toNumberOrUndefined(formData.groupId),
-        policyId: toNumberOrUndefined(formData.policyId),
+        typeId: formData.typeCode,
+        groupId: formData.groupCode || undefined,
+        policyId: formData.policyCode || undefined,
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
         capacity: formData.capacity,
@@ -145,7 +111,6 @@ export const ResourceCreatePage: React.FC = () => {
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-
     setErrorMessage(null);
 
     if (!formData.name.trim()) {
@@ -153,7 +118,7 @@ export const ResourceCreatePage: React.FC = () => {
       return;
     }
 
-    if (!formData.typeId) {
+    if (!formData.typeCode) {
       setErrorMessage("Le type de ressource est obligatoire.");
       return;
     }
@@ -345,11 +310,11 @@ export const ResourceCreatePage: React.FC = () => {
                   </label>
 
                   <select
-                    value={formData.typeId}
+                    value={formData.typeCode}
                     onChange={(event) =>
                       setFormData({
                         ...formData,
-                        typeId: event.target.value,
+                        typeCode: event.target.value,
                       })
                     }
                     required
@@ -358,17 +323,11 @@ export const ResourceCreatePage: React.FC = () => {
                     <option value="">Sélectionner</option>
 
                     {types.map((type) => (
-                      <option key={type.code} value={getTypeId(type)}>
+                      <option key={type.code} value={type.code}>
                         {type.name}
                       </option>
                     ))}
                   </select>
-
-                  {!types.length && (
-                    <p className="mt-1 text-xs text-red-600">
-                      Aucun type avec identifiant numérique n’a été trouvé.
-                    </p>
-                  )}
                 </div>
 
                 <div>
@@ -377,11 +336,11 @@ export const ResourceCreatePage: React.FC = () => {
                   </label>
 
                   <select
-                    value={formData.groupId}
+                    value={formData.groupCode}
                     onChange={(event) =>
                       setFormData({
                         ...formData,
-                        groupId: event.target.value,
+                        groupCode: event.target.value,
                       })
                     }
                     className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
@@ -389,7 +348,7 @@ export const ResourceCreatePage: React.FC = () => {
                     <option value="">Aucun</option>
 
                     {groups.map((group) => (
-                      <option key={group.code} value={getGroupId(group)}>
+                      <option key={group.code} value={group.code}>
                         {group.name}
                       </option>
                     ))}
@@ -402,11 +361,11 @@ export const ResourceCreatePage: React.FC = () => {
                   </label>
 
                   <select
-                    value={formData.policyId}
+                    value={formData.policyCode}
                     onChange={(event) =>
                       setFormData({
                         ...formData,
-                        policyId: event.target.value,
+                        policyCode: event.target.value,
                       })
                     }
                     className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
@@ -414,7 +373,7 @@ export const ResourceCreatePage: React.FC = () => {
                     <option value="">Aucune</option>
 
                     {policies.map((policy) => (
-                      <option key={policy.code} value={getPolicyId(policy)}>
+                      <option key={policy.code} value={policy.code}>
                         {policy.name}
                       </option>
                     ))}
@@ -539,7 +498,21 @@ export const ResourceCreatePage: React.FC = () => {
                 <p>
                   Type :{" "}
                   <span className="text-white">
-                    {selectedTypeName || "Non défini"}
+                    {selectedType?.name || "Non défini"}
+                  </span>
+                </p>
+
+                <p>
+                  Groupe :{" "}
+                  <span className="text-white">
+                    {selectedGroup?.name || "Aucun"}
+                  </span>
+                </p>
+
+                <p>
+                  Politique :{" "}
+                  <span className="text-white">
+                    {selectedPolicy?.name || "Aucune"}
                   </span>
                 </p>
 

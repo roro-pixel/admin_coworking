@@ -38,12 +38,12 @@ export const ContractPreviewPage: React.FC = () => {
       templateCode: contract.templateCode,
       ownerType: contract.ownerType as any,
       ownerCode: contract.ownerCode,
-      businessCode: contract.businessCode,
+      businessCode: contract.businessCode || undefined,
       title: contract.title,
-      description: contract.description,
-      effectiveDate: contract.effectiveDate,
-      startDate: contract.startDate,
-      endDate: contract.endDate,
+      description: contract.description || undefined,
+      effectiveDate: contract.effectiveDate || "",
+      startDate: contract.startDate || "",
+      endDate: contract.endDate || undefined,
       signatoryName: signatory?.displayName,
       signatoryRole: signatory?.partyType || "Signataire",
       uploadedBy: admin?.id ? Number(admin.id) : 1,
@@ -74,8 +74,9 @@ export const ContractPreviewPage: React.FC = () => {
     setError(null);
     try {
       const result = await contractService.generateContract(payload);
-      if (result?.fileUrl) {
-        window.open(result.fileUrl, "_blank");
+      const documentUrl = result?.previewUrl || result?.downloadUrl || result?.fileUrl;
+      if (documentUrl) {
+        window.open(documentUrl, "_blank");
       } else {
         setError("Erreur: document non généré");
       }

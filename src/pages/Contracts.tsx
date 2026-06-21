@@ -86,6 +86,9 @@ const statusConfig: Record<
 
 const PAGE_SIZE = 20;
 
+const formatNullableDate = (value?: string | null) =>
+  value ? new Date(value).toLocaleDateString("fr-FR") : "—";
+
 export const AdminContracts: React.FC = () => {
   const navigate = useNavigate();
   const { admin } = useAuth();
@@ -168,9 +171,9 @@ export const AdminContracts: React.FC = () => {
       }),
   });
 
-  const contracts: ContractResponse[] = contractsData?.data || [];
-  const totalPages = contractsData?.pageable?.totalPages ?? 0;
-  const totalElements = contractsData?.pageable?.totalElements ?? 0;
+  const contracts: ContractResponse[] = contractsData?.content || [];
+  const totalPages = contractsData?.totalPages ?? 0;
+  const totalElements = contractsData?.totalElements ?? 0;
 
   const filteredContracts = debouncedSearch
     ? contracts.filter(
@@ -179,7 +182,7 @@ export const AdminContracts: React.FC = () => {
           c.contractCode
             .toLowerCase()
             .includes(debouncedSearch.toLowerCase()) ||
-          c.ownerCode.toLowerCase().includes(debouncedSearch.toLowerCase()),
+          (c.ownerCode || "").toLowerCase().includes(debouncedSearch.toLowerCase()),
       )
     : contracts;
 
@@ -491,6 +494,13 @@ export const AdminContracts: React.FC = () => {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => navigate("/contracts/templates-drafting")}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <FileText size={18} />
+            Templates & rédaction
+          </button>
           {/* Bouton création rapide (modal) */}
           <button
             onClick={() => {
@@ -676,9 +686,7 @@ export const AdminContracts: React.FC = () => {
                     <td className="px-6 py-4">
                       <p className="text-sm text-gray-600">
                         Début :{" "}
-                        {new Date(contract.startDate).toLocaleDateString(
-                          "fr-FR",
-                        )}
+                        {formatNullableDate(contract.startDate)}
                       </p>
                       {contract.endDate && (
                         <p className="text-xs text-gray-400">

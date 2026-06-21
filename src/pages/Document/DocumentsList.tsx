@@ -40,6 +40,31 @@ const statusConfig: Record<
     color: "bg-gray-100 text-gray-500",
     icon: AlertCircle,
   },
+  NEEDS_CORRECTION: {
+    label: "Correction",
+    color: "bg-orange-100 text-orange-700",
+    icon: AlertCircle,
+  },
+  UPLOADED: {
+    label: "Uploadé",
+    color: "bg-blue-100 text-blue-700",
+    icon: FileText,
+  },
+  SIGNED: {
+    label: "Signé",
+    color: "bg-purple-100 text-purple-700",
+    icon: CheckCircle,
+  },
+  ARCHIVED: {
+    label: "Archivé",
+    color: "bg-gray-100 text-gray-500",
+    icon: AlertCircle,
+  },
+  SUPERSEDED: {
+    label: "Remplacé",
+    color: "bg-gray-100 text-gray-500",
+    icon: AlertCircle,
+  },
 };
 
 export const DocumentsList: React.FC = () => {

@@ -8,6 +8,7 @@ import type {
   ResourcePricingRuleResponse,
   ResourceAvailabilityResponse,
   ResourceBookingUnit,
+  ResourceStatus,
 } from "../../../services/resource.service";
 import { ModalPortal } from "../../../components/ui/ModalPortal";
 
@@ -93,7 +94,7 @@ export const ResourceDetailModal: React.FC<ResourceDetailModalProps> = ({
     {
       queryKey: ["resource-availabilities", resource.code],
       queryFn: () =>
-        resourceService.getResourceAvailabilities({
+        resourceService.getAvailabilities({
           resourceCode: resource.code,
           size: 50,
         }),
@@ -125,7 +126,7 @@ export const ResourceDetailModal: React.FC<ResourceDetailModalProps> = ({
       const from = `${calMonth}-01`;
       const lastDay = new Date(Number(y), Number(m), 0).getDate();
       const to = `${calMonth}-${String(lastDay).padStart(2, "0")}`;
-      return resourceService.getPublicCalendar(resource.code, from, to);
+      return resourceService.getPublicCalendar(resource.code, { fromDate: from, toDate: to });
     },
     enabled: isOpen && activeTab === "calendar",
   });
@@ -141,11 +142,8 @@ export const ResourceDetailModal: React.FC<ResourceDetailModalProps> = ({
   };
 
   const updateStatusMutation = useMutation({
-    mutationFn: (status: string) =>
-      resourceService.updateResourceStatus(
-        resource.code,
-        status as ResourceResponse["status"],
-      ),
+    mutationFn: (status: ResourceStatus) =>
+      resourceService.updateResourceStatus(resource.code, status),
     onSuccess: invalidateResource,
     onError: () => alert("Erreur lors du changement de statut."),
   });
@@ -218,7 +216,7 @@ export const ResourceDetailModal: React.FC<ResourceDetailModalProps> = ({
       <div className="flex flex-wrap gap-2 p-4 border-b bg-gray-50">
         <select
           value={resource.status}
-          onChange={(e) => updateStatusMutation.mutate(e.target.value)}
+          onChange={(e) => updateStatusMutation.mutate(e.target.value as ResourceStatus)}
           disabled={updateStatusMutation.isPending}
           className="px-3 py-1 border rounded-lg text-sm bg-white disabled:opacity-50"
         >
@@ -558,7 +556,7 @@ export const ResourceDetailModal: React.FC<ResourceDetailModalProps> = ({
                   setQuoteError(null);
                   setQuoteResult(null);
                   try {
-                    const r = await resourceService.getPricingRuleQuote({
+                    const r = await resourceService.quotePrice({
                       resourceCode: resource.code,
                       bookingUnit: quoteForm.bookingUnit,
                       startedAt: quoteForm.startedAt,

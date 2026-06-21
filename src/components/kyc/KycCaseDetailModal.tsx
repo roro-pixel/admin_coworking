@@ -20,6 +20,9 @@ import {
   Scan,
   Shield,
   Plus,
+  Trash2,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import { kycService, documentService } from "../../services/document.service";
 import {
@@ -120,9 +123,21 @@ const docStatusConfig: Record<string, { label: string; color: string }> = {
   APPROVED: { label: "Validé", color: "bg-green-100 text-green-700" },
   REJECTED: { label: "Rejeté", color: "bg-red-100 text-red-700" },
   EXPIRED: { label: "Expiré", color: "bg-gray-100 text-gray-500" },
+  NEEDS_CORRECTION: {
+    label: "Correction",
+    color: "bg-orange-100 text-orange-700",
+  },
+  UPLOADED: { label: "Uploadé", color: "bg-blue-100 text-blue-700" },
 };
 
-type DetailTab = "documents" | "notes" | "timeline" | "expiry" | "ocr";
+type DetailTab =
+  | "documents"
+  | "requirements"
+  | "caseReview"
+  | "notes"
+  | "timeline"
+  | "expiry"
+  | "ocr";
 
 export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
   kycCase,
@@ -153,6 +168,17 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
 
   // OCR
   const [selectedOcrDoc, setSelectedOcrDoc] = useState<string | null>(null);
+
+  // Exigences KYC spécifiques au dossier
+  const [requirementForm, setRequirementForm] = useState({
+    documentTypeCode: "",
+    required: true,
+  });
+
+  // Revue documentaire par dossier KYC
+  const [selectedReviewDocs, setSelectedReviewDocs] = useState<string[]>([]);
+  const [bulkReviewComment, setBulkReviewComment] = useState("");
+  const [bulkRejectReason, setBulkRejectReason] = useState("");
 
   useEffect(() => {
     setComment("");
@@ -197,9 +223,37 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
     enabled: activeTab === "ocr" && !!selectedOcrDoc,
   });
 
+  const { data: caseRequirements = [] } = useQuery({
+    queryKey: ["kyc-case-requirements", currentCase.code],
+    queryFn: () => kycService.getKycCaseRequirements(currentCase.code),
+    enabled: activeTab === "requirements",
+  });
+
+  const { data: availableDocumentTypes = [] } = useQuery({
+    queryKey: ["documentTypes", currentCase.ownerType],
+    queryFn: () =>
+      documentService.getDocumentTypes(currentCase.ownerType as any, true),
+    enabled: activeTab === "requirements",
+  });
+
+  const { data: caseReviewQueueData, isLoading: caseReviewLoading } = useQuery({
+    queryKey: ["kyc-case-review-queue", currentCase.code],
+    queryFn: () =>
+      kycService.getKycCaseReviewQueue(currentCase.code, { size: 100 }),
+    enabled: activeTab === "caseReview",
+  });
+
+  const caseReviewDocuments = caseReviewQueueData?.content || [];
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["kycCases"] });
     queryClient.invalidateQueries({ queryKey: ["kyc-case", kycCase.code] });
+    queryClient.invalidateQueries({
+      queryKey: ["kyc-case-requirements", currentCase.code],
+    });
+    queryClient.invalidateQueries({
+      queryKey: ["kyc-case-review-queue", currentCase.code],
+    });
     onRefresh();
   };
 
@@ -371,6 +425,118 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
     }
   };
 
+  const addRequirementMutation = useMutation({
+    mutationFn: () =>
+      kycService.addKycCaseRequirement(currentCase.code, {
+        documentTypeCode: requirementForm.documentTypeCode,
+        required: requirementForm.required,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["kyc-case-requirements", currentCase.code],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["kyc-case", currentCase.code],
+      });
+      setRequirementForm({ documentTypeCode: "", required: true });
+      setActionError(null);
+    },
+    onError: (e: any) =>
+      setActionError(
+        e?.response?.data?.message || "Erreur lors de l'ajout de l'exigence.",
+      ),
+  });
+
+  const removeRequirementMutation = useMutation({
+    mutationFn: (documentTypeCode: string) =>
+      kycService.removeKycCaseRequirement(currentCase.code, documentTypeCode),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["kyc-case-requirements", currentCase.code],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["kyc-case", currentCase.code],
+      });
+      setActionError(null);
+    },
+    onError: (e: any) =>
+      setActionError(
+        e?.response?.data?.message ||
+          "Erreur lors de la suppression de l'exigence.",
+      ),
+  });
+
+  const bulkApproveCaseDocsMutation = useMutation({
+    mutationFn: () =>
+      kycService.bulkApproveKycCaseDocuments(
+        currentCase.code,
+        selectedReviewDocs,
+        adminId,
+        bulkReviewComment || undefined,
+      ),
+    onSuccess: () => {
+      setSelectedReviewDocs([]);
+      setBulkReviewComment("");
+      invalidate();
+    },
+    onError: (e: any) =>
+      setActionError(
+        e?.response?.data?.message || "Erreur lors de l'approbation en masse.",
+      ),
+  });
+
+  const bulkRejectCaseDocsMutation = useMutation({
+    mutationFn: () =>
+      kycService.bulkRejectKycCaseDocuments(
+        currentCase.code,
+        selectedReviewDocs.map((documentCode) => ({
+          documentCode,
+          reason: bulkRejectReason || bulkReviewComment || "Correction requise",
+        })),
+        adminId,
+      ),
+    onSuccess: () => {
+      setSelectedReviewDocs([]);
+      setBulkReviewComment("");
+      setBulkRejectReason("");
+      invalidate();
+    },
+    onError: (e: any) =>
+      setActionError(
+        e?.response?.data?.message || "Erreur lors du rejet en masse.",
+      ),
+  });
+
+  const requestCorrectionMutation = useMutation({
+    mutationFn: ({
+      documentCode,
+      reason,
+    }: {
+      documentCode: string;
+      reason: string;
+    }) =>
+      kycService.requestCorrectionKycCaseDocument(
+        currentCase.code,
+        documentCode,
+        reason,
+        adminId,
+      ),
+    onSuccess: invalidate,
+    onError: (e: any) =>
+      setActionError(
+        e?.response?.data?.message ||
+          "Erreur lors de la demande de correction.",
+      ),
+  });
+
+  const toggleReviewDoc = (documentCode: string) => {
+    setSelectedReviewDocs((prev) =>
+      prev.includes(documentCode)
+        ? prev.filter((code) => code !== documentCode)
+        : [...prev, documentCode],
+    );
+  };
+
   const sc = kycStatusConfig[currentCase.status];
   const StatusIcon = sc?.icon || Clock;
 
@@ -401,6 +567,8 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
 
   const tabs: { id: DetailTab; label: string; icon: React.ElementType }[] = [
     { id: "documents", label: "Documents", icon: FileText },
+    { id: "requirements", label: "Exigences", icon: Shield },
+    { id: "caseReview", label: "Revue dossier", icon: CheckSquare },
     { id: "notes", label: "Notes", icon: MessageSquare },
     { id: "timeline", label: "Timeline", icon: History },
     { id: "expiry", label: "Expiration", icon: Calendar },
@@ -471,9 +639,8 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
               <p className="text-xs text-gray-500">Commencé</p>
               <p className="font-medium">
                 {currentCase.startedAt
-                ? new Date(currentCase.startedAt).toLocaleDateString("fr-FR")
-                : "—"
-                }
+                  ? new Date(currentCase.startedAt).toLocaleDateString("fr-FR")
+                  : "—"}
               </p>
             </div>
             {currentCase.submittedAt && (
@@ -643,6 +810,10 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
                 <div className="space-y-2">
                   {currentCase.documents?.map((doc) => {
                     const ds = docStatusConfig[doc.status];
+                    const docPreviewUrl =
+                      doc.previewUrl || doc.fileUrl || doc.downloadUrl;
+                    const docDownloadUrl =
+                      doc.downloadUrl || doc.fileUrl || doc.previewUrl;
                     return (
                       <div
                         key={doc.code}
@@ -670,14 +841,20 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
                         </div>
                         <div className="flex gap-1 ml-3">
                           <button
-                            onClick={() => window.open(doc.fileUrl, "_blank")}
+                            onClick={() =>
+                              docPreviewUrl &&
+                              window.open(docPreviewUrl, "_blank")
+                            }
                             className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-primary-600"
                             title="Voir"
                           >
                             <Eye size={15} />
                           </button>
                           <button
-                            onClick={() => window.open(doc.fileUrl, "_blank")}
+                            onClick={() =>
+                              docDownloadUrl &&
+                              window.open(docDownloadUrl, "_blank")
+                            }
                             className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-primary-600"
                             title="Télécharger"
                           >
@@ -729,6 +906,235 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
               )}
             </div>
           </>
+        )}
+
+        {/* ========== ONGLET EXIGENCES ========== */}
+        {activeTab === "requirements" && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+              <h4 className="mb-3 text-sm font-semibold text-gray-700">
+                Ajouter une exigence spécifique au dossier
+              </h4>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_auto]">
+                <select
+                  value={requirementForm.documentTypeCode}
+                  onChange={(e) =>
+                    setRequirementForm({
+                      ...requirementForm,
+                      documentTypeCode: e.target.value,
+                    })
+                  }
+                  className="rounded-xl border border-gray-200 px-3 py-2 text-sm bg-white"
+                >
+                  <option value="">Choisir un type de document</option>
+                  {availableDocumentTypes.map((type: any) => (
+                    <option key={type.code} value={type.code}>
+                      {type.name} — {type.code}
+                    </option>
+                  ))}
+                </select>
+                <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={requirementForm.required}
+                    onChange={(e) =>
+                      setRequirementForm({
+                        ...requirementForm,
+                        required: e.target.checked,
+                      })
+                    }
+                  />
+                  Obligatoire
+                </label>
+                <button
+                  onClick={() => addRequirementMutation.mutate()}
+                  disabled={
+                    !requirementForm.documentTypeCode ||
+                    addRequirementMutation.isPending
+                  }
+                  className="rounded-xl bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {addRequirementMutation.isPending ? "Ajout..." : "Ajouter"}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {caseRequirements.map((requirement: any) => (
+                <div
+                  key={requirement.documentTypeCode}
+                  className="flex items-center justify-between rounded-xl border border-gray-200 p-3"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {requirement.documentTypeName ||
+                        requirement.documentTypeCode}
+                    </p>
+                    <p className="font-mono text-xs text-gray-400">
+                      {requirement.documentTypeCode}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded-full px-2 py-1 text-xs font-medium ${
+                        requirement.fulfilled
+                          ? "bg-green-100 text-green-700"
+                          : "bg-amber-100 text-amber-700"
+                      }`}
+                    >
+                      {requirement.fulfilled ? "Fourni" : "Manquant"}
+                    </span>
+                    <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">
+                      {requirement.required ? "Obligatoire" : "Optionnel"}
+                    </span>
+                    <button
+                      onClick={() =>
+                        removeRequirementMutation.mutate(
+                          requirement.documentTypeCode,
+                        )
+                      }
+                      disabled={removeRequirementMutation.isPending}
+                      className="rounded-lg p-2 text-red-500 hover:bg-red-50 disabled:opacity-50"
+                      title="Retirer l'exigence"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {caseRequirements.length === 0 && (
+                <div className="rounded-xl bg-gray-50 py-8 text-center text-sm text-gray-400">
+                  Aucune exigence spécifique chargée pour ce dossier.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ========== ONGLET REVUE DOSSIER ========== */}
+        {activeTab === "caseReview" && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-end">
+                <div className="flex-1">
+                  <label className="mb-1 block text-xs font-medium text-gray-500">
+                    Commentaire d'approbation / rejet
+                  </label>
+                  <textarea
+                    value={bulkReviewComment}
+                    onChange={(e) => setBulkReviewComment(e.target.value)}
+                    rows={2}
+                    placeholder="Commentaire de revue..."
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm resize-none"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="mb-1 block text-xs font-medium text-gray-500">
+                    Motif correction/rejet
+                  </label>
+                  <input
+                    value={bulkRejectReason}
+                    onChange={(e) => setBulkRejectReason(e.target.value)}
+                    placeholder="Ex: document illisible, expiré..."
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                  />
+                </div>
+                <button
+                  onClick={() => bulkApproveCaseDocsMutation.mutate()}
+                  disabled={
+                    selectedReviewDocs.length === 0 ||
+                    bulkApproveCaseDocsMutation.isPending
+                  }
+                  className="rounded-xl bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  Approuver sélection
+                </button>
+                <button
+                  onClick={() => bulkRejectCaseDocsMutation.mutate()}
+                  disabled={
+                    selectedReviewDocs.length === 0 ||
+                    !bulkRejectReason.trim() ||
+                    bulkRejectCaseDocsMutation.isPending
+                  }
+                  className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  Rejeter sélection
+                </button>
+              </div>
+            </div>
+
+            {caseReviewLoading ? (
+              <div className="py-8 text-center text-sm text-gray-400">
+                Chargement...
+              </div>
+            ) : caseReviewDocuments.length === 0 ? (
+              <div className="rounded-xl bg-gray-50 py-8 text-center text-sm text-gray-400">
+                Aucun document en attente de revue pour ce dossier.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {caseReviewDocuments.map((doc: DocumentResponse) => {
+                  const selected = selectedReviewDocs.includes(doc.code);
+                  return (
+                    <div
+                      key={doc.code}
+                      className="flex items-center justify-between rounded-xl border border-gray-200 p-3"
+                    >
+                      <button
+                        onClick={() => toggleReviewDoc(doc.code)}
+                        className="mr-3 text-gray-500 hover:text-primary-600"
+                      >
+                        {selected ? (
+                          <CheckSquare size={18} />
+                        ) : (
+                          <Square size={18} />
+                        )}
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-gray-900">
+                          {doc.documentTypeName}
+                        </p>
+                        <p className="truncate text-xs text-gray-500">
+                          {doc.title}
+                        </p>
+                        <p className="font-mono text-xs text-gray-400">
+                          {doc.code}
+                        </p>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => {
+                            setSelectedDoc(doc);
+                            setIsReviewOpen(true);
+                            setReviewError(null);
+                          }}
+                          className="rounded-lg p-2 text-yellow-600 hover:bg-yellow-50"
+                          title="Revue individuelle"
+                        >
+                          <CheckCircle size={15} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const reason = prompt("Motif de correction :");
+                            if (reason) {
+                              requestCorrectionMutation.mutate({
+                                documentCode: doc.code,
+                                reason,
+                              });
+                            }
+                          }}
+                          className="rounded-lg p-2 text-orange-600 hover:bg-orange-50"
+                          title="Demander une correction"
+                        >
+                          <AlertCircle size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
 
         {/* ========== ONGLET NOTES ========== */}
@@ -1002,7 +1408,9 @@ export const KycCaseDetailModal: React.FC<KycCaseDetailModalProps> = ({
           <button
             onClick={() => {
               setShowRiskEdit(true);
-              setEditRiskLevel((currentCase.riskLevel as KycRiskLevel) || "LOW");
+              setEditRiskLevel(
+                (currentCase.riskLevel as KycRiskLevel) || "LOW",
+              );
               setEditRiskComment("");
             }}
             className="text-xs text-primary-600 hover:text-primary-800 flex items-center gap-1"

@@ -70,8 +70,15 @@ export const DocumentRequirementsList: React.FC = () => {
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["documentRequirements"] });
+  const getRequirementPayload = () => ({
+    ...form,
+    documentTypeName:
+      documentTypes.find((dt) => dt.code === form.documentTypeCode)?.name ||
+      form.documentTypeCode,
+  });
+
   const createMutation = useMutation({
-    mutationFn: () => documentService.createDocumentRequirement(form),
+    mutationFn: () => documentService.createDocumentRequirement(getRequirementPayload() as any),
     onSuccess: () => {
       invalidate();
       setIsFormOpen(false);
@@ -81,7 +88,7 @@ export const DocumentRequirementsList: React.FC = () => {
   });
   const updateMutation = useMutation({
     mutationFn: () =>
-      documentService.updateDocumentRequirement(editing!.id, form),
+      documentService.updateDocumentRequirement(editing!.id, getRequirementPayload() as any),
     onSuccess: () => {
       invalidate();
       setIsFormOpen(false);
