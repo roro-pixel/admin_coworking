@@ -187,7 +187,8 @@ export const NotificationDropdown: React.FC = () => {
                 {notifications.map((notification) => {
                   const Icon = notificationIcons[notification.type] || Bell;
                   const tone =
-                    notificationTone[notification.type] || notificationTone.default;
+                    notificationTone[notification.type] ||
+                    notificationTone.default;
                   const isRead =
                     notification.status !== "SENT" || !!notification.readAt;
 

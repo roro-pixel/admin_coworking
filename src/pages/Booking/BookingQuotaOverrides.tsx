@@ -107,20 +107,21 @@ export const BookingQuotaOverrides: React.FC = () => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-semibold text-gray-900">
           Dérogations de quotas
         </h2>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-primary-600 text-white px-4 py-2 rounded-xl hover:bg-primary-700 flex items-center gap-2"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-white hover:bg-primary-700 sm:w-auto"
         >
           <Plus size={18} />
           Nouvelle dérogation
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
+        <div className="hidden overflow-x-auto md:block">
         <table className="w-full border-separate border-spacing-y-1">
           <thead className="bg-gray-50/80">
             <tr>
@@ -217,6 +218,28 @@ export const BookingQuotaOverrides: React.FC = () => {
             ))}
           </tbody>
         </table>
+        </div>
+        <div className="space-y-3 p-3 md:hidden">
+          {overrides.map((override) => (
+            <article key={override.overrideNumber} className={`rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-100 ${!override.active ? "opacity-60" : ""}`}>
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-mono text-xs font-black text-primary-700">{override.overrideNumber}</p>
+                  <p className="mt-1 text-sm font-black text-gray-950">{override.ownerCode}</p>
+                  <p className="text-[11px] font-semibold text-gray-400">{override.ownerType}</p>
+                </div>
+                <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold ${override.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>{override.active ? "Actif" : "Inactif"}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-xl bg-white p-2"><p className="text-gray-400">Ressource</p><p className="font-black text-gray-800">{override.resourceCode || "Toutes"}</p></div>
+                <div className="rounded-xl bg-white p-2"><p className="text-gray-400">Actives +</p><p className="font-black text-green-700">+{override.extraActiveBookings}</p></div>
+                <div className="rounded-xl bg-white p-2"><p className="text-gray-400">Jour +</p><p className="font-black text-green-700">+{override.extraBookingsPerDay}</p></div>
+                <div className="rounded-xl bg-white p-2"><p className="text-gray-400">Mois +</p><p className="font-black text-green-700">+{override.extraBookingsPerMonth}</p></div>
+              </div>
+              <p className="mt-3 rounded-xl bg-white p-2 text-xs font-semibold text-gray-600">{override.reason}</p>
+            </article>
+          ))}
+        </div>
       </div>
 
       {overrides.length === 0 && !isLoading && (

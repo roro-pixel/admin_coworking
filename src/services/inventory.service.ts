@@ -1,4 +1,4 @@
-import { apiClient } from './api';
+import { apiClient } from "./api";
 
 // ==================== HELPERS ====================
 export interface PaginatedResponse<T> {
@@ -23,11 +23,18 @@ const toPage = <T>(raw: any): PaginatedResponse<T> => {
       ...raw,
       content: raw.data,
       data: raw.data,
-      totalElements: raw.pageable?.totalElements ?? raw.totalElements ?? raw.data.length,
+      totalElements:
+        raw.pageable?.totalElements ?? raw.totalElements ?? raw.data.length,
       totalPages: raw.pageable?.totalPages ?? raw.totalPages ?? 1,
     };
   }
-  if (Array.isArray(raw)) return { content: raw, data: raw, totalElements: raw.length, totalPages: 1 };
+  if (Array.isArray(raw))
+    return {
+      content: raw,
+      data: raw,
+      totalElements: raw.length,
+      totalPages: 1,
+    };
   return { content: [], data: [], totalElements: 0, totalPages: 0 };
 };
 
@@ -39,16 +46,45 @@ const toList = <T>(raw: any): T[] => {
 };
 
 const blob = async (url: string, params?: any): Promise<Blob> =>
-  (await apiClient.get(url, { params, responseType: 'blob' })).data;
+  (await apiClient.get(url, { params, responseType: "blob" })).data;
 
 // ==================== TYPES ====================
-export type InventoryItemType = 'CONSUMABLE' | 'ASSET' | 'SERVICE' | 'SPARE_PART';
-export type InventoryTrackingType = 'NONE' | 'LOT' | 'SERIAL';
-export type StockMovementType = 'IN' | 'OUT' | 'TRANSFER' | 'ADJUSTMENT_IN' | 'ADJUSTMENT_OUT';
-export type StockOutReasonCode = 'CONSUMPTION' | 'DAMAGE' | 'LOSS' | 'INTERNAL_USE' | 'SAMPLE' | 'DONATION' | 'OTHER';
-export type ConsumptionTrend = 'RISING' | 'STABLE' | 'FALLING';
-export type InventorySerialStatus = 'AVAILABLE' | 'ISSUED' | 'TRANSFERRED' | 'LOST' | 'DAMAGED';
-export type AssetStatus = 'AVAILABLE' | 'RESERVED' | 'ASSIGNED' | 'IN_USE' | 'IN_MAINTENANCE' | 'LOST' | 'RETIRED' | 'DAMAGED';
+export type InventoryItemType =
+  | "CONSUMABLE"
+  | "ASSET"
+  | "SERVICE"
+  | "SPARE_PART";
+export type InventoryTrackingType = "NONE" | "LOT" | "SERIAL";
+export type StockMovementType =
+  | "IN"
+  | "OUT"
+  | "TRANSFER"
+  | "ADJUSTMENT_IN"
+  | "ADJUSTMENT_OUT";
+export type StockOutReasonCode =
+  | "CONSUMPTION"
+  | "DAMAGE"
+  | "LOSS"
+  | "INTERNAL_USE"
+  | "SAMPLE"
+  | "DONATION"
+  | "OTHER";
+export type ConsumptionTrend = "RISING" | "STABLE" | "FALLING";
+export type InventorySerialStatus =
+  | "AVAILABLE"
+  | "ISSUED"
+  | "TRANSFERRED"
+  | "LOST"
+  | "DAMAGED";
+export type AssetStatus =
+  | "AVAILABLE"
+  | "RESERVED"
+  | "ASSIGNED"
+  | "IN_USE"
+  | "IN_MAINTENANCE"
+  | "LOST"
+  | "RETIRED"
+  | "DAMAGED";
 
 export interface InventoryCategory {
   code?: string;
@@ -65,7 +101,7 @@ export interface InventoryUnit {
   code?: string;
   unitCode?: string;
   name: string;
-  unitType: 'COUNT' | 'WEIGHT' | 'VOLUME' | 'LENGTH' | string;
+  unitType: "COUNT" | "WEIGHT" | "VOLUME" | "LENGTH" | string;
   active?: boolean;
   symbol?: string;
 }
@@ -98,7 +134,7 @@ export interface InventoryItem {
 export interface InventoryLocation {
   locationCode: string;
   name: string;
-  locationType: 'WAREHOUSE' | 'OFFICE' | 'ROOM' | 'ZONE' | 'VIRTUAL';
+  locationType: "WAREHOUSE" | "OFFICE" | "ROOM" | "ZONE" | "VIRTUAL";
   description?: string;
   active: boolean;
 }
@@ -167,7 +203,7 @@ export interface StockReservation {
   locationCode: string;
   locationName?: string;
   quantity: number;
-  status: 'ACTIVE' | 'CONSUMED' | 'RELEASED' | string;
+  status: "ACTIVE" | "CONSUMED" | "RELEASED" | string;
   referenceType?: string;
   referenceCode?: string;
   reason?: string;
@@ -195,7 +231,7 @@ export interface Supplier {
   phone?: string;
   taxId?: string;
   address?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'BLACKLISTED';
+  status: "ACTIVE" | "INACTIVE" | "BLACKLISTED";
 }
 
 export interface SupplierPerformance {
@@ -230,7 +266,13 @@ export interface PurchaseRequest {
   requestCode: string;
   locationCode: string;
   locationName?: string;
-  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CONVERTED' | string;
+  status:
+    | "DRAFT"
+    | "SUBMITTED"
+    | "APPROVED"
+    | "REJECTED"
+    | "CONVERTED"
+    | string;
   requestedBy: string;
   approvedBy?: string;
   rejectionReason?: string;
@@ -253,8 +295,16 @@ export interface PurchaseOrder {
   supplierName?: string;
   locationCode: string;
   sourceRequestCode?: string;
-  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'ORDERED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CANCELLED' | string;
-  approvalLevel?: 'NONE' | 'MANAGER' | 'DIRECTOR' | 'FINANCE' | string;
+  status:
+    | "DRAFT"
+    | "PENDING_APPROVAL"
+    | "APPROVED"
+    | "ORDERED"
+    | "PARTIALLY_RECEIVED"
+    | "RECEIVED"
+    | "CANCELLED"
+    | string;
+  approvalLevel?: "NONE" | "MANAGER" | "DIRECTOR" | "FINANCE" | string;
   approvedBy?: string;
   approvedAt?: string;
   totalAmount: number;
@@ -282,10 +332,10 @@ export interface Asset {
   serialNumber?: string;
   assetTag?: string;
   status: AssetStatus;
-  condition: 'NEW' | 'GOOD' | 'FAIR' | 'POOR' | 'DAMAGED';
+  condition: "NEW" | "GOOD" | "FAIR" | "POOR" | "DAMAGED";
   locationCode: string;
   locationName?: string;
-  assignedToType?: 'MEMBER' | 'CUSTOMER' | 'BUSINESS' | 'ROOM' | 'LOCATION';
+  assignedToType?: "MEMBER" | "CUSTOMER" | "BUSINESS" | "ROOM" | "LOCATION";
   assignedToCode?: string;
   purchaseDate?: string;
   purchaseCost: number;
@@ -325,17 +375,17 @@ export interface AssetAssignment {
 export interface Alert {
   alertCode: string;
   alertType:
-    | 'LOW_STOCK'
-    | 'RECURRING_LOW_STOCK'
-    | 'OUT_OF_STOCK'
-    | 'NEGATIVE_STOCK'
-    | 'EXPIRY_SOON'
-    | 'LOT_EXPIRED'
-    | 'ASSET_WARRANTY_EXPIRING'
-    | 'ASSET_MAINTENANCE_DUE'
-    | 'ASSET_RETURN_DUE_SOON'
+    | "LOW_STOCK"
+    | "RECURRING_LOW_STOCK"
+    | "OUT_OF_STOCK"
+    | "NEGATIVE_STOCK"
+    | "EXPIRY_SOON"
+    | "LOT_EXPIRED"
+    | "ASSET_WARRANTY_EXPIRING"
+    | "ASSET_MAINTENANCE_DUE"
+    | "ASSET_RETURN_DUE_SOON"
     | string;
-  status: 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED' | 'DISMISSED' | string;
+  status: "OPEN" | "ACKNOWLEDGED" | "RESOLVED" | "DISMISSED" | string;
   itemCode?: string;
   itemName?: string;
   locationCode?: string;
@@ -367,7 +417,7 @@ export interface ReorderSuggestion {
   minimumQuantity: number;
   suggestedOrderQuantity: number;
   estimatedOrderCost: number;
-  severity?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | string;
+  severity?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | string;
   priorityScore?: number;
   consumptionRateLast30Days?: number;
   consumptionRatePrev30Days?: number;
@@ -446,43 +496,150 @@ export interface InventoryDashboardMetrics {
 // ==================== SERVICE ====================
 export const inventoryService = {
   // ---------- Catalogue / categories ----------
-  getCategories: async (): Promise<InventoryCategory[]> => toList<InventoryCategory>((await apiClient.get('/sni/api/v1/inventory/categories')).data),
-  getCategory: async (categoryCode: string): Promise<InventoryCategory> => (await apiClient.get(`/sni/api/v1/inventory/categories/${categoryCode}`)).data,
-  createCategory: async (data: Partial<InventoryCategory>): Promise<InventoryCategory> => (await apiClient.post('/sni/api/v1/inventory/categories', data)).data,
-  updateCategory: async (categoryCode: string, data: Partial<InventoryCategory>): Promise<InventoryCategory> => (await apiClient.put(`/sni/api/v1/inventory/categories/${categoryCode}`, data)).data,
-  deleteCategory: async (categoryCode: string): Promise<void> => { await apiClient.delete(`/sni/api/v1/inventory/categories/${categoryCode}`); },
+  getCategories: async (): Promise<InventoryCategory[]> =>
+    toList<InventoryCategory>(
+      (await apiClient.get("/sni/api/v1/inventory/categories")).data,
+    ),
+  getCategory: async (categoryCode: string): Promise<InventoryCategory> =>
+    (await apiClient.get(`/sni/api/v1/inventory/categories/${categoryCode}`))
+      .data,
+  createCategory: async (
+    data: Partial<InventoryCategory>,
+  ): Promise<InventoryCategory> =>
+    (await apiClient.post("/sni/api/v1/inventory/categories", data)).data,
+  updateCategory: async (
+    categoryCode: string,
+    data: Partial<InventoryCategory>,
+  ): Promise<InventoryCategory> =>
+    (
+      await apiClient.put(
+        `/sni/api/v1/inventory/categories/${categoryCode}`,
+        data,
+      )
+    ).data,
+  deleteCategory: async (categoryCode: string): Promise<void> => {
+    await apiClient.delete(`/sni/api/v1/inventory/categories/${categoryCode}`);
+  },
 
   // ---------- Units ----------
-  getUnits: async (): Promise<InventoryUnit[]> => toList<InventoryUnit>((await apiClient.get('/sni/api/v1/inventory/units')).data),
-  getUnit: async (unitCode: string): Promise<InventoryUnit> => (await apiClient.get(`/sni/api/v1/inventory/units/${unitCode}`)).data,
-  createUnit: async (data: Partial<InventoryUnit>): Promise<InventoryUnit> => (await apiClient.post('/sni/api/v1/inventory/units', data)).data,
-  updateUnit: async (unitCode: string, data: Partial<InventoryUnit>): Promise<InventoryUnit> => (await apiClient.put(`/sni/api/v1/inventory/units/${unitCode}`, data)).data,
-  deleteUnit: async (unitCode: string): Promise<void> => { await apiClient.delete(`/sni/api/v1/inventory/units/${unitCode}`); },
+  getUnits: async (): Promise<InventoryUnit[]> =>
+    toList<InventoryUnit>(
+      (await apiClient.get("/sni/api/v1/inventory/units")).data,
+    ),
+  getUnit: async (unitCode: string): Promise<InventoryUnit> =>
+    (await apiClient.get(`/sni/api/v1/inventory/units/${unitCode}`)).data,
+  createUnit: async (data: Partial<InventoryUnit>): Promise<InventoryUnit> =>
+    (await apiClient.post("/sni/api/v1/inventory/units", data)).data,
+  updateUnit: async (
+    unitCode: string,
+    data: Partial<InventoryUnit>,
+  ): Promise<InventoryUnit> =>
+    (await apiClient.put(`/sni/api/v1/inventory/units/${unitCode}`, data)).data,
+  deleteUnit: async (unitCode: string): Promise<void> => {
+    await apiClient.delete(`/sni/api/v1/inventory/units/${unitCode}`);
+  },
 
   // ---------- Items ----------
-  getItems: async (params?: { query?: string; categoryCode?: string; itemType?: string; active?: boolean; page?: number; size?: number; sort?: string }): Promise<PaginatedResponse<InventoryItem>> =>
-    toPage<InventoryItem>((await apiClient.get('/sni/api/v1/inventory/items', { params })).data),
-  searchItems: async (query: string, params?: { categoryCode?: string; itemType?: string; active?: boolean; size?: number }): Promise<InventoryItem[]> =>
-    toPage<InventoryItem>((await apiClient.get('/sni/api/v1/inventory/items', { params: { ...params, query, size: params?.size ?? 20 } })).data).content,
-  getItem: async (itemCode: string): Promise<InventoryItem> => (await apiClient.get(`/sni/api/v1/inventory/items/${itemCode}`)).data,
-  createItem: async (data: Partial<InventoryItem>): Promise<InventoryItem> => (await apiClient.post('/sni/api/v1/inventory/items', data)).data,
-  updateItem: async (itemCode: string, data: Partial<InventoryItem>): Promise<InventoryItem> => (await apiClient.put(`/sni/api/v1/inventory/items/${itemCode}`, data)).data,
-  deleteItem: async (itemCode: string): Promise<void> => { await apiClient.delete(`/sni/api/v1/inventory/items/${itemCode}`); },
-  activateItem: async (itemCode: string): Promise<void> => { await apiClient.patch(`/sni/api/v1/inventory/items/${itemCode}/activate`); },
-  deactivateItem: async (itemCode: string): Promise<void> => { await apiClient.patch(`/sni/api/v1/inventory/items/${itemCode}/deactivate`); },
+  getItems: async (params?: {
+    query?: string;
+    categoryCode?: string;
+    itemType?: string;
+    active?: boolean;
+    page?: number;
+    size?: number;
+    sort?: string;
+  }): Promise<PaginatedResponse<InventoryItem>> =>
+    toPage<InventoryItem>(
+      (await apiClient.get("/sni/api/v1/inventory/items", { params })).data,
+    ),
+  searchItems: async (
+    query: string,
+    params?: {
+      categoryCode?: string;
+      itemType?: string;
+      active?: boolean;
+      size?: number;
+    },
+  ): Promise<InventoryItem[]> =>
+    toPage<InventoryItem>(
+      (
+        await apiClient.get("/sni/api/v1/inventory/items", {
+          params: { ...params, query, size: params?.size ?? 20 },
+        })
+      ).data,
+    ).content,
+  getItem: async (itemCode: string): Promise<InventoryItem> =>
+    (await apiClient.get(`/sni/api/v1/inventory/items/${itemCode}`)).data,
+  createItem: async (data: Partial<InventoryItem>): Promise<InventoryItem> =>
+    (await apiClient.post("/sni/api/v1/inventory/items", data)).data,
+  updateItem: async (
+    itemCode: string,
+    data: Partial<InventoryItem>,
+  ): Promise<InventoryItem> =>
+    (await apiClient.put(`/sni/api/v1/inventory/items/${itemCode}`, data)).data,
+  deleteItem: async (itemCode: string): Promise<void> => {
+    await apiClient.delete(`/sni/api/v1/inventory/items/${itemCode}`);
+  },
+  activateItem: async (itemCode: string): Promise<void> => {
+    await apiClient.patch(`/sni/api/v1/inventory/items/${itemCode}/activate`);
+  },
+  deactivateItem: async (itemCode: string): Promise<void> => {
+    await apiClient.patch(`/sni/api/v1/inventory/items/${itemCode}/deactivate`);
+  },
 
   // ---------- Locations ----------
-  getLocations: async (active?: boolean): Promise<InventoryLocation[]> => toList<InventoryLocation>((await apiClient.get('/sni/api/v1/inventory/locations', { params: active !== undefined ? { active } : undefined })).data),
-  getLocation: async (locationCode: string): Promise<InventoryLocation> => (await apiClient.get(`/sni/api/v1/inventory/locations/${locationCode}`)).data,
-  createLocation: async (data: Partial<InventoryLocation>): Promise<InventoryLocation> => (await apiClient.post('/sni/api/v1/inventory/locations', data)).data,
-  updateLocation: async (locationCode: string, data: Partial<InventoryLocation>): Promise<InventoryLocation> => (await apiClient.put(`/sni/api/v1/inventory/locations/${locationCode}`, data)).data,
-  deleteLocation: async (locationCode: string): Promise<void> => { await apiClient.delete(`/sni/api/v1/inventory/locations/${locationCode}`); },
-  activateLocation: async (locationCode: string): Promise<void> => { await apiClient.patch(`/sni/api/v1/inventory/locations/${locationCode}/activate`); },
-  deactivateLocation: async (locationCode: string): Promise<void> => { await apiClient.patch(`/sni/api/v1/inventory/locations/${locationCode}/deactivate`); },
+  getLocations: async (active?: boolean): Promise<InventoryLocation[]> =>
+    toList<InventoryLocation>(
+      (
+        await apiClient.get("/sni/api/v1/inventory/locations", {
+          params: active !== undefined ? { active } : undefined,
+        })
+      ).data,
+    ),
+  getLocation: async (locationCode: string): Promise<InventoryLocation> =>
+    (await apiClient.get(`/sni/api/v1/inventory/locations/${locationCode}`))
+      .data,
+  createLocation: async (
+    data: Partial<InventoryLocation>,
+  ): Promise<InventoryLocation> =>
+    (await apiClient.post("/sni/api/v1/inventory/locations", data)).data,
+  updateLocation: async (
+    locationCode: string,
+    data: Partial<InventoryLocation>,
+  ): Promise<InventoryLocation> =>
+    (
+      await apiClient.put(
+        `/sni/api/v1/inventory/locations/${locationCode}`,
+        data,
+      )
+    ).data,
+  deleteLocation: async (locationCode: string): Promise<void> => {
+    await apiClient.delete(`/sni/api/v1/inventory/locations/${locationCode}`);
+  },
+  activateLocation: async (locationCode: string): Promise<void> => {
+    await apiClient.patch(
+      `/sni/api/v1/inventory/locations/${locationCode}/activate`,
+    );
+  },
+  deactivateLocation: async (locationCode: string): Promise<void> => {
+    await apiClient.patch(
+      `/sni/api/v1/inventory/locations/${locationCode}/deactivate`,
+    );
+  },
 
   // ---------- Stock levels / movements ----------
-  getStockLevels: async (params?: { itemCode?: string; locationCode?: string; belowMinimum?: boolean; page?: number; size?: number; sort?: string }): Promise<PaginatedResponse<StockLevel>> =>
-    toPage<StockLevel>((await apiClient.get('/sni/api/v1/inventory/stock/levels', { params })).data),
+  getStockLevels: async (params?: {
+    itemCode?: string;
+    locationCode?: string;
+    belowMinimum?: boolean;
+    page?: number;
+    size?: number;
+    sort?: string;
+  }): Promise<PaginatedResponse<StockLevel>> =>
+    toPage<StockLevel>(
+      (await apiClient.get("/sni/api/v1/inventory/stock/levels", { params }))
+        .data,
+    ),
 
   getStockMovements: async (params?: {
     itemCode?: string;
@@ -500,7 +657,17 @@ export const inventoryService = {
     sort?: string;
   }): Promise<PaginatedResponse<StockMovement>> => {
     const { from, to, ...rest } = params || {};
-    return toPage<StockMovement>((await apiClient.get('/sni/api/v1/inventory/stock/movements', { params: { ...rest, fromDate: rest.fromDate ?? from, toDate: rest.toDate ?? to } })).data);
+    return toPage<StockMovement>(
+      (
+        await apiClient.get("/sni/api/v1/inventory/stock/movements", {
+          params: {
+            ...rest,
+            fromDate: rest.fromDate ?? from,
+            toDate: rest.toDate ?? to,
+          },
+        })
+      ).data,
+    );
   },
 
   stockIn: async (data: {
@@ -519,8 +686,12 @@ export const inventoryService = {
     reasonDetails?: string;
     performedBy: string;
   }): Promise<StockMovement> => {
-    const payload = { ...data, reasonDetails: data.reasonDetails ?? data.reason };
-    return (await apiClient.post('/sni/api/v1/inventory/stock/in', payload)).data;
+    const payload = {
+      ...data,
+      reasonDetails: data.reasonDetails ?? data.reason,
+    };
+    return (await apiClient.post("/sni/api/v1/inventory/stock/in", payload))
+      .data;
   },
 
   stockOut: async (data: {
@@ -538,8 +709,12 @@ export const inventoryService = {
     confirmCreateLot?: boolean;
     serialNumbers?: string[];
   }): Promise<StockMovement> => {
-    const payload = { ...data, reasonDetails: data.reasonDetails ?? data.reason };
-    return (await apiClient.post('/sni/api/v1/inventory/stock/out', payload)).data;
+    const payload = {
+      ...data,
+      reasonDetails: data.reasonDetails ?? data.reason,
+    };
+    return (await apiClient.post("/sni/api/v1/inventory/stock/out", payload))
+      .data;
   },
 
   stockTransfer: async (data: {
@@ -555,8 +730,13 @@ export const inventoryService = {
     confirmCreateLot?: boolean;
     serialNumbers?: string[];
   }): Promise<StockMovement> => {
-    const payload = { ...data, reasonDetails: data.reasonDetails ?? data.reason };
-    return (await apiClient.post('/sni/api/v1/inventory/stock/transfer', payload)).data;
+    const payload = {
+      ...data,
+      reasonDetails: data.reasonDetails ?? data.reason,
+    };
+    return (
+      await apiClient.post("/sni/api/v1/inventory/stock/transfer", payload)
+    ).data;
   },
 
   stockAdjust: async (data: {
@@ -570,243 +750,777 @@ export const inventoryService = {
     referenceCode?: string;
     performedBy: string;
   }): Promise<StockMovement> => {
-    const payload = { ...data, reasonDetails: data.reasonDetails ?? data.reason };
-    return (await apiClient.post('/sni/api/v1/inventory/stock/adjust', payload)).data;
+    const payload = {
+      ...data,
+      reasonDetails: data.reasonDetails ?? data.reason,
+    };
+    return (await apiClient.post("/sni/api/v1/inventory/stock/adjust", payload))
+      .data;
   },
 
-  reverseMovement: async (movementCode: string, reversedBy: string, reversalReason: string): Promise<StockMovement> =>
-    (await apiClient.post(`/sni/api/v1/inventory/stock/movements/${movementCode}/reverse`, { reversedBy, reversalReason })).data,
+  reverseMovement: async (
+    movementCode: string,
+    reversedBy: string,
+    reversalReason: string,
+  ): Promise<StockMovement> =>
+    (
+      await apiClient.post(
+        `/sni/api/v1/inventory/stock/movements/${movementCode}/reverse`,
+        { reversedBy, reversalReason },
+      )
+    ).data,
 
   // ---------- Reservations ----------
-  createStockReservation: async (data: { itemCode: string; locationCode: string; quantity: number; referenceType?: string; referenceCode?: string; reason?: string; reservedBy: string }): Promise<StockReservation> =>
-    (await apiClient.post('/sni/api/v1/inventory/stock/reservations', data)).data,
-  getStockReservations: async (params?: { itemCode?: string; status?: string; page?: number; size?: number; sort?: string }): Promise<PaginatedResponse<StockReservation>> =>
-    toPage<StockReservation>((await apiClient.get('/sni/api/v1/inventory/stock/reservations', { params })).data),
-  releaseStockReservation: async (reservationCode: string): Promise<StockReservation> =>
-    (await apiClient.patch(`/sni/api/v1/inventory/stock/reservations/${reservationCode}/release`)).data,
-  consumeStockReservation: async (reservationCode: string): Promise<StockReservation> =>
-    (await apiClient.patch(`/sni/api/v1/inventory/stock/reservations/${reservationCode}/consume`)).data,
+  createStockReservation: async (data: {
+    itemCode: string;
+    locationCode: string;
+    quantity: number;
+    referenceType?: string;
+    referenceCode?: string;
+    reason?: string;
+    reservedBy: string;
+  }): Promise<StockReservation> =>
+    (await apiClient.post("/sni/api/v1/inventory/stock/reservations", data))
+      .data,
+  getStockReservations: async (params?: {
+    itemCode?: string;
+    status?: string;
+    page?: number;
+    size?: number;
+    sort?: string;
+  }): Promise<PaginatedResponse<StockReservation>> =>
+    toPage<StockReservation>(
+      (
+        await apiClient.get("/sni/api/v1/inventory/stock/reservations", {
+          params,
+        })
+      ).data,
+    ),
+  releaseStockReservation: async (
+    reservationCode: string,
+  ): Promise<StockReservation> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/stock/reservations/${reservationCode}/release`,
+      )
+    ).data,
+  consumeStockReservation: async (
+    reservationCode: string,
+  ): Promise<StockReservation> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/stock/reservations/${reservationCode}/consume`,
+      )
+    ).data,
 
   // ---------- Lots / serials ----------
-  getItemLots: async (itemCode: string, params?: { locationCode?: string; activeOnly?: boolean }): Promise<StockLot[]> =>
-    toList<StockLot>((await apiClient.get(`/sni/api/v1/inventory/items/${itemCode}/lots`, { params })).data),
-  createItemLot: async (itemCode: string, data: { locationCode: string; lotNumber: string; expiryDate?: string; initialQuantity?: number; ownershipType?: string }): Promise<StockLot> =>
-    (await apiClient.post(`/sni/api/v1/inventory/items/${itemCode}/lots`, data)).data,
-  getStockLots: async (params?: { itemCode?: string; locationCode?: string; page?: number; size?: number }): Promise<PaginatedResponse<StockLot>> =>
-    toPage<StockLot>((await apiClient.get('/sni/api/v1/inventory/stock/lots', { params })).data),
-  getItemSerials: async (itemCode: string, params?: { locationCode?: string; status?: InventorySerialStatus | string }): Promise<InventoryItemSerial[]> =>
-    toList<InventoryItemSerial>((await apiClient.get(`/sni/api/v1/inventory/items/${itemCode}/serials`, { params })).data),
+  getItemLots: async (
+    itemCode: string,
+    params?: { locationCode?: string; activeOnly?: boolean },
+  ): Promise<StockLot[]> =>
+    toList<StockLot>(
+      (
+        await apiClient.get(`/sni/api/v1/inventory/items/${itemCode}/lots`, {
+          params,
+        })
+      ).data,
+    ),
+  createItemLot: async (
+    itemCode: string,
+    data: {
+      locationCode: string;
+      lotNumber: string;
+      expiryDate?: string;
+      initialQuantity?: number;
+      ownershipType?: string;
+    },
+  ): Promise<StockLot> =>
+    (await apiClient.post(`/sni/api/v1/inventory/items/${itemCode}/lots`, data))
+      .data,
+  getStockLots: async (params?: {
+    itemCode?: string;
+    locationCode?: string;
+    page?: number;
+    size?: number;
+  }): Promise<PaginatedResponse<StockLot>> =>
+    toPage<StockLot>(
+      (await apiClient.get("/sni/api/v1/inventory/stock/lots", { params }))
+        .data,
+    ),
+  getItemSerials: async (
+    itemCode: string,
+    params?: { locationCode?: string; status?: InventorySerialStatus | string },
+  ): Promise<InventoryItemSerial[]> =>
+    toList<InventoryItemSerial>(
+      (
+        await apiClient.get(`/sni/api/v1/inventory/items/${itemCode}/serials`, {
+          params,
+        })
+      ).data,
+    ),
 
   // ---------- Transfer workflow ----------
-  createStockTransferWorkflow: async (data: any): Promise<StockTransferWorkflow> =>
-    (await apiClient.post('/sni/api/v1/inventory/stock/transfers', data)).data,
-  getStockTransferWorkflows: async (params?: any): Promise<PaginatedResponse<StockTransferWorkflow>> =>
-    toPage<StockTransferWorkflow>((await apiClient.get('/sni/api/v1/inventory/stock/transfers', { params })).data),
-  approveStockTransferWorkflow: async (transferCode: string, data: { approvedBy: string; note?: string }): Promise<StockTransferWorkflow> =>
-    (await apiClient.patch(`/sni/api/v1/inventory/stock/transfers/${transferCode}/approve`, null, { params: { approvedBy: data.approvedBy } })).data,
-  shipStockTransferWorkflow: async (transferCode: string, data: { shippedBy: string }): Promise<StockTransferWorkflow> =>
-    (await apiClient.patch(`/sni/api/v1/inventory/stock/transfers/${transferCode}/ship`, null, { params: { shippedBy: data.shippedBy } })).data,
-  rejectStockTransferWorkflow: async (transferCode: string, data: { rejectedBy: string; reason: string }): Promise<StockTransferWorkflow> =>
-    (await apiClient.patch(`/sni/api/v1/inventory/stock/transfers/${transferCode}/cancel`, null, { params: { cancelledBy: data.rejectedBy, reason: data.reason } })).data,
-  executeStockTransferWorkflow: async (transferCode: string, data: { performedBy: string }): Promise<StockTransferWorkflow> =>
-    (await apiClient.patch(`/sni/api/v1/inventory/stock/transfers/${transferCode}/receive`, null, { params: { receivedBy: data.performedBy } })).data,
+  createStockTransferWorkflow: async (
+    data: any,
+  ): Promise<StockTransferWorkflow> =>
+    (await apiClient.post("/sni/api/v1/inventory/stock/transfers", data)).data,
+  getStockTransferWorkflows: async (
+    params?: any,
+  ): Promise<PaginatedResponse<StockTransferWorkflow>> =>
+    toPage<StockTransferWorkflow>(
+      (await apiClient.get("/sni/api/v1/inventory/stock/transfers", { params }))
+        .data,
+    ),
+  approveStockTransferWorkflow: async (
+    transferCode: string,
+    data: { approvedBy: string; note?: string },
+  ): Promise<StockTransferWorkflow> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/stock/transfers/${transferCode}/approve`,
+        null,
+        { params: { approvedBy: data.approvedBy } },
+      )
+    ).data,
+  shipStockTransferWorkflow: async (
+    transferCode: string,
+    data: { shippedBy: string },
+  ): Promise<StockTransferWorkflow> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/stock/transfers/${transferCode}/ship`,
+        null,
+        { params: { shippedBy: data.shippedBy } },
+      )
+    ).data,
+  rejectStockTransferWorkflow: async (
+    transferCode: string,
+    data: { rejectedBy: string; reason: string },
+  ): Promise<StockTransferWorkflow> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/stock/transfers/${transferCode}/cancel`,
+        null,
+        { params: { cancelledBy: data.rejectedBy, reason: data.reason } },
+      )
+    ).data,
+  executeStockTransferWorkflow: async (
+    transferCode: string,
+    data: { performedBy: string },
+  ): Promise<StockTransferWorkflow> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/stock/transfers/${transferCode}/receive`,
+        null,
+        { params: { receivedBy: data.performedBy } },
+      )
+    ).data,
 
   // ---------- Suppliers ----------
-  getSuppliers: async (params?: { query?: string; status?: string; page?: number; size?: number }): Promise<PaginatedResponse<Supplier>> =>
-    toPage<Supplier>((await apiClient.get('/sni/api/v1/inventory/procurement/suppliers', { params })).data),
+  getSuppliers: async (params?: {
+    query?: string;
+    status?: string;
+    page?: number;
+    size?: number;
+  }): Promise<PaginatedResponse<Supplier>> =>
+    toPage<Supplier>(
+      (
+        await apiClient.get("/sni/api/v1/inventory/procurement/suppliers", {
+          params,
+        })
+      ).data,
+    ),
   searchSuppliers: async (query: string): Promise<Supplier[]> =>
-    toPage<Supplier>((await apiClient.get('/sni/api/v1/inventory/procurement/suppliers', { params: { query, size: 20 } })).data).content,
-  getSupplier: async (supplierCode: string): Promise<Supplier> => (await apiClient.get(`/sni/api/v1/inventory/procurement/suppliers/${supplierCode}`)).data,
-  getSupplierPerformance: async (supplierCode: string, params?: any): Promise<SupplierPerformance> =>
-    (await apiClient.get(`/sni/api/v1/inventory/procurement/suppliers/${supplierCode}/performance`, { params })).data,
-  createSupplier: async (data: Partial<Supplier>): Promise<Supplier> => (await apiClient.post('/sni/api/v1/inventory/procurement/suppliers', data)).data,
-  updateSupplier: async (supplierCode: string, data: Partial<Supplier>): Promise<Supplier> => (await apiClient.put(`/sni/api/v1/inventory/procurement/suppliers/${supplierCode}`, data)).data,
-  deleteSupplier: async (supplierCode: string): Promise<void> => { await apiClient.delete(`/sni/api/v1/inventory/procurement/suppliers/${supplierCode}`); },
+    toPage<Supplier>(
+      (
+        await apiClient.get("/sni/api/v1/inventory/procurement/suppliers", {
+          params: { query, size: 20 },
+        })
+      ).data,
+    ).content,
+  getSupplier: async (supplierCode: string): Promise<Supplier> =>
+    (
+      await apiClient.get(
+        `/sni/api/v1/inventory/procurement/suppliers/${supplierCode}`,
+      )
+    ).data,
+  getSupplierPerformance: async (
+    supplierCode: string,
+    params?: any,
+  ): Promise<SupplierPerformance> =>
+    (
+      await apiClient.get(
+        `/sni/api/v1/inventory/procurement/suppliers/${supplierCode}/performance`,
+        { params },
+      )
+    ).data,
+  createSupplier: async (data: Partial<Supplier>): Promise<Supplier> =>
+    (await apiClient.post("/sni/api/v1/inventory/procurement/suppliers", data))
+      .data,
+  updateSupplier: async (
+    supplierCode: string,
+    data: Partial<Supplier>,
+  ): Promise<Supplier> =>
+    (
+      await apiClient.put(
+        `/sni/api/v1/inventory/procurement/suppliers/${supplierCode}`,
+        data,
+      )
+    ).data,
+  deleteSupplier: async (supplierCode: string): Promise<void> => {
+    await apiClient.delete(
+      `/sni/api/v1/inventory/procurement/suppliers/${supplierCode}`,
+    );
+  },
 
   // ---------- Purchase requests ----------
-  getPurchaseRequests: async (params?: any): Promise<PaginatedResponse<PurchaseRequest>> =>
-    toPage<PurchaseRequest>((await apiClient.get('/sni/api/v1/inventory/procurement/purchase-requests', { params })).data),
-  createPurchaseRequest: async (data: Partial<PurchaseRequest>): Promise<PurchaseRequest> =>
-    (await apiClient.post('/sni/api/v1/inventory/procurement/purchase-requests', data)).data,
-  submitPurchaseRequest: async (requestCode: string): Promise<PurchaseRequest> =>
-    (await apiClient.patch(`/sni/api/v1/inventory/procurement/purchase-requests/${requestCode}/submit`)).data,
-  approvePurchaseRequest: async (requestCode: string, approvedByOrData: string | { approvedBy?: string; note?: string; supplierCode?: string }, supplierCode?: string): Promise<PurchaseRequest> => {
-    const data = typeof approvedByOrData === 'string' ? { approvedBy: approvedByOrData } : approvedByOrData;
-    return (await apiClient.patch(`/sni/api/v1/inventory/procurement/purchase-requests/${requestCode}/approve`, data, { params: { supplierCode: supplierCode ?? (typeof approvedByOrData === 'object' ? approvedByOrData.supplierCode : undefined) } })).data;
+  getPurchaseRequests: async (
+    params?: any,
+  ): Promise<PaginatedResponse<PurchaseRequest>> =>
+    toPage<PurchaseRequest>(
+      (
+        await apiClient.get(
+          "/sni/api/v1/inventory/procurement/purchase-requests",
+          { params },
+        )
+      ).data,
+    ),
+  createPurchaseRequest: async (
+    data: Partial<PurchaseRequest>,
+  ): Promise<PurchaseRequest> =>
+    (
+      await apiClient.post(
+        "/sni/api/v1/inventory/procurement/purchase-requests",
+        data,
+      )
+    ).data,
+  submitPurchaseRequest: async (
+    requestCode: string,
+  ): Promise<PurchaseRequest> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/procurement/purchase-requests/${requestCode}/submit`,
+      )
+    ).data,
+  approvePurchaseRequest: async (
+    requestCode: string,
+    approvedByOrData:
+      | string
+      | { approvedBy?: string; note?: string; supplierCode?: string },
+    supplierCode?: string,
+  ): Promise<PurchaseRequest> => {
+    const data =
+      typeof approvedByOrData === "string"
+        ? { approvedBy: approvedByOrData }
+        : approvedByOrData;
+    return (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/procurement/purchase-requests/${requestCode}/approve`,
+        data,
+        {
+          params: {
+            supplierCode:
+              supplierCode ??
+              (typeof approvedByOrData === "object"
+                ? approvedByOrData.supplierCode
+                : undefined),
+          },
+        },
+      )
+    ).data;
   },
-  rejectPurchaseRequest: async (requestCode: string, rejectedByOrReason: string, reasonMaybe?: string): Promise<PurchaseRequest> =>
-    (await apiClient.patch(`/sni/api/v1/inventory/procurement/purchase-requests/${requestCode}/reject`, { rejectedBy: reasonMaybe ? rejectedByOrReason : undefined, rejectionReason: reasonMaybe ?? rejectedByOrReason })).data,
-  createPurchaseOrderFromRequest: async (requestCode: string, supplierCode?: string): Promise<PurchaseOrder> =>
-    (await apiClient.post(`/sni/api/v1/inventory/procurement/purchase-requests/${requestCode}/purchase-order`, null, { params: { supplierCode } })).data,
+  rejectPurchaseRequest: async (
+    requestCode: string,
+    rejectedByOrReason: string,
+    reasonMaybe?: string,
+  ): Promise<PurchaseRequest> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/procurement/purchase-requests/${requestCode}/reject`,
+        {
+          rejectedBy: reasonMaybe ? rejectedByOrReason : undefined,
+          rejectionReason: reasonMaybe ?? rejectedByOrReason,
+        },
+      )
+    ).data,
+  createPurchaseOrderFromRequest: async (
+    requestCode: string,
+    supplierCode?: string,
+  ): Promise<PurchaseOrder> =>
+    (
+      await apiClient.post(
+        `/sni/api/v1/inventory/procurement/purchase-requests/${requestCode}/purchase-order`,
+        null,
+        { params: { supplierCode } },
+      )
+    ).data,
   createPurchaseRequestFromReorderSuggestions: async (
     params: CreatePurchaseRequestFromReorderSuggestionsParams,
   ): Promise<PurchaseRequest> =>
     (
       await apiClient.post(
-        '/sni/api/v1/inventory/procurement/purchase-requests/from-reorder-suggestions',
+        "/sni/api/v1/inventory/procurement/purchase-requests/from-reorder-suggestions",
         null,
         { params },
       )
     ).data,
 
   // ---------- Purchase orders / receipts ----------
-  getPurchaseOrders: async (params?: any): Promise<PaginatedResponse<PurchaseOrder>> =>
-    toPage<PurchaseOrder>((await apiClient.get('/sni/api/v1/inventory/procurement/purchase-orders', { params })).data),
+  getPurchaseOrders: async (
+    params?: any,
+  ): Promise<PaginatedResponse<PurchaseOrder>> =>
+    toPage<PurchaseOrder>(
+      (
+        await apiClient.get(
+          "/sni/api/v1/inventory/procurement/purchase-orders",
+          { params },
+        )
+      ).data,
+    ),
   getPurchaseOrderById: async (orderCode: string): Promise<PurchaseOrder> =>
-    (await apiClient.get(`/sni/api/v1/inventory/procurement/purchase-orders/${orderCode}`)).data,
-  createPurchaseOrder: async (data: CreatePurchaseOrderRequest): Promise<PurchaseOrder> =>
-    (await apiClient.post('/sni/api/v1/inventory/procurement/purchase-orders', data)).data,
-  approvePurchaseOrder: async (orderCode: string, approvedByOrData: string | any): Promise<PurchaseOrder> =>
-    (await apiClient.patch(`/sni/api/v1/inventory/procurement/purchase-orders/${orderCode}/approve`, typeof approvedByOrData === 'string' ? { approvedBy: approvedByOrData } : approvedByOrData)).data,
-  markOrdered: async (orderCode: string, orderedBy?: string): Promise<PurchaseOrder> =>
+    (
+      await apiClient.get(
+        `/sni/api/v1/inventory/procurement/purchase-orders/${orderCode}`,
+      )
+    ).data,
+  createPurchaseOrder: async (
+    data: CreatePurchaseOrderRequest,
+  ): Promise<PurchaseOrder> =>
+    (
+      await apiClient.post(
+        "/sni/api/v1/inventory/procurement/purchase-orders",
+        data,
+      )
+    ).data,
+  approvePurchaseOrder: async (
+    orderCode: string,
+    approvedByOrData: string | any,
+  ): Promise<PurchaseOrder> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/procurement/purchase-orders/${orderCode}/approve`,
+        typeof approvedByOrData === "string"
+          ? { approvedBy: approvedByOrData }
+          : approvedByOrData,
+      )
+    ).data,
+  markOrdered: async (
+    orderCode: string,
+    orderedBy?: string,
+  ): Promise<PurchaseOrder> =>
     (
       await apiClient.patch(
         `/sni/api/v1/inventory/procurement/purchase-orders/${orderCode}/mark-ordered`,
         orderedBy ? { orderedBy } : undefined,
       )
     ).data,
-  cancelPurchaseOrder: async (orderCode: string, reason?: string): Promise<PurchaseOrder> =>
-    (await apiClient.patch(`/sni/api/v1/inventory/procurement/purchase-orders/${orderCode}/cancel`, { reason })).data,
+  cancelPurchaseOrder: async (
+    orderCode: string,
+    reason?: string,
+  ): Promise<PurchaseOrder> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/procurement/purchase-orders/${orderCode}/cancel`,
+        { reason },
+      )
+    ).data,
   createGoodsReceipt: async (data: any): Promise<GoodsReceipt> =>
-    (await apiClient.post('/sni/api/v1/inventory/procurement/goods-receipts', data)).data,
-  getGoodsReceipts: async (params?: any): Promise<PaginatedResponse<GoodsReceipt>> =>
-    toPage<GoodsReceipt>((await apiClient.get('/sni/api/v1/inventory/procurement/goods-receipts', { params })).data),
+    (
+      await apiClient.post(
+        "/sni/api/v1/inventory/procurement/goods-receipts",
+        data,
+      )
+    ).data,
+  getGoodsReceipts: async (
+    params?: any,
+  ): Promise<PaginatedResponse<GoodsReceipt>> =>
+    toPage<GoodsReceipt>(
+      (
+        await apiClient.get(
+          "/sni/api/v1/inventory/procurement/goods-receipts",
+          { params },
+        )
+      ).data,
+    ),
   getGoodsReceipt: async (receiptCode: string): Promise<GoodsReceipt> =>
-    (await apiClient.get(`/sni/api/v1/inventory/procurement/goods-receipts/${receiptCode}`)).data,
+    (
+      await apiClient.get(
+        `/sni/api/v1/inventory/procurement/goods-receipts/${receiptCode}`,
+      )
+    ).data,
 
   // ---------- Approval rules ----------
-  getApprovalRules: async (): Promise<any[]> => toList<any>((await apiClient.get('/sni/api/v1/inventory/procurement/approval-rules')).data),
-  createApprovalRule: async (data: any): Promise<any> => (await apiClient.post('/sni/api/v1/inventory/procurement/approval-rules', data)).data,
-  updateApprovalRule: async (id: number, data: any): Promise<any> => (await apiClient.put(`/sni/api/v1/inventory/procurement/approval-rules/${id}`, data)).data,
-  deleteApprovalRule: async (id: number): Promise<void> => { await apiClient.delete(`/sni/api/v1/inventory/procurement/approval-rules/${id}`); },
+  getApprovalRules: async (): Promise<any[]> =>
+    toList<any>(
+      (await apiClient.get("/sni/api/v1/inventory/procurement/approval-rules"))
+        .data,
+    ),
+  createApprovalRule: async (data: any): Promise<any> =>
+    (
+      await apiClient.post(
+        "/sni/api/v1/inventory/procurement/approval-rules",
+        data,
+      )
+    ).data,
+  updateApprovalRule: async (id: number, data: any): Promise<any> =>
+    (
+      await apiClient.put(
+        `/sni/api/v1/inventory/procurement/approval-rules/${id}`,
+        data,
+      )
+    ).data,
+  deleteApprovalRule: async (id: number): Promise<void> => {
+    await apiClient.delete(
+      `/sni/api/v1/inventory/procurement/approval-rules/${id}`,
+    );
+  },
 
   // ---------- Assets ----------
   getAssets: async (params?: any): Promise<PaginatedResponse<Asset>> =>
-    toPage<Asset>((await apiClient.get('/sni/api/v1/inventory/assets', { params })).data),
+    toPage<Asset>(
+      (await apiClient.get("/sni/api/v1/inventory/assets", { params })).data,
+    ),
   searchAssets: async (query: string): Promise<Asset[]> =>
-    toPage<Asset>((await apiClient.get('/sni/api/v1/inventory/assets', { params: { query, size: 20 } })).data).content,
-  getAsset: async (assetCode: string): Promise<Asset> => (await apiClient.get(`/sni/api/v1/inventory/assets/${assetCode}`)).data,
-  createAsset: async (data: Partial<Asset>): Promise<Asset> => (await apiClient.post('/sni/api/v1/inventory/assets', data)).data,
-  updateAsset: async (assetCode: string, data: Partial<Asset>): Promise<Asset> => (await apiClient.put(`/sni/api/v1/inventory/assets/${assetCode}`, data)).data,
-  deleteAsset: async (assetCode: string): Promise<void> => { await apiClient.delete(`/sni/api/v1/inventory/assets/${assetCode}`); },
-  assignAsset: async (assetCode: string, data: { assigneeType: string; assigneeCode: string; expectedReturnAt: string; assignedBy: string; purpose: string; [key: string]: any }): Promise<AssetAssignment> =>
-    (await apiClient.post(`/sni/api/v1/inventory/assets/${assetCode}/assignments`, data)).data,
-  returnAsset: async (assetCode: string, assignmentIdOrData?: number | any, maybeData?: any): Promise<Asset> => {
-    if (typeof assignmentIdOrData === 'number') {
-      return (await apiClient.patch(`/sni/api/v1/inventory/assets/${assetCode}/assignments/${assignmentIdOrData}/return`, maybeData || {})).data;
-    }
-    return (await apiClient.patch(`/sni/api/v1/inventory/assets/${assetCode}/return`, assignmentIdOrData || {})).data;
+    toPage<Asset>(
+      (
+        await apiClient.get("/sni/api/v1/inventory/assets", {
+          params: { query, size: 20 },
+        })
+      ).data,
+    ).content,
+  getAsset: async (assetCode: string): Promise<Asset> =>
+    (await apiClient.get(`/sni/api/v1/inventory/assets/${assetCode}`)).data,
+  createAsset: async (data: Partial<Asset>): Promise<Asset> =>
+    (await apiClient.post("/sni/api/v1/inventory/assets", data)).data,
+  updateAsset: async (
+    assetCode: string,
+    data: Partial<Asset>,
+  ): Promise<Asset> =>
+    (await apiClient.put(`/sni/api/v1/inventory/assets/${assetCode}`, data))
+      .data,
+  deleteAsset: async (assetCode: string): Promise<void> => {
+    await apiClient.delete(`/sni/api/v1/inventory/assets/${assetCode}`);
   },
-  getAssetLoanSheetPdf: async (assetCode: string, assignmentId: number): Promise<Blob> =>
-    blob(`/sni/api/v1/inventory/assets/${assetCode}/assignments/${assignmentId}/loan-sheet.pdf`),
-  markAssetLost: async (assetCode: string, data: any): Promise<Asset> => (await apiClient.patch(`/sni/api/v1/inventory/assets/${assetCode}/lost`, data)).data,
-  reserveAsset: async (assetCode: string, data: any): Promise<Asset> => (await apiClient.patch(`/sni/api/v1/inventory/assets/${assetCode}/reserve`, data)).data,
-  markAssetDamaged: async (assetCode: string, data: any): Promise<Asset> => (await apiClient.patch(`/sni/api/v1/inventory/assets/${assetCode}/damaged`, data)).data,
-  retireAsset: async (assetCode: string, data: any): Promise<Asset> => (await apiClient.patch(`/sni/api/v1/inventory/assets/${assetCode}/retire`, data)).data,
-  getAssetLocationHistory: async (assetCode: string): Promise<any[]> => toList<any>((await apiClient.get(`/sni/api/v1/inventory/assets/${assetCode}/location-history`)).data),
+  assignAsset: async (
+    assetCode: string,
+    data: {
+      assigneeType: string;
+      assigneeCode: string;
+      expectedReturnAt: string;
+      assignedBy: string;
+      purpose: string;
+      [key: string]: any;
+    },
+  ): Promise<AssetAssignment> =>
+    (
+      await apiClient.post(
+        `/sni/api/v1/inventory/assets/${assetCode}/assignments`,
+        data,
+      )
+    ).data,
+  returnAsset: async (
+    assetCode: string,
+    assignmentIdOrData?: number | any,
+    maybeData?: any,
+  ): Promise<Asset> => {
+    if (typeof assignmentIdOrData === "number") {
+      return (
+        await apiClient.patch(
+          `/sni/api/v1/inventory/assets/${assetCode}/assignments/${assignmentIdOrData}/return`,
+          maybeData || {},
+        )
+      ).data;
+    }
+    return (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/assets/${assetCode}/return`,
+        assignmentIdOrData || {},
+      )
+    ).data;
+  },
+  getAssetLoanSheetPdf: async (
+    assetCode: string,
+    assignmentId: number,
+  ): Promise<Blob> =>
+    blob(
+      `/sni/api/v1/inventory/assets/${assetCode}/assignments/${assignmentId}/loan-sheet.pdf`,
+    ),
+  markAssetLost: async (assetCode: string, data: any): Promise<Asset> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/assets/${assetCode}/lost`,
+        data,
+      )
+    ).data,
+  reserveAsset: async (assetCode: string, data: any): Promise<Asset> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/assets/${assetCode}/reserve`,
+        data,
+      )
+    ).data,
+  markAssetDamaged: async (assetCode: string, data: any): Promise<Asset> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/assets/${assetCode}/damaged`,
+        data,
+      )
+    ).data,
+  retireAsset: async (assetCode: string, data: any): Promise<Asset> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/assets/${assetCode}/retire`,
+        data,
+      )
+    ).data,
+  getAssetLocationHistory: async (assetCode: string): Promise<any[]> =>
+    toList<any>(
+      (
+        await apiClient.get(
+          `/sni/api/v1/inventory/assets/${assetCode}/location-history`,
+        )
+      ).data,
+    ),
   createAssetMaintenance: async (
     assetCodeOrData: string | Partial<AssetMaintenance>,
     data?: Partial<AssetMaintenance>,
   ): Promise<AssetMaintenance> => {
-    const assetCode = typeof assetCodeOrData === 'string' ? assetCodeOrData : assetCodeOrData.assetCode;
-    const payload = typeof assetCodeOrData === 'string' ? data : assetCodeOrData;
-    if (!assetCode) throw new Error('assetCode is required');
-    return (await apiClient.post(`/sni/api/v1/inventory/assets/${assetCode}/maintenances`, payload)).data;
+    const assetCode =
+      typeof assetCodeOrData === "string"
+        ? assetCodeOrData
+        : assetCodeOrData.assetCode;
+    const payload =
+      typeof assetCodeOrData === "string" ? data : assetCodeOrData;
+    if (!assetCode) throw new Error("assetCode is required");
+    return (
+      await apiClient.post(
+        `/sni/api/v1/inventory/assets/${assetCode}/maintenances`,
+        payload,
+      )
+    ).data;
   },
-  getAssetMaintenances: async (assetCode: string): Promise<AssetMaintenance[]> =>
-    toList<AssetMaintenance>((await apiClient.get(`/sni/api/v1/inventory/assets/${assetCode}/maintenances`)).data),
+  getAssetMaintenances: async (
+    assetCode: string,
+  ): Promise<AssetMaintenance[]> =>
+    toList<AssetMaintenance>(
+      (
+        await apiClient.get(
+          `/sni/api/v1/inventory/assets/${assetCode}/maintenances`,
+        )
+      ).data,
+    ),
 
   // ---------- Counts ----------
-  getInventoryCounts: async (params?: any): Promise<PaginatedResponse<InventoryCount>> =>
-    toPage<InventoryCount>((await apiClient.get('/sni/api/v1/inventory/counts', { params })).data),
+  getInventoryCounts: async (
+    params?: any,
+  ): Promise<PaginatedResponse<InventoryCount>> =>
+    toPage<InventoryCount>(
+      (await apiClient.get("/sni/api/v1/inventory/counts", { params })).data,
+    ),
   getInventoryCount: async (countCode: string): Promise<InventoryCount> =>
     (await apiClient.get(`/sni/api/v1/inventory/counts/${countCode}`)).data,
-  createInventoryCount: async (data: Partial<InventoryCount>): Promise<InventoryCount> =>
-    (await apiClient.post('/sni/api/v1/inventory/counts', data)).data,
+  createInventoryCount: async (
+    data: Partial<InventoryCount>,
+  ): Promise<InventoryCount> =>
+    (await apiClient.post("/sni/api/v1/inventory/counts", data)).data,
   startInventoryCount: async (countCode: string): Promise<InventoryCount> =>
-    (await apiClient.patch(`/sni/api/v1/inventory/counts/${countCode}/start`)).data,
+    (await apiClient.patch(`/sni/api/v1/inventory/counts/${countCode}/start`))
+      .data,
   saveInventoryCountLine: async (
     countCode: string,
     lineOrItemCode: any,
     countedQuantity?: number,
   ): Promise<InventoryCount> => {
     const line =
-      typeof lineOrItemCode === 'string'
+      typeof lineOrItemCode === "string"
         ? { itemCode: lineOrItemCode, countedQuantity }
         : lineOrItemCode;
-    return (await apiClient.put(`/sni/api/v1/inventory/counts/${countCode}/lines`, line)).data;
+    return (
+      await apiClient.put(
+        `/sni/api/v1/inventory/counts/${countCode}/lines`,
+        line,
+      )
+    ).data;
   },
-  reviewInventoryCount: async (countCode: string, data?: any): Promise<InventoryCount> =>
-    (await apiClient.patch(`/sni/api/v1/inventory/counts/${countCode}/review`, data || {})).data,
-  validateInventoryCount: async (countCode: string, data?: any): Promise<InventoryCount> =>
-    (await apiClient.patch(`/sni/api/v1/inventory/counts/${countCode}/validate`, data || {})).data,
-  cancelInventoryCount: async (countCode: string, reason?: string): Promise<InventoryCount> =>
-    (await apiClient.patch(`/sni/api/v1/inventory/counts/${countCode}/cancel`, { reason })).data,
+  reviewInventoryCount: async (
+    countCode: string,
+    data?: any,
+  ): Promise<InventoryCount> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/counts/${countCode}/review`,
+        data || {},
+      )
+    ).data,
+  validateInventoryCount: async (
+    countCode: string,
+    data?: any,
+  ): Promise<InventoryCount> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/counts/${countCode}/validate`,
+        data || {},
+      )
+    ).data,
+  cancelInventoryCount: async (
+    countCode: string,
+    reason?: string,
+  ): Promise<InventoryCount> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/counts/${countCode}/cancel`,
+        { reason },
+      )
+    ).data,
 
   // ---------- Alerts / reorder ----------
   getAlerts: async (params?: any): Promise<PaginatedResponse<Alert>> =>
-    toPage<Alert>((await apiClient.get('/sni/api/v1/inventory/alerts', { params })).data),
+    toPage<Alert>(
+      (await apiClient.get("/sni/api/v1/inventory/alerts", { params })).data,
+    ),
   acknowledgeAlert: async (alertCode: string, data?: any): Promise<Alert> =>
-    (await apiClient.patch(`/sni/api/v1/inventory/alerts/${alertCode}/acknowledge`, typeof data === 'string' ? { acknowledgedBy: data } : data || {})).data,
-  resolveAlert: async (alertCode: string, data?: any, resolutionNote?: string): Promise<Alert> => {
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/alerts/${alertCode}/acknowledge`,
+        typeof data === "string" ? { acknowledgedBy: data } : data || {},
+      )
+    ).data,
+  resolveAlert: async (
+    alertCode: string,
+    data?: any,
+    resolutionNote?: string,
+  ): Promise<Alert> => {
     const payload =
-      typeof data === 'string'
+      typeof data === "string"
         ? { resolvedBy: data, resolutionNote }
         : data || {};
-    return (await apiClient.patch(`/sni/api/v1/inventory/alerts/${alertCode}/resolve`, payload)).data;
+    return (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/alerts/${alertCode}/resolve`,
+        payload,
+      )
+    ).data;
   },
   dismissAlert: async (alertCode: string, data?: any): Promise<Alert> =>
-    (await apiClient.patch(`/sni/api/v1/inventory/alerts/${alertCode}/dismiss`, typeof data === 'string' ? { dismissedBy: data } : data || {})).data,
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/alerts/${alertCode}/dismiss`,
+        typeof data === "string" ? { dismissedBy: data } : data || {},
+      )
+    ).data,
 
-  getReorderRules: async (params?: any): Promise<PaginatedResponse<ReorderRule>> =>
-    toPage<ReorderRule>((await apiClient.get('/sni/api/v1/inventory/reorder-rules', { params })).data),
+  getReorderRules: async (
+    params?: any,
+  ): Promise<PaginatedResponse<ReorderRule>> =>
+    toPage<ReorderRule>(
+      (await apiClient.get("/sni/api/v1/inventory/reorder-rules", { params }))
+        .data,
+    ),
   createReorderRule: async (data: Partial<ReorderRule>): Promise<ReorderRule> =>
-    (await apiClient.post('/sni/api/v1/inventory/reorder-rules', data)).data,
-  updateReorderRule: async (ruleCode: string, data: Partial<ReorderRule>): Promise<ReorderRule> =>
-    (await apiClient.put(`/sni/api/v1/inventory/reorder-rules/${ruleCode}`, data)).data,
-  deleteReorderRule: async (ruleCode: string): Promise<void> => { await apiClient.delete(`/sni/api/v1/inventory/reorder-rules/${ruleCode}`); },
+    (await apiClient.post("/sni/api/v1/inventory/reorder-rules", data)).data,
+  updateReorderRule: async (
+    ruleCode: string,
+    data: Partial<ReorderRule>,
+  ): Promise<ReorderRule> =>
+    (
+      await apiClient.put(
+        `/sni/api/v1/inventory/reorder-rules/${ruleCode}`,
+        data,
+      )
+    ).data,
+  deleteReorderRule: async (ruleCode: string): Promise<void> => {
+    await apiClient.delete(`/sni/api/v1/inventory/reorder-rules/${ruleCode}`);
+  },
   getReorderSuggestions: async (params?: any): Promise<ReorderSuggestion[]> =>
-    toList<ReorderSuggestion>((await apiClient.get('/sni/api/v1/inventory/reorder-rules/suggestions', { params })).data),
+    toList<ReorderSuggestion>(
+      (
+        await apiClient.get("/sni/api/v1/inventory/reorder-rules/suggestions", {
+          params,
+        })
+      ).data,
+    ),
 
   // ---------- Admin reports / labels ----------
   getDashboardMetrics: async (): Promise<InventoryDashboardMetrics> =>
-    (await apiClient.get('/sni/api/v1/inventory/admin/dashboard')).data,
-  getMovementsReport: async (params?: { fromDate?: string; toDate?: string; itemCode?: string; locationCode?: string; movementType?: string }): Promise<any> =>
-    (await apiClient.get('/sni/api/v1/inventory/admin/reports/movements', { params })).data,
-  exportMovementsCSV: async (params?: any): Promise<Blob> => blob('/sni/api/v1/inventory/admin/reports/movements.csv', params),
-  exportMovementsPDF: async (params?: any): Promise<Blob> => blob('/sni/api/v1/inventory/admin/reports/movements.pdf', params),
+    (await apiClient.get("/sni/api/v1/inventory/admin/dashboard")).data,
+  getMovementsReport: async (params?: {
+    fromDate?: string;
+    toDate?: string;
+    itemCode?: string;
+    locationCode?: string;
+    movementType?: string;
+  }): Promise<any> =>
+    (
+      await apiClient.get("/sni/api/v1/inventory/admin/reports/movements", {
+        params,
+      })
+    ).data,
+  exportMovementsCSV: async (params?: any): Promise<Blob> =>
+    blob("/sni/api/v1/inventory/admin/reports/movements.csv", params),
+  exportMovementsPDF: async (params?: any): Promise<Blob> =>
+    blob("/sni/api/v1/inventory/admin/reports/movements.pdf", params),
   getAnomaliesReport: async (params?: any): Promise<any> =>
-    (await apiClient.get('/sni/api/v1/inventory/admin/reports/anomalies', { params })).data,
-  getLabel: async (type: string, code: string): Promise<Blob> => blob(`/sni/api/v1/inventory/admin/labels/${type}/${code}`),
-  generateLabels: async (data: GenerateInventoryLabelsRequest | { type: string; codes: string[]; format?: string }): Promise<Blob> => {
+    (
+      await apiClient.get("/sni/api/v1/inventory/admin/reports/anomalies", {
+        params,
+      })
+    ).data,
+  getLabel: async (type: string, code: string): Promise<Blob> =>
+    blob(`/sni/api/v1/inventory/admin/labels/${type}/${code}`),
+  generateLabels: async (
+    data:
+      | GenerateInventoryLabelsRequest
+      | { type: string; codes: string[]; format?: string },
+  ): Promise<Blob> => {
     const payload =
-      'items' in data
+      "items" in data
         ? data
         : {
             items: data.codes.map((code) => ({ type: data.type, code })),
             format: data.format,
           };
-    return (await apiClient.post('/sni/api/v1/inventory/admin/labels', payload, { responseType: 'blob' })).data;
+    return (
+      await apiClient.post("/sni/api/v1/inventory/admin/labels", payload, {
+        responseType: "blob",
+      })
+    ).data;
   },
 
   // ---------- Import ----------
   importInventory: async (
-    type: 'ITEMS' | 'INITIAL_STOCK' | 'SUPPLIERS' | 'ASSETS' | string,
+    type: "ITEMS" | "INITIAL_STOCK" | "SUPPLIERS" | "ASSETS" | string,
     file: File,
     dryRun = false,
   ): Promise<InventoryImportResult> => {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append("file", file);
     return (
       await apiClient.post(`/sni/api/v1/inventory/import/${type}`, formData, {
         params: { dryRun },
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { "Content-Type": "multipart/form-data" },
       })
     ).data;
   },
-  importItems: async (file: File, dryRun = false): Promise<InventoryImportResult> => inventoryService.importInventory('ITEMS', file, dryRun),
-  importAssets: async (file: File, dryRun = false): Promise<InventoryImportResult> => inventoryService.importInventory('ASSETS', file, dryRun),
-  importStock: async (file: File, dryRun = false): Promise<InventoryImportResult> => inventoryService.importInventory('INITIAL_STOCK', file, dryRun),
-  importSuppliers: async (file: File, dryRun = false): Promise<InventoryImportResult> => inventoryService.importInventory('SUPPLIERS', file, dryRun),
-  downloadTemplate: async (type: string): Promise<Blob> => blob(`/sni/api/v1/inventory/import/template/${type}`),
+  importItems: async (
+    file: File,
+    dryRun = false,
+  ): Promise<InventoryImportResult> =>
+    inventoryService.importInventory("ITEMS", file, dryRun),
+  importAssets: async (
+    file: File,
+    dryRun = false,
+  ): Promise<InventoryImportResult> =>
+    inventoryService.importInventory("ASSETS", file, dryRun),
+  importStock: async (
+    file: File,
+    dryRun = false,
+  ): Promise<InventoryImportResult> =>
+    inventoryService.importInventory("INITIAL_STOCK", file, dryRun),
+  importSuppliers: async (
+    file: File,
+    dryRun = false,
+  ): Promise<InventoryImportResult> =>
+    inventoryService.importInventory("SUPPLIERS", file, dryRun),
+  downloadTemplate: async (type: string): Promise<Blob> =>
+    blob(`/sni/api/v1/inventory/import/template/${type}`),
 };

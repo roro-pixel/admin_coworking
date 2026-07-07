@@ -40,6 +40,9 @@ import { BookingDetailPage } from "./components/bookings/BookingDetailPage";
 import { PublicQuoteSignaturePage } from "./pages/Billing/PublicQuoteSignaturePage";
 import { SubscriptionDetailPage } from "./pages/Subscription/subscriptions/SubscriptionDetailPage";
 
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
 const queryClient = new QueryClient();
 
 function App() {
@@ -331,6 +334,20 @@ function App() {
               }
             />
           </Routes>
+          <ToastContainer
+    position="top-right"
+    autoClose={3000}
+    hideProgressBar={false}
+    newestOnTop
+    closeOnClick
+    rtl={false}
+    pauseOnFocusLoss
+    draggable
+    pauseOnHover
+    theme="light"
+    limit={3}
+    stacked
+  />
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
@@ -338,3 +355,5 @@ function App() {
 }
 
 export default App;
+
+

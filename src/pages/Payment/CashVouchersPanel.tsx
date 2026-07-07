@@ -84,7 +84,7 @@ export const CashVouchersPanel: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="mx-auto w-full max-w-7xl space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-gray-900">Bons de caisse</h2>
         <p className="text-sm text-gray-500 mt-1">

@@ -22,7 +22,6 @@ const statusOptions: { value: ResourceStatus; label: string }[] = [
   { value: "ARCHIVED", label: "Archivé" },
 ];
 
-
 export const ResourceCreatePage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -78,7 +77,6 @@ export const ResourceCreatePage: React.FC = () => {
     () => policies.find((policy) => policy.code === formData.policyCode),
     [policies, formData.policyCode],
   );
-
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -389,9 +387,7 @@ export const ResourceCreatePage: React.FC = () => {
                 </div>
 
                 <div>
-                  <h2 className="font-semibold text-gray-900">
-                    Localisation
-                  </h2>
+                  <h2 className="font-semibold text-gray-900">Localisation</h2>
                   <p className="text-sm text-gray-500">
                     Zone interne et libellé affiché aux utilisateurs.
                   </p>
@@ -450,9 +446,7 @@ export const ResourceCreatePage: React.FC = () => {
 
               <div className="space-y-4">
                 <label className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 text-sm">
-                  <span className="font-medium text-gray-700">
-                    Réservable
-                  </span>
+                  <span className="font-medium text-gray-700">Réservable</span>
 
                   <input
                     type="checkbox"

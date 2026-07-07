@@ -75,6 +75,80 @@ const paymentModeLabels: Record<string, string> = {
   PASS: "Pass",
 };
 
+
+
+const formatBookingDate = (value?: string) =>
+  value ? new Date(value).toLocaleDateString("fr-FR") : "—";
+
+const formatBookingTime = (value?: string) =>
+  value
+    ? new Date(value).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+    : "—";
+
+const MobileInfoRow: React.FC<{ label: string; value: React.ReactNode; strong?: boolean }> = ({ label, value, strong }) => (
+  <div className="flex items-start justify-between gap-4 border-t border-gray-100 py-2 first:border-t-0 first:pt-0 last:pb-0">
+    <span className="shrink-0 text-[11px] font-black uppercase tracking-wide text-gray-400">{label}</span>
+    <div className={`min-w-0 text-right text-xs ${strong ? "font-black text-gray-950" : "font-semibold text-gray-700"}`}>{value}</div>
+  </div>
+);
+
+const MobileBookingCard: React.FC<{
+  booking: BookingResponse;
+  actions: { label: string; action: string; icon: React.ElementType; color: string }[];
+  onOpen: () => void;
+  onAction: (action: string) => void;
+  anyPending: boolean;
+}> = ({ booking, actions, onOpen, onAction, anyPending }) => {
+  const status = statusConfig[booking.status];
+  const StatusIcon = status?.icon;
+  return (
+    <article onClick={onOpen} className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-gray-100 transition hover:bg-primary-50/30">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate font-mono text-xs font-black text-primary-700">{booking.bookingNumber}</p>
+          <p className="mt-1 truncate text-sm font-black text-gray-950">{booking.resourceName || booking.resourceCode}</p>
+          <p className="mt-0.5 truncate text-[11px] font-semibold text-gray-400">{booking.resourceCode}</p>
+        </div>
+        {status && (
+          <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold ${status.color}`}>
+            <StatusIcon size={11} /> {status.label}
+          </span>
+        )}
+      </div>
+      <div className="space-y-0 rounded-2xl bg-gray-50 p-3">
+        <MobileInfoRow label="Client" value={<span className="break-words">{booking.ownerName || booking.ownerCode || "—"}</span>} />
+        <MobileInfoRow label="Contact" value={<span className="break-all">{booking.contactEmail || "—"}</span>} />
+        <MobileInfoRow label="Date" value={`${formatBookingDate(booking.startedAt)} · ${formatBookingTime(booking.startedAt)} - ${formatBookingTime(booking.endedAt)}`} />
+        <MobileInfoRow label="Mode" value={paymentModeLabels[booking.paymentMode] || booking.paymentMode} />
+        <MobileInfoRow label="Montant" strong value={`${booking.totalAmount.toLocaleString("fr-FR")} FCFA`} />
+      </div>
+      <div className="mt-3 flex flex-wrap justify-end gap-2">
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onOpen(); }}
+          className="inline-flex items-center gap-1 rounded-xl bg-primary-50 px-3 py-2 text-xs font-black text-primary-700"
+        >
+          <Eye size={14} /> Voir
+        </button>
+        {actions.map((action) => {
+          const Icon = action.icon;
+          return (
+            <button
+              key={action.action}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onAction(action.action); }}
+              disabled={anyPending}
+              className={`inline-flex items-center gap-1 rounded-xl bg-gray-50 px-3 py-2 text-xs font-black ${action.color} disabled:opacity-40`}
+            >
+              <Icon size={14} /> {action.label}
+            </button>
+          );
+        })}
+      </div>
+    </article>
+  );
+};
+
 export const AdminBookings: React.FC = () => {
   const navigate = useNavigate();
   const { admin } = useAuth();
@@ -401,7 +475,7 @@ export const AdminBookings: React.FC = () => {
 
   return (
     <>
-      <div className="mb-6 flex justify-between items-center">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Réservations</h2>
           {totalElements > 0 && (
@@ -412,7 +486,7 @@ export const AdminBookings: React.FC = () => {
         </div>
         <button
           onClick={() => navigate("/bookings/create")}
-          className="bg-primary-600 text-white px-4 py-2 rounded-xl hover:bg-primary-700 flex items-center gap-2"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-white hover:bg-primary-700 sm:w-auto"
         >
           <Plus size={18} />
           Nouvelle réservation
@@ -461,7 +535,7 @@ export const AdminBookings: React.FC = () => {
             onChange={(e) =>
               handleFilterChange(setResourceFilter, e.target.value)
             }
-            className="px-4 py-2 border border-gray-200 rounded-xl w-40"
+            className="w-full rounded-xl border border-gray-200 px-4 py-2 md:w-40"
           />
           {(statusFilter || resourceFilter || search) && (
             <button
@@ -481,7 +555,7 @@ export const AdminBookings: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[1000px]">
             <thead className="bg-gray-50 ">
               <tr>
@@ -526,7 +600,8 @@ export const AdminBookings: React.FC = () => {
                 return (
                   <tr
                     key={booking.bookingNumber}
-                    className="hover:bg-primary-50/40 transition-colors"
+                    onClick={() => navigate(`/bookings/${booking.bookingNumber}`)}
+                    className="cursor-pointer hover:bg-primary-50/40 transition-colors"
                   >
                     <td className="px-6 py-4">
                       <button
@@ -644,28 +719,30 @@ export const AdminBookings: React.FC = () => {
                     <td className="px-6 py-4">
                       <div className="flex justify-center gap-1 flex-wrap">
                         <button
-                          onClick={() =>
-                            navigate(`/bookings/${booking.bookingNumber}`)
-                          }
-                          className="p-1 text-primary-600 hover:text-primary-700"
-                          title="Voir détail"
-                        >
-                          <Eye size={16} />
-                        </button>
+  onClick={(e) => {
+    e.stopPropagation();
+    navigate(`/bookings/${booking.bookingNumber}`);
+  }}
+  className="p-1 text-primary-600 hover:text-primary-700"
+  title="Voir détail"
+>
+  <Eye size={16} />
+</button>
                         {actions.map((action) => {
                           const Icon = action.icon;
                           return (
-                            <button
-                              key={action.action}
-                              onClick={() =>
-                                handleAction(action.action, booking)
-                              }
-                              disabled={anyPending}
-                              className={`p-1 ${action.color} hover:opacity-80 disabled:opacity-40`}
-                              title={action.label}
-                            >
-                              <Icon size={15} />
-                            </button>
+                           <button
+  key={action.action}
+  onClick={(e) => {
+    e.stopPropagation();
+    handleAction(action.action, booking);
+  }}
+  disabled={anyPending}
+  className={`p-1 ${action.color} hover:opacity-80 disabled:opacity-40`}
+  title={action.label}
+>
+  <Icon size={15} />
+</button>
                           );
                         })}
                       </div>
@@ -676,6 +753,21 @@ export const AdminBookings: React.FC = () => {
             </tbody>
           </table>
         </div>
+        <div className="space-y-3 p-3 md:hidden">
+          {bookings.map((booking) => {
+            const actions = getAvailableActions(booking);
+            return (
+              <MobileBookingCard
+                key={booking.bookingNumber}
+                booking={booking}
+                actions={actions}
+                anyPending={anyPending}
+                onOpen={() => navigate(`/bookings/${booking.bookingNumber}`)}
+                onAction={(action) => handleAction(action, booking)}
+              />
+            );
+          })}
+        </div>
 
         {bookings.length === 0 && !isLoading && (
           <div className="text-center py-12">
@@ -685,7 +777,7 @@ export const AdminBookings: React.FC = () => {
         )}
 
         {totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+          <div className="flex flex-col gap-3 border-t border-gray-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <p className="text-sm text-gray-500">
               {totalElements} réservation{totalElements > 1 ? "s" : ""} — Page{" "}
               {page + 1} / {totalPages}

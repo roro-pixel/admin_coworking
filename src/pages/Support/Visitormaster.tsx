@@ -211,11 +211,12 @@ export const VisitorMaster: React.FC = () => {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-gray-900 mb-4">
+      <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">
         Gestion des visiteurs
       </h2>
 
-      <div className="overflow-x-auto mb-6 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100 flex flex-wrap gap-1">
+      <div className="mb-6 overflow-x-auto rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-max gap-1">
         {visibleTabs.map((tab) => (
           <button
             key={tab.id}
@@ -230,6 +231,7 @@ export const VisitorMaster: React.FC = () => {
             {tab.label}
           </button>
         ))}
+        </div>
       </div>
 
       {actionError && (
@@ -261,7 +263,7 @@ export const VisitorMaster: React.FC = () => {
               {todayPasses.map((pass) => (
                 <div
                   key={pass.passNumber}
-                  className="bg-white rounded-xl p-4 shadow-sm flex items-center justify-between"
+                  className="bg-white rounded-xl p-4 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div>
                     <p className="font-semibold">{pass.fullName}</p>
@@ -339,7 +341,7 @@ export const VisitorMaster: React.FC = () => {
             <div className="text-center py-8">Chargement...</div>
           ) : (
             <div className="bg-white rounded-xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-              <table className="w-full border-separate border-spacing-y-2">
+              <table className="w-full border-separate border-spacing-y-2 text-sm max-md:block max-md:border-spacing-0 max-md:[&_thead]:hidden max-md:[&_tbody]:block max-md:[&_tr]:mb-3 max-md:[&_tr]:block max-md:[&_tr]:rounded-2xl max-md:[&_tr]:bg-gray-50 max-md:[&_tr]:p-3 max-md:[&_tr]:shadow-sm max-md:[&_tr]:ring-1 max-md:[&_tr]:ring-gray-100 max-md:[&_td]:block max-md:[&_td]:px-0 max-md:[&_td]:py-1.5 max-md:[&_td]:text-left max-md:[&_td]:text-xs max-md:[&_td]:break-words">
                 <thead className="bg-transparent">
                   <tr>
                     <th className="px-4 py-3 text-left text-sm font-semibold">
@@ -361,7 +363,10 @@ export const VisitorMaster: React.FC = () => {
                 </thead>
                 <tbody className="divide-y-0">
                   {filteredAll.map((pass) => (
-                    <tr key={pass.passNumber} className="bg-gray-50/70 hover:bg-gray-100">
+                    <tr
+                      key={pass.passNumber}
+                      className="bg-gray-50/70 hover:bg-gray-100"
+                    >
                       <td className="px-4 py-3 text-sm font-mono">
                         {pass.passNumber}
                       </td>
@@ -431,7 +436,7 @@ export const VisitorMaster: React.FC = () => {
       {/* Check-in / Check-out desk */}
       {activeTab === "checkin" && (
         <div className="max-w-md mx-auto">
-          <div className="bg-white rounded-xl p-6 shadow-sm space-y-4">
+          <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm space-y-4">
             <div className="text-center">
               <QrCode size={48} className="mx-auto text-primary-600 mb-2" />
               <h3 className="font-semibold text-gray-900">Guichet d'accueil</h3>
@@ -524,7 +529,7 @@ export const VisitorMaster: React.FC = () => {
 
       {/* Création pass */}
       {activeTab === "create" && (
-        <div className="max-w-lg mx-auto bg-white rounded-xl p-6 shadow-sm space-y-4">
+        <div className="max-w-lg mx-auto bg-white rounded-xl p-4 sm:p-6 shadow-sm space-y-4">
           <h3 className="font-semibold text-gray-900 mb-2">
             Nouveau pass visiteur
           </h3>
@@ -679,7 +684,7 @@ export const VisitorMaster: React.FC = () => {
             <div className="text-center py-8">Chargement...</div>
           ) : (
             <div className="bg-white rounded-xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-              <table className="w-full border-separate border-spacing-y-2">
+              <table className="w-full border-separate border-spacing-y-2 text-sm max-md:block max-md:border-spacing-0 max-md:[&_thead]:hidden max-md:[&_tbody]:block max-md:[&_tr]:mb-3 max-md:[&_tr]:block max-md:[&_tr]:rounded-2xl max-md:[&_tr]:bg-gray-50 max-md:[&_tr]:p-3 max-md:[&_tr]:shadow-sm max-md:[&_tr]:ring-1 max-md:[&_tr]:ring-gray-100 max-md:[&_td]:block max-md:[&_td]:px-0 max-md:[&_td]:py-1.5 max-md:[&_td]:text-left max-md:[&_td]:text-xs max-md:[&_td]:break-words">
                 <thead className="bg-transparent">
                   <tr>
                     <th className="px-4 py-3 text-left text-sm font-semibold">
@@ -701,7 +706,10 @@ export const VisitorMaster: React.FC = () => {
                 </thead>
                 <tbody className="divide-y-0">
                   {logEntries.map((entry) => (
-                    <tr key={entry.id} className="bg-gray-50/70 hover:bg-gray-100">
+                    <tr
+                      key={entry.id}
+                      className="bg-gray-50/70 hover:bg-gray-100"
+                    >
                       <td className="px-4 py-3 text-sm">
                         {new Date(entry.eventAt).toLocaleString("fr-FR")}
                       </td>

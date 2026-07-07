@@ -94,8 +94,10 @@ export const PricingRuleCreatePage: React.FC = () => {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    if (!formData.resourceCode) return setErrorMessage("La ressource est obligatoire.");
-    if (formData.price <= 0) return setErrorMessage("Le prix doit être supérieur à 0.");
+    if (!formData.resourceCode)
+      return setErrorMessage("La ressource est obligatoire.");
+    if (formData.price <= 0)
+      return setErrorMessage("Le prix doit être supérieur à 0.");
     createMutation.mutate();
   };
 
@@ -110,9 +112,12 @@ export const PricingRuleCreatePage: React.FC = () => {
             <ArrowLeft size={16} />
             Retour aux tarifs
           </button>
-          <h1 className="text-2xl font-bold text-gray-900">Nouvelle règle de tarification</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Nouvelle règle de tarification
+          </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Définissez une règle de prix applicable à une ressource et à une unité de réservation.
+            Définissez une règle de prix applicable à une ressource et à une
+            unité de réservation.
           </p>
         </div>
         <button
@@ -121,7 +126,11 @@ export const PricingRuleCreatePage: React.FC = () => {
           disabled={createMutation.isPending}
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-primary-700 disabled:opacity-50"
         >
-          {createMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          {createMutation.isPending ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Save size={16} />
+          )}
           Créer la règle
         </button>
       </div>
@@ -132,55 +141,84 @@ export const PricingRuleCreatePage: React.FC = () => {
         </div>
       )}
 
-      <form id="pricing-rule-form" onSubmit={submit} className="max-w-5xl space-y-6">
+      <form
+        id="pricing-rule-form"
+        onSubmit={submit}
+        className="max-w-5xl space-y-6"
+      >
         <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
           <div className="mb-5 flex items-center gap-2">
             <SlidersHorizontal size={18} className="text-primary-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Informations principales</h2>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Informations principales
+            </h2>
           </div>
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <div className="md:col-span-2">
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Ressource *</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Ressource *
+              </label>
               <ResourceAutocomplete
                 selectedResource={selectedResource}
                 selectedCode={formData.resourceCode}
                 onSelect={(resource) => {
                   setSelectedResource(resource);
-                  setFormData({ ...formData, resourceCode: resource?.code || "" });
+                  setFormData({
+                    ...formData,
+                    resourceCode: resource?.code || "",
+                  });
                 }}
                 placeholder="Rechercher une ressource..."
                 required
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Unité *</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Unité *
+              </label>
               <select
                 value={formData.bookingUnit}
                 onChange={(e) =>
-                  setFormData({ ...formData, bookingUnit: e.target.value as ResourceBookingUnit })
+                  setFormData({
+                    ...formData,
+                    bookingUnit: e.target.value as ResourceBookingUnit,
+                  })
                 }
                 className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-300 focus:ring-2 focus:ring-primary-100"
               >
                 {bookingUnits.map((unit) => (
-                  <option key={unit.value} value={unit.value}>{unit.label}</option>
+                  <option key={unit.value} value={unit.value}>
+                    {unit.label}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Prix (FCFA) *</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Prix (FCFA) *
+              </label>
               <input
                 type="number"
                 min="1"
                 value={formData.price || ""}
-                onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    price: Number(e.target.value) || 0,
+                  })
+                }
                 className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-primary-300 focus:ring-2 focus:ring-primary-100"
               />
             </div>
             <div className="md:col-span-2">
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Libellé</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Libellé
+              </label>
               <input
                 value={formData.label}
-                onChange={(e) => setFormData({ ...formData, label: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, label: e.target.value })
+                }
                 placeholder="ex : Week-end, matin, last minute..."
                 className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-primary-300 focus:ring-2 focus:ring-primary-100"
               />
@@ -189,79 +227,168 @@ export const PricingRuleCreatePage: React.FC = () => {
         </section>
 
         <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-          <h2 className="mb-5 text-lg font-semibold text-gray-900">Conditions d'application</h2>
+          <h2 className="mb-5 text-lg font-semibold text-gray-900">
+            Conditions d'application
+          </h2>
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Jour</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Jour
+              </label>
               <select
                 value={formData.dayOfWeek}
-                onChange={(e) => setFormData({ ...formData, dayOfWeek: Number(e.target.value) })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    dayOfWeek: Number(e.target.value),
+                  })
+                }
                 className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
               >
                 <option value={0}>Tous les jours</option>
-                {daysOfWeek.map((day) => <option key={day.value} value={day.value}>{day.label}</option>)}
+                {daysOfWeek.map((day) => (
+                  <option key={day.value} value={day.value}>
+                    {day.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Priorité</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Priorité
+              </label>
               <input
                 type="number"
                 min="0"
                 value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: Number(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    priority: Number(e.target.value) || 0,
+                  })
+                }
                 className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Heure début</label>
-              <input type="time" value={formData.startsAt} onChange={(e) => setFormData({ ...formData, startsAt: e.target.value ? `${e.target.value}:00` : "" })} className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm" />
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Heure début
+              </label>
+              <input
+                type="time"
+                value={formData.startsAt}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    startsAt: e.target.value ? `${e.target.value}:00` : "",
+                  })
+                }
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
+              />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Heure fin</label>
-              <input type="time" value={formData.endsAt} onChange={(e) => setFormData({ ...formData, endsAt: e.target.value ? `${e.target.value}:00` : "" })} className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm" />
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Heure fin
+              </label>
+              <input
+                type="time"
+                value={formData.endsAt}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    endsAt: e.target.value ? `${e.target.value}:00` : "",
+                  })
+                }
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
+              />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Valide du</label>
-              <input type="date" value={formData.validFrom} onChange={(e) => setFormData({ ...formData, validFrom: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm" />
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Valide du
+              </label>
+              <input
+                type="date"
+                value={formData.validFrom}
+                onChange={(e) =>
+                  setFormData({ ...formData, validFrom: e.target.value })
+                }
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
+              />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Valide jusqu'au</label>
-              <input type="date" value={formData.validUntil} onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm" />
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Valide jusqu'au
+              </label>
+              <input
+                type="date"
+                value={formData.validUntil}
+                onChange={(e) =>
+                  setFormData({ ...formData, validUntil: e.target.value })
+                }
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
+              />
             </div>
           </div>
         </section>
 
         <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-          <h2 className="mb-5 text-lg font-semibold text-gray-900">Ajustements</h2>
+          <h2 className="mb-5 text-lg font-semibold text-gray-900">
+            Ajustements
+          </h2>
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Type d'ajustement</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Type d'ajustement
+              </label>
               <select
                 value={formData.adjustmentType}
-                onChange={(e) => setFormData({ ...formData, adjustmentType: e.target.value as any })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    adjustmentType: e.target.value as any,
+                  })
+                }
                 className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
               >
                 <option value="">Aucun ajustement</option>
-                {adjustmentTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+                {adjustmentTypes.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Valeur</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Valeur
+              </label>
               <input
                 type="number"
                 value={formData.adjustmentValue}
                 disabled={!formData.adjustmentType}
-                onChange={(e) => setFormData({ ...formData, adjustmentValue: Number(e.target.value) })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    adjustmentValue: Number(e.target.value),
+                  })
+                }
                 className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm disabled:bg-gray-50"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Last minute (minutes)</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Last minute (minutes)
+              </label>
               <input
                 type="number"
                 min="0"
                 value={formData.lastMinuteMinutes}
-                onChange={(e) => setFormData({ ...formData, lastMinuteMinutes: e.target.value })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    lastMinuteMinutes: e.target.value,
+                  })
+                }
                 placeholder="ex : 60"
                 className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
               />
@@ -270,7 +397,9 @@ export const PricingRuleCreatePage: React.FC = () => {
               <input
                 type="checkbox"
                 checked={formData.active}
-                onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
+                onChange={(e) =>
+                  setFormData({ ...formData, active: e.target.checked })
+                }
                 className="rounded"
               />
               Règle active

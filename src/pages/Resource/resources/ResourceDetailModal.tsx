@@ -126,7 +126,10 @@ export const ResourceDetailModal: React.FC<ResourceDetailModalProps> = ({
       const from = `${calMonth}-01`;
       const lastDay = new Date(Number(y), Number(m), 0).getDate();
       const to = `${calMonth}-${String(lastDay).padStart(2, "0")}`;
-      return resourceService.getPublicCalendar(resource.code, { fromDate: from, toDate: to });
+      return resourceService.getPublicCalendar(resource.code, {
+        fromDate: from,
+        toDate: to,
+      });
     },
     enabled: isOpen && activeTab === "calendar",
   });
@@ -216,7 +219,9 @@ export const ResourceDetailModal: React.FC<ResourceDetailModalProps> = ({
       <div className="flex flex-wrap gap-2 p-4 border-b bg-gray-50">
         <select
           value={resource.status}
-          onChange={(e) => updateStatusMutation.mutate(e.target.value as ResourceStatus)}
+          onChange={(e) =>
+            updateStatusMutation.mutate(e.target.value as ResourceStatus)
+          }
           disabled={updateStatusMutation.isPending}
           className="px-3 py-1 border rounded-lg text-sm bg-white disabled:opacity-50"
         >

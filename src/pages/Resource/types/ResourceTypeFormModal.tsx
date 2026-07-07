@@ -98,7 +98,8 @@ export const ResourceTypeFormModal: React.FC<ResourceTypeFormModalProps> = ({
                 {editingType ? "Modifier le type" : "Nouveau type de ressource"}
               </h3>
               <p className="text-sm text-gray-500 mt-1">
-                Classez les ressources pour faciliter leur recherche et leur organisation.
+                Classez les ressources pour faciliter leur recherche et leur
+                organisation.
               </p>
             </div>
           </div>

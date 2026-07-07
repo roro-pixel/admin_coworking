@@ -15,7 +15,11 @@ const prependUniqueNotification = (
   notification: Notification,
 ) => {
   const list = Array.isArray(current) ? current : [];
-  if (list.some((item) => item.notificationNumber === notification.notificationNumber)) {
+  if (
+    list.some(
+      (item) => item.notificationNumber === notification.notificationNumber,
+    )
+  ) {
     return list;
   }
   return [notification, ...list].slice(0, 20);
@@ -39,41 +43,49 @@ export const useAdminRealtime = () => {
     realtimeService.connect(token);
 
     const subscribe = () => {
-      const unsubscribeNotifications = realtimeService.subscribe<ClientNotificationPayload>(
-        "/user/queue/notifications",
-        (payload) => {
-          const notification = normalizeRealtimeNotification(payload);
+      const unsubscribeNotifications =
+        realtimeService.subscribe<ClientNotificationPayload>(
+          "/user/queue/notifications",
+          (payload) => {
+            const notification = normalizeRealtimeNotification(payload);
 
-          queryClient.setQueryData<Notification[]>(
-            ["unread-notifications"],
-            (current) => prependUniqueNotification(current, notification),
-          );
-
-          queryClient.invalidateQueries({ queryKey: ["notifications"] });
-          queryClient.invalidateQueries({ queryKey: ["unread-notifications-count"] });
-
-          emitRealtimeToast({
-            title: notification.subject || "Nouvelle notification",
-            message: notification.body,
-            tone: "info",
-          });
-        },
-      );
-
-      const unsubscribeUnreadCount = realtimeService.subscribe<UnreadCountSignal>(
-        "/user/queue/notifications/unread-count",
-        (payload) => {
-          if (payload.action === "INCREMENT") {
-            queryClient.setQueryData<number>(
-              ["unread-notifications-count"],
-              (current) => Number(current ?? 0) + 1,
+            queryClient.setQueryData<Notification[]>(
+              ["unread-notifications"],
+              (current) => prependUniqueNotification(current, notification),
             );
-          } else {
-            queryClient.invalidateQueries({ queryKey: ["unread-notifications-count"] });
-          }
-          queryClient.invalidateQueries({ queryKey: ["unread-notifications"] });
-        },
-      );
+
+            queryClient.invalidateQueries({ queryKey: ["notifications"] });
+            queryClient.invalidateQueries({
+              queryKey: ["unread-notifications-count"],
+            });
+
+            emitRealtimeToast({
+              title: notification.subject || "Nouvelle notification",
+              message: notification.body,
+              tone: "info",
+            });
+          },
+        );
+
+      const unsubscribeUnreadCount =
+        realtimeService.subscribe<UnreadCountSignal>(
+          "/user/queue/notifications/unread-count",
+          (payload) => {
+            if (payload.action === "INCREMENT") {
+              queryClient.setQueryData<number>(
+                ["unread-notifications-count"],
+                (current) => Number(current ?? 0) + 1,
+              );
+            } else {
+              queryClient.invalidateQueries({
+                queryKey: ["unread-notifications-count"],
+              });
+            }
+            queryClient.invalidateQueries({
+              queryKey: ["unread-notifications"],
+            });
+          },
+        );
 
       const unsubscribeAdminAlerts = realtimeService.subscribe<AdminAlertEvent>(
         "/topic/admin/alerts",
@@ -95,23 +107,26 @@ export const useAdminRealtime = () => {
         },
       );
 
-      const unsubscribeInventoryAlerts = realtimeService.subscribe<InventoryAlertEvent>(
-        "/topic/inventory/alerts",
-        (alert) => {
-          queryClient.invalidateQueries({ queryKey: ["inventory-alerts"] });
-          queryClient.invalidateQueries({ queryKey: ["inventory-metrics"] });
-          queryClient.invalidateQueries({ queryKey: ["inventory-stock"] });
+      const unsubscribeInventoryAlerts =
+        realtimeService.subscribe<InventoryAlertEvent>(
+          "/topic/inventory/alerts",
+          (alert) => {
+            queryClient.invalidateQueries({ queryKey: ["inventory-alerts"] });
+            queryClient.invalidateQueries({ queryKey: ["inventory-metrics"] });
+            queryClient.invalidateQueries({ queryKey: ["inventory-stock"] });
 
-          emitRealtimeToast({
-            title: alert.alertType,
-            message: alert.message,
-            tone: "warning",
-          });
-        },
-      );
+            emitRealtimeToast({
+              title: alert.alertType,
+              message: alert.message,
+              tone: "warning",
+            });
+          },
+        );
 
       queryClient.invalidateQueries({ queryKey: ["unread-notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["unread-notifications-count"] });
+      queryClient.invalidateQueries({
+        queryKey: ["unread-notifications-count"],
+      });
 
       return () => {
         unsubscribeNotifications();

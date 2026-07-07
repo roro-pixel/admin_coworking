@@ -141,17 +141,17 @@ export const MemberDetail: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white rounded-2xl p-4 shadow-sm ring-1 ring-gray-100">
-        <div className="flex items-center">
+      <div className="mb-6 flex flex-col gap-4 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-gray-100 sm:p-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-start">
           <button
             onClick={() => navigate("/members")}
-            className="mr-4 p-2 hover:bg-gray-100 rounded-xl transition-colors"
+            className="mr-3 shrink-0 rounded-xl p-2 transition-colors hover:bg-gray-100 sm:mr-4"
           >
             <ArrowLeft size={20} className="text-gray-600" />
           </button>
           <div>
-            <div className="flex items-center space-x-3">
-              <h1 className="text-2xl font-bold text-gray-900">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+              <h1 className="min-w-0 break-words text-xl font-black text-gray-900 sm:text-2xl">
                 {member.fullname}
               </h1>
               <span
@@ -161,15 +161,15 @@ export const MemberDetail: React.FC = () => {
                 <span className="ml-1">{member.status}</span>
               </span>
             </div>
-            <p className="text-gray-500 text-sm mt-1">{member.memberId}</p>
+            <p className="mt-1 break-all font-mono text-xs text-gray-500 sm:text-sm">{member.memberId}</p>
           </div>
         </div>
-        <div className="flex space-x-3">
+        <div className="grid grid-cols-1 gap-2 sm:flex sm:gap-3">
           {isEditing ? (
             <>
               <button
                 onClick={() => setIsEditing(false)}
-                className="px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50/70"
+                className="inline-flex w-full items-center justify-center rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50/70 sm:w-auto"
               >
                 <X size={16} className="inline mr-1" />
                 Annuler
@@ -177,7 +177,7 @@ export const MemberDetail: React.FC = () => {
               <button
                 onClick={handleSave}
                 disabled={updateMutation.isPending}
-                className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50"
+                className="inline-flex w-full items-center justify-center rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50 sm:w-auto"
               >
                 <Save size={16} className="inline mr-1" />
                 {updateMutation.isPending ? "Sauvegarde..." : "Enregistrer"}
@@ -187,7 +187,7 @@ export const MemberDetail: React.FC = () => {
             <>
               <button
                 onClick={() => setShowResetPassword(true)}
-                className="px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50/70"
+                className="inline-flex w-full items-center justify-center rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50/70 sm:w-auto"
               >
                 <Key size={16} className="inline mr-1" />
                 Réinitialiser mot de passe
@@ -197,7 +197,7 @@ export const MemberDetail: React.FC = () => {
                   setFormData(member);
                   setIsEditing(true);
                 }}
-                className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700"
+                className="inline-flex w-full items-center justify-center rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-primary-700 sm:w-auto"
               >
                 <Edit size={16} className="inline mr-1" />
                 Modifier
@@ -208,11 +208,11 @@ export const MemberDetail: React.FC = () => {
       </div>
 
       {/* Informations personnelles */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:mb-6 sm:p-6">
+        <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">
           Informations personnelles
         </h2>
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Prénom
@@ -223,10 +223,10 @@ export const MemberDetail: React.FC = () => {
                 name="firstname"
                 value={formData.firstname}
                 onChange={handleChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             ) : (
-              <p className="text-gray-900">{member.firstname}</p>
+              <p className="break-words text-sm font-semibold text-gray-900 sm:text-base">{member.firstname}</p>
             )}
           </div>
           <div>
@@ -239,19 +239,19 @@ export const MemberDetail: React.FC = () => {
                 name="lastname"
                 value={formData.lastname}
                 onChange={handleChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             ) : (
-              <p className="text-gray-900">{member.lastname}</p>
+              <p className="break-words text-sm font-semibold text-gray-900 sm:text-base">{member.lastname}</p>
             )}
           </div>
         </div>
       </div>
 
       {/* Contact */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Contact</h2>
-        <div className="grid md:grid-cols-2 gap-6">
+      <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:mb-6 sm:p-6">
+        <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">Contact</h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               <Mail size={14} className="inline mr-1" /> Email
@@ -262,10 +262,10 @@ export const MemberDetail: React.FC = () => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             ) : (
-              <p className="text-gray-900">{member.email}</p>
+              <p className="break-words text-sm font-semibold text-gray-900 sm:text-base">{member.email}</p>
             )}
           </div>
           <div>
@@ -278,10 +278,10 @@ export const MemberDetail: React.FC = () => {
                 name="phone"
                 value={formData.phone || ""}
                 onChange={handleChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             ) : (
-              <p className="text-gray-900">{member.phone || "-"}</p>
+              <p className="break-words text-sm font-semibold text-gray-900 sm:text-base">{member.phone || "-"}</p>
             )}
           </div>
           <div>
@@ -294,21 +294,21 @@ export const MemberDetail: React.FC = () => {
                 name="whatsappPhone"
                 value={formData.whatsappPhone || ""}
                 onChange={handleChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             ) : (
-              <p className="text-gray-900">{member.whatsappPhone || "-"}</p>
+              <p className="break-words text-sm font-semibold text-gray-900 sm:text-base">{member.whatsappPhone || "-"}</p>
             )}
           </div>
         </div>
       </div>
 
       {/* Accès et statut */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:mb-6 sm:p-6">
+        <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">
           Accès et statut
         </h2>
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Customer associé
@@ -324,7 +324,7 @@ export const MemberDetail: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Statut
             </label>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span
                 className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass()}`}
               >
@@ -347,7 +347,7 @@ export const MemberDetail: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Accès portail
             </label>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {member.portalAccess ? (
                 <span className="flex items-center text-green-600">
                   <Unlock size={14} className="mr-1" /> Activé
@@ -369,16 +369,16 @@ export const MemberDetail: React.FC = () => {
       </div>
 
       {/* Métadonnées */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-6">
+        <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">
           Métadonnées
         </h2>
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Créé le
             </label>
-            <p className="text-gray-900">
+            <p className="break-words text-sm font-semibold text-gray-900 sm:text-base">
               {new Date(member.createdAt).toLocaleDateString("fr-FR")}
             </p>
           </div>
@@ -386,7 +386,7 @@ export const MemberDetail: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Dernière modification
             </label>
-            <p className="text-gray-900">
+            <p className="break-words text-sm font-semibold text-gray-900 sm:text-base">
               {new Date(member.updatedAt).toLocaleDateString("fr-FR")}
             </p>
           </div>
@@ -400,7 +400,7 @@ export const MemberDetail: React.FC = () => {
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowResetPassword(false)}
           />
-          <div className="relative bg-white rounded-2xl w-full max-w-md p-6">
+          <div className="relative w-full max-w-md rounded-2xl bg-white p-4 sm:p-6">
             <h3 className="text-xl font-bold text-gray-900 mb-4">
               Réinitialiser le mot de passe
             </h3>
@@ -408,7 +408,7 @@ export const MemberDetail: React.FC = () => {
               Un email de réinitialisation sera envoyé à{" "}
               <strong>{member.email}</strong>.
             </p>
-            <div className="flex gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <button
                 onClick={() => setShowResetPassword(false)}
                 className="flex-1 px-4 py-2 ring-1 ring-gray-100 rounded-2xl text-gray-700"

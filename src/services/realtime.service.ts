@@ -2,7 +2,10 @@ import { Client, type IMessage, type StompSubscription } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { API_BASE_URL } from "./api";
 
-export type RealtimeMessageHandler<T = any> = (payload: T, message: IMessage) => void;
+export type RealtimeMessageHandler<T = any> = (
+  payload: T,
+  message: IMessage,
+) => void;
 
 const getWsBaseUrl = () => {
   const configured = (API_BASE_URL || "").replace(/\/$/, "");

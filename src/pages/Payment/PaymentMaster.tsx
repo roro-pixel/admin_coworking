@@ -49,7 +49,8 @@ const PaymentNav: React.FC = () => {
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-gray-900">Paiements & caisse</h1>
         <p className="text-gray-500 mt-1">
-          Intentions, recouvrement, reçus, sessions, mouvements et contrôle de caisse.
+          Intentions, recouvrement, reçus, sessions, mouvements et contrôle de
+          caisse.
         </p>
       </div>
       <div className="overflow-x-auto pb-1">
@@ -101,8 +102,14 @@ export const PaymentMaster: React.FC = () => {
       <Route path="/requests" element={withLayout(<CashRequestsList />)} />
       <Route path="/metrics" element={withLayout(<CashMetricsDashboard />)} />
       <Route path="/anomalies" element={withLayout(<CashAnomaliesPanel />)} />
-      <Route path="/reconciliation" element={withLayout(<ReconciliationPanel />)} />
-      <Route path="/:intentNumber" element={withLayout(<PaymentIntentDetailPage />)} />
+      <Route
+        path="/reconciliation"
+        element={withLayout(<ReconciliationPanel />)}
+      />
+      <Route
+        path="/:intentNumber"
+        element={withLayout(<PaymentIntentDetailPage />)}
+      />
       <Route path="*" element={<Navigate to="/payments" replace />} />
     </Routes>
   );

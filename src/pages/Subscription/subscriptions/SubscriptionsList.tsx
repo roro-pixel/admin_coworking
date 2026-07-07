@@ -342,170 +342,170 @@ export const SubscriptionsList: React.FC = () => {
       <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
         <div className="overflow-x-auto p-2">
           <table className="w-full border-separate border-spacing-y-2">
-          <thead className="bg-transparent">
-            <tr>
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                N° Souscription
-              </th>
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                Plan
-              </th>
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                Souscripteur
-              </th>
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                Période
-              </th>
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                Statut
-              </th>
-              <th className="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">
-                Renouvellement
-              </th>
-              <th className="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredSubscriptions.map((sub) => (
-              <tr
-                key={sub.subscriptionNumber}
-                className="group cursor-pointer rounded-xl transition-colors hover:bg-primary-50/40"
-                onClick={() => handleViewDetail(sub)}
-              >
-                <td className="rounded-l-xl px-5 py-4 text-sm font-mono text-gray-700 group-hover:bg-transparent">
-                  {sub.subscriptionNumber}
-                </td>
-                <td className="px-5 py-4 text-sm font-semibold text-gray-900">
-                  {sub.planName}
-                </td>
-                <td className="px-5 py-4 text-sm text-gray-700">
-                  <div>
-                    <p>{sub.subscriberName ?? sub.subscriberCode}</p>
-                    <p className="text-xs text-gray-500">
-                      {sub.subscriberType}
-                    </p>
-                  </div>
-                </td>
-                <td className="px-5 py-4 text-sm text-gray-700">
-                  <div>
-                    <p>
-                      Début :{" "}
-                      {new Date(sub.startDate).toLocaleDateString("fr-FR")}
-                    </p>
-                    {sub.endDate && (
-                      <p className="text-xs text-gray-500">
-                        Fin :{" "}
-                        {new Date(sub.endDate).toLocaleDateString("fr-FR")}
-                      </p>
-                    )}
-                    {/* FIX : prochaine facturation affichée si disponible */}
-                    {sub.nextBillingDate && (
-                      <p className="text-xs text-amber-600 mt-0.5">
-                        Facture :{" "}
-                        {new Date(sub.nextBillingDate).toLocaleDateString(
-                          "fr-FR",
-                        )}
-                      </p>
-                    )}
-                  </div>
-                </td>
-                <td className="px-5 py-4">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs ${
-                      statusConfig[sub.status]?.color ??
-                      "bg-gray-100 text-gray-600"
-                    }`}
-                  >
-                    {statusConfig[sub.status]?.label ?? sub.status}
-                  </span>
-                </td>
-                <td className="px-5 py-4 text-center text-sm text-gray-700">
-                  {sub.autoRenew ? "Auto" : "Manuel"}
-                </td>
-                <td className="rounded-r-xl px-5 py-4 text-center">
-                  <div
-                    className="flex justify-center gap-2"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <button
-                      onClick={() => handleViewDetail(sub)}
-                      className="rounded-lg p-2 text-gray-500 hover:bg-white hover:text-primary-600"
-                      title="Voir détail"
-                    >
-                      <Eye size={16} />
-                    </button>
-                    {sub.status === "PENDING_ACTIVATION" && (
-                      <button
-                        onClick={() =>
-                          activateMutation.mutate(sub.subscriptionNumber)
-                        }
-                        disabled={activateMutation.isPending}
-                        className="rounded-lg p-2 text-green-600 hover:bg-white hover:text-green-800 disabled:opacity-40"
-                        title="Activer"
-                      >
-                        <Play size={16} />
-                      </button>
-                    )}
-                    {/* FIX : PAST_DUE — réactivation possible */}
-                    {sub.status === "PAST_DUE" && (
-                      <button
-                        onClick={() =>
-                          activateMutation.mutate(sub.subscriptionNumber)
-                        }
-                        disabled={activateMutation.isPending}
-                        className="rounded-lg p-2 text-green-600 hover:bg-white hover:text-green-800 disabled:opacity-40"
-                        title="Réactiver"
-                      >
-                        <Play size={16} />
-                      </button>
-                    )}
-                    {sub.status === "ACTIVE" && (
-                      <>
-                        <button
-                          onClick={() =>
-                            suspendMutation.mutate(sub.subscriptionNumber)
-                          }
-                          disabled={suspendMutation.isPending}
-                          className="rounded-lg p-2 text-orange-600 hover:bg-white hover:text-orange-800 disabled:opacity-40"
-                          title="Suspendre"
-                        >
-                          <Pause size={16} />
-                        </button>
-                        <button
-                          onClick={() =>
-                            renewMutation.mutate(sub.subscriptionNumber)
-                          }
-                          disabled={renewMutation.isPending}
-                          className="rounded-lg p-2 text-blue-600 hover:bg-white hover:text-blue-800 disabled:opacity-40"
-                          title="Renouveler"
-                        >
-                          <RefreshCw size={16} />
-                        </button>
-                      </>
-                    )}
-                    {(sub.status === "ACTIVE" ||
-                      sub.status === "SUSPENDED" ||
-                      sub.status === "PAST_DUE") && (
-                      <button
-                        onClick={() => {
-                          if (confirm("Confirmer l'annulation ?")) {
-                            cancelMutation.mutate(sub.subscriptionNumber);
-                          }
-                        }}
-                        disabled={cancelMutation.isPending}
-                        className="rounded-lg p-2 text-red-600 hover:bg-white hover:text-red-800 disabled:opacity-40"
-                        title="Annuler"
-                      >
-                        <XCircle size={16} />
-                      </button>
-                    )}
-                  </div>
-                </td>
+            <thead className="bg-transparent">
+              <tr>
+                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  N° Souscription
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  Plan
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  Souscripteur
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  Période
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  Statut
+                </th>
+                <th className="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  Renouvellement
+                </th>
+                <th className="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  Actions
+                </th>
               </tr>
-            ))}
-          </tbody>
+            </thead>
+            <tbody>
+              {filteredSubscriptions.map((sub) => (
+                <tr
+                  key={sub.subscriptionNumber}
+                  className="group cursor-pointer rounded-xl transition-colors hover:bg-primary-50/40"
+                  onClick={() => handleViewDetail(sub)}
+                >
+                  <td className="rounded-l-xl px-5 py-4 text-sm font-mono text-gray-700 group-hover:bg-transparent">
+                    {sub.subscriptionNumber}
+                  </td>
+                  <td className="px-5 py-4 text-sm font-semibold text-gray-900">
+                    {sub.planName}
+                  </td>
+                  <td className="px-5 py-4 text-sm text-gray-700">
+                    <div>
+                      <p>{sub.subscriberName ?? sub.subscriberCode}</p>
+                      <p className="text-xs text-gray-500">
+                        {sub.subscriberType}
+                      </p>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4 text-sm text-gray-700">
+                    <div>
+                      <p>
+                        Début :{" "}
+                        {new Date(sub.startDate).toLocaleDateString("fr-FR")}
+                      </p>
+                      {sub.endDate && (
+                        <p className="text-xs text-gray-500">
+                          Fin :{" "}
+                          {new Date(sub.endDate).toLocaleDateString("fr-FR")}
+                        </p>
+                      )}
+                      {/* FIX : prochaine facturation affichée si disponible */}
+                      {sub.nextBillingDate && (
+                        <p className="text-xs text-amber-600 mt-0.5">
+                          Facture :{" "}
+                          {new Date(sub.nextBillingDate).toLocaleDateString(
+                            "fr-FR",
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-5 py-4">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        statusConfig[sub.status]?.color ??
+                        "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {statusConfig[sub.status]?.label ?? sub.status}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4 text-center text-sm text-gray-700">
+                    {sub.autoRenew ? "Auto" : "Manuel"}
+                  </td>
+                  <td className="rounded-r-xl px-5 py-4 text-center">
+                    <div
+                      className="flex justify-center gap-2"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        onClick={() => handleViewDetail(sub)}
+                        className="rounded-lg p-2 text-gray-500 hover:bg-white hover:text-primary-600"
+                        title="Voir détail"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      {sub.status === "PENDING_ACTIVATION" && (
+                        <button
+                          onClick={() =>
+                            activateMutation.mutate(sub.subscriptionNumber)
+                          }
+                          disabled={activateMutation.isPending}
+                          className="rounded-lg p-2 text-green-600 hover:bg-white hover:text-green-800 disabled:opacity-40"
+                          title="Activer"
+                        >
+                          <Play size={16} />
+                        </button>
+                      )}
+                      {/* FIX : PAST_DUE — réactivation possible */}
+                      {sub.status === "PAST_DUE" && (
+                        <button
+                          onClick={() =>
+                            activateMutation.mutate(sub.subscriptionNumber)
+                          }
+                          disabled={activateMutation.isPending}
+                          className="rounded-lg p-2 text-green-600 hover:bg-white hover:text-green-800 disabled:opacity-40"
+                          title="Réactiver"
+                        >
+                          <Play size={16} />
+                        </button>
+                      )}
+                      {sub.status === "ACTIVE" && (
+                        <>
+                          <button
+                            onClick={() =>
+                              suspendMutation.mutate(sub.subscriptionNumber)
+                            }
+                            disabled={suspendMutation.isPending}
+                            className="rounded-lg p-2 text-orange-600 hover:bg-white hover:text-orange-800 disabled:opacity-40"
+                            title="Suspendre"
+                          >
+                            <Pause size={16} />
+                          </button>
+                          <button
+                            onClick={() =>
+                              renewMutation.mutate(sub.subscriptionNumber)
+                            }
+                            disabled={renewMutation.isPending}
+                            className="rounded-lg p-2 text-blue-600 hover:bg-white hover:text-blue-800 disabled:opacity-40"
+                            title="Renouveler"
+                          >
+                            <RefreshCw size={16} />
+                          </button>
+                        </>
+                      )}
+                      {(sub.status === "ACTIVE" ||
+                        sub.status === "SUSPENDED" ||
+                        sub.status === "PAST_DUE") && (
+                        <button
+                          onClick={() => {
+                            if (confirm("Confirmer l'annulation ?")) {
+                              cancelMutation.mutate(sub.subscriptionNumber);
+                            }
+                          }}
+                          disabled={cancelMutation.isPending}
+                          className="rounded-lg p-2 text-red-600 hover:bg-white hover:text-red-800 disabled:opacity-40"
+                          title="Annuler"
+                        >
+                          <XCircle size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
       </div>
@@ -552,7 +552,6 @@ export const SubscriptionsList: React.FC = () => {
           </div>
         </div>
       )}
-
 
       <CreateSubscriptionModal
         isOpen={isCreateModalOpen}

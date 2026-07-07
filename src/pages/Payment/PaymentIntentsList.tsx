@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Search,
   Clock,
@@ -21,7 +21,6 @@ import {
   AlertCircle,
   Receipt,
   Download,
-  Smartphone,
 } from "lucide-react";
 import { paymentService } from "../../services/payment.service";
 import type {
@@ -30,7 +29,6 @@ import type {
 } from "../../services/payment.service";
 import { useAuth } from "../../contexts/AuthContext";
 import { ModalPortal } from "../../components/ui/ModalPortal";
-import { MobileMoneyModal } from "../../components/payment/MobileMoneyModal";
 
 const statusConfig: Record<
   string,
@@ -83,6 +81,7 @@ const formatDateTime = (value?: string | null) =>
 export const PaymentIntentsList: React.FC = () => {
   const { admin } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
 
   // ========== ÉTATS RECHERCHE ET FILTRES ==========
@@ -90,27 +89,8 @@ export const PaymentIntentsList: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(0);
-
-  // ========== ÉTATS MODAL PAIEMENT CASH ==========
-  const [selectedIntent, setSelectedIntent] = useState<PaymentIntent | null>(
-    null,
-  );
-  const [isCashModalOpen, setIsCashModalOpen] = useState(false);
-  const [cashForm, setCashForm] = useState({
-    cashSessionNumber: "",
-    providerReference: "",
-  });
-  const [cashError, setCashError] = useState<string | null>(null);
-
-  // ========== ÉTATS MODAL PAIEMENT WALLET ==========
-  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
-  const [walletNumber, setWalletNumber] = useState("");
-  const [walletError, setWalletError] = useState<string | null>(null);
-
-  // ========== ÉTATS MODAL MOBILE MONEY ==========
-  const [isMobileMoneyOpen, setIsMobileMoneyOpen] = useState(false);
-  const [mobileMoneyIntent, setMobileMoneyIntent] =
-    useState<PaymentIntent | null>(null);
+  const [redirectMessage, setRedirectMessage] = useState<string | null>(null);
+  const [redirectStateHandled, setRedirectStateHandled] = useState(false);
 
   // ========== ÉTATS MODAL DEPUIS FACTURE ==========
   const [isFromBillingOpen, setIsFromBillingOpen] = useState(false);
@@ -135,6 +115,29 @@ export const PaymentIntentsList: React.FC = () => {
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
   const [receiptLoading, setReceiptLoading] = useState(false);
+
+  // ========== REDIRECTION DEPUIS LE RECOUVREMENT ==========
+  useEffect(() => {
+    if (redirectStateHandled) return;
+
+    const state = location.state as
+      | { intentNumber?: string; message?: string }
+      | null
+      | undefined;
+
+    if (!state?.intentNumber) return;
+
+    setSearch(state.intentNumber);
+    setDebouncedSearch(state.intentNumber);
+    setStatusFilter("");
+    setPage(0);
+    setRedirectMessage(
+      state.message || "Intention de paiement créée avec succès.",
+    );
+    setRedirectStateHandled(true);
+
+    window.history.replaceState({}, document.title);
+  }, [location.state, redirectStateHandled]);
 
   // ========== DEBOUNCE RECHERCHE ==========
   useEffect(() => {
@@ -192,49 +195,6 @@ export const PaymentIntentsList: React.FC = () => {
       paymentService.getCashSessions({ status: "OPEN", size: 100 }),
   });
   const openSessions: CashSession[] = openSessionsData?.content || [];
-
-  // ========== MUTATION PAIEMENT CASH ==========
-  const payCashMutation = useMutation({
-    mutationFn: () =>
-      paymentService.payCash(selectedIntent!.intentNumber, {
-        receivedBy: admin?.email || "admin",
-        cashSessionNumber: cashForm.cashSessionNumber || undefined,
-        providerReference: cashForm.providerReference || undefined,
-      }),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["payment-intents"] });
-      setIsCashModalOpen(false);
-      setCashForm({ cashSessionNumber: "", providerReference: "" });
-      setCashError(null);
-      handleOpenReceipt(data.transactionNumber);
-    },
-    onError: (error: any) => {
-      setCashError(
-        error?.response?.data?.message || "Erreur lors du paiement cash.",
-      );
-    },
-  });
-
-  // ========== MUTATION PAIEMENT WALLET ==========
-  const payWalletMutation = useMutation({
-    mutationFn: () =>
-      paymentService.payWallet(selectedIntent!.intentNumber, {
-        walletNumber,
-        createdBy: admin?.email || "admin",
-      }),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["payment-intents"] });
-      setIsWalletModalOpen(false);
-      setWalletNumber("");
-      setWalletError(null);
-      handleOpenReceipt(data.transactionNumber);
-    },
-    onError: (error: any) => {
-      setWalletError(
-        error?.response?.data?.message || "Erreur lors du paiement wallet.",
-      );
-    },
-  });
 
   // ========== MUTATION CRÉATION DEPUIS FACTURE ==========
   const fromBillingMutation = useMutation({
@@ -390,7 +350,7 @@ export const PaymentIntentsList: React.FC = () => {
             </p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           {/* Navigation vers la page de création */}
           <button
             onClick={() => navigate("/payments/create")}
@@ -426,6 +386,20 @@ export const PaymentIntentsList: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {redirectMessage && (
+        <div className="mb-6 flex items-start justify-between gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <span>{redirectMessage}</span>
+          <button
+            type="button"
+            onClick={() => setRedirectMessage(null)}
+            className="rounded-lg p-1 text-emerald-700 transition hover:bg-emerald-100"
+            aria-label="Fermer le message"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* ========== FILTRES ========== */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
@@ -463,8 +437,8 @@ export const PaymentIntentsList: React.FC = () => {
       </div>
 
       {/* ========== TABLEAU ========== */}
-      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-        <table className="w-full border-separate border-spacing-y-2">
+      <div className="overflow-x-auto rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
+        <table className="min-w-[1120px] w-full border-separate border-spacing-y-2">
           <thead className="bg-gray-50/70">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -497,9 +471,12 @@ export const PaymentIntentsList: React.FC = () => {
             {intents.map((intent) => {
               const status = statusConfig[intent.status];
               const StatusIcon = status?.icon;
-              const isPending = intent.status === "PENDING";
               return (
-                <tr key={intent.intentNumber} className="hover:bg-gray-50/80">
+                <tr
+                  key={intent.intentNumber}
+                  onClick={() => navigate(`/payments/${intent.intentNumber}`)}
+                  className="cursor-pointer transition hover:bg-gray-50/80"
+                >
                   <td className="px-6 py-4 text-sm font-mono">
                     {intent.intentNumber}
                   </td>
@@ -560,61 +537,16 @@ export const PaymentIntentsList: React.FC = () => {
                     {formatDateTime(intent.expiresAt)}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <div className="flex justify-center gap-1">
-                      {/* Navigation vers la page de détail */}
-                      <button
-                        onClick={() =>
-                          navigate(`/payments/${intent.intentNumber}`)
-                        }
-                        className="p-1 text-gray-600 hover:text-primary-600"
-                        title="Voir détail et transactions"
-                      >
-                        <Eye size={15} />
-                      </button>
-                      {isPending && (
-                        <button
-                          onClick={() => {
-                            setSelectedIntent(intent);
-                            setCashError(null);
-                            setCashForm({
-                              cashSessionNumber: "",
-                              providerReference: "",
-                            });
-                            setIsCashModalOpen(true);
-                          }}
-                          className="px-2 py-1 bg-green-100 text-green-700 hover:bg-green-200 rounded text-xs font-medium flex items-center gap-1"
-                          title="Payer en cash"
-                        >
-                          <Banknote size={12} /> Cash
-                        </button>
-                      )}
-                      {isPending && (
-                        <button
-                          onClick={() => {
-                            setSelectedIntent(intent);
-                            setWalletError(null);
-                            setWalletNumber("");
-                            setIsWalletModalOpen(true);
-                          }}
-                          className="px-2 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded text-xs font-medium flex items-center gap-1"
-                          title="Payer avec wallet"
-                        >
-                          <Wallet size={12} /> Wallet
-                        </button>
-                      )}
-                      {isPending && (
-                        <button
-                          onClick={() => {
-                            setMobileMoneyIntent(intent);
-                            setIsMobileMoneyOpen(true);
-                          }}
-                          className="px-2 py-1 bg-yellow-100 text-yellow-700 hover:bg-yellow-200 rounded text-xs font-medium flex items-center gap-1"
-                          title="Payer avec Mobile Money"
-                        >
-                          <Smartphone size={12} /> Mobile Money
-                        </button>
-                      )}
-                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/payments/${intent.intentNumber}`);
+                      }}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition hover:bg-primary-50 hover:text-primary-600"
+                      title="Voir détail et transactions"
+                    >
+                      <Eye size={16} />
+                    </button>
                   </td>
                 </tr>
               );
@@ -654,187 +586,6 @@ export const PaymentIntentsList: React.FC = () => {
             </button>
           </div>
         </div>
-      )}
-
-      {/* ========== MODAL PAIEMENT CASH ========== */}
-      {isCashModalOpen && selectedIntent && (
-        <ModalPortal onClose={() => setIsCashModalOpen(false)}>
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-xl font-bold">Paiement en cash</h3>
-            <button
-              onClick={() => setIsCashModalOpen(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          <div className="p-6 space-y-4">
-            {cashError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex items-start gap-2">
-                <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-                {cashError}
-              </div>
-            )}
-            <div className="bg-gray-50 p-3 rounded-lg text-sm">
-              <p>
-                Intention :{" "}
-                <span className="font-mono font-medium">
-                  {selectedIntent.intentNumber}
-                </span>
-              </p>
-              <p>
-                Montant :{" "}
-                <span className="font-bold">
-                  {selectedIntent.amount.toLocaleString("fr-FR")}{" "}
-                  {selectedIntent.currency}
-                </span>
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Session de caisse
-              </label>
-              <select
-                value={cashForm.cashSessionNumber}
-                onChange={(e) =>
-                  setCashForm({
-                    ...cashForm,
-                    cashSessionNumber: e.target.value,
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-              >
-                <option value="">Aucune (paiement hors session)</option>
-                {openSessions.map((s) => (
-                  <option key={s.sessionNumber} value={s.sessionNumber}>
-                    {s.sessionNumber} — {s.registerCode}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-400 mt-1">
-                Si sélectionné, crée un mouvement PAYMENT dans la session
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Référence reçu
-              </label>
-              <input
-                type="text"
-                value={cashForm.providerReference}
-                onChange={(e) =>
-                  setCashForm({
-                    ...cashForm,
-                    providerReference: e.target.value,
-                  })
-                }
-                placeholder="RECU-001 (optionnel)"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Le backend générera une référence si non renseignée
-              </p>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setIsCashModalOpen(false)}
-                disabled={payCashMutation.isPending}
-                className="flex-1 px-4 py-2 border rounded-lg text-gray-700 disabled:opacity-50"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={() => payCashMutation.mutate()}
-                disabled={payCashMutation.isPending}
-                className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {payCashMutation.isPending ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <>
-                    <Banknote size={14} /> Encaisser
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </ModalPortal>
-      )}
-
-      {/* ========== MODAL PAIEMENT WALLET ========== */}
-      {isWalletModalOpen && selectedIntent && (
-        <ModalPortal onClose={() => setIsWalletModalOpen(false)}>
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-xl font-bold">Paiement par wallet</h3>
-            <button
-              onClick={() => setIsWalletModalOpen(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          <div className="p-6 space-y-4">
-            {walletError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex items-start gap-2">
-                <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-                {walletError}
-              </div>
-            )}
-            <div className="bg-gray-50 p-3 rounded-lg text-sm">
-              <p>
-                Intention :{" "}
-                <span className="font-mono font-medium">
-                  {selectedIntent.intentNumber}
-                </span>
-              </p>
-              <p>
-                Montant :{" "}
-                <span className="font-bold">
-                  {selectedIntent.amount.toLocaleString("fr-FR")}{" "}
-                  {selectedIntent.currency}
-                </span>
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                N° Wallet *
-              </label>
-              <input
-                type="text"
-                value={walletNumber}
-                onChange={(e) => setWalletNumber(e.target.value)}
-                placeholder="WAL-000001"
-                required
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Le wallet doit appartenir au client et avoir un solde suffisant
-              </p>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setIsWalletModalOpen(false)}
-                disabled={payWalletMutation.isPending}
-                className="flex-1 px-4 py-2 border rounded-lg text-gray-700 disabled:opacity-50"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={() => payWalletMutation.mutate()}
-                disabled={payWalletMutation.isPending || !walletNumber}
-                className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {payWalletMutation.isPending ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <>
-                    <Wallet size={14} /> Payer
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </ModalPortal>
       )}
 
       {/* ========== MODAL CRÉATION DEPUIS FACTURE(S) ========== */}
@@ -1371,21 +1122,6 @@ export const PaymentIntentsList: React.FC = () => {
             )}
           </div>
         </ModalPortal>
-      )}
-
-      {/* ========== MODAL MOBILE MONEY ========== */}
-      {mobileMoneyIntent && (
-        <MobileMoneyModal
-          isOpen={isMobileMoneyOpen}
-          onClose={() => {
-            setIsMobileMoneyOpen(false);
-            setMobileMoneyIntent(null);
-          }}
-          intent={mobileMoneyIntent}
-          onPaymentSuccess={(transactionNumber) => {
-            handleOpenReceipt(transactionNumber);
-          }}
-        />
       )}
     </div>
   );

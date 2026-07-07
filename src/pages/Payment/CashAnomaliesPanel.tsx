@@ -164,12 +164,20 @@ export const CashAnomaliesPanel: React.FC = () => {
           <table className="w-full border-separate border-spacing-y-2">
             <thead className="bg-gray-50/70">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Flag</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Session</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Flag
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Session
+                </th>
                 <th className="px-4 py-3 text-center text-sm">Sévérité</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Description</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Description
+                </th>
                 <th className="px-4 py-3 text-center text-sm">Revue</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Actions</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>

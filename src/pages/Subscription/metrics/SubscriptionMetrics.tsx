@@ -20,10 +20,7 @@ const formatNumber = (value: number): string => value.toLocaleString("fr-FR");
 
 type MetricTone = "green" | "blue" | "purple" | "orange" | "slate";
 
-const metricToneClass: Record<
-  MetricTone,
-  { icon: string; bar: string }
-> = {
+const metricToneClass: Record<MetricTone, { icon: string; bar: string }> = {
   green: { icon: "bg-green-50 text-green-700", bar: "bg-green-500" },
   blue: { icon: "bg-blue-50 text-blue-700", bar: "bg-blue-500" },
   purple: { icon: "bg-purple-50 text-purple-700", bar: "bg-purple-500" },

@@ -110,7 +110,10 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
       setFormData({
         ...formData,
         ownerType: type as any,
-        ownerCode: (item as any).customerId || (item as any).memberId || (item as any).code,
+        ownerCode:
+          (item as any).customerId ||
+          (item as any).memberId ||
+          (item as any).code,
       });
       setSelectedOwner(item);
     } else {
@@ -231,177 +234,80 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
     <ModalPortal onClose={onClose} size="2xl">
       <div className="max-h-[85vh] overflow-y-auto rounded-2xl bg-white">
         <div className="sticky top-0 z-10 flex items-center justify-between bg-white/95 p-5 backdrop-blur ring-1 ring-gray-100">
-            <h3 className="text-xl font-bold">
-              {isEditing ? "Modifier le contrat" : "Nouveau contrat"}
-            </h3>
-            <button
-              onClick={onClose}
-              className="p-1 hover:bg-gray-100 rounded-xl"
-            >
-              <X size={20} />
-            </button>
-          </div>
+          <h3 className="text-xl font-bold">
+            {isEditing ? "Modifier le contrat" : "Nouveau contrat"}
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-gray-100 rounded-xl"
+          >
+            <X size={20} />
+          </button>
+        </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            {/* Informations générales */}
-            <div>
-              <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">Informations générales</h4>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Titre *
-                  </label>
-                  <input
-                    type="text"
-                    name="title"
-                    value={formData.title}
-                    onChange={handleChange}
-                    required
-                    className="w-full rounded-2xl bg-gray-50/60 px-3 py-2.5 ring-1 ring-gray-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    name="description"
-                    value={formData.description}
-                    onChange={handleChange}
-                    rows={2}
-                    className="w-full rounded-2xl bg-gray-50/60 px-3 py-2.5 ring-1 ring-gray-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Template *
-                    </label>
-                    <select
-                      name="templateCode"
-                      value={formData.templateCode}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-3 py-2 border rounded-xl"
-                    >
-                      <option value="">Sélectionner</option>
-                      {templates.map((t) => (
-                        <option key={t.code} value={t.code}>
-                          {t.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Type de propriétaire *
-                    </label>
-                    <select
-                      name="ownerType"
-                      value={formData.ownerType}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 border rounded-xl"
-                    >
-                      {ownerTypes.map((t) => (
-                        <option key={t.value} value={t.value}>
-                          {t.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Propriétaire *
-                    </label>
-                    {formData.ownerType === "MEMBER" ? (
-                      <MemberAutocomplete
-                        onSelect={(member) =>
-                          handleOwnerSelect(member as any, "MEMBER")
-                        }
-                        selectedMember={selectedOwner as MemberSummaryResponse}
-                        placeholder="Rechercher un membre..."
-                      />
-                    ) : (
-                      <CustomerAutocomplete
-                        onSelect={(customer) =>
-                          handleOwnerSelect(customer, formData.ownerType)
-                        }
-                        selectedCustomer={
-                          selectedOwner as CustomerSummaryResponse
-                        }
-                        placeholder="Rechercher un customer..."
-                      />
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Business (optionnel)
-                    </label>
-                    <CustomerAutocomplete
-                      onSelect={handleBusinessSelect}
-                      selectedCustomer={selectedBusiness}
-                      placeholder="Rechercher un business..."
-                    />
-                  </div>
-                </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Informations générales */}
+          <div>
+            <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
+              Informations générales
+            </h4>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Titre *
+                </label>
+                <input
+                  type="text"
+                  name="title"
+                  value={formData.title}
+                  onChange={handleChange}
+                  required
+                  className="w-full rounded-2xl bg-gray-50/60 px-3 py-2.5 ring-1 ring-gray-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
               </div>
-            </div>
-
-            {/* Dates */}
-            <div>
-              <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">Dates</h4>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Description
+                </label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  rows={2}
+                  className="w-full rounded-2xl bg-gray-50/60 px-3 py-2.5 ring-1 ring-gray-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    Date d'effet *
-                  </label>
-                  <input
-                    type="date"
-                    name="effectiveDate"
-                    value={formData.effectiveDate}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3 py-2 border rounded-xl"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Date de début *
-                  </label>
-                  <input
-                    type="date"
-                    name="startDate"
-                    value={formData.startDate}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3 py-2 border rounded-xl"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Date de fin
-                  </label>
-                  <input
-                    type="date"
-                    name="endDate"
-                    value={formData.endDate}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-xl"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Type de renouvellement *
+                    Template *
                   </label>
                   <select
-                    name="renewalType"
-                    value={formData.renewalType}
+                    name="templateCode"
+                    value={formData.templateCode}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-3 py-2 border rounded-xl"
+                  >
+                    <option value="">Sélectionner</option>
+                    {templates.map((t) => (
+                      <option key={t.code} value={t.code}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Type de propriétaire *
+                  </label>
+                  <select
+                    name="ownerType"
+                    value={formData.ownerType}
                     onChange={handleChange}
                     className="w-full px-3 py-2 border rounded-xl"
                   >
-                    {renewalTypes.map((t) => (
+                    {ownerTypes.map((t) => (
                       <option key={t.value} value={t.value}>
                         {t.label}
                       </option>
@@ -409,130 +315,233 @@ export const ContractFormModal: React.FC<ContractFormModalProps> = ({
                   </select>
                 </div>
               </div>
-            </div>
-
-            {/* Parties */}
-            <div>
-              <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">Parties prenantes</h4>
-              <div className="space-y-3 mb-4">
-                {formData.parties.map((party, index) => (
-                  <div
-                    key={index}
-                    className="flex justify-between items-center p-3 bg-gray-50 rounded-xl"
-                  >
-                    <div>
-                      <p className="font-medium">{party.displayName}</p>
-                      <div className="flex gap-2 mt-1 text-xs text-gray-500">
-                        <span>{party.partyType}</span>
-                        <span>{party.partyCode}</span>
-                        <span>{party.email}</span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeParty(index)}
-                      className="text-red-500"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <div className="border-t pt-4">
-                <p className="text-sm font-medium mb-3">Ajouter une partie</p>
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <select
-                    value={newParty.partyType}
-                    onChange={(e) => handlePartyTypeChange(e.target.value)}
-                    className="px-3 py-2 border rounded-xl"
-                  >
-                    <option value="MEMBER">Membre</option>
-                    <option value="CUSTOMER">Customer</option>
-                    <option value="BUSINESS">Business</option>
-                  </select>
-                  <select
-                    value={newParty.role}
-                    onChange={(e) =>
-                      setNewParty({ ...newParty, role: e.target.value })
-                    }
-                    className="px-3 py-2 border rounded-xl"
-                  >
-                    <option value="SIGNATORY">Signataire</option>
-                    <option value="BENEFICIARY">Bénéficiaire</option>
-                    <option value="OPERATOR">Opérateur</option>
-                  </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Propriétaire *
+                  </label>
+                  {formData.ownerType === "MEMBER" ? (
+                    <MemberAutocomplete
+                      onSelect={(member) =>
+                        handleOwnerSelect(member as any, "MEMBER")
+                      }
+                      selectedMember={selectedOwner as MemberSummaryResponse}
+                      placeholder="Rechercher un membre..."
+                    />
+                  ) : (
+                    <CustomerAutocomplete
+                      onSelect={(customer) =>
+                        handleOwnerSelect(customer, formData.ownerType)
+                      }
+                      selectedCustomer={
+                        selectedOwner as CustomerSummaryResponse
+                      }
+                      placeholder="Rechercher un customer..."
+                    />
+                  )}
                 </div>
-
-                {newParty.partyType === "MEMBER" ? (
-                  <MemberAutocomplete
-                    onSelect={(member) => handlePartySelect(member, "MEMBER")}
-                    selectedMember={selectedPartyMember}
-                    placeholder="Rechercher un membre..."
-                  />
-                ) : (
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Business (optionnel)
+                  </label>
                   <CustomerAutocomplete
-                    onSelect={(customer) =>
-                      handlePartySelect(customer, "CUSTOMER")
-                    }
-                    selectedCustomer={selectedPartyCustomer}
-                    placeholder="Rechercher un customer..."
+                    onSelect={handleBusinessSelect}
+                    selectedCustomer={selectedBusiness}
+                    placeholder="Rechercher un business..."
                   />
-                )}
-
-                <input
-                  type="tel"
-                  placeholder="Téléphone (optionnel)"
-                  value={newParty.phone}
-                  onChange={(e) =>
-                    setNewParty({ ...newParty, phone: e.target.value })
-                  }
-                  className="w-full mt-3 px-3 py-2 border rounded-xl"
-                />
-
-                <button
-                  type="button"
-                  onClick={addParty}
-                  disabled={
-                    !newParty.partyCode ||
-                    !newParty.displayName ||
-                    !newParty.email
-                  }
-                  className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2 border border-primary-600 text-primary-600 rounded-xl hover:bg-primary-50 disabled:opacity-50"
-                >
-                  <Plus size={16} />
-                  Ajouter
-                </button>
+                </div>
               </div>
+            </div>
+          </div>
 
-              {formData.parties.length === 0 && (
-                <p className="text-sm text-red-500 mt-2">
-                  Au moins une partie signataire est requise
-                </p>
-              )}
+          {/* Dates */}
+          <div>
+            <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
+              Dates
+            </h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Date d'effet *
+                </label>
+                <input
+                  type="date"
+                  name="effectiveDate"
+                  value={formData.effectiveDate}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-3 py-2 border rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Date de début *
+                </label>
+                <input
+                  type="date"
+                  name="startDate"
+                  value={formData.startDate}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-3 py-2 border rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Date de fin
+                </label>
+                <input
+                  type="date"
+                  name="endDate"
+                  value={formData.endDate}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Type de renouvellement *
+                </label>
+                <select
+                  name="renewalType"
+                  value={formData.renewalType}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border rounded-xl"
+                >
+                  {renewalTypes.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Parties */}
+          <div>
+            <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
+              Parties prenantes
+            </h4>
+            <div className="space-y-3 mb-4">
+              {formData.parties.map((party, index) => (
+                <div
+                  key={index}
+                  className="flex justify-between items-center p-3 bg-gray-50 rounded-xl"
+                >
+                  <div>
+                    <p className="font-medium">{party.displayName}</p>
+                    <div className="flex gap-2 mt-1 text-xs text-gray-500">
+                      <span>{party.partyType}</span>
+                      <span>{party.partyCode}</span>
+                      <span>{party.email}</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeParty(index)}
+                    className="text-red-500"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
             </div>
 
-            {/* Boutons */}
-            <div className="flex justify-end gap-3 pt-4 border-t">
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium mb-3">Ajouter une partie</p>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <select
+                  value={newParty.partyType}
+                  onChange={(e) => handlePartyTypeChange(e.target.value)}
+                  className="px-3 py-2 border rounded-xl"
+                >
+                  <option value="MEMBER">Membre</option>
+                  <option value="CUSTOMER">Customer</option>
+                  <option value="BUSINESS">Business</option>
+                </select>
+                <select
+                  value={newParty.role}
+                  onChange={(e) =>
+                    setNewParty({ ...newParty, role: e.target.value })
+                  }
+                  className="px-3 py-2 border rounded-xl"
+                >
+                  <option value="SIGNATORY">Signataire</option>
+                  <option value="BENEFICIARY">Bénéficiaire</option>
+                  <option value="OPERATOR">Opérateur</option>
+                </select>
+              </div>
+
+              {newParty.partyType === "MEMBER" ? (
+                <MemberAutocomplete
+                  onSelect={(member) => handlePartySelect(member, "MEMBER")}
+                  selectedMember={selectedPartyMember}
+                  placeholder="Rechercher un membre..."
+                />
+              ) : (
+                <CustomerAutocomplete
+                  onSelect={(customer) =>
+                    handlePartySelect(customer, "CUSTOMER")
+                  }
+                  selectedCustomer={selectedPartyCustomer}
+                  placeholder="Rechercher un customer..."
+                />
+              )}
+
+              <input
+                type="tel"
+                placeholder="Téléphone (optionnel)"
+                value={newParty.phone}
+                onChange={(e) =>
+                  setNewParty({ ...newParty, phone: e.target.value })
+                }
+                className="w-full mt-3 px-3 py-2 border rounded-xl"
+              />
+
               <button
                 type="button"
-                onClick={onClose}
-                className="px-4 py-2 border rounded-xl text-gray-700 hover:bg-gray-50"
-              >
-                Annuler
-              </button>
-              <button
-                type="submit"
+                onClick={addParty}
                 disabled={
-                  formData.parties.length === 0 ||
-                  !formData.templateCode ||
-                  !formData.ownerCode
+                  !newParty.partyCode ||
+                  !newParty.displayName ||
+                  !newParty.email
                 }
-                className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50"
+                className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2 border border-primary-600 text-primary-600 rounded-xl hover:bg-primary-50 disabled:opacity-50"
               >
-                {isEditing ? "Mettre à jour" : "Créer le contrat"}
+                <Plus size={16} />
+                Ajouter
               </button>
             </div>
+
+            {formData.parties.length === 0 && (
+              <p className="text-sm text-red-500 mt-2">
+                Au moins une partie signataire est requise
+              </p>
+            )}
+          </div>
+
+          {/* Boutons */}
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border rounded-xl text-gray-700 hover:bg-gray-50"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={
+                formData.parties.length === 0 ||
+                !formData.templateCode ||
+                !formData.ownerCode
+              }
+              className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50"
+            >
+              {isEditing ? "Mettre à jour" : "Créer le contrat"}
+            </button>
+          </div>
         </form>
       </div>
     </ModalPortal>

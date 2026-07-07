@@ -16,39 +16,40 @@ import { EntitlementDefinitionsList } from "./entitlements/EntitlementDefinition
 import { SubscriptionsList } from "./subscriptions/SubscriptionsList";
 import { PromotionsList } from "./promotions/PromotionsList";
 import { SubscriptionMetrics } from "./metrics/SubscriptionMetrics";
-import { PassesList } from "./passes/PassesList";
 import { UsageRecordsList } from "./usage/UsageRecordsList";
 import { BillableItemsList } from "./billing/BillableItemsList";
+import { PassCommercialMaster } from "./PassCommercialMaster";
 
 type TabId =
   | "metrics"
   | "plans"
   | "entitlements"
   | "subscriptions"
-  | "promotions"
-  | "passes"
+  | "passCommercial"
   | "usage"
-  | "billable";
+  | "billable"
+  | "promotions";
 
 const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "metrics", label: "Métriques", icon: BarChart3 },
   { id: "plans", label: "Plans", icon: Package },
   { id: "entitlements", label: "Droits", icon: Tags },
   { id: "subscriptions", label: "Souscriptions", icon: Users },
-  { id: "promotions", label: "Promotions", icon: Ticket },
-  { id: "passes", label: "Passes", icon: PassIcon },
+  { id: "passCommercial", label: "Pass commercial", icon: PassIcon },
   { id: "usage", label: "Usage", icon: Activity },
   { id: "billable", label: "Items facturables", icon: CreditCard },
+  { id: "promotions", label: "Promotions", icon: Ticket },
 ];
 
 const getTabFromPath = (pathname: string): TabId => {
   if (pathname.startsWith("/subscriptions/entitlements")) return "entitlements";
   if (pathname.startsWith("/subscriptions/plans")) return "plans";
-  if (pathname.startsWith("/subscriptions/subscriptions")) return "subscriptions";
-  if (pathname.startsWith("/subscriptions/promotions")) return "promotions";
-  if (pathname.startsWith("/subscriptions/passes")) return "passes";
+  if (pathname.startsWith("/subscriptions/subscriptions"))
+    return "subscriptions";
+  if (pathname.startsWith("/subscriptions/passes")) return "passCommercial";
   if (pathname.startsWith("/subscriptions/usage")) return "usage";
   if (pathname.startsWith("/subscriptions/billable")) return "billable";
+  if (pathname.startsWith("/subscriptions/promotions")) return "promotions";
   return "metrics";
 };
 
@@ -107,7 +108,11 @@ export const SubscriptionMaster: React.FC = () => {
               >
                 <Icon
                   size={18}
-                  className={active ? "text-white" : "text-gray-500 group-hover:text-gray-800"}
+                  className={
+                    active
+                      ? "text-white"
+                      : "text-gray-500 group-hover:text-gray-800"
+                  }
                 />
                 {tab.label}
               </button>
@@ -138,14 +143,9 @@ export const SubscriptionMaster: React.FC = () => {
             <SubscriptionsList />
           </div>
         )}
-        {visitedTabs.has("promotions") && (
-          <div className={activeTab !== "promotions" ? "hidden" : ""}>
-            <PromotionsList />
-          </div>
-        )}
-        {visitedTabs.has("passes") && (
-          <div className={activeTab !== "passes" ? "hidden" : ""}>
-            <PassesList />
+        {visitedTabs.has("passCommercial") && (
+          <div className={activeTab !== "passCommercial" ? "hidden" : ""}>
+            <PassCommercialMaster />
           </div>
         )}
         {visitedTabs.has("usage") && (
@@ -156,6 +156,11 @@ export const SubscriptionMaster: React.FC = () => {
         {visitedTabs.has("billable") && (
           <div className={activeTab !== "billable" ? "hidden" : ""}>
             <BillableItemsList />
+          </div>
+        )}
+        {visitedTabs.has("promotions") && (
+          <div className={activeTab !== "promotions" ? "hidden" : ""}>
+            <PromotionsList />
           </div>
         )}
       </div>

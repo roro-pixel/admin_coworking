@@ -327,7 +327,8 @@ export const TaskMaster: React.FC = () => {
 
   return (
     <div>
-      <div className="overflow-x-auto mb-6 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100 flex flex-wrap gap-1">
+      <div className="mb-6 overflow-x-auto rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-max gap-1">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -338,6 +339,7 @@ export const TaskMaster: React.FC = () => {
             {tab.label}
           </button>
         ))}
+        </div>
       </div>
       {actionError && (
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex justify-between">
@@ -361,7 +363,7 @@ export const TaskMaster: React.FC = () => {
             setSourceTypeFilter={setSourceTypeFilter}
           />
           {metrics && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
               <Metric label="Total" value={metrics.totalTasks} />
               <Metric label="Ouvertes" value={metrics.openTasks} />
               <Metric
@@ -379,7 +381,7 @@ export const TaskMaster: React.FC = () => {
           {boardLoading ? (
             <div className="py-12 text-center">Chargement...</div>
           ) : (
-            <div className="flex gap-4 overflow-x-auto pb-4">
+            <div className="flex flex-col sm:flex-row gap-4 overflow-x-auto pb-4">
               {activeStatuses.map((status) => {
                 const col = boardData?.columns?.find(
                   (c) => c.status === status,
@@ -478,7 +480,7 @@ export const TaskMaster: React.FC = () => {
           ) : (
             metrics && (
               <div className="space-y-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                   <Metric label="Total" value={metrics.totalTasks} />
                   <Metric label="Ouvertes" value={metrics.openTasks} />
                   <Metric label="En cours" value={metrics.inProgressTasks} />
@@ -499,7 +501,7 @@ export const TaskMaster: React.FC = () => {
                     value={`${Number(metrics.avgCompletionHours ?? 0).toFixed(1)} h`}
                   />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:p-6">
                   <Breakdown title="Par priorité" data={metrics.byPriority} />
                   <Breakdown title="Par source" data={metrics.bySourceType} />
                 </div>
@@ -510,7 +512,7 @@ export const TaskMaster: React.FC = () => {
       )}
 
       {activeTab === "create" && (
-        <div className="bg-white rounded-xl shadow-sm p-6 max-w-4xl space-y-4">
+        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 max-w-4xl space-y-4">
           <TaskCreateForm
             form={createForm}
             setForm={setCreateForm}
@@ -522,7 +524,7 @@ export const TaskMaster: React.FC = () => {
           <button
             onClick={() => createMutation.mutate()}
             disabled={!createForm.title || createMutation.isPending}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
+            className="w-full sm:w-auto justify-center px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
           >
             Créer la tâche
           </button>
@@ -533,14 +535,14 @@ export const TaskMaster: React.FC = () => {
         <ModalPortal onClose={() => setIsDetailOpen(false)}>
           <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-start rounded-t-2xl">
             <div>
-              <h3 className="text-xl font-bold">{currentTask.title}</h3>
+              <h3 className="text-lg sm:text-xl font-bold">{currentTask.title}</h3>
               <p className="text-sm text-gray-500">#{currentTask.id}</p>
             </div>
             <button onClick={() => setIsDetailOpen(false)}>
               <X size={20} />
             </button>
           </div>
-          <div className="p-6 space-y-6">
+          <div className="p-4 sm:p-6 space-y-6">
             <div className="flex flex-wrap gap-2">
               <span
                 className={`px-2 py-1 rounded-full text-xs ${statusConfig[currentTask.status].color}`}
@@ -617,7 +619,7 @@ export const TaskMaster: React.FC = () => {
               </div>
             </div>
             <div className="border rounded-xl p-4">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
                 <h4 className="font-semibold">Checklist</h4>
                 <span className="text-xs text-gray-500">
                   {
@@ -731,7 +733,7 @@ const Metric = ({
   color?: string;
 }) => (
   <div className="bg-white rounded-xl p-4 shadow-sm">
-    <p className={`text-xl font-bold ${color}`}>{value}</p>
+    <p className={`text-lg sm:text-xl font-bold ${color}`}>{value}</p>
     <p className="text-xs text-gray-500">{label}</p>
   </div>
 );
@@ -851,7 +853,7 @@ const TaskSimpleList = ({
     <div className="py-12 text-center">Chargement...</div>
   ) : (
     <div className="bg-white rounded-xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-      <table className="w-full border-separate border-spacing-y-2 text-sm">
+      <table className="w-full border-separate border-spacing-y-2 text-sm max-md:block max-md:border-spacing-0 max-md:[&_thead]:hidden max-md:[&_tbody]:block max-md:[&_tr]:mb-3 max-md:[&_tr]:block max-md:[&_tr]:rounded-2xl max-md:[&_tr]:bg-gray-50 max-md:[&_tr]:p-3 max-md:[&_tr]:shadow-sm max-md:[&_tr]:ring-1 max-md:[&_tr]:ring-gray-100 max-md:[&_td]:block max-md:[&_td]:px-0 max-md:[&_td]:py-1.5 max-md:[&_td]:text-left max-md:[&_td]:text-xs max-md:[&_td]:break-words">
         <tbody className="divide-y-0">
           {tasks.map((task) => (
             <tr

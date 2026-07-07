@@ -205,4 +205,8 @@ export const memberService = {
     });
     return response.data;
   },
+
+  deleteMember: async (id: string): Promise<void> => {
+  await apiClient.delete(`/sni/api/v1/members/${id}`);
+},
 };

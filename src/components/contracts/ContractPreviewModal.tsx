@@ -68,7 +68,10 @@ export const ContractPreviewModal: React.FC<ContractPreviewModalProps> = ({
       const documentResponse = await contractService.generateContract({
         ...buildPayload(),
       });
-      const documentUrl = documentResponse.previewUrl || documentResponse.downloadUrl || documentResponse.fileUrl;
+      const documentUrl =
+        documentResponse.previewUrl ||
+        documentResponse.downloadUrl ||
+        documentResponse.fileUrl;
       if (documentResponse && documentUrl) {
         window.open(documentUrl, "_blank");
       } else {

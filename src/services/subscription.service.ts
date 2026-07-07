@@ -206,6 +206,18 @@ export interface Pass {
   status: string;
   metadataJson?: string;
   entitlements?: PassEntitlement[];
+  usedCount?: number | null;
+  contractCode?: string | null;
+  planCode?: string | null;
+  planName?: string | null;
+  planVersion?: number | null;
+  currency?: string | null;
+  subtotalAmount?: number | null;
+  taxAmount?: number | null;
+  totalAmount?: number | null;
+  autoRenew?: boolean;
+  nextRenewalDate?: string | null;
+  renewalCount?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -216,6 +228,164 @@ export interface PassEntitlement {
   unlimited: boolean;
   validFrom?: string;
   validUntil?: string;
+}
+
+// ==================== PASS PLAN SYSTEM — BACKEND V2 ====================
+// Documentation: /sni/api/v1/pass-plans + /sni/api/v1/passes
+
+export type PassType =
+  | "DAY_PASS"
+  | "TIME_PACK"
+  | "VISITOR_PASS"
+  | "MEETING_ROOM_PACK"
+  | "PROMOTIONAL_PASS"
+  | "SUBSCRIPTION_PASS"
+  | "COMPANY_SHARED_PASS"
+  | "CUSTOM";
+
+export type PassDurationUnit = "DAY" | "WEEK" | "MONTH" | "YEAR";
+export type PassPlanStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
+export type PassTargetAudience = "INDIVIDUAL" | "COMPANY" | "BOTH";
+export type PassSubscriberType = "MEMBER" | "CUSTOMER" | "BUSINESS_ENTITY";
+export type PassLifecycleStatus =
+  | "DRAFT"
+  | "PENDING_ACTIVATION"
+  | "ACTIVE"
+  | "PARTIALLY_USED"
+  | "CONSUMED"
+  | "PAST_DUE"
+  | "EXPIRED"
+  | "CANCELLED"
+  | "SUSPENDED";
+
+export interface PassPlanRequest {
+  name: string;
+  description?: string | null;
+  passType: PassType;
+  targetAudience: PassTargetAudience;
+  visible?: boolean;
+  sortOrder?: number;
+  requiredKycLevel?: number;
+}
+
+export interface PassPlanResponse {
+  id: number;
+  code: string;
+  name: string;
+  description?: string | null;
+  passType: PassType | string;
+  targetAudience: PassTargetAudience | string;
+  status: PassPlanStatus | string;
+  visible: boolean;
+  sortOrder: number;
+  requiredKycLevel: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PassPlanVersionRequest {
+  name: string;
+  description?: string | null;
+  duration: number;
+  durationUnit: PassDurationUnit;
+  maxUses?: number | null;
+  autoRenewable?: boolean;
+  requiredKycLevel?: number;
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
+  termsJson?: string | null;
+}
+
+export interface PassPlanVersionResponse {
+  id: number;
+  planCode: string;
+  versionNumber: number;
+  name: string;
+  description?: string | null;
+  status: PassPlanStatus | string;
+  duration: number;
+  durationUnit: PassDurationUnit | string;
+  maxUses?: number | null;
+  autoRenewable: boolean;
+  requiredKycLevel: number;
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PassPlanPriceRequest {
+  currency: string;
+  amount: number;
+  setupFee?: number;
+  depositAmount?: number;
+  taxIncluded?: boolean;
+  taxCode?: string | null;
+}
+
+export interface PassPlanPriceResponse extends PassPlanPriceRequest {
+  id: number;
+  versionId: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PassPlanEntitlementRequest {
+  entitlementCode: string;
+  quantity?: number | null;
+  unlimited?: boolean;
+  rolloverAllowed?: boolean;
+  rolloverLimit?: number | null;
+  validForDays?: number | null;
+  priority?: number;
+}
+
+export interface PassPlanEntitlementResponse extends PassPlanEntitlementRequest {
+  id: number;
+  versionId: number;
+  entitlementName?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PassPurchaseRequest {
+  ownerType: PassSubscriberType;
+  ownerCode: string;
+  planVersionId?: number | null;
+  currency?: string | null;
+  validFrom?: string | null;
+  autoRenew?: boolean;
+  metadataJson?: string | null;
+}
+
+export interface PassEventResponse {
+  id: number;
+  eventType: string;
+  payloadJson?: string | null;
+  occurredAt: string;
+}
+
+export interface PassStatusHistoryResponse {
+  id: number;
+  fromStatus?: PassLifecycleStatus | string | null;
+  toStatus: PassLifecycleStatus | string;
+  reason?: string | null;
+  changedBy?: string | null;
+  changedAt: string;
+}
+
+export interface PassRenewalScheduleResponse {
+  id: number;
+  duration: number;
+  durationUnit: PassDurationUnit | string;
+  nextRenewalDate: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  status: string;
+  retryCount: number;
+  lastAttemptAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ==================== SEAT ====================
@@ -887,6 +1057,147 @@ export const subscriptionService = {
   // PASSES
   // ────────────────────────────────────────────────────────────
 
+  // ────────────────────────────────────────────────────────────
+  // PASS PLANS — nouveau catalogue de plans de pass
+  // ────────────────────────────────────────────────────────────
+
+  createPassPlan: async (data: PassPlanRequest): Promise<PassPlanResponse> => {
+    const response = await apiClient.post("/sni/api/v1/pass-plans", data);
+    return response.data;
+  },
+
+  getPassPlans: async (params?: {
+    passType?: PassType | string;
+    status?: PassPlanStatus | string;
+    searchText?: string;
+    page?: number;
+    size?: number;
+    sort?: string;
+  }): Promise<PaginatedResponse<PassPlanResponse>> => {
+    const response = await apiClient.get("/sni/api/v1/pass-plans", { params });
+    return normalizePaginated<PassPlanResponse>(response.data);
+  },
+
+  getPassPlan: async (planCode: string): Promise<PassPlanResponse> => {
+    const response = await apiClient.get(`/sni/api/v1/pass-plans/${planCode}`);
+    return response.data;
+  },
+
+  updatePassPlan: async (
+    planCode: string,
+    data: Partial<PassPlanRequest>,
+  ): Promise<PassPlanResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/pass-plans/${planCode}`,
+      data,
+    );
+    return response.data;
+  },
+
+  publishPassPlan: async (planCode: string): Promise<PassPlanResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/pass-plans/${planCode}/publish`,
+    );
+    return response.data;
+  },
+
+  archivePassPlan: async (planCode: string): Promise<PassPlanResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/pass-plans/${planCode}/archive`,
+    );
+    return response.data;
+  },
+
+  createPassPlanVersion: async (
+    planCode: string,
+    data: PassPlanVersionRequest,
+  ): Promise<PassPlanVersionResponse> => {
+    const response = await apiClient.post(
+      `/sni/api/v1/pass-plans/${planCode}/versions`,
+      data,
+    );
+    return response.data;
+  },
+
+  getPassPlanVersions: async (
+    planCode: string,
+  ): Promise<PassPlanVersionResponse[]> => {
+    const response = await apiClient.get(
+      `/sni/api/v1/pass-plans/${planCode}/versions`,
+    );
+    return normalizeList<PassPlanVersionResponse>(response.data);
+  },
+
+  publishPassPlanVersion: async (
+    planCode: string,
+    id: number,
+  ): Promise<PassPlanVersionResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/pass-plans/${planCode}/versions/${id}/publish`,
+    );
+    return response.data;
+  },
+
+  upsertPassPlanPrice: async (
+    versionId: number,
+    data: PassPlanPriceRequest,
+  ): Promise<PassPlanPriceResponse> => {
+    const response = await apiClient.post(
+      `/sni/api/v1/pass-plans/versions/${versionId}/prices`,
+      data,
+    );
+    return response.data;
+  },
+
+  getPassPlanPrices: async (
+    versionId: number,
+  ): Promise<PassPlanPriceResponse[]> => {
+    const response = await apiClient.get(
+      `/sni/api/v1/pass-plans/versions/${versionId}/prices`,
+    );
+    return normalizeList<PassPlanPriceResponse>(response.data);
+  },
+
+  addPassPlanEntitlement: async (
+    versionId: number,
+    data: PassPlanEntitlementRequest,
+  ): Promise<PassPlanEntitlementResponse> => {
+    const response = await apiClient.post(
+      `/sni/api/v1/pass-plans/versions/${versionId}/entitlements`,
+      data,
+    );
+    return response.data;
+  },
+
+  getPassPlanEntitlements: async (
+    versionId: number,
+  ): Promise<PassPlanEntitlementResponse[]> => {
+    const response = await apiClient.get(
+      `/sni/api/v1/pass-plans/versions/${versionId}/entitlements`,
+    );
+    return normalizeList<PassPlanEntitlementResponse>(response.data);
+  },
+
+  deletePassPlanEntitlement: async (
+    versionId: number,
+    id: number,
+  ): Promise<void> => {
+    await apiClient.delete(
+      `/sni/api/v1/pass-plans/versions/${versionId}/entitlements/${id}`,
+    );
+  },
+
+  purchasePassPlan: async (
+    planCode: string,
+    data: PassPurchaseRequest,
+  ): Promise<Pass> => {
+    const response = await apiClient.post(
+      `/sni/api/v1/pass-plans/${planCode}/purchase`,
+      data,
+    );
+    return response.data;
+  },
+
   getPasses: async (params?: {
     ownerType?: string;
     ownerCode?: string;
@@ -903,6 +1214,38 @@ export const subscriptionService = {
   getPass: async (passNumber: string): Promise<Pass> => {
     const response = await apiClient.get(`/sni/api/v1/passes/${passNumber}`);
     return response.data;
+  },
+
+  activatePass: async (passNumber: string): Promise<Pass> => {
+    const response = await apiClient.post(
+      `/sni/api/v1/passes/${passNumber}/activate`,
+    );
+    return response.data;
+  },
+
+  getPassEvents: async (passNumber: string): Promise<PassEventResponse[]> => {
+    const response = await apiClient.get(
+      `/sni/api/v1/passes/${passNumber}/events`,
+    );
+    return normalizeList<PassEventResponse>(response.data);
+  },
+
+  getPassStatusHistory: async (
+    passNumber: string,
+  ): Promise<PassStatusHistoryResponse[]> => {
+    const response = await apiClient.get(
+      `/sni/api/v1/passes/${passNumber}/history`,
+    );
+    return normalizeList<PassStatusHistoryResponse>(response.data);
+  },
+
+  getPassRenewalSchedule: async (
+    passNumber: string,
+  ): Promise<PassRenewalScheduleResponse | null> => {
+    const response = await apiClient.get(
+      `/sni/api/v1/passes/${passNumber}/renewal`,
+    );
+    return response.data?.data ?? response.data ?? null;
   },
 
   createPass: async (data: {
@@ -959,6 +1302,15 @@ export const subscriptionService = {
     });
     return normalizeList<EntitlementBalance>(response.data);
   },
+
+  deleteSubscriptionEntitlement: async (
+  subscriptionNumber: string,
+  entitlementCode: string,
+): Promise<void> => {
+  await apiClient.delete(
+    `/sni/api/v1/subscriptions/${subscriptionNumber}/entitlements/${entitlementCode}`,
+  );
+},
 
   // ────────────────────────────────────────────────────────────
   // USAGE RECORDS

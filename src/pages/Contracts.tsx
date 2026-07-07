@@ -182,16 +182,24 @@ export const AdminContracts: React.FC = () => {
           c.contractCode
             .toLowerCase()
             .includes(debouncedSearch.toLowerCase()) ||
-          (c.ownerCode || "").toLowerCase().includes(debouncedSearch.toLowerCase()),
+          (c.ownerCode || "")
+            .toLowerCase()
+            .includes(debouncedSearch.toLowerCase()),
       )
     : contracts;
 
-  const activeContracts = filteredContracts.filter((c) => c.status === "ACTIVE").length;
+  const activeContracts = filteredContracts.filter(
+    (c) => c.status === "ACTIVE",
+  ).length;
   const awaitingSignatureContracts = filteredContracts.filter(
     (c) => c.status === "AWAITING_SIGNATURE",
   ).length;
-  const draftContracts = filteredContracts.filter((c) => c.status === "DRAFT").length;
-  const signedContracts = filteredContracts.filter((c) => c.status === "SIGNED").length;
+  const draftContracts = filteredContracts.filter(
+    (c) => c.status === "DRAFT",
+  ).length;
+  const signedContracts = filteredContracts.filter(
+    (c) => c.status === "SIGNED",
+  ).length;
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["contracts"] });
@@ -482,10 +490,13 @@ export const AdminContracts: React.FC = () => {
       <div className="mb-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-600">Contrathèque</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-600">
+              Contrathèque
+            </p>
             <h1 className="mt-2 text-2xl font-bold text-gray-950">Contrats</h1>
             <p className="mt-1 max-w-2xl text-sm text-gray-500">
-              Gérez le cycle de vie contractuel, la génération, la signature et les actions de suivi.
+              Gérez le cycle de vie contractuel, la génération, la signature et
+              les actions de suivi.
               {totalElements > 0 && (
                 <span className="ml-2 text-sm">
                   · {totalElements} contrat{totalElements > 1 ? "s" : ""}
@@ -494,47 +505,64 @@ export const AdminContracts: React.FC = () => {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => navigate("/contracts/templates-drafting")}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            <FileText size={18} />
-            Templates & rédaction
-          </button>
-          {/* Bouton création rapide (modal) */}
-          <button
-            onClick={() => {
-              setSelectedContract(null);
-              setIsEditing(false);
-              setIsModalOpen(true);
-            }}
-            className="border border-primary-600 text-primary-600 px-4 py-2 rounded-xl hover:bg-primary-50 flex items-center gap-2"
-          >
-            <FileText size={18} />
-            Création rapide
-          </button>
-          {/* Bouton création avancée (page dédiée) */}
-          <button
-            onClick={() => navigate("/contracts/new")}
-            className="bg-primary-600 text-white px-4 py-2 rounded-xl hover:bg-primary-700 flex items-center gap-2"
-          >
-            <Plus size={18} />
-            Création avancée
-          </button>
+            <button
+              onClick={() => navigate("/contracts/templates-drafting")}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <FileText size={18} />
+              Templates & rédaction
+            </button>
+            {/* Bouton création rapide (modal) */}
+            <button
+              onClick={() => {
+                setSelectedContract(null);
+                setIsEditing(false);
+                setIsModalOpen(true);
+              }}
+              className="border border-primary-600 text-primary-600 px-4 py-2 rounded-xl hover:bg-primary-50 flex items-center gap-2"
+            >
+              <FileText size={18} />
+              Création rapide
+            </button>
+            {/* Bouton création avancée (page dédiée) */}
+            <button
+              onClick={() => navigate("/contracts/new")}
+              className="bg-primary-600 text-white px-4 py-2 rounded-xl hover:bg-primary-700 flex items-center gap-2"
+            >
+              <Plus size={18} />
+              Création avancée
+            </button>
           </div>
         </div>
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "Actifs", value: activeContracts, helper: "Contrats en cours" },
-          { label: "À signer", value: awaitingSignatureContracts, helper: "En attente de signature" },
+          {
+            label: "Actifs",
+            value: activeContracts,
+            helper: "Contrats en cours",
+          },
+          {
+            label: "À signer",
+            value: awaitingSignatureContracts,
+            helper: "En attente de signature",
+          },
           { label: "Brouillons", value: draftContracts, helper: "À finaliser" },
-          { label: "Signés", value: signedContracts, helper: "Prêts à activer" },
+          {
+            label: "Signés",
+            value: signedContracts,
+            helper: "Prêts à activer",
+          },
         ].map((stat) => (
-          <div key={stat.label} className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
+          <div
+            key={stat.label}
+            className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100"
+          >
             <p className="text-sm text-gray-500">{stat.label}</p>
-            <p className="mt-1 text-2xl font-bold text-gray-950">{stat.value}</p>
+            <p className="mt-1 text-2xl font-bold text-gray-950">
+              {stat.value}
+            </p>
             <p className="mt-1 text-xs text-gray-400">{stat.helper}</p>
           </div>
         ))}
@@ -685,8 +713,7 @@ export const AdminContracts: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-sm text-gray-600">
-                        Début :{" "}
-                        {formatNullableDate(contract.startDate)}
+                        Début : {formatNullableDate(contract.startDate)}
                       </p>
                       {contract.endDate && (
                         <p className="text-xs text-gray-400">

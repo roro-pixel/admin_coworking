@@ -132,13 +132,13 @@ export const BookingPolicies: React.FC = () => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-semibold text-gray-900">
           Politiques de réservation
         </h2>
         <button
           onClick={() => handleOpenModal()}
-          className="bg-primary-600 text-white px-4 py-2 rounded-xl hover:bg-primary-700 flex items-center gap-2"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-white hover:bg-primary-700 sm:w-auto"
         >
           <Plus size={18} />
           Nouvelle politique
@@ -155,11 +155,12 @@ export const BookingPolicies: React.FC = () => {
           placeholder="Rechercher par audience ou type/groupe de ressource..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl"
+          className="w-full rounded-xl border border-gray-200 py-2 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary-500"
         />
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
+        <div className="hidden overflow-x-auto md:block">
         <table className="w-full border-separate border-spacing-y-1">
           <thead className="bg-gray-50/80">
             <tr>
@@ -254,6 +255,27 @@ export const BookingPolicies: React.FC = () => {
             ))}
           </tbody>
         </table>
+        </div>
+        <div className="space-y-3 p-3 md:hidden">
+          {filteredPolicies.map((policy) => (
+            <article key={policy.id} className={`rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-100 ${!policy.active ? "opacity-60" : ""}`}>
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-gray-950">{audienceTypes.find((a) => a.value === policy.audienceType)?.label || policy.audienceType}</p>
+                  <p className="mt-1 truncate text-xs font-semibold text-gray-500">{[policy.resourceTypeCode, policy.resourceGroupCode].filter(Boolean).join(" / ") || "Toutes les ressources"}</p>
+                </div>
+                <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold ${policy.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>{policy.active ? "Actif" : "Inactif"}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-xl bg-white p-2"><p className="text-gray-400">Approbation</p><p className="font-black text-gray-800">{policy.approvalRequired ? "Requise" : "Non"}</p></div>
+                <div className="rounded-xl bg-white p-2"><p className="text-gray-400">Actives max</p><p className="font-black text-gray-800">{policy.maxActiveBookings}</p></div>
+                <div className="rounded-xl bg-white p-2"><p className="text-gray-400">Par jour</p><p className="font-black text-gray-800">{policy.maxBookingsPerDay}</p></div>
+                <div className="rounded-xl bg-white p-2"><p className="text-gray-400">Durée max</p><p className="font-black text-gray-800">{formatDuration(policy.maxBookingDurationMinutes)}</p></div>
+              </div>
+              <button type="button" onClick={() => handleOpenModal(policy)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700"><Edit size={14} /> Modifier</button>
+            </article>
+          ))}
+        </div>
       </div>
 
       {filteredPolicies.length === 0 && !isLoading && (

@@ -41,9 +41,12 @@ export const AdminRealtimeBridge: React.FC = () => {
       };
 
       setToasts((current) => [toast, ...current].slice(0, 3));
-      window.setTimeout(() => {
-        setToasts((current) => current.filter((item) => item.id !== id));
-      }, detail.tone === "critical" ? 9000 : 6000);
+      window.setTimeout(
+        () => {
+          setToasts((current) => current.filter((item) => item.id !== id));
+        },
+        detail.tone === "critical" ? 9000 : 6000,
+      );
     };
 
     window.addEventListener("admin-realtime-toast", handler);

@@ -45,7 +45,9 @@ export const entitlementTypeLabels = Object.fromEntries(
   entitlementTypes.map((item) => [item.value, item.label]),
 ) as Record<string, string>;
 
-export const unitLabels = Object.fromEntries(units.map((item) => [item.value, item.label])) as Record<string, string>;
+export const unitLabels = Object.fromEntries(
+  units.map((item) => [item.value, item.label]),
+) as Record<string, string>;
 
 export const consumptionModeLabels = Object.fromEntries(
   consumptionModes.map((item) => [item.value, item.label]),
@@ -70,7 +72,9 @@ export type EntitlementFormData = {
   active: boolean;
 };
 
-export const buildDefaultEntitlementFormData = (def?: EntitlementDefinition | null): EntitlementFormData => ({
+export const buildDefaultEntitlementFormData = (
+  def?: EntitlementDefinition | null,
+): EntitlementFormData => ({
   name: def?.name ?? "",
   description: def?.description ?? "",
   entitlementType: def?.entitlementType ?? "ACCESS",
@@ -107,13 +111,23 @@ const normalizeSearchResults = (raw: any): { code: string; name: string }[] => {
   return [];
 };
 
-const searchResourceTypes = async (query: string): Promise<{ code: string; name: string }[]> => {
-  const response = await apiClient.get("/sni/api/v1/resource-types/search/basic", { params: { query } });
+const searchResourceTypes = async (
+  query: string,
+): Promise<{ code: string; name: string }[]> => {
+  const response = await apiClient.get(
+    "/sni/api/v1/resource-types/search/basic",
+    { params: { query } },
+  );
   return normalizeSearchResults(response.data);
 };
 
-const searchResourceGroups = async (query: string): Promise<{ code: string; name: string }[]> => {
-  const response = await apiClient.get("/sni/api/v1/resource-groups/search/basic", { params: { query } });
+const searchResourceGroups = async (
+  query: string,
+): Promise<{ code: string; name: string }[]> => {
+  const response = await apiClient.get(
+    "/sni/api/v1/resource-groups/search/basic",
+    { params: { query } },
+  );
   return normalizeSearchResults(response.data);
 };
 
@@ -145,13 +159,19 @@ const ResourceCombobox: React.FC<ResourceComboboxProps> = ({
   }, [value]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedQuery(inputText.trim()), 300);
+    const timer = window.setTimeout(
+      () => setDebouncedQuery(inputText.trim()),
+      300,
+    );
     return () => window.clearTimeout(timer);
   }, [inputText]);
 
   useEffect(() => {
     const handler = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
         setOpen(false);
       }
     };
@@ -175,7 +195,10 @@ const ResourceCombobox: React.FC<ResourceComboboxProps> = ({
   return (
     <div ref={containerRef} className="relative">
       <div className="relative">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <Search
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+        />
         <input
           type="text"
           value={inputText}
@@ -189,7 +212,9 @@ const ResourceCombobox: React.FC<ResourceComboboxProps> = ({
           className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-20 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50 disabled:bg-gray-50 disabled:text-gray-400"
         />
         <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
-          {isFetching && <Loader2 size={14} className="animate-spin text-gray-400" />}
+          {isFetching && (
+            <Loader2 size={14} className="animate-spin text-gray-400" />
+          )}
           {value && !disabled && (
             <button
               type="button"
@@ -212,7 +237,14 @@ const ResourceCombobox: React.FC<ResourceComboboxProps> = ({
             disabled={disabled}
             aria-label="Afficher les résultats"
           >
-            <ChevronDown size={16} className={open ? "rotate-180 transition-transform" : "transition-transform"} />
+            <ChevronDown
+              size={16}
+              className={
+                open
+                  ? "rotate-180 transition-transform"
+                  : "transition-transform"
+              }
+            />
           </button>
         </div>
       </div>
@@ -241,27 +273,32 @@ const ResourceCombobox: React.FC<ResourceComboboxProps> = ({
                   handleSelect(item);
                 }}
                 className={`block w-full px-4 py-3 text-left text-sm transition hover:bg-primary-50 ${
-                  item.code === value ? "bg-primary-50 text-primary-700" : "text-gray-700"
+                  item.code === value
+                    ? "bg-primary-50 text-primary-700"
+                    : "text-gray-700"
                 }`}
               >
                 <span className="font-medium">{item.name}</span>
-                <span className="ml-2 font-mono text-xs text-gray-400">{item.code}</span>
+                <span className="ml-2 font-mono text-xs text-gray-400">
+                  {item.code}
+                </span>
               </button>
             ))}
 
-            {inputText && !suggestions.some((item) => item.code === inputText) && (
-              <button
-                type="button"
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  onChange(inputText.trim());
-                  setOpen(false);
-                }}
-                className="block w-full border-t border-gray-100 px-4 py-3 text-left text-sm font-medium text-primary-600 transition hover:bg-primary-50"
-              >
-                Utiliser “{inputText}” directement
-              </button>
-            )}
+            {inputText &&
+              !suggestions.some((item) => item.code === inputText) && (
+                <button
+                  type="button"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    onChange(inputText.trim());
+                    setOpen(false);
+                  }}
+                  className="block w-full border-t border-gray-100 px-4 py-3 text-left text-sm font-medium text-primary-600 transition hover:bg-primary-50"
+                >
+                  Utiliser “{inputText}” directement
+                </button>
+              )}
           </div>
         </div>
       )}
@@ -275,12 +312,13 @@ type EntitlementDefinitionFieldsProps = {
   disabled?: boolean;
 };
 
-export const EntitlementDefinitionFields: React.FC<EntitlementDefinitionFieldsProps> = ({
-  formData,
-  onChange,
-  disabled = false,
-}) => {
-  const update = <K extends keyof EntitlementFormData>(key: K, value: EntitlementFormData[K]) => {
+export const EntitlementDefinitionFields: React.FC<
+  EntitlementDefinitionFieldsProps
+> = ({ formData, onChange, disabled = false }) => {
+  const update = <K extends keyof EntitlementFormData>(
+    key: K,
+    value: EntitlementFormData[K],
+  ) => {
     onChange({ ...formData, [key]: value });
   };
 
@@ -288,13 +326,19 @@ export const EntitlementDefinitionFields: React.FC<EntitlementDefinitionFieldsPr
     <div className="space-y-6">
       <section className="rounded-2xl bg-white p-6 shadow-sm shadow-gray-200/70 ring-1 ring-gray-100">
         <div className="mb-5">
-          <h2 className="text-lg font-semibold text-gray-900">Informations générales</h2>
-          <p className="mt-1 text-sm text-gray-500">Nom, description et typologie du droit.</p>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Informations générales
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Nom, description et typologie du droit.
+          </p>
         </div>
 
         <div className="grid gap-5 md:grid-cols-2">
           <div className="md:col-span-2">
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Nom du droit *</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Nom du droit *
+            </label>
             <input
               value={formData.name}
               onChange={(event) => update("name", event.target.value)}
@@ -306,10 +350,17 @@ export const EntitlementDefinitionFields: React.FC<EntitlementDefinitionFieldsPr
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Type *</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Type *
+            </label>
             <select
               value={formData.entitlementType}
-              onChange={(event) => update("entitlementType", event.target.value as EntitlementFormData["entitlementType"])}
+              onChange={(event) =>
+                update(
+                  "entitlementType",
+                  event.target.value as EntitlementFormData["entitlementType"],
+                )
+              }
               disabled={disabled}
               className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50 disabled:bg-gray-50"
             >
@@ -322,10 +373,17 @@ export const EntitlementDefinitionFields: React.FC<EntitlementDefinitionFieldsPr
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Unité *</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Unité *
+            </label>
             <select
               value={formData.unit}
-              onChange={(event) => update("unit", event.target.value as EntitlementFormData["unit"])}
+              onChange={(event) =>
+                update(
+                  "unit",
+                  event.target.value as EntitlementFormData["unit"],
+                )
+              }
               disabled={disabled}
               className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50 disabled:bg-gray-50"
             >
@@ -338,7 +396,9 @@ export const EntitlementDefinitionFields: React.FC<EntitlementDefinitionFieldsPr
           </div>
 
           <div className="md:col-span-2">
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Description</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Description
+            </label>
             <textarea
               value={formData.description}
               onChange={(event) => update("description", event.target.value)}
@@ -353,16 +413,28 @@ export const EntitlementDefinitionFields: React.FC<EntitlementDefinitionFieldsPr
 
       <section className="rounded-2xl bg-white p-6 shadow-sm shadow-gray-200/70 ring-1 ring-gray-100">
         <div className="mb-5">
-          <h2 className="text-lg font-semibold text-gray-900">Règles de consommation</h2>
-          <p className="mt-1 text-sm text-gray-500">Définissez comment le droit est vérifié, réservé, consommé et réinitialisé.</p>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Règles de consommation
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Définissez comment le droit est vérifié, réservé, consommé et
+            réinitialisé.
+          </p>
         </div>
 
         <div className="grid gap-5 md:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Mode de consommation *</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Mode de consommation *
+            </label>
             <select
               value={formData.consumptionMode}
-              onChange={(event) => update("consumptionMode", event.target.value as EntitlementFormData["consumptionMode"])}
+              onChange={(event) =>
+                update(
+                  "consumptionMode",
+                  event.target.value as EntitlementFormData["consumptionMode"],
+                )
+              }
               disabled={disabled}
               className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50 disabled:bg-gray-50"
             >
@@ -375,10 +447,17 @@ export const EntitlementDefinitionFields: React.FC<EntitlementDefinitionFieldsPr
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Politique de reset *</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Politique de reset *
+            </label>
             <select
               value={formData.resetPolicy}
-              onChange={(event) => update("resetPolicy", event.target.value as EntitlementFormData["resetPolicy"])}
+              onChange={(event) =>
+                update(
+                  "resetPolicy",
+                  event.target.value as EntitlementFormData["resetPolicy"],
+                )
+              }
               disabled={disabled}
               className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50 disabled:bg-gray-50"
             >
@@ -399,8 +478,12 @@ export const EntitlementDefinitionFields: React.FC<EntitlementDefinitionFieldsPr
               className="mt-1 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
             />
             <span>
-              <span className="block text-sm font-medium text-gray-800">Cumulable</span>
-              <span className="mt-0.5 block text-xs text-gray-500">Les quantités peuvent s’additionner sur plusieurs sources.</span>
+              <span className="block text-sm font-medium text-gray-800">
+                Cumulable
+              </span>
+              <span className="mt-0.5 block text-xs text-gray-500">
+                Les quantités peuvent s’additionner sur plusieurs sources.
+              </span>
             </span>
           </label>
 
@@ -413,8 +496,12 @@ export const EntitlementDefinitionFields: React.FC<EntitlementDefinitionFieldsPr
               className="mt-1 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
             />
             <span>
-              <span className="block text-sm font-medium text-gray-800">Transférable</span>
-              <span className="mt-0.5 block text-xs text-gray-500">Le droit peut être transféré ou partagé selon les règles métier.</span>
+              <span className="block text-sm font-medium text-gray-800">
+                Transférable
+              </span>
+              <span className="mt-0.5 block text-xs text-gray-500">
+                Le droit peut être transféré ou partagé selon les règles métier.
+              </span>
             </span>
           </label>
         </div>
@@ -422,13 +509,20 @@ export const EntitlementDefinitionFields: React.FC<EntitlementDefinitionFieldsPr
 
       <section className="rounded-2xl bg-white p-6 shadow-sm shadow-gray-200/70 ring-1 ring-gray-100">
         <div className="mb-5">
-          <h2 className="text-lg font-semibold text-gray-900">Ressources liées</h2>
-          <p className="mt-1 text-sm text-gray-500">Associez le droit à un type ou à un groupe de ressources si nécessaire.</p>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Ressources liées
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Associez le droit à un type ou à un groupe de ressources si
+            nécessaire.
+          </p>
         </div>
 
         <div className="grid gap-5 md:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Type de ressource</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Type de ressource
+            </label>
             <ResourceCombobox
               value={formData.resourceTypeCode}
               onChange={(value) => update("resourceTypeCode", value)}
@@ -440,7 +534,9 @@ export const EntitlementDefinitionFields: React.FC<EntitlementDefinitionFieldsPr
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Groupe de ressources</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Groupe de ressources
+            </label>
             <ResourceCombobox
               value={formData.resourceGroupCode}
               onChange={(value) => update("resourceGroupCode", value)}
@@ -456,8 +552,12 @@ export const EntitlementDefinitionFields: React.FC<EntitlementDefinitionFieldsPr
       <section className="rounded-2xl bg-white p-6 shadow-sm shadow-gray-200/70 ring-1 ring-gray-100">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Paramètres avancés</h2>
-            <p className="mt-1 text-sm text-gray-500">Statut et métadonnées JSON optionnelles.</p>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Paramètres avancés
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Statut et métadonnées JSON optionnelles.
+            </p>
           </div>
           <label className="inline-flex items-center gap-2 rounded-full bg-gray-50 px-3 py-2 text-sm text-gray-700 ring-1 ring-gray-100">
             <input
@@ -472,7 +572,9 @@ export const EntitlementDefinitionFields: React.FC<EntitlementDefinitionFieldsPr
         </div>
 
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">Métadonnées JSON</label>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            Métadonnées JSON
+          </label>
           <textarea
             value={formData.metadataJson}
             onChange={(event) => update("metadataJson", event.target.value)}
@@ -487,9 +589,14 @@ export const EntitlementDefinitionFields: React.FC<EntitlementDefinitionFieldsPr
   );
 };
 
-export const DetailValue: React.FC<{ label: string; value?: React.ReactNode }> = ({ label, value }) => (
+export const DetailValue: React.FC<{
+  label: string;
+  value?: React.ReactNode;
+}> = ({ label, value }) => (
   <div className="rounded-xl bg-gray-50/80 px-4 py-3 ring-1 ring-gray-100">
-    <p className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</p>
+    <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+      {label}
+    </p>
     <div className="mt-1 text-sm font-medium text-gray-900">{value || "—"}</div>
   </div>
 );

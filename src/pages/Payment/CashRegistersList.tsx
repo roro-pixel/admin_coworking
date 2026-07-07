@@ -142,7 +142,7 @@ export const CashRegistersList: React.FC = () => {
   }
 
   return (
-    <div>
+    <div className="mx-auto w-full max-w-5xl space-y-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold text-gray-900">Caisses</h2>
         <button
@@ -185,7 +185,7 @@ export const CashRegistersList: React.FC = () => {
               <BarChart3 size={15} /> Sessions ouvertes
             </div>
             <p className="text-lg font-semibold mt-1">
-              {metrics.openSessionCount?? 0}
+              {metrics.openSessionCount ?? 0}
             </p>
           </div>
         </div>
@@ -212,7 +212,9 @@ export const CashRegistersList: React.FC = () => {
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Code
               </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Nom</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Nom
+              </th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Emplacement
               </th>

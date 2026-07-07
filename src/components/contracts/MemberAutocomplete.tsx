@@ -42,7 +42,11 @@ export const MemberAutocomplete: React.FC<MemberAutocompleteProps> = ({
       setIsLoading(true);
       try {
         const data = await memberService.searchMembers(query);
-        setResults(Array.isArray(data) ? data : ((data as any)?.content || (data as any)?.data || []));
+        setResults(
+          Array.isArray(data)
+            ? data
+            : (data as any)?.content || (data as any)?.data || [],
+        );
         setShowResults(true);
       } catch (error) {
         console.error(error);

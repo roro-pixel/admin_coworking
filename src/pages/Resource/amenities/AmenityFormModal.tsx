@@ -137,7 +137,10 @@ export const AmenityFormModal: React.FC<AmenityFormModalProps> = ({
         </div>
 
         <div className="rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-700 ring-1 ring-blue-100">
-          Ici vous gérez uniquement le référentiel global de l'équipement. La quantité, le caractère optionnel et le supplément FCFA se renseignent dans la liaison équipement-ressource depuis le détail d'une ressource ou la recherche avancée.
+          Ici vous gérez uniquement le référentiel global de l'équipement. La
+          quantité, le caractère optionnel et le supplément FCFA se renseignent
+          dans la liaison équipement-ressource depuis le détail d'une ressource
+          ou la recherche avancée.
         </div>
 
         <div className="flex gap-3 pt-4">

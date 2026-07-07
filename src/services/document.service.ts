@@ -164,7 +164,14 @@ export interface DocumentVersion {
   mimeTypeDetected?: string;
   fileExtension?: string;
   fileSizeBytes?: number;
-  uploadStatus?: "PENDING_SCAN" | "READY" | "QUARANTINED" | "REJECTED" | "DELETED" | "PENDING" | "FAILED";
+  uploadStatus?:
+    | "PENDING_SCAN"
+    | "READY"
+    | "QUARANTINED"
+    | "REJECTED"
+    | "DELETED"
+    | "PENDING"
+    | "FAILED";
   antivirusStatus?: "PENDING" | "CLEAN" | "INFECTED" | "ERROR";
 }
 
@@ -345,8 +352,6 @@ export interface KycOcrResult {
   rawOcrJson: { status: string; rawText?: string; [key: string]: any };
 }
 
-
-
 // ==================== GED V3 - FOLDERS / WORKFLOWS / SHARING ====================
 export interface DocumentFolderTreeResponse {
   code: string;
@@ -426,7 +431,13 @@ export interface DocumentShareResponse {
   createdAt?: string;
 }
 
-export type DocumentPermission = "READ" | "WRITE" | "DELETE" | "SHARE" | "REVIEW" | string;
+export type DocumentPermission =
+  | "READ"
+  | "WRITE"
+  | "DELETE"
+  | "SHARE"
+  | "REVIEW"
+  | string;
 export type DocumentPermissionTargetType = "DOCUMENT" | "FOLDER" | string;
 export type DocumentPermissionGranteeType = "USER" | "ROLE" | "TEAM" | string;
 
@@ -1189,7 +1200,6 @@ export const documentService = {
       )
     ).data,
 
-
   // ---------- Review queue by space ----------
   getReviewQueueBySpace: async (
     space: DocumentSpace | string,
@@ -1231,43 +1241,84 @@ export const documentService = {
     reviewedBy: number,
   ): Promise<any> =>
     (
-      await apiClient.post(`/sni/api/v1/review/${space}/bulk-request-correction`, {
-        items,
-        reviewedBy,
-      })
+      await apiClient.post(
+        `/sni/api/v1/review/${space}/bulk-request-correction`,
+        {
+          items,
+          reviewedBy,
+        },
+      )
     ).data,
 
   // ---------- Document spaces ----------
   uploadSpaceDocument: async (
-    spaceSlug: "contracts" | "financial" | "assets" | "administrative" | "general",
+    spaceSlug:
+      | "contracts"
+      | "financial"
+      | "assets"
+      | "administrative"
+      | "general",
     file: File,
     metadata: Record<string, any>,
   ): Promise<DocumentResponse> => {
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+    formData.append(
+      "metadata",
+      new Blob([JSON.stringify(metadata)], { type: "application/json" }),
+    );
     return (
-      await apiClient.post(`/sni/api/v1/spaces/${spaceSlug}/documents/upload`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      })
+      await apiClient.post(
+        `/sni/api/v1/spaces/${spaceSlug}/documents/upload`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        },
+      )
     ).data;
   },
 
   getSpaceDocuments: async (
-    spaceSlug: "contracts" | "financial" | "assets" | "administrative" | "general",
-    params?: { ownerType?: string; ownerCode?: string; statuses?: string; q?: string; from?: string; to?: string; page?: number; size?: number; sort?: string },
+    spaceSlug:
+      | "contracts"
+      | "financial"
+      | "assets"
+      | "administrative"
+      | "general",
+    params?: {
+      ownerType?: string;
+      ownerCode?: string;
+      statuses?: string;
+      q?: string;
+      from?: string;
+      to?: string;
+      page?: number;
+      size?: number;
+      sort?: string;
+    },
   ): Promise<PaginatedResponse<DocumentResponse>> =>
     toPage<DocumentResponse>(
-      (await apiClient.get(`/sni/api/v1/spaces/${spaceSlug}/documents`, { params })).data,
+      (
+        await apiClient.get(`/sni/api/v1/spaces/${spaceSlug}/documents`, {
+          params,
+        })
+      ).data,
     ),
 
   getSpaceDashboard: async (
-    spaceSlug: "contracts" | "financial" | "assets" | "administrative" | "general",
+    spaceSlug:
+      | "contracts"
+      | "financial"
+      | "assets"
+      | "administrative"
+      | "general",
   ): Promise<DocumentDashboardResponse> =>
     (await apiClient.get(`/sni/api/v1/spaces/${spaceSlug}/dashboard`)).data,
 
   // ---------- Folders ----------
-  createFolder: async (data: DocumentFolderRequest): Promise<DocumentFolderTreeResponse> =>
+  createFolder: async (
+    data: DocumentFolderRequest,
+  ): Promise<DocumentFolderTreeResponse> =>
     (await apiClient.post("/sni/api/v1/document-folders", data)).data,
 
   getFolder: async (code: string): Promise<DocumentFolderTreeResponse> =>
@@ -1283,17 +1334,30 @@ export const documentService = {
     await apiClient.delete(`/sni/api/v1/document-folders/${code}`);
   },
 
-  moveFolder: async (code: string, parentCode?: string): Promise<DocumentFolderTreeResponse> =>
-    (await apiClient.post(`/sni/api/v1/document-folders/${code}/move`, { parentCode })).data,
+  moveFolder: async (
+    code: string,
+    parentCode?: string,
+  ): Promise<DocumentFolderTreeResponse> =>
+    (
+      await apiClient.post(`/sni/api/v1/document-folders/${code}/move`, {
+        parentCode,
+      })
+    ).data,
 
-  getRootFolders: async (params?: { space?: DocumentSpace | string }): Promise<DocumentFolderTreeResponse[]> =>
+  getRootFolders: async (params?: {
+    space?: DocumentSpace | string;
+  }): Promise<DocumentFolderTreeResponse[]> =>
     toList<DocumentFolderTreeResponse>(
-      (await apiClient.get("/sni/api/v1/document-folders/roots", { params })).data,
+      (await apiClient.get("/sni/api/v1/document-folders/roots", { params }))
+        .data,
     ),
 
-  getFolderChildren: async (code: string): Promise<DocumentFolderTreeResponse[]> =>
+  getFolderChildren: async (
+    code: string,
+  ): Promise<DocumentFolderTreeResponse[]> =>
     toList<DocumentFolderTreeResponse>(
-      (await apiClient.get(`/sni/api/v1/document-folders/${code}/children`)).data,
+      (await apiClient.get(`/sni/api/v1/document-folders/${code}/children`))
+        .data,
     ),
 
   getFolderTree: async (code: string): Promise<DocumentFolderTreeResponse> =>
@@ -1304,16 +1368,31 @@ export const documentService = {
     params?: { page?: number; size?: number; sort?: string },
   ): Promise<PaginatedResponse<DocumentResponse>> =>
     toPage<DocumentResponse>(
-      (await apiClient.get(`/sni/api/v1/document-folders/${code}/documents`, { params })).data,
+      (
+        await apiClient.get(`/sni/api/v1/document-folders/${code}/documents`, {
+          params,
+        })
+      ).data,
     ),
 
-  getFolderBreadcrumb: async (code: string): Promise<DocumentFolderTreeResponse[]> =>
+  getFolderBreadcrumb: async (
+    code: string,
+  ): Promise<DocumentFolderTreeResponse[]> =>
     toList<DocumentFolderTreeResponse>(
-      (await apiClient.get(`/sni/api/v1/document-folders/${code}/breadcrumb`)).data,
+      (await apiClient.get(`/sni/api/v1/document-folders/${code}/breadcrumb`))
+        .data,
     ),
 
-  moveDocumentToFolder: async (documentCode: string, folderCode?: string): Promise<DocumentResponse> =>
-    (await apiClient.post(`/sni/api/v1/document-folders/${documentCode}/move-document`, { folderCode })).data,
+  moveDocumentToFolder: async (
+    documentCode: string,
+    folderCode?: string,
+  ): Promise<DocumentResponse> =>
+    (
+      await apiClient.post(
+        `/sni/api/v1/document-folders/${documentCode}/move-document`,
+        { folderCode },
+      )
+    ).data,
 
   // ---------- Multiple upload / ZIP ----------
   uploadBatch: async (
@@ -1322,7 +1401,10 @@ export const documentService = {
   ): Promise<DocumentResponse[]> => {
     const formData = new FormData();
     files.forEach((file) => formData.append("files", file));
-    formData.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+    formData.append(
+      "metadata",
+      new Blob([JSON.stringify(metadata)], { type: "application/json" }),
+    );
     return toList<DocumentResponse>(
       (
         await apiClient.post("/sni/api/v1/documents/upload-batch", formData, {
@@ -1332,10 +1414,17 @@ export const documentService = {
     );
   },
 
-  importZip: async (file: File, metadata?: Record<string, any>): Promise<any> => {
+  importZip: async (
+    file: File,
+    metadata?: Record<string, any>,
+  ): Promise<any> => {
     const formData = new FormData();
     formData.append("file", file);
-    if (metadata) formData.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+    if (metadata)
+      formData.append(
+        "metadata",
+        new Blob([JSON.stringify(metadata)], { type: "application/json" }),
+      );
     return (
       await apiClient.post("/sni/api/v1/documents/import-zip", formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -1344,10 +1433,14 @@ export const documentService = {
   },
 
   // ---------- Workflows ----------
-  createWorkflow: async (data: DocumentWorkflowRequest): Promise<DocumentWorkflowResponse> =>
+  createWorkflow: async (
+    data: DocumentWorkflowRequest,
+  ): Promise<DocumentWorkflowResponse> =>
     (await apiClient.post("/sni/api/v1/document-workflows", data)).data,
 
-  getWorkflows: async (params?: { activeOnly?: boolean }): Promise<DocumentWorkflowResponse[]> =>
+  getWorkflows: async (params?: {
+    activeOnly?: boolean;
+  }): Promise<DocumentWorkflowResponse[]> =>
     toList<DocumentWorkflowResponse>(
       (await apiClient.get("/sni/api/v1/document-workflows", { params })).data,
     ),
@@ -1364,31 +1457,76 @@ export const documentService = {
     workflowCode: string,
   ): Promise<DocumentWorkflowStatusResponse> =>
     (
-      await apiClient.post(`/sni/api/v1/documents/${documentCode}/start-workflow`, null, {
-        params: { workflowCode },
-      })
+      await apiClient.post(
+        `/sni/api/v1/documents/${documentCode}/start-workflow`,
+        null,
+        {
+          params: { workflowCode },
+        },
+      )
     ).data,
 
-  approveWorkflowStep: async (documentCode: string, comment?: string): Promise<DocumentWorkflowStatusResponse> =>
-    (await apiClient.post(`/sni/api/v1/documents/${documentCode}/workflow/approve`, { comment })).data,
+  approveWorkflowStep: async (
+    documentCode: string,
+    comment?: string,
+  ): Promise<DocumentWorkflowStatusResponse> =>
+    (
+      await apiClient.post(
+        `/sni/api/v1/documents/${documentCode}/workflow/approve`,
+        { comment },
+      )
+    ).data,
 
-  rejectWorkflowStep: async (documentCode: string, reason: string): Promise<DocumentWorkflowStatusResponse> =>
-    (await apiClient.post(`/sni/api/v1/documents/${documentCode}/workflow/reject`, { reason })).data,
+  rejectWorkflowStep: async (
+    documentCode: string,
+    reason: string,
+  ): Promise<DocumentWorkflowStatusResponse> =>
+    (
+      await apiClient.post(
+        `/sni/api/v1/documents/${documentCode}/workflow/reject`,
+        { reason },
+      )
+    ).data,
 
-  getDocumentWorkflowStatus: async (documentCode: string): Promise<DocumentWorkflowStatusResponse> =>
-    (await apiClient.get(`/sni/api/v1/documents/${documentCode}/workflow/status`)).data,
+  getDocumentWorkflowStatus: async (
+    documentCode: string,
+  ): Promise<DocumentWorkflowStatusResponse> =>
+    (
+      await apiClient.get(
+        `/sni/api/v1/documents/${documentCode}/workflow/status`,
+      )
+    ).data,
 
-  getMyPendingWorkflowApprovals: async (params?: { page?: number; size?: number }): Promise<PaginatedResponse<DocumentResponse>> =>
+  getMyPendingWorkflowApprovals: async (params?: {
+    page?: number;
+    size?: number;
+  }): Promise<PaginatedResponse<DocumentResponse>> =>
     toPage<DocumentResponse>(
-      (await apiClient.get("/sni/api/v1/document-workflows/my-pending", { params })).data,
+      (
+        await apiClient.get("/sni/api/v1/document-workflows/my-pending", {
+          params,
+        })
+      ).data,
     ),
 
   // ---------- Sharing ----------
-  shareDocument: async (documentCode: string, data: DocumentShareRequest): Promise<DocumentShareResponse> =>
-    (await apiClient.post(`/sni/api/v1/documents/${documentCode}/share`, data)).data,
+  shareDocument: async (
+    documentCode: string,
+    data: DocumentShareRequest,
+  ): Promise<DocumentShareResponse> =>
+    (await apiClient.post(`/sni/api/v1/documents/${documentCode}/share`, data))
+      .data,
 
-  shareFolder: async (folderCode: string, data: DocumentShareRequest): Promise<DocumentShareResponse> =>
-    (await apiClient.post(`/sni/api/v1/document-folders/${folderCode}/share`, data)).data,
+  shareFolder: async (
+    folderCode: string,
+    data: DocumentShareRequest,
+  ): Promise<DocumentShareResponse> =>
+    (
+      await apiClient.post(
+        `/sni/api/v1/document-folders/${folderCode}/share`,
+        data,
+      )
+    ).data,
 
   getPublicShare: async (token: string): Promise<any> =>
     (await apiClient.get(`/sni/api/v1/shares/${token}`)).data,
@@ -1397,16 +1535,23 @@ export const documentService = {
     await apiClient.delete(`/sni/api/v1/shares/${token}`);
   },
 
-  getDocumentShares: async (documentCode: string): Promise<DocumentShareResponse[]> =>
+  getDocumentShares: async (
+    documentCode: string,
+  ): Promise<DocumentShareResponse[]> =>
     toList<DocumentShareResponse>(
-      (await apiClient.get(`/sni/api/v1/documents/${documentCode}/shares`)).data,
+      (await apiClient.get(`/sni/api/v1/documents/${documentCode}/shares`))
+        .data,
     ),
 
   // ---------- Granular permissions ----------
-  grantDocumentPermission: async (data: DocumentPermissionRequest): Promise<DocumentPermissionResponse> =>
+  grantDocumentPermission: async (
+    data: DocumentPermissionRequest,
+  ): Promise<DocumentPermissionResponse> =>
     (await apiClient.post("/sni/api/v1/document-permissions", data)).data,
 
-  revokeDocumentPermission: async (params: DocumentPermissionRequest): Promise<void> => {
+  revokeDocumentPermission: async (
+    params: DocumentPermissionRequest,
+  ): Promise<void> => {
     await apiClient.delete("/sni/api/v1/document-permissions", { params });
   },
 
@@ -1415,7 +1560,8 @@ export const documentService = {
     targetCode: string;
   }): Promise<DocumentPermissionResponse[]> =>
     toList<DocumentPermissionResponse>(
-      (await apiClient.get("/sni/api/v1/document-permissions", { params })).data,
+      (await apiClient.get("/sni/api/v1/document-permissions", { params }))
+        .data,
     ),
 
   getEffectiveDocumentPermissions: async (
@@ -1423,18 +1569,28 @@ export const documentService = {
     documentCode: string,
   ): Promise<DocumentPermission[]> =>
     toList<DocumentPermission>(
-      (await apiClient.get("/sni/api/v1/document-permissions/effective", { params: { userId, documentCode } })).data,
+      (
+        await apiClient.get("/sni/api/v1/document-permissions/effective", {
+          params: { userId, documentCode },
+        })
+      ).data,
     ),
 
   // ---------- Lock / unlock ----------
-  lockDocument: async (code: string, reason?: string): Promise<DocumentResponse> =>
-    (await apiClient.post(`/sni/api/v1/documents/${code}/lock`, { reason })).data,
+  lockDocument: async (
+    code: string,
+    reason?: string,
+  ): Promise<DocumentResponse> =>
+    (await apiClient.post(`/sni/api/v1/documents/${code}/lock`, { reason }))
+      .data,
 
   unlockDocument: async (code: string): Promise<DocumentResponse> =>
     (await apiClient.post(`/sni/api/v1/documents/${code}/unlock`)).data,
 
   // ---------- KYC case requirements ----------
-  getKycCaseRequirements: async (code: string): Promise<KycRequirementResponse[]> =>
+  getKycCaseRequirements: async (
+    code: string,
+  ): Promise<KycRequirementResponse[]> =>
     toList<KycRequirementResponse>(
       (await apiClient.get(`/sni/api/v1/kyc/cases/${code}/requirements`)).data,
     ),
@@ -1443,15 +1599,28 @@ export const documentService = {
     code: string,
     data: { documentTypeCode: string; required?: boolean },
   ): Promise<KycRequirementResponse> =>
-    (await apiClient.post(`/sni/api/v1/kyc/cases/${code}/requirements`, data)).data,
+    (await apiClient.post(`/sni/api/v1/kyc/cases/${code}/requirements`, data))
+      .data,
 
-  removeKycCaseRequirement: async (code: string, documentTypeCode: string): Promise<void> => {
-    await apiClient.delete(`/sni/api/v1/kyc/cases/${code}/requirements/${documentTypeCode}`);
+  removeKycCaseRequirement: async (
+    code: string,
+    documentTypeCode: string,
+  ): Promise<void> => {
+    await apiClient.delete(
+      `/sni/api/v1/kyc/cases/${code}/requirements/${documentTypeCode}`,
+    );
   },
 
-  getKycCaseReviewQueue: async (code: string, params?: { page?: number; size?: number }): Promise<PaginatedResponse<DocumentResponse>> =>
+  getKycCaseReviewQueue: async (
+    code: string,
+    params?: { page?: number; size?: number },
+  ): Promise<PaginatedResponse<DocumentResponse>> =>
     toPage<DocumentResponse>(
-      (await apiClient.get(`/sni/api/v1/kyc/cases/${code}/review-queue`, { params })).data,
+      (
+        await apiClient.get(`/sni/api/v1/kyc/cases/${code}/review-queue`, {
+          params,
+        })
+      ).data,
     ),
 
   bulkApproveKycCaseDocuments: async (
@@ -1460,14 +1629,24 @@ export const documentService = {
     reviewedBy: number,
     comment?: string,
   ): Promise<any> =>
-    (await apiClient.post(`/sni/api/v1/kyc/cases/${code}/documents/bulk-approve`, { documentCodes, reviewedBy, comment })).data,
+    (
+      await apiClient.post(
+        `/sni/api/v1/kyc/cases/${code}/documents/bulk-approve`,
+        { documentCodes, reviewedBy, comment },
+      )
+    ).data,
 
   bulkRejectKycCaseDocuments: async (
     code: string,
     items: Array<{ documentCode: string; reason: string }>,
     reviewedBy: number,
   ): Promise<any> =>
-    (await apiClient.post(`/sni/api/v1/kyc/cases/${code}/documents/bulk-reject`, { items, reviewedBy })).data,
+    (
+      await apiClient.post(
+        `/sni/api/v1/kyc/cases/${code}/documents/bulk-reject`,
+        { items, reviewedBy },
+      )
+    ).data,
 
   requestCorrectionKycCaseDocument: async (
     code: string,
@@ -1475,26 +1654,54 @@ export const documentService = {
     reason: string,
     reviewedBy?: number,
   ): Promise<any> =>
-    (await apiClient.post(`/sni/api/v1/kyc/cases/${code}/documents/request-correction`, { documentCode, reason, reviewedBy })).data,
+    (
+      await apiClient.post(
+        `/sni/api/v1/kyc/cases/${code}/documents/request-correction`,
+        { documentCode, reason, reviewedBy },
+      )
+    ).data,
 
   bulkDisapproveKycDocuments: async (
     items: Array<{ documentCode: string; reason: string }>,
     reviewedBy: number,
   ): Promise<any> =>
-    (await apiClient.post("/sni/api/v1/kyc/documents/bulk-disapprove", { items, reviewedBy })).data,
+    (
+      await apiClient.post("/sni/api/v1/kyc/documents/bulk-disapprove", {
+        items,
+        reviewedBy,
+      })
+    ).data,
 
-  getKycCrossValidationRules: async (params?: { activeOnly?: boolean }): Promise<KycCrossValidationRuleResponse[]> =>
+  getKycCrossValidationRules: async (params?: {
+    activeOnly?: boolean;
+  }): Promise<KycCrossValidationRuleResponse[]> =>
     toList<KycCrossValidationRuleResponse>(
-      (await apiClient.get("/sni/api/v1/kyc/cross-validation-rules", { params })).data,
+      (
+        await apiClient.get("/sni/api/v1/kyc/cross-validation-rules", {
+          params,
+        })
+      ).data,
     ),
 
-  createKycCrossValidationRule: async (data: KycCrossValidationRuleRequest): Promise<KycCrossValidationRuleResponse> =>
+  createKycCrossValidationRule: async (
+    data: KycCrossValidationRuleRequest,
+  ): Promise<KycCrossValidationRuleResponse> =>
     (await apiClient.post("/sni/api/v1/kyc/cross-validation-rules", data)).data,
 
-  updateKycCrossValidationRule: async (id: number, data: Partial<KycCrossValidationRuleRequest>): Promise<KycCrossValidationRuleResponse> =>
-    (await apiClient.patch(`/sni/api/v1/kyc/cross-validation-rules/${id}`, data)).data,
+  updateKycCrossValidationRule: async (
+    id: number,
+    data: Partial<KycCrossValidationRuleRequest>,
+  ): Promise<KycCrossValidationRuleResponse> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/kyc/cross-validation-rules/${id}`,
+        data,
+      )
+    ).data,
 
-  getKycCrossValidationRule: async (id: number): Promise<KycCrossValidationRuleResponse> =>
+  getKycCrossValidationRule: async (
+    id: number,
+  ): Promise<KycCrossValidationRuleResponse> =>
     (await apiClient.get(`/sni/api/v1/kyc/cross-validation-rules/${id}`)).data,
 
   deleteKycCrossValidationRule: async (id: number): Promise<void> => {

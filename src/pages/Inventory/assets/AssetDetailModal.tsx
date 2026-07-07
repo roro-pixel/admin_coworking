@@ -179,7 +179,10 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
   const downloadLoanSheet = async (assignmentId?: number) => {
     const id = assignmentId ?? lastAssignment?.assignmentId;
     if (!id) return;
-    const pdf = await inventoryService.getAssetLoanSheetPdf(asset.assetCode, id);
+    const pdf = await inventoryService.getAssetLoanSheetPdf(
+      asset.assetCode,
+      id,
+    );
     const url = window.URL.createObjectURL(pdf);
     const a = document.createElement("a");
     a.href = url;
@@ -420,7 +423,10 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                   <button
                     onClick={() => assignMutation.mutate()}
                     disabled={
-                      !assignData.assigneeCode || !assignData.expectedReturnAt || !assignData.purpose || assignMutation.isPending
+                      !assignData.assigneeCode ||
+                      !assignData.expectedReturnAt ||
+                      !assignData.purpose ||
+                      assignMutation.isPending
                     }
                     className="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 text-base"
                   >
@@ -507,8 +513,12 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
             {lastAssignment?.assignmentId && (
               <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
-                  <p className="font-medium text-green-800">Actif attribué avec succès</p>
-                  <p className="text-sm text-green-700">Téléchargez la fiche de prêt pour signature immédiate.</p>
+                  <p className="font-medium text-green-800">
+                    Actif attribué avec succès
+                  </p>
+                  <p className="text-sm text-green-700">
+                    Téléchargez la fiche de prêt pour signature immédiate.
+                  </p>
                 </div>
                 <button
                   onClick={() => downloadLoanSheet(lastAssignment.assignmentId)}

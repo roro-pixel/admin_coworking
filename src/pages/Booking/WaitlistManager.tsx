@@ -210,7 +210,7 @@ export const WaitlistManager: React.FC = () => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">
             Liste d'attente
@@ -257,7 +257,7 @@ export const WaitlistManager: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-2xl p-4 shadow-sm ring-1 ring-gray-100 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
+        <div className="flex flex-col gap-3 md:flex-row">
           <select
             value={statusFilter}
             onChange={(e) =>
@@ -277,7 +277,7 @@ export const WaitlistManager: React.FC = () => {
             placeholder="Code ressource..."
             value={resourceFilter}
             onChange={(e) => setResourceFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-xl w-64"
+            className="w-full rounded-xl border border-gray-200 px-4 py-2 md:w-64"
           />
           {(statusFilter || resourceFilter) && (
             <button
@@ -285,7 +285,7 @@ export const WaitlistManager: React.FC = () => {
                 setStatusFilter("");
                 setResourceFilter("");
               }}
-              className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-primary-50/40"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-primary-50/40 md:w-auto"
             >
               Réinitialiser
             </button>
@@ -294,7 +294,7 @@ export const WaitlistManager: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[900px]">
             <thead className="bg-gray-50 ">
               <tr>
@@ -445,6 +445,35 @@ export const WaitlistManager: React.FC = () => {
               })}
             </tbody>
           </table>
+        </div>
+
+        <div className="space-y-3 p-3 md:hidden">
+          {entries.map((entry) => {
+            const status = statusConfig[entry.status];
+            return (
+              <article key={entry.id} className="rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-100">
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-mono text-xs font-black text-primary-700">#{entry.id}</p>
+                    <p className="mt-1 truncate text-sm font-black text-gray-950">{entry.ownerName || entry.contactName || entry.ownerCode || "—"}</p>
+                    <p className="text-[11px] font-semibold text-gray-400">{entry.ownerType}</p>
+                  </div>
+                  {status && <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold ${status.color}`}>{status.label}</span>}
+                </div>
+                <div className="space-y-2 rounded-2xl bg-white p-3 text-xs">
+                  <div className="flex justify-between gap-3"><span className="font-bold text-gray-400">Ressource</span><span className="text-right font-black text-gray-800">{entry.resourceName || entry.resourceCode}</span></div>
+                  <div className="flex justify-between gap-3"><span className="font-bold text-gray-400">Créneau</span><span className="text-right font-semibold text-gray-700">{new Date(entry.startedAt).toLocaleDateString("fr-FR")} · {new Date(entry.startedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span></div>
+                  <div className="flex justify-between gap-3"><span className="font-bold text-gray-400">Mode</span><span className="font-semibold text-gray-700">{entry.paymentMode === "SUBSCRIPTION" ? "Abonnement" : entry.paymentMode === "PASS" ? "Pass" : "Direct"}</span></div>
+                </div>
+                {entry.status === "WAITING" && (
+                  <div className="mt-3 flex gap-2">
+                    <button type="button" onClick={() => handleViewAlternatives(entry)} className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700"><Eye size={14} /> Alternatives</button>
+                    <button type="button" onClick={() => { if (confirm("Annuler cette entrée en liste d'attente ?")) cancelMutation.mutate(entry.id); }} disabled={cancelMutation.isPending} className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-700 disabled:opacity-50"><XCircle size={14} /> Annuler</button>
+                  </div>
+                )}
+              </article>
+            );
+          })}
         </div>
 
         {entries.length === 0 && (

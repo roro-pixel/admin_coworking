@@ -129,7 +129,10 @@ export const ContractDetailPage: React.FC = () => {
 
   const generateDraftMutation = useMutation({
     mutationFn: () =>
-      contractService.generateDraft(contractCode!, admin?.id ? Number(admin.id) : 1),
+      contractService.generateDraft(
+        contractCode!,
+        admin?.id ? Number(admin.id) : 1,
+      ),
     onSuccess: invalidate,
     onError: (err: any) =>
       setActionError(
@@ -260,7 +263,8 @@ export const ContractDetailPage: React.FC = () => {
     },
     onError: (err: any) =>
       setActionError(
-        err?.response?.data?.message || "Erreur lors de la demande de signature",
+        err?.response?.data?.message ||
+          "Erreur lors de la demande de signature",
       ),
   });
 
@@ -384,20 +388,20 @@ export const ContractDetailPage: React.FC = () => {
               )}
               {contract.status === "AWAITING_SIGNATURE" && (
                 <>
-                <button
-                  onClick={() => setShowSignatureModal(true)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 flex items-center gap-2"
-                >
-                  <Send size={16} />
-                  Demander signature
-                </button>
-                <button
-                  onClick={() => setShowAttachModal(true)}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 flex items-center gap-2"
-                >
-                  <Upload size={16} />
-                  Rattacher signé
-                </button>
+                  <button
+                    onClick={() => setShowSignatureModal(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 flex items-center gap-2"
+                  >
+                    <Send size={16} />
+                    Demander signature
+                  </button>
+                  <button
+                    onClick={() => setShowAttachModal(true)}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 flex items-center gap-2"
+                  >
+                    <Upload size={16} />
+                    Rattacher signé
+                  </button>
                 </>
               )}
               {contract.status === "SIGNED" && (
@@ -554,7 +558,8 @@ export const ContractDetailPage: React.FC = () => {
                   <p className="text-sm text-gray-500">Renouvellement</p>
                   <p className="font-medium">
                     {contract.renewalType
-                      ? renewalTypeLabels[contract.renewalType] || contract.renewalType
+                      ? renewalTypeLabels[contract.renewalType] ||
+                        contract.renewalType
                       : "—"}
                   </p>
                 </div>
@@ -881,7 +886,10 @@ export const ContractDetailPage: React.FC = () => {
         <ModalPortal onClose={() => setShowReviewRejectModal(false)} size="lg">
           <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
             <h3 className="text-xl font-bold">Rejeter la revue interne</h3>
-            <button onClick={() => setShowReviewRejectModal(false)} className="p-1 hover:bg-gray-100 rounded-xl">
+            <button
+              onClick={() => setShowReviewRejectModal(false)}
+              className="p-1 hover:bg-gray-100 rounded-xl"
+            >
               <X size={20} />
             </button>
           </div>
@@ -894,13 +902,24 @@ export const ContractDetailPage: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-200 rounded-xl resize-none focus:ring-2 focus:ring-primary-500"
             />
             <div className="flex gap-3">
-              <button onClick={() => setShowReviewRejectModal(false)} className="flex-1 px-4 py-2 border rounded-xl text-gray-700 hover:bg-gray-50">Annuler</button>
+              <button
+                onClick={() => setShowReviewRejectModal(false)}
+                className="flex-1 px-4 py-2 border rounded-xl text-gray-700 hover:bg-gray-50"
+              >
+                Annuler
+              </button>
               <button
                 onClick={() => rejectReviewMutation.mutate()}
-                disabled={rejectReviewMutation.isPending || !reviewRejectReason.trim()}
+                disabled={
+                  rejectReviewMutation.isPending || !reviewRejectReason.trim()
+                }
                 className="flex-1 bg-red-600 text-white py-2 rounded-xl hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {rejectReviewMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : "Rejeter"}
+                {rejectReviewMutation.isPending ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  "Rejeter"
+                )}
               </button>
             </div>
           </div>
@@ -911,52 +930,101 @@ export const ContractDetailPage: React.FC = () => {
         <ModalPortal onClose={() => setShowSignatureModal(false)} size="lg">
           <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
             <h3 className="text-xl font-bold">Demande de signature</h3>
-            <button onClick={() => setShowSignatureModal(false)} className="p-1 hover:bg-gray-100 rounded-xl">
+            <button
+              onClick={() => setShowSignatureModal(false)}
+              className="p-1 hover:bg-gray-100 rounded-xl"
+            >
               <X size={20} />
             </button>
           </div>
           <div className="p-6 space-y-4">
             {signatureResult && (
               <div className="bg-green-50 border border-green-100 text-green-700 rounded-xl p-3 text-sm">
-                Demande envoyée. {signatureResult.publicUrl || signatureResult.signatureUrl || signatureResult.url ? (
-                  <a className="underline" href={signatureResult.publicUrl || signatureResult.signatureUrl || signatureResult.url} target="_blank" rel="noreferrer">Ouvrir le lien public</a>
+                Demande envoyée.{" "}
+                {signatureResult.publicUrl ||
+                signatureResult.signatureUrl ||
+                signatureResult.url ? (
+                  <a
+                    className="underline"
+                    href={
+                      signatureResult.publicUrl ||
+                      signatureResult.signatureUrl ||
+                      signatureResult.url
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Ouvrir le lien public
+                  </a>
                 ) : null}
               </div>
             )}
             <input
               value={signatureForm.signerName}
-              onChange={(e) => setSignatureForm({ ...signatureForm, signerName: e.target.value })}
+              onChange={(e) =>
+                setSignatureForm({
+                  ...signatureForm,
+                  signerName: e.target.value,
+                })
+              }
               placeholder="Nom du signataire"
               className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500"
             />
             <input
               type="email"
               value={signatureForm.signerEmail}
-              onChange={(e) => setSignatureForm({ ...signatureForm, signerEmail: e.target.value })}
+              onChange={(e) =>
+                setSignatureForm({
+                  ...signatureForm,
+                  signerEmail: e.target.value,
+                })
+              }
               placeholder="Email du signataire"
               className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500"
             />
             <input
               type="datetime-local"
               value={signatureForm.expiresAt}
-              onChange={(e) => setSignatureForm({ ...signatureForm, expiresAt: e.target.value })}
+              onChange={(e) =>
+                setSignatureForm({
+                  ...signatureForm,
+                  expiresAt: e.target.value,
+                })
+              }
               className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500"
             />
             <textarea
               value={signatureForm.message}
-              onChange={(e) => setSignatureForm({ ...signatureForm, message: e.target.value })}
+              onChange={(e) =>
+                setSignatureForm({ ...signatureForm, message: e.target.value })
+              }
               rows={3}
               placeholder="Message au signataire"
               className="w-full px-3 py-2 border border-gray-200 rounded-xl resize-none focus:ring-2 focus:ring-primary-500"
             />
             <div className="flex gap-3">
-              <button onClick={() => setShowSignatureModal(false)} className="flex-1 px-4 py-2 border rounded-xl text-gray-700 hover:bg-gray-50">Fermer</button>
+              <button
+                onClick={() => setShowSignatureModal(false)}
+                className="flex-1 px-4 py-2 border rounded-xl text-gray-700 hover:bg-gray-50"
+              >
+                Fermer
+              </button>
               <button
                 onClick={() => requestSignatureMutation.mutate()}
-                disabled={requestSignatureMutation.isPending || !signatureForm.signerName || !signatureForm.signerEmail}
+                disabled={
+                  requestSignatureMutation.isPending ||
+                  !signatureForm.signerName ||
+                  !signatureForm.signerEmail
+                }
                 className="flex-1 bg-primary-600 text-white py-2 rounded-xl hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {requestSignatureMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <><Send size={16} /> Envoyer</>}
+                {requestSignatureMutation.isPending ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <>
+                    <Send size={16} /> Envoyer
+                  </>
+                )}
               </button>
             </div>
           </div>

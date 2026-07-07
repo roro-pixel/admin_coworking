@@ -340,6 +340,110 @@ export interface Opportunity {
   lostReason?: string;
 }
 
+// ==================== TYPES CRM PROPOSALS ====================
+
+export type ProposalStatus =
+  | "DRAFT"
+  | "SENT"
+  | "VIEWED"
+  | "ACCEPTED"
+  | "REJECTED"
+  | "EXPIRED"
+  | "CONVERTED";
+
+export type ProposalRecipientType =
+  | "CUSTOMER"
+  | "MEMBER"
+  | "BUSINESS_ENTITY"
+  | string;
+export type ProposalServiceType =
+  | "SUBSCRIPTION"
+  | "PASS"
+  | "BOOKING"
+  | "CUSTOM"
+  | string;
+
+export interface ProposalLineResponse {
+  id: number;
+  sortOrder: number;
+  serviceType?: ProposalServiceType | null;
+  serviceRefCode?: string | null;
+  label: string;
+  description?: string | null;
+  quantity: number;
+  unitPrice: number;
+  discountPercent: number;
+  taxRate: number;
+  taxIncluded: boolean;
+  subtotalAmount: number;
+  taxAmount: number;
+  totalAmount: number;
+  currency: string;
+}
+
+export interface ProposalResponse {
+  id: number;
+  proposalNumber: string;
+  title: string;
+  opportunityId?: number | null;
+  leadId?: number | null;
+  recipientType?: ProposalRecipientType | null;
+  recipientCode?: string | null;
+  recipientName?: string | null;
+  recipientEmail?: string | null;
+  status: ProposalStatus | string;
+  validUntil?: string | null;
+  subtotalAmount: number;
+  taxAmount: number;
+  totalAmount: number;
+  currency: string;
+  notes?: string | null;
+  internalNotes?: string | null;
+  convertedInvoiceNumber?: string | null;
+  convertedContractCode?: string | null;
+  convertedSubscriptionNumber?: string | null;
+  convertedPassNumber?: string | null;
+  sentAt?: string | null;
+  viewedAt?: string | null;
+  acceptedAt?: string | null;
+  rejectedAt?: string | null;
+  rejectionReason?: string | null;
+  createdBy?: number | null;
+  assignedTo?: number | null;
+  createdAt: string;
+  updatedAt: string;
+  lines?: ProposalLineResponse[];
+}
+
+export interface ProposalRequest {
+  title: string;
+  opportunityId?: number | null;
+  leadId?: number | null;
+  recipientType?: ProposalRecipientType | null;
+  recipientCode?: string | null;
+  recipientName?: string | null;
+  recipientEmail?: string | null;
+  validUntil?: string | null;
+  currency?: string;
+  notes?: string | null;
+  internalNotes?: string | null;
+  assignedTo?: number | null;
+}
+
+export interface ProposalLineRequest {
+  label?: string;
+  description?: string | null;
+  serviceType?: ProposalServiceType | null;
+  serviceRefCode?: string | null;
+  quantity?: number;
+  unitPrice?: number;
+  discountPercent?: number;
+  taxRate?: number;
+  taxIncluded?: boolean;
+  sortOrder?: number;
+  currency?: string;
+}
+
 // ==================== TYPES TASK ====================
 export type TaskStatus =
   | "OPEN"
@@ -815,6 +919,86 @@ export const operationsService = {
     to?: string;
   }): Promise<CrmAnalytics> =>
     (await apiClient.get("/sni/api/v1/crm/analytics", { params })).data,
+
+  // ===== CRM PROPOSALS =====
+  createProposal: async (data: ProposalRequest): Promise<ProposalResponse> =>
+    (await apiClient.post("/sni/api/v1/crm/proposals", data)).data,
+
+  getProposals: async (params?: {
+    status?: ProposalStatus | string;
+    opportunityId?: number;
+    searchText?: string;
+    page?: number;
+    size?: number;
+    sort?: string;
+  }): Promise<PaginatedResult<ProposalResponse>> =>
+    paginated<ProposalResponse>(
+      (await apiClient.get("/sni/api/v1/crm/proposals", { params })).data,
+    ),
+
+  getProposal: async (id: number): Promise<ProposalResponse> =>
+    (await apiClient.get(`/sni/api/v1/crm/proposals/${id}`)).data,
+
+  getProposalByNumber: async (
+    proposalNumber: string,
+  ): Promise<ProposalResponse> =>
+    (await apiClient.get(`/sni/api/v1/crm/proposals/number/${proposalNumber}`))
+      .data,
+
+  updateProposal: async (
+    id: number,
+    data: Partial<ProposalRequest>,
+  ): Promise<ProposalResponse> =>
+    (await apiClient.put(`/sni/api/v1/crm/proposals/${id}`, data)).data,
+
+  sendProposal: async (id: number): Promise<ProposalResponse> =>
+    (await apiClient.patch(`/sni/api/v1/crm/proposals/${id}/send`)).data,
+
+  acceptProposal: async (id: number): Promise<ProposalResponse> =>
+    (await apiClient.patch(`/sni/api/v1/crm/proposals/${id}/accept`)).data,
+
+  rejectProposal: async (
+    id: number,
+    reason: string,
+  ): Promise<ProposalResponse> =>
+    (
+      await apiClient.patch(`/sni/api/v1/crm/proposals/${id}/reject`, {
+        reason,
+      })
+    ).data,
+
+  addProposalLine: async (
+    proposalId: number,
+    data: ProposalLineRequest,
+  ): Promise<ProposalResponse> =>
+    (
+      await apiClient.post(
+        `/sni/api/v1/crm/proposals/${proposalId}/lines`,
+        data,
+      )
+    ).data,
+
+  updateProposalLine: async (
+    proposalId: number,
+    lineId: number,
+    data: ProposalLineRequest,
+  ): Promise<ProposalResponse> =>
+    (
+      await apiClient.put(
+        `/sni/api/v1/crm/proposals/${proposalId}/lines/${lineId}`,
+        data,
+      )
+    ).data,
+
+  deleteProposalLine: async (
+    proposalId: number,
+    lineId: number,
+  ): Promise<ProposalResponse> =>
+    (
+      await apiClient.delete(
+        `/sni/api/v1/crm/proposals/${proposalId}/lines/${lineId}`,
+      )
+    ).data,
 
   // ===== TASK =====
   getTasks: async (params?: {

@@ -46,8 +46,14 @@ const entryTypeLabels: Record<string, string> = {
 
 const holdStatusConfig: Record<string, { label: string; color: string }> = {
   ACTIVE: { label: "Actif", color: "bg-blue-50 text-blue-700 ring-blue-100" },
-  CAPTURED: { label: "Capturé", color: "bg-green-50 text-green-700 ring-green-100" },
-  RELEASED: { label: "Libéré", color: "bg-gray-50 text-gray-500 ring-gray-100" },
+  CAPTURED: {
+    label: "Capturé",
+    color: "bg-green-50 text-green-700 ring-green-100",
+  },
+  RELEASED: {
+    label: "Libéré",
+    color: "bg-gray-50 text-gray-500 ring-gray-100",
+  },
   EXPIRED: { label: "Expiré", color: "bg-red-50 text-red-700 ring-red-100" },
 };
 
@@ -105,7 +111,8 @@ export const WalletDetailModal: React.FC = () => {
 
   const ledgerEntries: LedgerEntry[] = ledgerData?.content || [];
   const totalElements = ledgerData?.totalElements ?? 0;
-  const totalPages = ledgerData?.totalPages ?? Math.ceil(totalElements / PAGE_SIZE);
+  const totalPages =
+    ledgerData?.totalPages ?? Math.ceil(totalElements / PAGE_SIZE);
   const holds: WalletHold[] = holdsData?.content || [];
 
   useEffect(() => {
@@ -114,7 +121,9 @@ export const WalletDetailModal: React.FC = () => {
 
   const invalidateQueries = () => {
     queryClient.invalidateQueries({ queryKey: ["wallet", walletNumber] });
-    queryClient.invalidateQueries({ queryKey: ["wallet-ledger", walletNumber] });
+    queryClient.invalidateQueries({
+      queryKey: ["wallet-ledger", walletNumber],
+    });
     queryClient.invalidateQueries({ queryKey: ["wallet-holds", walletNumber] });
     queryClient.invalidateQueries({ queryKey: ["wallets"] });
   };
@@ -136,7 +145,9 @@ export const WalletDetailModal: React.FC = () => {
       setHoldError(null);
     },
     onError: (error: any) => {
-      setHoldError(error?.response?.data?.message || "Erreur lors de la création du hold.");
+      setHoldError(
+        error?.response?.data?.message || "Erreur lors de la création du hold.",
+      );
     },
   });
 
@@ -148,7 +159,9 @@ export const WalletDetailModal: React.FC = () => {
       setActionError(null);
     },
     onError: (error: any) => {
-      setActionError(error?.response?.data?.message || "Erreur lors de la capture du hold.");
+      setActionError(
+        error?.response?.data?.message || "Erreur lors de la capture du hold.",
+      );
     },
   });
 
@@ -160,7 +173,10 @@ export const WalletDetailModal: React.FC = () => {
       setActionError(null);
     },
     onError: (error: any) => {
-      setActionError(error?.response?.data?.message || "Erreur lors de la libération du hold.");
+      setActionError(
+        error?.response?.data?.message ||
+          "Erreur lors de la libération du hold.",
+      );
     },
   });
 
@@ -168,14 +184,25 @@ export const WalletDetailModal: React.FC = () => {
   const availableBalance = safeNumber(wallet?.availableBalance);
   const heldBalance = safeNumber(wallet?.heldBalance);
   const ledgerBalance = safeNumber(wallet?.ledgerBalance);
-  const totalForBars = Math.max(availableBalance + heldBalance, ledgerBalance, 1);
-  const availablePct = Math.max(0, Math.min(100, (availableBalance / totalForBars) * 100));
-  const heldPct = Math.max(0, Math.min(100, (heldBalance / totalForBars) * 100));
+  const totalForBars = Math.max(
+    availableBalance + heldBalance,
+    ledgerBalance,
+    1,
+  );
+  const availablePct = Math.max(
+    0,
+    Math.min(100, (availableBalance / totalForBars) * 100),
+  );
+  const heldPct = Math.max(
+    0,
+    Math.min(100, (heldBalance / totalForBars) * 100),
+  );
 
   const ledgerStats = useMemo(() => {
     return ledgerEntries.reduce(
       (acc, entry) => {
-        if (entry.direction === "CREDIT") acc.credit += safeNumber(entry.amount);
+        if (entry.direction === "CREDIT")
+          acc.credit += safeNumber(entry.amount);
         else acc.debit += safeNumber(entry.amount);
         return acc;
       },
@@ -221,13 +248,15 @@ export const WalletDetailModal: React.FC = () => {
           Retour aux portefeuilles
         </button>
 
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+        <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="mb-2 inline-flex rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
                 Portefeuille
               </p>
-              <h1 className="font-mono text-2xl font-bold text-gray-900">{wallet.walletNumber}</h1>
+              <h1 className="font-mono text-2xl font-bold text-gray-900">
+                {wallet.walletNumber}
+              </h1>
               <p className="mt-1 text-sm text-gray-500">
                 {wallet.ownerType} · {wallet.ownerCode}
               </p>
@@ -244,7 +273,10 @@ export const WalletDetailModal: React.FC = () => {
 
           <div className="mt-6 h-3 overflow-hidden rounded-full bg-gray-100">
             <div className="flex h-full">
-              <div className="bg-green-500" style={{ width: `${availablePct}%` }} />
+              <div
+                className="bg-green-500"
+                style={{ width: `${availablePct}%` }}
+              />
               <div className="bg-orange-400" style={{ width: `${heldPct}%` }} />
             </div>
           </div>
@@ -261,22 +293,41 @@ export const WalletDetailModal: React.FC = () => {
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <BalanceCard label="Solde disponible" value={formatAmount(wallet.availableBalance, wallet.currency)} tone="green" icon={TrendingUp} />
-        <BalanceCard label="Solde bloqué" value={formatAmount(wallet.heldBalance, wallet.currency)} tone="orange" icon={Lock} />
-        <BalanceCard label="Solde ledger" value={formatAmount(wallet.ledgerBalance, wallet.currency)} tone="gray" icon={Layers} />
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <BalanceCard
+          label="Solde disponible"
+          value={formatAmount(wallet.availableBalance, wallet.currency)}
+          tone="green"
+          icon={TrendingUp}
+        />
+        <BalanceCard
+          label="Solde bloqué"
+          value={formatAmount(wallet.heldBalance, wallet.currency)}
+          tone="orange"
+          icon={Lock}
+        />
+        <BalanceCard
+          label="Solde ledger"
+          value={formatAmount(wallet.ledgerBalance, wallet.currency)}
+          tone="gray"
+          icon={Layers}
+        />
       </div>
 
       {actionError && (
         <div className="mb-6 flex items-center justify-between rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100">
           <span>{actionError}</span>
-          <button onClick={() => setActionError(null)} className="text-red-500 hover:text-red-700">
+          <button
+            onClick={() => setActionError(null)}
+            className="text-red-500 hover:text-red-700"
+          >
             <XCircle size={16} />
           </button>
         </div>
       )}
 
-      <div className="mb-6 inline-flex rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100">
+      <div className="mb-6 overflow-x-auto rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-max gap-1">
         <button
           onClick={() => setActiveTab("ledger")}
           className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
@@ -297,13 +348,22 @@ export const WalletDetailModal: React.FC = () => {
         >
           Holds ({holds.length})
         </button>
+        </div>
       </div>
 
       {activeTab === "ledger" && (
-        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-gray-100 sm:p-4">
           <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <MiniStat label="Crédits affichés" value={`${formatAmountOnly(ledgerStats.credit)} ${wallet.currency}`} tone="green" />
-            <MiniStat label="Débits affichés" value={`${formatAmountOnly(ledgerStats.debit)} ${wallet.currency}`} tone="red" />
+            <MiniStat
+              label="Crédits affichés"
+              value={`${formatAmountOnly(ledgerStats.credit)} ${wallet.currency}`}
+              tone="green"
+            />
+            <MiniStat
+              label="Débits affichés"
+              value={`${formatAmountOnly(ledgerStats.debit)} ${wallet.currency}`}
+              tone="red"
+            />
           </div>
 
           {ledgerLoading ? (
@@ -321,9 +381,9 @@ export const WalletDetailModal: React.FC = () => {
                 {ledgerEntries.map((entry) => (
                   <div
                     key={entry.entryNumber}
-                    className="flex items-center justify-between rounded-2xl bg-gray-50 p-4 transition hover:bg-gray-100"
+                    className="flex flex-col gap-3 rounded-2xl bg-gray-50 p-3 transition hover:bg-gray-100 sm:flex-row sm:items-center sm:justify-between sm:p-4"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
                       <div
                         className={`rounded-xl p-2 ${
                           entry.direction === "CREDIT"
@@ -337,30 +397,39 @@ export const WalletDetailModal: React.FC = () => {
                           <TrendingDown size={18} />
                         )}
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-900">
                           {entryTypeLabels[entry.entryType] || entry.entryType}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {entry.sourceCode && <span className="font-mono">{entry.sourceCode} · </span>}
+                          {entry.sourceCode && (
+                            <span className="font-mono">
+                              {entry.sourceCode} ·{" "}
+                            </span>
+                          )}
                           {new Date(entry.createdAt).toLocaleString("fr-FR")}
                         </p>
                         {entry.reference && (
-                          <p className="mt-0.5 text-xs text-gray-400">Réf: {entry.reference}</p>
+                          <p className="mt-0.5 text-xs text-gray-400">
+                            Réf: {entry.reference}
+                          </p>
                         )}
                       </div>
                     </div>
-                    <div className="flex-shrink-0 text-right">
+                    <div className="flex-shrink-0 text-left sm:text-right">
                       <p
                         className={`text-sm font-bold ${
-                          entry.direction === "CREDIT" ? "text-green-600" : "text-red-600"
+                          entry.direction === "CREDIT"
+                            ? "text-green-600"
+                            : "text-red-600"
                         }`}
                       >
                         {entry.direction === "CREDIT" ? "+" : "-"}
                         {formatAmountOnly(entry.amount)} {entry.currency}
                       </p>
                       <p className="text-xs text-gray-400">
-                        Solde: {formatAmountOnly(entry.balanceAfter)} {entry.currency}
+                        Solde: {formatAmountOnly(entry.balanceAfter)}{" "}
+                        {entry.currency}
                       </p>
                     </div>
                   </div>
@@ -381,7 +450,9 @@ export const WalletDetailModal: React.FC = () => {
                       <ChevronLeft size={16} />
                     </button>
                     <button
-                      onClick={() => setLedgerPage((p) => Math.min(totalPages - 1, p + 1))}
+                      onClick={() =>
+                        setLedgerPage((p) => Math.min(totalPages - 1, p + 1))
+                      }
                       disabled={ledgerPage >= totalPages - 1}
                       className="rounded-xl bg-white p-2 shadow-sm ring-1 ring-gray-100 disabled:opacity-50"
                     >
@@ -397,11 +468,13 @@ export const WalletDetailModal: React.FC = () => {
 
       {activeTab === "holds" && (
         <div>
-          <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm text-gray-600">Réservations de fonds sur ce portefeuille</p>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-gray-600">
+              Réservations de fonds sur ce portefeuille
+            </p>
             <button
               onClick={() => setIsCreateHoldOpen(true)}
-              className="inline-flex items-center gap-1 rounded-xl bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700"
+              className="inline-flex w-full items-center justify-center gap-1 rounded-xl bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 sm:w-auto"
             >
               <Plus size={14} /> Nouveau hold
             </button>
@@ -432,12 +505,17 @@ export const WalletDetailModal: React.FC = () => {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="font-mono text-sm font-semibold text-gray-900">{hold.holdNumber}</p>
+                        <p className="font-mono text-sm font-semibold text-gray-900">
+                          {hold.holdNumber}
+                        </p>
                         <p className="mt-0.5 text-xs text-gray-500">
                           {hold.sourceType} · {hold.sourceCode}
                         </p>
-                        <p className={`mt-0.5 text-xs ${isExpired && isActive ? "text-red-500" : "text-gray-400"}`}>
-                          Expire le : {new Date(hold.expiresAt).toLocaleString("fr-FR")}
+                        <p
+                          className={`mt-0.5 text-xs ${isExpired && isActive ? "text-red-500" : "text-gray-400"}`}
+                        >
+                          Expire le :{" "}
+                          {new Date(hold.expiresAt).toLocaleString("fr-FR")}
                           {isExpired && isActive && " (expiré)"}
                         </p>
                       </div>
@@ -445,7 +523,9 @@ export const WalletDetailModal: React.FC = () => {
                         <p className="font-bold text-orange-600">
                           {formatAmountOnly(hold.amount)} {wallet.currency}
                         </p>
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${hs.color}`}>
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${hs.color}`}
+                        >
                           {hs.label}
                         </span>
                       </div>
@@ -455,14 +535,19 @@ export const WalletDetailModal: React.FC = () => {
                       <div className="mt-4 grid grid-cols-2 gap-2">
                         <button
                           onClick={() => {
-                            if (confirm(`Capturer le hold ${hold.holdNumber} (débit définitif de ${formatAmountOnly(hold.amount)} ${wallet.currency}) ?`)) {
+                            if (
+                              confirm(
+                                `Capturer le hold ${hold.holdNumber} (débit définitif de ${formatAmountOnly(hold.amount)} ${wallet.currency}) ?`,
+                              )
+                            ) {
                               captureMutation.mutate(hold.holdNumber);
                             }
                           }}
                           disabled={anyPending}
                           className="inline-flex items-center justify-center gap-1 rounded-xl bg-green-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-green-700 disabled:opacity-50"
                         >
-                          {captureMutation.isPending && captureMutation.variables === hold.holdNumber ? (
+                          {captureMutation.isPending &&
+                          captureMutation.variables === hold.holdNumber ? (
                             <Loader2 size={12} className="animate-spin" />
                           ) : (
                             <CheckCircle size={12} />
@@ -471,14 +556,19 @@ export const WalletDetailModal: React.FC = () => {
                         </button>
                         <button
                           onClick={() => {
-                            if (confirm(`Libérer le hold ${hold.holdNumber} (remettre ${formatAmountOnly(hold.amount)} ${wallet.currency} dans le solde disponible) ?`)) {
+                            if (
+                              confirm(
+                                `Libérer le hold ${hold.holdNumber} (remettre ${formatAmountOnly(hold.amount)} ${wallet.currency} dans le solde disponible) ?`,
+                              )
+                            ) {
                               releaseMutation.mutate(hold.holdNumber);
                             }
                           }}
                           disabled={anyPending}
                           className="inline-flex items-center justify-center gap-1 rounded-xl bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-200 disabled:opacity-50"
                         >
-                          {releaseMutation.isPending && releaseMutation.variables === hold.holdNumber ? (
+                          {releaseMutation.isPending &&
+                          releaseMutation.variables === hold.holdNumber ? (
                             <Loader2 size={12} className="animate-spin" />
                           ) : (
                             <XCircle size={12} />
@@ -495,9 +585,14 @@ export const WalletDetailModal: React.FC = () => {
 
           {isCreateHoldOpen && (
             <div className="mt-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-blue-100">
-              <div className="mb-4 flex items-center justify-between">
-                <p className="text-sm font-semibold text-gray-900">Nouveau hold</p>
-                <button onClick={() => setIsCreateHoldOpen(false)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm font-semibold text-gray-900">
+                  Nouveau hold
+                </p>
+                <button
+                  onClick={() => setIsCreateHoldOpen(false)}
+                  className="rounded-lg p-1 text-gray-400 hover:bg-gray-100"
+                >
                   <X size={16} />
                 </button>
               </div>
@@ -514,7 +609,10 @@ export const WalletDetailModal: React.FC = () => {
                     value={holdForm.amount === 0 ? "" : holdForm.amount}
                     onChange={(e) => {
                       const val = e.target.value.replace(/[^\d.]/g, "");
-                      setHoldForm({ ...holdForm, amount: val === "" ? 0 : parseFloat(val) });
+                      setHoldForm({
+                        ...holdForm,
+                        amount: val === "" ? 0 : parseFloat(val),
+                      });
                     }}
                     placeholder="0"
                     className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
@@ -523,7 +621,9 @@ export const WalletDetailModal: React.FC = () => {
                 <Field label="Type de source">
                   <select
                     value={holdForm.sourceType}
-                    onChange={(e) => setHoldForm({ ...holdForm, sourceType: e.target.value })}
+                    onChange={(e) =>
+                      setHoldForm({ ...holdForm, sourceType: e.target.value })
+                    }
                     className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
                   >
                     <option value="BOOKING">Réservation</option>
@@ -538,7 +638,9 @@ export const WalletDetailModal: React.FC = () => {
                     type="text"
                     value={holdForm.sourceCode}
                     placeholder="BKG-000001"
-                    onChange={(e) => setHoldForm({ ...holdForm, sourceCode: e.target.value })}
+                    onChange={(e) =>
+                      setHoldForm({ ...holdForm, sourceCode: e.target.value })
+                    }
                     className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
                   />
                 </Field>
@@ -546,12 +648,14 @@ export const WalletDetailModal: React.FC = () => {
                   <input
                     type="datetime-local"
                     value={holdForm.expiresAt}
-                    onChange={(e) => setHoldForm({ ...holdForm, expiresAt: e.target.value })}
+                    onChange={(e) =>
+                      setHoldForm({ ...holdForm, expiresAt: e.target.value })
+                    }
                     className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
                   />
                 </Field>
               </div>
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <button
                   onClick={() => setIsCreateHoldOpen(false)}
                   disabled={createHoldMutation.isPending}
@@ -566,7 +670,9 @@ export const WalletDetailModal: React.FC = () => {
                       return;
                     }
                     if (holdForm.amount > availableBalance) {
-                      setHoldError(`Montant supérieur au solde disponible (${formatAmountOnly(availableBalance)} FCFA).`);
+                      setHoldError(
+                        `Montant supérieur au solde disponible (${formatAmountOnly(availableBalance)} FCFA).`,
+                      );
                       return;
                     }
                     createHoldMutation.mutate();
@@ -574,7 +680,11 @@ export const WalletDetailModal: React.FC = () => {
                   disabled={createHoldMutation.isPending}
                   className="flex-1 rounded-xl bg-primary-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50"
                 >
-                  {createHoldMutation.isPending ? <Loader2 size={14} className="mx-auto animate-spin" /> : "Créer le hold"}
+                  {createHoldMutation.isPending ? (
+                    <Loader2 size={14} className="mx-auto animate-spin" />
+                  ) : (
+                    "Créer le hold"
+                  )}
                 </button>
               </div>
             </div>
@@ -610,22 +720,31 @@ const BalanceCard: React.FC<{
   );
 };
 
-const MiniStat: React.FC<{ label: string; value: string; tone: "green" | "red" }> = ({
-  label,
-  value,
-  tone,
-}) => (
-  <div className={`rounded-2xl px-4 py-3 ${tone === "green" ? "bg-green-50" : "bg-red-50"}`}>
+const MiniStat: React.FC<{
+  label: string;
+  value: string;
+  tone: "green" | "red";
+}> = ({ label, value, tone }) => (
+  <div
+    className={`rounded-2xl px-4 py-3 ${tone === "green" ? "bg-green-50" : "bg-red-50"}`}
+  >
     <p className="text-xs text-gray-500">{label}</p>
-    <p className={`mt-1 font-semibold ${tone === "green" ? "text-green-700" : "text-red-700"}`}>
+    <p
+      className={`mt-1 font-semibold ${tone === "green" ? "text-green-700" : "text-red-700"}`}
+    >
       {value}
     </p>
   </div>
 );
 
-const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+const Field: React.FC<{ label: string; children: React.ReactNode }> = ({
+  label,
+  children,
+}) => (
   <label className="block">
-    <span className="mb-1 block text-xs font-medium text-gray-600">{label}</span>
+    <span className="mb-1 block text-xs font-medium text-gray-600">
+      {label}
+    </span>
     {children}
   </label>
 );

@@ -148,9 +148,9 @@ export const TicketCreatePage: React.FC = () => {
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm max-w-3xl">
-        <div className="border-b px-6 py-4">
-          <h2 className="text-xl font-bold text-gray-900">
+      <div className="bg-white rounded-2xl shadow-sm max-w-3xl w-full">
+        <div className="border-b px-4 py-3 sm:px-6 sm:py-4">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">
             Nouveau ticket support
           </h2>
           <p className="text-sm text-gray-500 mt-1">
@@ -158,7 +158,7 @@ export const TicketCreatePage: React.FC = () => {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5">
           {actionError && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
               {actionError}
@@ -193,7 +193,7 @@ export const TicketCreatePage: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Priorité
@@ -238,7 +238,7 @@ export const TicketCreatePage: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Type propriétaire
@@ -333,7 +333,7 @@ export const TicketCreatePage: React.FC = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Contact
@@ -376,7 +376,7 @@ export const TicketCreatePage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex gap-4 pt-4 border-t">
+          <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t">
             <button
               type="button"
               onClick={() => navigate("/operations")}

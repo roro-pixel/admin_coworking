@@ -15,16 +15,24 @@ export const CreateEntitlementDefinition: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [formData, setFormData] = useState<EntitlementFormData>(() => buildDefaultEntitlementFormData());
+  const [formData, setFormData] = useState<EntitlementFormData>(() =>
+    buildDefaultEntitlementFormData(),
+  );
 
   const createMutation = useMutation({
-    mutationFn: () => subscriptionService.createEntitlementDefinition(buildEntitlementPayload(formData)),
+    mutationFn: () =>
+      subscriptionService.createEntitlementDefinition(
+        buildEntitlementPayload(formData),
+      ),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ["entitlement-definitions"] });
       navigate(`/subscriptions/entitlements/${created.code}`);
     },
     onError: (error: any) => {
-      setErrorMessage(error?.response?.data?.message ?? "Erreur lors de la création du droit.");
+      setErrorMessage(
+        error?.response?.data?.message ??
+          "Erreur lors de la création du droit.",
+      );
     },
   });
 
@@ -51,8 +59,13 @@ export const CreateEntitlementDefinition: React.FC = () => {
               <div className="flex items-center gap-2 text-sm font-medium text-primary-600">
                 <Tags size={16} /> Droits d’abonnement
               </div>
-              <h1 className="mt-1 text-2xl font-bold text-gray-900">Créer un droit</h1>
-              <p className="mt-1 text-sm text-gray-500">Définissez un droit réutilisable dans vos plans, passes et souscriptions.</p>
+              <h1 className="mt-1 text-2xl font-bold text-gray-900">
+                Créer un droit
+              </h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Définissez un droit réutilisable dans vos plans, passes et
+                souscriptions.
+              </p>
             </div>
           </div>
 
@@ -69,7 +82,11 @@ export const CreateEntitlementDefinition: React.FC = () => {
               disabled={createMutation.isPending || !formData.name.trim()}
               className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {createMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              {createMutation.isPending ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Save size={16} />
+              )}
               Créer le droit
             </button>
           </div>
@@ -81,7 +98,10 @@ export const CreateEntitlementDefinition: React.FC = () => {
           </div>
         )}
 
-        <EntitlementDefinitionFields formData={formData} onChange={setFormData} />
+        <EntitlementDefinitionFields
+          formData={formData}
+          onChange={setFormData}
+        />
       </form>
     </AdminLayout>
   );

@@ -213,7 +213,9 @@ export const ReorderRulesList: React.FC = () => {
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 flex-wrap">
-                      <p className="font-semibold text-base">{suggestion.itemName}</p>
+                      <p className="font-semibold text-base">
+                        {suggestion.itemName}
+                      </p>
                       {suggestion.severity && (
                         <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-700">
                           {suggestion.severity}
@@ -226,22 +228,50 @@ export const ReorderRulesList: React.FC = () => {
                       )}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3 text-sm text-gray-600">
-                      <p>Stock actuel : {suggestion.currentQuantity} / seuil {suggestion.minimumQuantity}</p>
+                      <p>
+                        Stock actuel : {suggestion.currentQuantity} / seuil{" "}
+                        {suggestion.minimumQuantity}
+                      </p>
                       <p>Qté suggérée : {suggestion.suggestedOrderQuantity}</p>
                       <p>En commande : {suggestion.quantityOnOrder ?? 0}</p>
-                      <p>Jours restants : {suggestion.daysOfStockRemaining ?? "—"}</p>
-                      <p>Tendance : {suggestion.consumptionTrend ?? "—"} {suggestion.consumptionTrendPercent !== undefined ? `(${suggestion.consumptionTrendPercent}%)` : ""}</p>
-                      <p>Commander avant : {suggestion.recommendedOrderByDate || "—"}</p>
-                      <p>Fournisseur conseillé : {suggestion.bestSupplierCode || "—"}</p>
-                      <p>Prix fournisseur : {(suggestion.bestSupplierPrice ?? 0).toLocaleString()} FCFA</p>
-                      <p>Délai fournisseur : {suggestion.bestSupplierLeadTimeDays ?? "—"} j</p>
+                      <p>
+                        Jours restants :{" "}
+                        {suggestion.daysOfStockRemaining ?? "—"}
+                      </p>
+                      <p>
+                        Tendance : {suggestion.consumptionTrend ?? "—"}{" "}
+                        {suggestion.consumptionTrendPercent !== undefined
+                          ? `(${suggestion.consumptionTrendPercent}%)`
+                          : ""}
+                      </p>
+                      <p>
+                        Commander avant :{" "}
+                        {suggestion.recommendedOrderByDate || "—"}
+                      </p>
+                      <p>
+                        Fournisseur conseillé :{" "}
+                        {suggestion.bestSupplierCode || "—"}
+                      </p>
+                      <p>
+                        Prix fournisseur :{" "}
+                        {(suggestion.bestSupplierPrice ?? 0).toLocaleString()}{" "}
+                        FCFA
+                      </p>
+                      <p>
+                        Délai fournisseur :{" "}
+                        {suggestion.bestSupplierLeadTimeDays ?? "—"} j
+                      </p>
                     </div>
                     <p className="text-base font-semibold text-primary-600 mt-2">
-                      Coût estimé : {(suggestion.estimatedOrderCost ?? 0).toLocaleString()} FCFA
+                      Coût estimé :{" "}
+                      {(suggestion.estimatedOrderCost ?? 0).toLocaleString()}{" "}
+                      FCFA
                     </p>
                   </div>
                   <button
-                    onClick={() => createRequestFromSuggestionMutation.mutate(suggestion)}
+                    onClick={() =>
+                      createRequestFromSuggestionMutation.mutate(suggestion)
+                    }
                     disabled={createRequestFromSuggestionMutation.isPending}
                     className="px-5 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-base font-medium"
                   >

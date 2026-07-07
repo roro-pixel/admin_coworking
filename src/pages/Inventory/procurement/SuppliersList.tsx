@@ -56,7 +56,7 @@ export const SuppliersList: React.FC = () => {
 
   const suppliers = suppliersData?.content || [];
   const getSupplierCode = (supplier: Supplier) =>
-  supplier.code ?? supplier.supplierCode ?? "";
+    supplier.code ?? supplier.supplierCode ?? "";
 
   const createMutation = useMutation({
     mutationFn: () => inventoryService.createSupplier(formData),
@@ -68,7 +68,10 @@ export const SuppliersList: React.FC = () => {
 
   const updateMutation = useMutation({
     mutationFn: () =>
-      inventoryService.updateSupplier(getSupplierCode(editingSupplier!), formData),
+      inventoryService.updateSupplier(
+        getSupplierCode(editingSupplier!),
+        formData,
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       handleCloseModal();
@@ -128,11 +131,11 @@ export const SuppliersList: React.FC = () => {
   };
 
   const handleDelete = (code: string) => {
-  if (!code) return;
-  if (confirm("Êtes-vous sûr de vouloir supprimer ce fournisseur ?")) {
-    deleteMutation.mutate(code);
-  }
-};
+    if (!code) return;
+    if (confirm("Êtes-vous sûr de vouloir supprimer ce fournisseur ?")) {
+      deleteMutation.mutate(code);
+    }
+  };
 
   const handleViewDetail = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
@@ -144,7 +147,9 @@ export const SuppliersList: React.FC = () => {
     setShowPerformance(true);
     setPerformanceData(null);
     try {
-      const data = await inventoryService.getSupplierPerformance(getSupplierCode(supplier));
+      const data = await inventoryService.getSupplierPerformance(
+        getSupplierCode(supplier),
+      );
       setPerformanceData(data);
     } catch (error) {
       console.error(error);

@@ -1,7 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Eye, Loader2, Plus, PowerOff, Search, Tags } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Loader2,
+  Plus,
+  PowerOff,
+  Search,
+  Tags,
+} from "lucide-react";
 import { subscriptionService } from "../../../services/subscription.service";
 import type { EntitlementDefinition } from "../../../services/subscription.service";
 import {
@@ -55,7 +64,10 @@ export const EntitlementDefinitionsList: React.FC = () => {
   const totalPages = data?.totalPages ?? 1;
   const totalElements = data?.totalElements ?? definitions.length;
 
-  const handleToggleActive = (event: React.MouseEvent, def: EntitlementDefinition) => {
+  const handleToggleActive = (
+    event: React.MouseEvent,
+    def: EntitlementDefinition,
+  ) => {
     event.stopPropagation();
     const label = def.active ? "désactiver" : "réactiver";
     if (confirm(`Êtes-vous sûr de vouloir ${label} “${def.name}” ?`)) {
@@ -78,30 +90,33 @@ export const EntitlementDefinitionsList: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-6">
-  <div>
-    <h1 className="text-2xl font-bold text-gray-900">
-      Définitions de droits
-    </h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Définitions de droits
+          </h1>
 
-    <p className="text-sm text-gray-500 mt-1">
-      Centralisez les droits utilisés dans vos plans, passes, abonnements et
-      règles de consommation.
-    </p>
-  </div>
+          <p className="text-sm text-gray-500 mt-1">
+            Centralisez les droits utilisés dans vos plans, passes, abonnements
+            et règles de consommation.
+          </p>
+        </div>
 
-  <button
-    onClick={() => navigate("/subscriptions/entitlements/create")}
-    className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
-  >
-    <Plus size={18} />
-    Nouveau droit
-  </button>
-</div>
+        <button
+          onClick={() => navigate("/subscriptions/entitlements/create")}
+          className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
+        >
+          <Plus size={18} />
+          Nouveau droit
+        </button>
+      </div>
 
       <div className="rounded-2xl bg-white p-4 shadow-sm shadow-gray-200/70 ring-1 ring-gray-100">
         <div className="flex flex-col gap-3 md:flex-row">
           <div className="relative flex-1">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search
+              size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
             <input
               type="text"
               placeholder="Rechercher par nom ou code..."
@@ -110,7 +125,9 @@ export const EntitlementDefinitionsList: React.FC = () => {
               className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-28 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
             />
             {isFetching && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">Recherche...</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">
+                Recherche...
+              </span>
             )}
           </div>
 
@@ -132,8 +149,13 @@ export const EntitlementDefinitionsList: React.FC = () => {
       <div className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-gray-200/70 ring-1 ring-gray-100">
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
           <div>
-            <p className="text-sm font-semibold text-gray-900">{totalElements.toLocaleString("fr-FR")} droit{totalElements > 1 ? "s" : ""}</p>
-            <p className="text-xs text-gray-500">Cliquez sur une ligne pour ouvrir le détail.</p>
+            <p className="text-sm font-semibold text-gray-900">
+              {totalElements.toLocaleString("fr-FR")} droit
+              {totalElements > 1 ? "s" : ""}
+            </p>
+            <p className="text-xs text-gray-500">
+              Cliquez sur une ligne pour ouvrir le détail.
+            </p>
           </div>
         </div>
 
@@ -163,20 +185,40 @@ export const EntitlementDefinitionsList: React.FC = () => {
                         <Tags size={16} />
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-900 group-hover:text-primary-700">{def.name}</p>
-                        <p className="mt-0.5 font-mono text-xs text-gray-400">{def.code}</p>
-                        {def.description && <p className="mt-1 line-clamp-1 max-w-md text-xs text-gray-500">{def.description}</p>}
+                        <p className="font-semibold text-gray-900 group-hover:text-primary-700">
+                          {def.name}
+                        </p>
+                        <p className="mt-0.5 font-mono text-xs text-gray-400">
+                          {def.code}
+                        </p>
+                        {def.description && (
+                          <p className="mt-1 line-clamp-1 max-w-md text-xs text-gray-500">
+                            {def.description}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </td>
-                  <td className="px-5 py-4 text-gray-700">{entitlementTypeLabels[def.entitlementType] ?? def.entitlementType}</td>
-                  <td className="px-5 py-4 text-gray-700">{unitLabels[def.unit] ?? def.unit}</td>
-                  <td className="px-5 py-4 text-gray-700">{consumptionModeLabels[def.consumptionMode] ?? def.consumptionMode}</td>
-                  <td className="px-5 py-4 text-gray-700">{resetPolicyLabels[def.resetPolicy] ?? def.resetPolicy}</td>
+                  <td className="px-5 py-4 text-gray-700">
+                    {entitlementTypeLabels[def.entitlementType] ??
+                      def.entitlementType}
+                  </td>
+                  <td className="px-5 py-4 text-gray-700">
+                    {unitLabels[def.unit] ?? def.unit}
+                  </td>
+                  <td className="px-5 py-4 text-gray-700">
+                    {consumptionModeLabels[def.consumptionMode] ??
+                      def.consumptionMode}
+                  </td>
+                  <td className="px-5 py-4 text-gray-700">
+                    {resetPolicyLabels[def.resetPolicy] ?? def.resetPolicy}
+                  </td>
                   <td className="px-5 py-4 text-center">
                     <span
                       className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
-                        def.active ? "bg-green-50 text-green-700 ring-green-100" : "bg-gray-100 text-gray-600 ring-gray-200"
+                        def.active
+                          ? "bg-green-50 text-green-700 ring-green-100"
+                          : "bg-gray-100 text-gray-600 ring-gray-200"
                       }`}
                     >
                       {def.active ? "Actif" : "Inactif"}
@@ -200,7 +242,9 @@ export const EntitlementDefinitionsList: React.FC = () => {
                         onClick={(event) => handleToggleActive(event, def)}
                         disabled={toggleActiveMutation.isPending}
                         className={`rounded-lg p-2 transition hover:bg-white hover:shadow-sm ${
-                          def.active ? "text-gray-400 hover:text-red-600" : "text-gray-400 hover:text-green-600"
+                          def.active
+                            ? "text-gray-400 hover:text-red-600"
+                            : "text-gray-400 hover:text-green-600"
                         }`}
                         title={def.active ? "Désactiver" : "Réactiver"}
                       >
@@ -218,8 +262,13 @@ export const EntitlementDefinitionsList: React.FC = () => {
                       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-50 text-gray-400 ring-1 ring-gray-100">
                         <Tags size={22} />
                       </div>
-                      <p className="mt-4 font-semibold text-gray-900">Aucun droit trouvé</p>
-                      <p className="mt-1 text-sm text-gray-500">Créez un nouveau droit ou modifiez vos filtres de recherche.</p>
+                      <p className="mt-4 font-semibold text-gray-900">
+                        Aucun droit trouvé
+                      </p>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Créez un nouveau droit ou modifiez vos filtres de
+                        recherche.
+                      </p>
                     </div>
                   </td>
                 </tr>
@@ -238,10 +287,14 @@ export const EntitlementDefinitionsList: React.FC = () => {
               <ChevronLeft size={16} /> Précédent
             </button>
             <span className="text-sm text-gray-500">
-              Page <span className="font-semibold text-gray-900">{page + 1}</span> / {totalPages}
+              Page{" "}
+              <span className="font-semibold text-gray-900">{page + 1}</span> /{" "}
+              {totalPages}
             </span>
             <button
-              onClick={() => setPage((current) => Math.min(totalPages - 1, current + 1))}
+              onClick={() =>
+                setPage((current) => Math.min(totalPages - 1, current + 1))
+              }
               disabled={page >= totalPages - 1}
               className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
             >

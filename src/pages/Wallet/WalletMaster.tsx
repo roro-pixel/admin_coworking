@@ -24,15 +24,16 @@ export const WalletMaster: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Portefeuilles</h1>
-        <p className="text-gray-600 mt-1">
-          Recherchez, créez automatiquement, créditez et suivez les portefeuilles clients.
+      <div className="mb-5 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-5">
+        <h1 className="text-xl font-black tracking-tight text-gray-900 sm:text-2xl">Portefeuilles</h1>
+        <p className="mt-1 text-sm leading-6 text-gray-600">
+          Recherchez, créez automatiquement, créditez et suivez les
+          portefeuilles clients.
         </p>
       </div>
 
-      <div className="mb-6 overflow-x-auto">
-        <div className="inline-flex min-w-max rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100">
+      <div className="mb-6 overflow-x-auto rounded-[1.35rem] bg-white p-1.5 shadow-sm ring-1 ring-gray-100 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-max gap-1.5">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -40,7 +41,7 @@ export const WalletMaster: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => switchTab(tab.id)}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all whitespace-nowrap ${
+                className={`flex items-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-black transition-all whitespace-nowrap sm:px-4 sm:text-sm ${
                   active
                     ? "bg-primary-600 text-white shadow-sm"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
@@ -56,7 +57,10 @@ export const WalletMaster: React.FC = () => {
 
       {visitedTabs.has("list") && (
         <div className={activeTab !== "list" ? "hidden" : ""}>
-          <WalletsList onOpenLookup={() => switchTab("lookup")} onOpenTopUp={() => switchTab("topup")} />
+          <WalletsList
+            onOpenLookup={() => switchTab("lookup")}
+            onOpenTopUp={() => switchTab("topup")}
+          />
         </div>
       )}
       {visitedTabs.has("lookup") && (

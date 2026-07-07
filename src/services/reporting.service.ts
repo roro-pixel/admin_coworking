@@ -355,6 +355,325 @@ export interface RealOwnerActivity {
   bookedMinutes?: number;
   lastBookingAt?: string;
 }
+
+// ==================== REPORTING METIER (NOUVEAU) ====================
+
+export interface ActivityVariation {
+  previousValue: number;
+  currentValue: number;
+  changePercent: number;
+}
+export interface ActivityReportResponse {
+  generatedAt: string;
+  fromDate?: string;
+  toDate?: string;
+  bookings: {
+    totalCount: number;
+    confirmedCount: number;
+    completedCount: number;
+    cancelledCount: number;
+    totalRevenue: number;
+    totalBookedMinutes: number;
+    variation?: ActivityVariation | null;
+  };
+  invoices: {
+    totalCount: number;
+    totalInvoiced: number;
+    totalPaid: number;
+    totalOutstanding: number;
+    overdueCount: number;
+    variation?: ActivityVariation | null;
+  };
+  payments: {
+    transactionCount: number;
+    totalReceived: number;
+    cashAmount: number;
+    walletAmount: number;
+    mobileMoneyAmount: number;
+    bankTransferAmount: number;
+    cardAmount: number;
+    variation?: ActivityVariation | null;
+  };
+  subscriptions: {
+    activeCount: number;
+    newCount: number;
+    cancelledCount: number;
+    renewedCount: number;
+    variation?: ActivityVariation | null;
+  };
+  stock: {
+    inboundMovements: number;
+    outboundMovements: number;
+    inboundValue: number;
+    outboundValue: number;
+    variation?: ActivityVariation | null;
+  };
+  contracts: {
+    signedCount: number;
+    expiredCount: number;
+    activeCount: number;
+    variation?: ActivityVariation | null;
+  };
+  members: {
+    totalActive: number;
+    newCount: number;
+    variation?: ActivityVariation | null;
+  };
+  support: {
+    openedCount: number;
+    resolvedCount: number;
+    closedCount: number;
+    highPriorityCount: number;
+    variation?: ActivityVariation | null;
+  };
+}
+export interface MemberProfileResponse {
+  generatedAt: string;
+  member: {
+    memberCode: string;
+    firstname: string;
+    lastname: string;
+    email?: string;
+    phone?: string;
+    whatsappPhone?: string;
+    status: string;
+    customerCode?: string;
+    customerName?: string;
+    jobTitle?: string;
+    companyRole?: string;
+    birthDate?: string;
+    city?: string;
+    country?: string;
+    photoUrl?: string | null;
+    portalAccess?: boolean;
+    createdAt?: string;
+  };
+  subscriptions: Array<{
+    subscriptionNumber: string;
+    planName: string;
+    status: string;
+    billingCycle?: string;
+    totalAmount?: number;
+    currency?: string;
+    startDate?: string;
+    currentPeriodEnd?: string;
+    autoRenew?: boolean;
+  }>;
+  bookings: Array<{
+    bookingNumber: string;
+    resourceName: string;
+    status: string;
+    startDate?: string;
+    durationMinutes?: number;
+    totalAmount?: number;
+    currency?: string;
+  }>;
+  invoices: Array<{
+    documentNumber: string;
+    status: string;
+    totalAmount: number;
+    paidAmount: number;
+    balanceDue: number;
+    currency?: string;
+    issueDate?: string;
+    dueDate?: string;
+  }>;
+  payments: Array<{
+    transactionNumber: string;
+    paymentMethod: string;
+    amount: number;
+    currency?: string;
+    status: string;
+    paidAt?: string;
+  }>;
+  wallet?: {
+    walletNumber: string;
+    availableBalance: number;
+    ledgerBalance: number;
+    heldBalance: number;
+    currency: string;
+    status: string;
+  } | null;
+  contracts: Array<{
+    contractCode: string;
+    title: string;
+    status: string;
+    startDate?: string;
+    endDate?: string;
+    renewalType?: string;
+    signedAt?: string;
+  }>;
+  tickets: Array<{
+    ticketNumber: string;
+    title: string;
+    status: string;
+    priority: string;
+    category: string;
+    createdAt?: string;
+    resolvedAt?: string;
+  }>;
+}
+export interface DebtRecoveryAgingBucket {
+  label: string;
+  invoiceCount: number;
+  totalAmount: number;
+  averageAmount: number;
+  percentage: number;
+}
+export interface DebtRecoveryInvoice {
+  documentNumber: string;
+  customerName: string;
+  customerCode: string;
+  customerType: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  issueDate: string;
+  dueDate: string;
+  totalAmount: number;
+  paidAmount: number;
+  balanceDue: number;
+  agingDays: number;
+  agingBucket: string;
+}
+export interface DebtRecoveryResponse {
+  generatedAt: string;
+  totalOutstanding: number;
+  totalInvoices: number;
+  aging: {
+    current: DebtRecoveryAgingBucket;
+    days1to30: DebtRecoveryAgingBucket;
+    days31to60: DebtRecoveryAgingBucket;
+    days61to90: DebtRecoveryAgingBucket;
+    days90plus: DebtRecoveryAgingBucket;
+  };
+  unpaidInvoices: DebtRecoveryInvoice[];
+}
+export interface ResourceUtilizationHour {
+  hour: number;
+  bookingCount: number;
+  percentage: number;
+}
+export interface ResourceUtilizationItem {
+  resourceCode: string;
+  resourceName: string;
+  resourceType: string;
+  totalBookings: number;
+  morningBookings: number;
+  afternoonBookings: number;
+  eveningBookings: number;
+  bookedMinutes: number;
+  availableMinutes: number;
+  occupancyRate: number;
+  totalRevenue: number;
+  revenuePerHour: number;
+}
+export interface UnderutilizedResource {
+  resourceCode: string;
+  resourceName: string;
+  resourceType: string;
+  bookedMinutes: number;
+  occupancyRate: number;
+  totalRevenue: number;
+}
+export interface ResourceUtilizationReportResponse {
+  generatedAt: string;
+  fromDate?: string;
+  toDate?: string;
+  periodDays: number;
+  overallOccupancyRate: number;
+  resources: ResourceUtilizationItem[];
+  hourlyHeatmap: ResourceUtilizationHour[];
+  underutilized: UnderutilizedResource[];
+}
+export interface StockValuationCategory {
+  categoryCode: string;
+  categoryName: string;
+  itemCount: number;
+  totalQuantity: number;
+  totalValue: number;
+  percentage: number;
+}
+export interface StockValuationLocation {
+  locationCode: string;
+  locationName: string;
+  locationType: string;
+  itemCount: number;
+  totalQuantity: number;
+  totalValue: number;
+  percentage: number;
+}
+export interface LowStockItem {
+  itemCode: string;
+  itemName: string;
+  categoryName: string;
+  quantityAvailable: number;
+  reorderPoint: number;
+  reorderQuantity: number;
+}
+export interface DeadStockItem {
+  itemCode: string;
+  itemName: string;
+  categoryName: string;
+  locationName: string;
+  quantityOnHand: number;
+  stockValue: number;
+  lastMovementDate: string;
+  daysSinceLastMovement: number;
+}
+export interface StockValuationReportResponse {
+  generatedAt: string;
+  totalValue: number;
+  totalItems: number;
+  totalLocations: number;
+  byCategory: StockValuationCategory[];
+  byLocation: StockValuationLocation[];
+  lowStockItems: LowStockItem[];
+  deadStockItems: DeadStockItem[];
+}
+export interface MrrTrendItem {
+  month: string;
+  mrr: number;
+  activeCount: number;
+}
+export interface ActivePlanAnalytics {
+  planName: string;
+  subscriptionCount: number;
+  totalAmount: number;
+  percentage: number;
+}
+export interface ChurnTrendItem {
+  month: string;
+  cancelledCount: number;
+  totalCount: number;
+  churnRate: number;
+}
+export interface UpcomingRenewal {
+  subscriptionNumber: string;
+  subscriberCode: string;
+  subscriberType: string;
+  planName: string;
+  totalAmount: number;
+  currency: string;
+  currentPeriodEnd: string;
+  daysUntilRenewal: number;
+}
+export interface RevenueByPlan {
+  planName: string;
+  subscriptionCount: number;
+  totalRevenue: number;
+  percentage: number;
+}
+export interface SubscriptionAnalyticsResponse {
+  generatedAt: string;
+  totalActive: number;
+  currentMrr: number;
+  mrrTrend: MrrTrendItem[];
+  activeByPlan: ActivePlanAnalytics[];
+  churnTrend: ChurnTrendItem[];
+  upcomingRenewals: UpcomingRenewal[];
+  revenueByPlan: RevenueByPlan[];
+}
+
 // ==================== SERVICE ====================
 
 export const reportingService = {
@@ -542,6 +861,138 @@ export const reportingService = {
     const response = await apiClient.get("/sni/api/v1/reporting/occupancy", {
       params,
     });
+    return response.data;
+  },
+
+  // ========== REPORTING METIER (NOUVEAU) ==========
+  getActivityReport: async (params?: {
+    from?: string;
+    to?: string;
+    compareWithPrevious?: boolean;
+  }): Promise<ActivityReportResponse> => {
+    const response = await apiClient.get("/sni/api/v1/reports/activity", {
+      params,
+    });
+    return response.data;
+  },
+  exportActivityPdf: async (params?: {
+    from?: string;
+    to?: string;
+    compareWithPrevious?: boolean;
+  }): Promise<Blob> => {
+    const response = await apiClient.get("/sni/api/v1/reports/activity/pdf", {
+      params,
+      responseType: "blob",
+    });
+    return response.data;
+  },
+  exportActivityCsv: async (params?: {
+    from?: string;
+    to?: string;
+    compareWithPrevious?: boolean;
+  }): Promise<Blob> => {
+    const response = await apiClient.get("/sni/api/v1/reports/activity/csv", {
+      params,
+      responseType: "blob",
+    });
+    return response.data;
+  },
+  getMemberProfile: async (
+    memberId: string,
+  ): Promise<MemberProfileResponse> => {
+    const response = await apiClient.get(
+      `/sni/api/v1/reports/member-profile/${memberId}`,
+    );
+    return response.data;
+  },
+  exportMemberProfilePdf: async (memberId: string): Promise<Blob> => {
+    const response = await apiClient.get(
+      `/sni/api/v1/reports/member-profile/${memberId}/pdf`,
+      { responseType: "blob" },
+    );
+    return response.data;
+  },
+  getDebtRecoveryReport: async (params?: {
+    sortBy?: string;
+  }): Promise<DebtRecoveryResponse> => {
+    const response = await apiClient.get("/sni/api/v1/reports/debt-recovery", {
+      params,
+    });
+    return response.data;
+  },
+  exportDebtRecoveryPdf: async (params?: {
+    sortBy?: string;
+  }): Promise<Blob> => {
+    const response = await apiClient.get(
+      "/sni/api/v1/reports/debt-recovery/pdf",
+      { params, responseType: "blob" },
+    );
+    return response.data;
+  },
+  exportDebtRecoveryCsv: async (params?: {
+    sortBy?: string;
+  }): Promise<Blob> => {
+    const response = await apiClient.get(
+      "/sni/api/v1/reports/debt-recovery/csv",
+      { params, responseType: "blob" },
+    );
+    return response.data;
+  },
+  getResourceUtilizationReport: async (params?: {
+    from?: string;
+    to?: string;
+  }): Promise<ResourceUtilizationReportResponse> => {
+    const response = await apiClient.get(
+      "/sni/api/v1/reports/resource-utilization",
+      { params },
+    );
+    return response.data;
+  },
+  exportResourceUtilizationPdf: async (params?: {
+    from?: string;
+    to?: string;
+  }): Promise<Blob> => {
+    const response = await apiClient.get(
+      "/sni/api/v1/reports/resource-utilization/pdf",
+      { params, responseType: "blob" },
+    );
+    return response.data;
+  },
+  getStockValuationReport: async (params?: {
+    inactiveDays?: number;
+  }): Promise<StockValuationReportResponse> => {
+    const response = await apiClient.get(
+      "/sni/api/v1/reports/stock-valuation",
+      { params },
+    );
+    return response.data;
+  },
+  exportStockValuationPdf: async (params?: {
+    inactiveDays?: number;
+  }): Promise<Blob> => {
+    const response = await apiClient.get(
+      "/sni/api/v1/reports/stock-valuation/pdf",
+      { params, responseType: "blob" },
+    );
+    return response.data;
+  },
+  getSubscriptionAnalytics: async (params?: {
+    months?: number;
+    renewalDays?: number;
+  }): Promise<SubscriptionAnalyticsResponse> => {
+    const response = await apiClient.get("/sni/api/v1/reports/subscriptions", {
+      params,
+    });
+    return response.data;
+  },
+  exportSubscriptionAnalyticsPdf: async (params?: {
+    months?: number;
+    renewalDays?: number;
+  }): Promise<Blob> => {
+    const response = await apiClient.get(
+      "/sni/api/v1/reports/subscriptions/pdf",
+      { params, responseType: "blob" },
+    );
     return response.data;
   },
 };

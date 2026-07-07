@@ -74,7 +74,8 @@ export const ContractPreviewPage: React.FC = () => {
     setError(null);
     try {
       const result = await contractService.generateContract(payload);
-      const documentUrl = result?.previewUrl || result?.downloadUrl || result?.fileUrl;
+      const documentUrl =
+        result?.previewUrl || result?.downloadUrl || result?.fileUrl;
       if (documentUrl) {
         window.open(documentUrl, "_blank");
       } else {

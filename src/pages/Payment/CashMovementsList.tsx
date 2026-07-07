@@ -1,6 +1,16 @@
-import React, { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Loader2, TrendingUp, TrendingDown, Eye, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  CalendarDays,
+  Eye,
+  Filter,
+  Loader2,
+  Plus,
+  Search,
+  TrendingDown,
+  TrendingUp,
+  X,
+} from "lucide-react";
 import { paymentService } from "../../services/payment.service";
 import type {
   CashMovement,
@@ -16,8 +26,8 @@ const movementTypeLabels: Record<string, string> = {
   CASH_IN: "Entrée caisse",
   CASH_OUT: "Sortie caisse",
   SAFE_DEPOSIT: "Dépôt coffre",
-  TRANSFER_IN: "Virement reçu",
-  TRANSFER_OUT: "Virement émis",
+  TRANSFER_IN: "Transfert entrant",
+  TRANSFER_OUT: "Transfert sortant",
   ADJUSTMENT: "Ajustement",
   OPENING_FLOAT: "Fond de caisse",
   CLOSING_COUNT: "Comptage clôture",
@@ -31,6 +41,7 @@ const MANUAL_TYPES = [
   "TRANSFER_OUT",
   "ADJUSTMENT",
 ] as const;
+
 const REASON_REQUIRED = [
   "REFUND",
   "CASH_OUT",
@@ -40,9 +51,8 @@ const REASON_REQUIRED = [
 ] as const;
 
 const isPositive = (type: string) =>
-  ["PAYMENT", "CASH_IN", "TRANSFER_IN", "OPENING_FLOAT", "ADJUSTMENT"].includes(
-    type,
-  );
+  ["PAYMENT", "CASH_IN", "TRANSFER_IN", "OPENING_FLOAT"].includes(type) ||
+  type === "ADJUSTMENT";
 
 type ManualCashMovementType = CreateCashMovementPayload["movementType"];
 
@@ -88,23 +98,30 @@ const buildDefaultFormData = (): {
   metadataJson: "",
 });
 
+const formatAmount = (amount?: number | null) =>
+  `${(amount ?? 0).toLocaleString("fr-FR")} FCFA`;
+
+const formatDateTime = (value?: string | null) =>
+  value ? new Date(value).toLocaleString("fr-FR") : "—";
+
 export const CashMovementsList: React.FC<CashMovementsListProps> = ({
   sessionNumber,
 }) => {
   const { admin } = useAuth();
   const queryClient = useQueryClient();
-
   const isEmbedded = !!sessionNumber;
 
   const [sessionFilter, setSessionFilter] = useState(sessionNumber || "");
   const [typeFilter, setTypeFilter] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [page, setPage] = useState(0);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState(buildDefaultFormData);
 
-  // Détail mouvement
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedMovement, setSelectedMovement] = useState<CashMovement | null>(
     null,
@@ -119,26 +136,39 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({
 
   const { data: sessionsData } = useQuery({
     queryKey: ["cash-sessions-open"],
-    queryFn: () =>
-      paymentService.getCashSessions({ status: "OPEN", size: 100 }),
+    queryFn: () => paymentService.getCashSessions({ status: "OPEN", size: 100 }),
     enabled: !isEmbedded,
   });
+
   const openSessions: CashSession[] = sessionsData?.content || [];
 
-  const { data: movementsData, isLoading } = useQuery({
-    queryKey: ["cash-movements", sessionFilter, typeFilter, page],
+  const { data: movementsData, isLoading, isFetching } = useQuery({
+    queryKey: [
+      "cash-movements",
+      sessionFilter,
+      typeFilter,
+      searchText,
+      fromDate,
+      toDate,
+      page,
+      sessionNumber,
+    ],
     queryFn: () =>
       paymentService.getCashMovements({
-        sessionNumber: sessionFilter || undefined,
+        sessionNumber: sessionFilter || sessionNumber || undefined,
         movementType: typeFilter || undefined,
+        searchText: searchText || undefined,
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
         page,
         size: isEmbedded ? 100 : 20,
+        sort: "createdAt,desc",
       }),
-    enabled: isEmbedded ? true : !!sessionFilter || !!typeFilter,
   });
 
   const movements: CashMovement[] = movementsData?.content || [];
-  const totalPages = (movementsData as any)?.totalPages ?? 0;
+  const totalPages = movementsData?.totalPages ?? 0;
+  const totalElements = movementsData?.totalElements ?? 0;
 
   const reasonRequired = (REASON_REQUIRED as readonly string[]).includes(
     formData.movementType,
@@ -169,6 +199,7 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cash-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["cash-metrics-overview"] });
       setIsModalOpen(false);
     },
     onError: (error: any) => {
@@ -192,598 +223,454 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({
     }
     const targetSession = sessionFilter || sessionNumber;
     if (!targetSession) {
-      setErrorMessage("Veuillez sélectionner une session.");
+      setErrorMessage("Veuillez sélectionner une session ouverte.");
       return;
     }
     setErrorMessage(null);
     createMutation.mutate();
   };
 
-  if (isLoading && isEmbedded) {
-    return <div className="text-center py-4">Chargement...</div>;
-  }
+  const resetFilters = () => {
+    if (!isEmbedded) setSessionFilter("");
+    setTypeFilter("");
+    setSearchText("");
+    setFromDate("");
+    setToDate("");
+    setPage(0);
+  };
 
   return (
-    <div>
-      {/* En-tête */}
-      <div className="flex justify-between items-center mb-4">
-        {!isEmbedded && (
-          <h2 className="text-xl font-semibold text-gray-900">
+    <div className="mx-auto w-full max-w-5xl space-y-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h2 className={isEmbedded ? "font-semibold" : "text-xl font-semibold text-gray-900"}>
             Mouvements de caisse
           </h2>
-        )}
-        {isEmbedded && <h3 className="font-semibold">Mouvements de caisse</h3>}
+          {!isEmbedded && (
+            <p className="mt-1 text-sm text-gray-500">
+              Entrées, sorties, paiements, ajustements et justificatifs associés.
+            </p>
+          )}
+        </div>
+
         <button
+          type="button"
           onClick={() => setIsModalOpen(true)}
-          className={`flex items-center gap-1 ${
-            isEmbedded
-              ? "text-primary-600 text-sm"
-              : "bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 text-sm"
-          }`}
+          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700"
         >
-          <Plus size={isEmbedded ? 14 : 18} />
-          {isEmbedded ? "Ajouter" : "Nouveau mouvement"}
+          <Plus size={17} />
+          Nouveau mouvement
         </button>
       </div>
 
-      {/* Filtres en mode standalone */}
       {!isEmbedded && (
-        <div className="flex flex-col md:flex-row gap-3 mb-6">
-          <select
-            value={sessionFilter}
-            onChange={(e) => setSessionFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white w-full md:w-64"
-          >
-            <option value="">Toutes les sessions</option>
-            {openSessions.map((s) => (
-              <option key={s.sessionNumber} value={s.sessionNumber}>
-                {s.sessionNumber} — {s.registerCode}
-              </option>
-            ))}
-          </select>
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
-          >
-            <option value="">Tous les types</option>
-            {Object.entries(movementTypeLabels).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <section className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-gray-100">
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.3fr_1fr_1fr_1fr_1fr_auto]">
+            <div className="relative">
+              <Search
+                size={17}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+              <input
+                value={searchText}
+                onChange={(e) => {
+                  setSearchText(e.target.value);
+                  setPage(0);
+                }}
+                placeholder="Rechercher mouvement, client, référence, reçu..."
+                className="h-11 w-full rounded-2xl border border-gray-200 bg-gray-50 pl-10 pr-3 text-sm outline-none focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-50"
+              />
+            </div>
+
+            <select
+              value={sessionFilter}
+              onChange={(e) => {
+                setSessionFilter(e.target.value);
+                setPage(0);
+              }}
+              className="h-11 rounded-2xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+            >
+              <option value="">Toutes les sessions</option>
+              {openSessions.map((s) => (
+                <option key={s.sessionNumber} value={s.sessionNumber}>
+                  {s.sessionNumber} — {s.registerCode}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={typeFilter}
+              onChange={(e) => {
+                setTypeFilter(e.target.value);
+                setPage(0);
+              }}
+              className="h-11 rounded-2xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+            >
+              <option value="">Tous les types</option>
+              {Object.entries(movementTypeLabels).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setPage(0);
+              }}
+              className="h-11 rounded-2xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+            />
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => {
+                setToDate(e.target.value);
+                setPage(0);
+              }}
+              className="h-11 rounded-2xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+            />
+
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+            >
+              <Filter size={16} />
+              Réinitialiser
+            </button>
+          </div>
+        </section>
       )}
 
-      {/* Liste */}
-      <div className="space-y-2">
-        {movements.map((movement) => (
-          <div
-            key={movement.movementNumber}
-            className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
-          >
-            <div className="flex items-center gap-3">
-              {isPositive(movement.movementType) ? (
-                <TrendingUp
-                  size={16}
-                  className="text-green-600 flex-shrink-0"
-                />
-              ) : (
-                <TrendingDown
-                  size={16}
-                  className="text-red-600 flex-shrink-0"
-                />
-              )}
-              <div>
-                <p className="font-medium text-sm">
-                  {movementTypeLabels[movement.movementType] ||
-                    movement.movementType}
-                </p>
-                {movement.reason && (
-                  <p className="text-xs text-gray-500">{movement.reason}</p>
-                )}
-                {movement.referenceCode && (
-                  <p className="text-xs text-gray-400 font-mono">
-                    {movement.referenceCode}
-                  </p>
-                )}
-                {movement.relatedCustomerName && (
-                  <p className="text-xs text-blue-500">
-                    {movement.relatedCustomerName}
-                  </p>
-                )}
-                {movement.relatedSourceLabel && (
-                  <p className="text-xs text-gray-400">
-                    {movement.relatedSourceLabel}
-                  </p>
-                )}
-                <div className="flex gap-2 flex-wrap">
-                  {movement.relatedTransactionNumber && (
-                    <span className="text-xs text-primary-600 font-mono">
-                      {movement.relatedTransactionNumber}
-                    </span>
-                  )}
-                  {movement.relatedReceiptNumber && (
-                    <span className="text-xs text-green-600 font-mono">
-                      {movement.relatedReceiptNumber}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-gray-400">
-                  {new Date(movement.createdAt).toLocaleString("fr-FR")}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <p
-                className={`font-semibold text-sm ${
-                  isPositive(movement.movementType)
-                    ? "text-green-600"
-                    : "text-red-600"
-                }`}
-              >
-                {isPositive(movement.movementType) ? "+" : "-"}
-                {movement.amount.toLocaleString("fr-FR")} FCFA
-              </p>
-              {/* Bouton détail */}
-              <button
-                onClick={() => {
+      <section className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-gray-900">
+              {totalElements} mouvement(s)
+            </p>
+            <p className="text-xs text-gray-500">
+              {isFetching ? "Mise à jour..." : "Classés du plus récent au plus ancien"}
+            </p>
+          </div>
+          {isFetching && <Loader2 size={18} className="animate-spin text-gray-400" />}
+        </div>
+
+        {isLoading ? (
+          <div className="py-10 text-center text-sm text-gray-500">
+            <Loader2 className="mx-auto mb-2 animate-spin" />
+            Chargement des mouvements...
+          </div>
+        ) : movements.length === 0 ? (
+          <div className="rounded-2xl bg-gray-50 py-10 text-center text-sm text-gray-500">
+            Aucun mouvement trouvé.
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {movements.map((movement) => (
+              <MovementCard
+                key={movement.movementNumber}
+                movement={movement}
+                onOpen={() => {
                   setSelectedMovement(movement);
                   setIsDetailOpen(true);
                 }}
-                className="p-1 text-gray-400 hover:text-primary-600"
-                title="Voir détail"
-              >
-                <Eye size={15} />
-              </button>
-            </div>
-          </div>
-        ))}
-        {movements.length === 0 && !isLoading && (
-          <div className="text-center py-8 text-gray-500 text-sm">
-            {isEmbedded
-              ? "Aucun mouvement"
-              : "Sélectionnez une session pour voir les mouvements"}
+              />
+            ))}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Pagination mode standalone */}
       {!isEmbedded && totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-4">
+        <div className="flex items-center justify-end gap-2">
           <button
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             disabled={page === 0}
-            className="px-3 py-1.5 border rounded-lg text-sm disabled:opacity-50"
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm disabled:opacity-50"
           >
             Précédent
           </button>
-          <span className="px-3 py-1.5 text-sm text-gray-600">
-            Page {page + 1} / {totalPages}
+          <span className="rounded-xl bg-white px-3 py-2 text-sm text-gray-600 ring-1 ring-gray-100">
+            {page + 1}/{Math.max(totalPages, 1)}
           </span>
           <button
             onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
             disabled={page >= totalPages - 1}
-            className="px-3 py-1.5 border rounded-lg text-sm disabled:opacity-50"
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm disabled:opacity-50"
           >
             Suivant
           </button>
         </div>
       )}
 
-      {/* Modal création mouvement */}
       {isModalOpen && (
-        <ModalPortal onClose={() => setIsModalOpen(false)}>
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-xl font-bold">Nouveau mouvement de caisse</h3>
+        <ModalPortal onClose={() => setIsModalOpen(false)} size="3xl">
+          <div className="sticky top-0 z-10 flex items-start justify-between border-b bg-white px-6 py-5 rounded-t-2xl">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">
+                Nouveau mouvement de caisse
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Créez uniquement les mouvements manuels. Les paiements et comptages sont automatisés.
+              </p>
+            </div>
             <button
+              type="button"
               onClick={() => setIsModalOpen(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
+              className="rounded-xl p-2 text-gray-400 transition hover:bg-gray-50 hover:text-gray-700"
             >
               <X size={20} />
             </button>
           </div>
-          <div className="p-6 space-y-4">
+
+          <div className="space-y-5 p-6">
             {errorMessage && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+              <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {errorMessage}
               </div>
             )}
 
-            {!isEmbedded && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Session *
-                </label>
-                <select
-                  value={sessionFilter}
-                  onChange={(e) => setSessionFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-                >
-                  <option value="">Sélectionner une session ouverte</option>
-                  {openSessions.map((s) => (
-                    <option key={s.sessionNumber} value={s.sessionNumber}>
-                      {s.sessionNumber} — {s.registerCode}
-                    </option>
-                  ))}
-                </select>
+            <section className="rounded-2xl bg-gray-50 p-4">
+              <h4 className="mb-4 text-sm font-semibold text-gray-900">
+                Informations principales
+              </h4>
+              <div className="grid gap-4 md:grid-cols-2">
+                {!isEmbedded && (
+                  <Field label="Session ouverte *">
+                    <select
+                      value={sessionFilter}
+                      onChange={(e) => setSessionFilter(e.target.value)}
+                      className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+                    >
+                      <option value="">Sélectionner une session ouverte</option>
+                      {openSessions.map((s) => (
+                        <option key={s.sessionNumber} value={s.sessionNumber}>
+                          {s.sessionNumber} — {s.registerCode}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                )}
+
+                <Field label="Type de mouvement *">
+                  <select
+                    value={formData.movementType}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        movementType: e.target.value as ManualCashMovementType,
+                        reason: "",
+                      })
+                    }
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+                  >
+                    {MANUAL_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {movementTypeLabels[type]}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Montant (FCFA) *">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={formData.amount === 0 ? "" : formData.amount}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "");
+                      setFormData({
+                        ...formData,
+                        amount: val === "" ? 0 : parseInt(val, 10),
+                      });
+                    }}
+                    placeholder="25000"
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+                  />
+                </Field>
+
+                <Field label="Canal">
+                  <select
+                    value={formData.channel}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        channel: e.target.value as typeof formData.channel,
+                      })
+                    }
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+                  >
+                    <option value="MANUAL">Manuel</option>
+                    <option value="POS">Point de vente</option>
+                    <option value="IMPORT">Import</option>
+                    <option value="API">API</option>
+                  </select>
+                </Field>
               </div>
-            )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Type de mouvement *
-              </label>
-              <select
-                value={formData.movementType}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    movementType: e.target.value as ManualCashMovementType,
-                    reason: "",
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-              >
-                {MANUAL_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {movementTypeLabels[type]}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-400 mt-1">
-                Les types PAYMENT, OPENING_FLOAT et CLOSING_COUNT sont générés
-                automatiquement par le système
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Montant (FCFA) *
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={formData.amount === 0 ? "" : formData.amount}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, "");
-                  setFormData({
-                    ...formData,
-                    amount: val === "" ? 0 : parseInt(val),
-                  });
-                }}
-                placeholder="25000"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Motif {reasonRequired ? "*" : "(optionnel)"}
-              </label>
-              <textarea
-                value={formData.reason}
-                onChange={(e) =>
-                  setFormData({ ...formData, reason: e.target.value })
-                }
-                rows={2}
-                required={reasonRequired}
-                placeholder={
-                  reasonRequired
-                    ? "Motif obligatoire pour ce type de mouvement"
-                    : "Motif optionnel..."
-                }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none"
-              />
-            </div>
-
-            <div className="border-t pt-4">
-              <p className="text-sm font-medium text-gray-700 mb-3">
-                Informations complémentaires
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <input
-                  value={formData.documentType}
-                  onChange={(e) =>
-                    setFormData({ ...formData, documentType: e.target.value })
-                  }
-                  placeholder="Type document"
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                />
-                <input
-                  value={formData.documentNumber}
-                  onChange={(e) =>
-                    setFormData({ ...formData, documentNumber: e.target.value })
-                  }
-                  placeholder="N° document"
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                />
-                <input
-                  value={formData.flowCategory}
-                  onChange={(e) =>
-                    setFormData({ ...formData, flowCategory: e.target.value })
-                  }
-                  placeholder="Catégorie flux"
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                />
-                <input
-                  value={formData.referenceType}
-                  onChange={(e) =>
-                    setFormData({ ...formData, referenceType: e.target.value })
-                  }
-                  placeholder="Type référence"
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                />
-                <input
-                  value={formData.referenceCode}
-                  onChange={(e) =>
-                    setFormData({ ...formData, referenceCode: e.target.value })
-                  }
-                  placeholder="Code référence"
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                />
-                <input
-                  value={formData.counterpartyType}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      counterpartyType: e.target.value,
-                    })
-                  }
-                  placeholder="Type contrepartie"
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                />
-                <input
-                  value={formData.counterpartyCode}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      counterpartyCode: e.target.value,
-                    })
-                  }
-                  placeholder="Code contrepartie"
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                />
-                <input
-                  value={formData.counterpartyName}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      counterpartyName: e.target.value,
-                    })
-                  }
-                  placeholder="Nom contrepartie"
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                />
-                <input
-                  value={formData.subCategory}
-                  onChange={(e) =>
-                    setFormData({ ...formData, subCategory: e.target.value })
-                  }
-                  placeholder="Sous-catégorie"
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                />
-                <input
-                  value={formData.tags}
-                  onChange={(e) =>
-                    setFormData({ ...formData, tags: e.target.value })
-                  }
-                  placeholder="Tags"
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                />
-                <input
-                  value={formData.deviceCode}
-                  onChange={(e) =>
-                    setFormData({ ...formData, deviceCode: e.target.value })
-                  }
-                  placeholder="Device code"
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                />
-                <input
-                  value={formData.deviceIp}
-                  onChange={(e) =>
-                    setFormData({ ...formData, deviceIp: e.target.value })
-                  }
-                  placeholder="Device IP"
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                />
-                <select
-                  value={formData.channel}
-                  onChange={(e) =>
-                    setFormData({ ...formData, channel: e.target.value as any })
-                  }
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
-                >
-                  <option value="MANUAL">Manuel</option>
-                  <option value="IMPORT">Import</option>
-                  <option value="API">API</option>
-                  <option value="POS">POS</option>
-                </select>
+              <div className="mt-4">
+                <Field label={`Motif ${reasonRequired ? "*" : "(optionnel)"}`}>
+                  <textarea
+                    value={formData.reason}
+                    onChange={(e) =>
+                      setFormData({ ...formData, reason: e.target.value })
+                    }
+                    rows={3}
+                    required={reasonRequired}
+                    placeholder={
+                      reasonRequired
+                        ? "Motif obligatoire pour ce type de mouvement"
+                        : "Motif ou observation..."
+                    }
+                    className="min-h-[96px] w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50 resize-none"
+                  />
+                </Field>
               </div>
-              <textarea
-                value={formData.metadataJson}
-                onChange={(e) =>
-                  setFormData({ ...formData, metadataJson: e.target.value })
-                }
-                rows={2}
-                placeholder="Métadonnées JSON"
-                className="w-full mt-3 px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono"
-              />
-            </div>
+            </section>
 
-            <div className="flex gap-3 pt-2">
+            <section className="rounded-2xl bg-gray-50 p-4">
+              <h4 className="mb-4 text-sm font-semibold text-gray-900">
+                Références et contrepartie
+              </h4>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Type document">
+                  <input
+                    value={formData.documentType}
+                    onChange={(e) =>
+                      setFormData({ ...formData, documentType: e.target.value })
+                    }
+                    placeholder="INVOICE, RECEIPT..."
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+                  />
+                </Field>
+                <Field label="N° document">
+                  <input
+                    value={formData.documentNumber}
+                    onChange={(e) =>
+                      setFormData({ ...formData, documentNumber: e.target.value })
+                    }
+                    placeholder="FAC-..."
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+                  />
+                </Field>
+                <Field label="Catégorie de flux">
+                  <input
+                    value={formData.flowCategory}
+                    onChange={(e) =>
+                      setFormData({ ...formData, flowCategory: e.target.value })
+                    }
+                    placeholder="EXPENSE, TRANSFER..."
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+                  />
+                </Field>
+                <Field label="Sous-catégorie">
+                  <input
+                    value={formData.subCategory}
+                    onChange={(e) =>
+                      setFormData({ ...formData, subCategory: e.target.value })
+                    }
+                    placeholder="Frais transport, achat..."
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+                  />
+                </Field>
+                <Field label="Type référence">
+                  <input
+                    value={formData.referenceType}
+                    onChange={(e) =>
+                      setFormData({ ...formData, referenceType: e.target.value })
+                    }
+                    placeholder="ORDER, TICKET..."
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+                  />
+                </Field>
+                <Field label="Code référence">
+                  <input
+                    value={formData.referenceCode}
+                    onChange={(e) =>
+                      setFormData({ ...formData, referenceCode: e.target.value })
+                    }
+                    placeholder="REF-..."
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+                  />
+                </Field>
+                <Field label="Type contrepartie">
+                  <input
+                    value={formData.counterpartyType}
+                    onChange={(e) =>
+                      setFormData({ ...formData, counterpartyType: e.target.value })
+                    }
+                    placeholder="SUPPLIER, MEMBER..."
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+                  />
+                </Field>
+                <Field label="Nom contrepartie">
+                  <input
+                    value={formData.counterpartyName}
+                    onChange={(e) =>
+                      setFormData({ ...formData, counterpartyName: e.target.value })
+                    }
+                    placeholder="Nom du bénéficiaire"
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+                  />
+                </Field>
+              </div>
+            </section>
+
+            <div className="flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-end">
               <button
+                type="button"
                 onClick={() => setIsModalOpen(false)}
-                disabled={createMutation.isPending}
-                className="flex-1 px-4 py-2 border rounded-lg text-gray-700 disabled:opacity-50"
+                className="rounded-2xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
               >
                 Annuler
               </button>
               <button
+                type="button"
                 onClick={handleSubmit}
-                disabled={createMutation.isPending || formData.amount <= 0}
-                className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                disabled={createMutation.isPending}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50"
               >
-                {createMutation.isPending ? (
+                {createMutation.isPending && (
                   <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  "Créer"
                 )}
+                Enregistrer
               </button>
             </div>
           </div>
         </ModalPortal>
       )}
 
-      {/* Modal détail mouvement */}
       {isDetailOpen && selectedMovement && (
-        <ModalPortal onClose={() => setIsDetailOpen(false)} size="lg">
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-xl font-bold">
-              {selectedMovement.movementNumber}
-            </h3>
+        <ModalPortal onClose={() => setIsDetailOpen(false)} size="2xl">
+          <div className="flex items-start justify-between border-b bg-white px-6 py-5 rounded-t-2xl">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">
+                Détail mouvement
+              </h3>
+              <p className="mt-1 font-mono text-sm text-gray-500">
+                {selectedMovement.movementNumber}
+              </p>
+            </div>
             <button
               onClick={() => setIsDetailOpen(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
+              className="rounded-xl p-2 text-gray-400 transition hover:bg-gray-50 hover:text-gray-700"
             >
               <X size={20} />
             </button>
           </div>
-          <div className="p-6 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500">Type</p>
-                <p className="font-medium">
-                  {movementTypeLabels[selectedMovement.movementType] ||
-                    selectedMovement.movementType}
-                </p>
-              </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500">Montant</p>
-                <p
-                  className={`font-bold text-lg ${isPositive(selectedMovement.movementType) ? "text-green-600" : "text-red-600"}`}
-                >
-                  {isPositive(selectedMovement.movementType) ? "+" : "-"}
-                  {selectedMovement.amount?.toLocaleString("fr-FR")} FCFA
-                </p>
-              </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500">Registre</p>
-                <p className="font-mono text-sm">
-                  {selectedMovement.registerCode}
-                </p>
-                {selectedMovement.registerName && (
-                  <p className="text-xs text-gray-400">
-                    {selectedMovement.registerName}
-                  </p>
-                )}
-              </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500">Session</p>
-                <p className="font-mono text-sm">
-                  {selectedMovement.sessionNumber}
-                </p>
-                {selectedMovement.sessionStatus && (
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${
-                      selectedMovement.sessionStatus === "OPEN"
-                        ? "bg-green-100 text-green-700"
-                        : selectedMovement.sessionStatus === "CLOSING_REVIEW"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {selectedMovement.sessionStatus}
-                  </span>
-                )}
-              </div>
-              {selectedMovement.sessionOpenedBy && (
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Ouverte par</p>
-                  <p className="text-sm">{selectedMovement.sessionOpenedBy}</p>
-                </div>
-              )}
-              {selectedMovement.sessionOpenedAt && (
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Ouverte le</p>
-                  <p className="text-sm">
-                    {new Date(selectedMovement.sessionOpenedAt).toLocaleString(
-                      "fr-FR",
-                    )}
-                  </p>
-                </div>
-              )}
-              {selectedMovement.reason && (
-                <div className="p-3 bg-gray-50 rounded-lg col-span-2">
-                  <p className="text-xs text-gray-500">Motif</p>
-                  <p className="text-sm">{selectedMovement.reason}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Champs enrichis */}
-            {(selectedMovement.relatedTransactionNumber ||
-              selectedMovement.relatedIntentNumber ||
-              selectedMovement.relatedReceiptNumber ||
-              selectedMovement.relatedCustomerName ||
-              selectedMovement.relatedSourceLabel) && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">
-                  Liens et source
-                </h4>
-                <div className="grid grid-cols-2 gap-3">
-                  {selectedMovement.relatedTransactionNumber && (
-                    <div className="p-2 bg-blue-50 rounded-lg">
-                      <p className="text-xs text-blue-500">Transaction</p>
-                      <p className="font-mono text-sm text-blue-700">
-                        {selectedMovement.relatedTransactionNumber}
-                      </p>
-                    </div>
-                  )}
-                  {selectedMovement.relatedIntentNumber && (
-                    <div className="p-2 bg-purple-50 rounded-lg">
-                      <p className="text-xs text-purple-500">Intention</p>
-                      <p className="font-mono text-sm text-purple-700">
-                        {selectedMovement.relatedIntentNumber}
-                      </p>
-                    </div>
-                  )}
-                  {selectedMovement.relatedReceiptNumber && (
-                    <div className="p-2 bg-green-50 rounded-lg">
-                      <p className="text-xs text-green-500">Reçu</p>
-                      <p className="font-mono text-sm text-green-700">
-                        {selectedMovement.relatedReceiptNumber}
-                      </p>
-                    </div>
-                  )}
-                  {selectedMovement.relatedCustomerName && (
-                    <div className="p-2 bg-amber-50 rounded-lg">
-                      <p className="text-xs text-amber-500">Client</p>
-                      <p className="text-sm text-amber-700">
-                        {selectedMovement.relatedCustomerName}
-                      </p>
-                    </div>
-                  )}
-                  {selectedMovement.relatedSourceLabel && (
-                    <div className="p-2 bg-indigo-50 rounded-lg col-span-2">
-                      <p className="text-xs text-indigo-500">Source</p>
-                      <p className="text-sm text-indigo-700">
-                        {selectedMovement.relatedSourceLabel}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setIsDetailOpen(false)}
-                className="flex-1 px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50"
-              >
-                Fermer
-              </button>
+          <div className="space-y-4 p-6">
+            <MovementCard movement={selectedMovement} onOpen={() => undefined} detail />
+            <div className="grid gap-3 md:grid-cols-2">
+              <Info label="Session" value={selectedMovement.sessionNumber} />
+              <Info label="Caisse" value={selectedMovement.registerCode} />
+              <Info label="Créé par" value={selectedMovement.createdBy} />
+              <Info label="Créé le" value={formatDateTime(selectedMovement.createdAt)} />
+              <Info label="Document" value={selectedMovement.documentNumber || "—"} />
+              <Info label="Référence" value={selectedMovement.referenceCode || "—"} />
+              <Info label="Client lié" value={selectedMovement.relatedCustomerName || "—"} />
+              <Info label="Reçu lié" value={selectedMovement.relatedReceiptNumber || "—"} />
             </div>
           </div>
         </ModalPortal>
@@ -791,3 +678,118 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({
     </div>
   );
 };
+
+function MovementCard({
+  movement,
+  onOpen,
+  detail = false,
+}: {
+  movement: CashMovement;
+  onOpen: () => void;
+  detail?: boolean;
+}) {
+  const positive = isPositive(movement.movementType);
+  const Icon = positive ? TrendingUp : TrendingDown;
+
+  return (
+    <article className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:shadow-md">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="flex min-w-0 gap-3">
+          <div
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+              positive ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+            }`}
+          >
+            <Icon size={20} />
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-semibold text-gray-900">
+                {movementTypeLabels[movement.movementType] || movement.movementType}
+              </p>
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                {movement.status || "CONFIRMED"}
+              </span>
+            </div>
+            <p className="mt-1 font-mono text-xs text-gray-400">
+              {movement.movementNumber}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+              <span className="font-mono">{movement.sessionNumber}</span>
+              <span>{movement.registerName || movement.registerCode}</span>
+              <span className="inline-flex items-center gap-1">
+                <CalendarDays size={12} />
+                {formatDateTime(movement.createdAt)}
+              </span>
+            </div>
+            {movement.reason && (
+              <p className="mt-2 text-sm text-gray-600">{movement.reason}</p>
+            )}
+            <div className="mt-2 flex flex-wrap gap-2">
+              {movement.relatedCustomerName && <Tag text={movement.relatedCustomerName} />}
+              {movement.relatedTransactionNumber && <Tag text={movement.relatedTransactionNumber} mono />}
+              {movement.relatedReceiptNumber && <Tag text={movement.relatedReceiptNumber} tone="green" mono />}
+              {movement.referenceCode && <Tag text={movement.referenceCode} mono />}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-4 md:flex-col md:items-end">
+          <p
+            className={`text-lg font-bold ${
+              positive ? "text-emerald-700" : "text-rose-700"
+            }`}
+          >
+            {positive ? "+" : "-"}
+            {formatAmount(movement.amount)}
+          </p>
+          {!detail && (
+            <button
+              type="button"
+              onClick={onOpen}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 hover:text-primary-700"
+            >
+              <Eye size={15} />
+              Détail
+            </button>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+const Tag: React.FC<{ text: string; mono?: boolean; tone?: "green" }> = ({
+  text,
+  mono,
+  tone,
+}) => (
+  <span
+    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+      tone === "green" ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"
+    } ${mono ? "font-mono" : ""}`}
+  >
+    {text}
+  </span>
+);
+
+const Field: React.FC<{ label: string; children: React.ReactNode }> = ({
+  label,
+  children,
+}) => (
+  <label className="block">
+    <span className="mb-1.5 block text-xs font-semibold text-gray-600">
+      {label}
+    </span>
+    {children}
+  </label>
+);
+
+const Info: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className="rounded-2xl bg-gray-50 p-3">
+    <p className="text-xs font-medium text-gray-500">{label}</p>
+    <p className="mt-1 break-words text-sm font-semibold text-gray-900">
+      {value}
+    </p>
+  </div>
+);

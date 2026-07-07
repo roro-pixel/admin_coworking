@@ -128,7 +128,8 @@ export const ResourceAdvancedSearchPage: React.FC = () => {
 
   const typeSearchQuery = useQuery({
     queryKey: ["resource-type-search", referenceQuery],
-    queryFn: () => resourceService.searchResourceTypes(referenceQuery, { size: 10 }),
+    queryFn: () =>
+      resourceService.searchResourceTypes(referenceQuery, { size: 10 }),
     enabled: referenceQuery.trim().length >= 2,
   });
   const typeBasicQuery = useQuery({
@@ -138,7 +139,8 @@ export const ResourceAdvancedSearchPage: React.FC = () => {
   });
   const groupSearchQuery = useQuery({
     queryKey: ["resource-group-search", referenceQuery],
-    queryFn: () => resourceService.searchResourceGroups(referenceQuery, { size: 10 }),
+    queryFn: () =>
+      resourceService.searchResourceGroups(referenceQuery, { size: 10 }),
     enabled: referenceQuery.trim().length >= 2,
   });
   const groupBasicQuery = useQuery({
@@ -148,7 +150,8 @@ export const ResourceAdvancedSearchPage: React.FC = () => {
   });
   const policySearchQuery = useQuery({
     queryKey: ["resource-policy-search", referenceQuery],
-    queryFn: () => resourceService.searchResourcePolicies(referenceQuery, { size: 10 }),
+    queryFn: () =>
+      resourceService.searchResourcePolicies(referenceQuery, { size: 10 }),
     enabled: referenceQuery.trim().length >= 2,
   });
   const policyBasicQuery = useQuery({
@@ -158,7 +161,8 @@ export const ResourceAdvancedSearchPage: React.FC = () => {
   });
   const amenitySearchQuery = useQuery({
     queryKey: ["resource-amenity-search", referenceQuery],
-    queryFn: () => resourceService.searchAmenities(referenceQuery, { size: 10 }),
+    queryFn: () =>
+      resourceService.searchAmenities(referenceQuery, { size: 10 }),
     enabled: referenceQuery.trim().length >= 2,
   });
   const amenityBasicQuery = useQuery({
@@ -195,7 +199,8 @@ export const ResourceAdvancedSearchPage: React.FC = () => {
 
   const advancedResources: ResourceSummaryResponse[] =
     advancedSearchQuery.data?.content || [];
-  const quickResources: ResourceSummaryResponse[] = quickResourceQuery.data || [];
+  const quickResources: ResourceSummaryResponse[] =
+    quickResourceQuery.data || [];
 
   const referenceSections = useMemo(
     () => [
@@ -243,12 +248,13 @@ export const ResourceAdvancedSearchPage: React.FC = () => {
             Recherche avancée ressources
           </h2>
           <p className="mt-1 text-sm text-gray-500">
-            Exploite la recherche avancée, les recherches basic/autocomplete et la liaison précise équipement-ressource.
+            Exploite la recherche avancée, les recherches basic/autocomplete et
+            la liaison précise équipement-ressource.
           </p>
         </div>
         <button
           onClick={() => {
-            setCriteria({
+            const emptyCriteria = {
               code: "",
               name: "",
               typeCode: "",
@@ -256,12 +262,14 @@ export const ResourceAdvancedSearchPage: React.FC = () => {
               policyCode: "",
               zone: "",
               locationLabel: "",
-              status: "",
+              status: "" as "" | ResourceStatus,
               portalVisible: "",
               bookingEnabled: "",
               active: "",
               minCapacity: "",
-            });
+            };
+            setCriteria(emptyCriteria);
+            setSubmittedCriteria(emptyCriteria);
           }}
           className={softBtn}
         >
@@ -271,40 +279,109 @@ export const ResourceAdvancedSearchPage: React.FC = () => {
 
       <SearchCard
         title="Recherche avancée"
-        description="Filtre par code, libellé, classification, statut, visibilité, capacité et zone."
+        description="Renseignez uniquement les champs utiles. Les codes correspondent aux valeurs techniques visibles dans les listes Types, Groupes, Politiques et Équipements."
         icon={Filter}
       >
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-4">
-          <input className={inputClass} placeholder="Code ressource" value={criteria.code} onChange={(e) => updateCriteria("code", e.target.value)} />
-          <input className={inputClass} placeholder="Nom" value={criteria.name} onChange={(e) => updateCriteria("name", e.target.value)} />
-          <input className={inputClass} placeholder="Type code" value={criteria.typeCode} onChange={(e) => updateCriteria("typeCode", e.target.value)} />
-          <input className={inputClass} placeholder="Groupe code" value={criteria.groupCode} onChange={(e) => updateCriteria("groupCode", e.target.value)} />
-          <input className={inputClass} placeholder="Politique code" value={criteria.policyCode} onChange={(e) => updateCriteria("policyCode", e.target.value)} />
-          <input className={inputClass} placeholder="Zone" value={criteria.zone} onChange={(e) => updateCriteria("zone", e.target.value)} />
-          <input className={inputClass} placeholder="Localisation" value={criteria.locationLabel} onChange={(e) => updateCriteria("locationLabel", e.target.value)} />
-          <input type="number" className={inputClass} placeholder="Capacité minimale" value={criteria.minCapacity} onChange={(e) => updateCriteria("minCapacity", e.target.value)} />
-          <select className={inputClass} value={criteria.status} onChange={(e) => updateCriteria("status", e.target.value)}>
+          <input
+            className={inputClass}
+            placeholder="Code ressource (ex: SALLE-REUNION-01)"
+            value={criteria.code}
+            onChange={(e) => updateCriteria("code", e.target.value)}
+          />
+          <input
+            className={inputClass}
+            placeholder="Nom de la ressource (ex: Bureau privé A)"
+            value={criteria.name}
+            onChange={(e) => updateCriteria("name", e.target.value)}
+          />
+          <input
+            className={inputClass}
+            placeholder="Code type (ex: MEETING_ROOM)"
+            value={criteria.typeCode}
+            onChange={(e) => updateCriteria("typeCode", e.target.value)}
+          />
+          <input
+            className={inputClass}
+            placeholder="Code groupe (ex: ETAGE-1)"
+            value={criteria.groupCode}
+            onChange={(e) => updateCriteria("groupCode", e.target.value)}
+          />
+          <input
+            className={inputClass}
+            placeholder="Code politique (ex: STANDARD)"
+            value={criteria.policyCode}
+            onChange={(e) => updateCriteria("policyCode", e.target.value)}
+          />
+          <input
+            className={inputClass}
+            placeholder="Zone ou bâtiment (ex: RDC, Aile nord)"
+            value={criteria.zone}
+            onChange={(e) => updateCriteria("zone", e.target.value)}
+          />
+          <input
+            className={inputClass}
+            placeholder="Libellé emplacement (ex: 1er étage, porte 12)"
+            value={criteria.locationLabel}
+            onChange={(e) => updateCriteria("locationLabel", e.target.value)}
+          />
+          <input
+            type="number"
+            className={inputClass}
+            placeholder="Capacité minimale"
+            value={criteria.minCapacity}
+            onChange={(e) => updateCriteria("minCapacity", e.target.value)}
+          />
+          <select
+            className={inputClass}
+            value={criteria.status}
+            onChange={(e) => updateCriteria("status", e.target.value)}
+          >
             <option value="">Tous statuts</option>
-            {statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
+            {statusOptions.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
           </select>
-          <select className={inputClass} value={criteria.portalVisible} onChange={(e) => updateCriteria("portalVisible", e.target.value)}>
+          <select
+            className={inputClass}
+            value={criteria.portalVisible}
+            onChange={(e) => updateCriteria("portalVisible", e.target.value)}
+          >
             <option value="">Portail : tous</option>
             <option value="true">Visible portail</option>
             <option value="false">Masqué portail</option>
           </select>
-          <select className={inputClass} value={criteria.bookingEnabled} onChange={(e) => updateCriteria("bookingEnabled", e.target.value)}>
+          <select
+            className={inputClass}
+            value={criteria.bookingEnabled}
+            onChange={(e) => updateCriteria("bookingEnabled", e.target.value)}
+          >
             <option value="">Réservation : tous</option>
             <option value="true">Réservation activée</option>
             <option value="false">Réservation désactivée</option>
           </select>
-          <select className={inputClass} value={criteria.active} onChange={(e) => updateCriteria("active", e.target.value)}>
+          <select
+            className={inputClass}
+            value={criteria.active}
+            onChange={(e) => updateCriteria("active", e.target.value)}
+          >
             <option value="">Actif : tous</option>
             <option value="true">Actif</option>
             <option value="false">Inactif</option>
           </select>
         </div>
-        <button className={`${primaryBtn} mt-4`} onClick={() => setSubmittedCriteria(criteria)} disabled={advancedSearchQuery.isFetching}>
-          {advancedSearchQuery.isFetching ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+        <button
+          className={`${primaryBtn} mt-4`}
+          onClick={() => setSubmittedCriteria(criteria)}
+          disabled={advancedSearchQuery.isFetching}
+        >
+          {advancedSearchQuery.isFetching ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Search size={16} />
+          )}
           Lancer la recherche avancée
         </button>
         <div className="mt-4 overflow-x-auto rounded-2xl ring-1 ring-gray-100">
@@ -319,21 +396,39 @@ export const ResourceAdvancedSearchPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {advancedResources.map((resource: ResourceSummaryResponse | ResourceResponse) => (
-                <tr key={resource.code} className="bg-gray-50/70">
-                  <td className="rounded-l-2xl px-4 py-3">
-                    <p className="text-sm font-semibold text-gray-900">{resource.name}</p>
-                    <p className="font-mono text-xs text-gray-400">{resource.code}</p>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{resource.typeCode || "—"}</td>
-                  <td className="px-4 py-3 text-center text-xs font-medium text-gray-600">{resource.status}</td>
-                  <td className="px-4 py-3 text-center text-xs">{resource.portalVisible ? "Visible" : "Masqué"}</td>
-                  <td className="rounded-r-2xl px-4 py-3 text-center text-xs">{resource.bookingEnabled ? "Activée" : "Désactivée"}</td>
-                </tr>
-              ))}
+              {advancedResources.map(
+                (resource: ResourceSummaryResponse | ResourceResponse) => (
+                  <tr key={resource.code} className="bg-gray-50/70">
+                    <td className="rounded-l-2xl px-4 py-3">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {resource.name}
+                      </p>
+                      <p className="font-mono text-xs text-gray-400">
+                        {resource.code}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {resource.typeCode || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-center text-xs font-medium text-gray-600">
+                      {resource.status}
+                    </td>
+                    <td className="px-4 py-3 text-center text-xs">
+                      {resource.portalVisible ? "Visible" : "Masqué"}
+                    </td>
+                    <td className="rounded-r-2xl px-4 py-3 text-center text-xs">
+                      {resource.bookingEnabled ? "Activée" : "Désactivée"}
+                    </td>
+                  </tr>
+                ),
+              )}
             </tbody>
           </table>
-          {advancedResources.length === 0 && <p className="p-6 text-center text-sm text-gray-500">Aucun résultat.</p>}
+          {advancedResources.length === 0 && (
+            <p className="p-6 text-center text-sm text-gray-500">
+              Aucun résultat.
+            </p>
+          )}
         </div>
       </SearchCard>
 
@@ -343,17 +438,33 @@ export const ResourceAdvancedSearchPage: React.FC = () => {
           description="Utilise l'endpoint basic pour l'autocomplete ressource."
           icon={Building2}
         >
-          <input className={inputClass} placeholder="Nom/code ressource..." value={quickQuery} onChange={(e) => setQuickQuery(e.target.value)} />
+          <input
+            className={inputClass}
+            placeholder="Nom/code ressource..."
+            value={quickQuery}
+            onChange={(e) => setQuickQuery(e.target.value)}
+          />
           <div className="mt-4 max-h-80 space-y-2 overflow-auto">
             {quickResources.map((resource) => (
-              <div key={resource.code} className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-100">
-                <p className="text-sm font-semibold text-gray-900">{resource.name}</p>
-                <p className="font-mono text-xs text-gray-400">{resource.code} · {resource.status}</p>
+              <div
+                key={resource.code}
+                className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-100"
+              >
+                <p className="text-sm font-semibold text-gray-900">
+                  {resource.name}
+                </p>
+                <p className="font-mono text-xs text-gray-400">
+                  {resource.code} · {resource.status}
+                </p>
               </div>
             ))}
-            {quickQuery.length >= 2 && !quickResourceQuery.isFetching && quickResources.length === 0 && (
-              <p className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-500">Aucune ressource trouvée.</p>
-            )}
+            {quickQuery.length >= 2 &&
+              !quickResourceQuery.isFetching &&
+              quickResources.length === 0 && (
+                <p className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-500">
+                  Aucune ressource trouvée.
+                </p>
+              )}
           </div>
         </SearchCard>
 
@@ -362,19 +473,41 @@ export const ResourceAdvancedSearchPage: React.FC = () => {
           description="Types, groupes, politiques et équipements via search + search/basic."
           icon={Search}
         >
-          <input className={inputClass} placeholder="Rechercher dans les référentiels..." value={referenceQuery} onChange={(e) => setReferenceQuery(e.target.value)} />
+          <input
+            className={inputClass}
+            placeholder="Rechercher dans les référentiels..."
+            value={referenceQuery}
+            onChange={(e) => setReferenceQuery(e.target.value)}
+          />
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             {referenceSections.map((section) => (
-              <div key={section.title} className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-100">
-                <p className="mb-2 text-sm font-semibold text-gray-800">{section.title}</p>
-                <p className="mb-2 text-xs text-gray-400">Recherche : {section.items.length} · Basic : {section.basic.length}</p>
+              <div
+                key={section.title}
+                className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-100"
+              >
+                <p className="mb-2 text-sm font-semibold text-gray-800">
+                  {section.title}
+                </p>
+                <p className="mb-2 text-xs text-gray-400">
+                  Recherche : {section.items.length} · Basic :{" "}
+                  {section.basic.length}
+                </p>
                 <div className="max-h-40 space-y-1 overflow-auto">
-                  {[...section.items, ...section.basic].slice(0, 8).map((item: any) => (
-                    <div key={`${section.title}-${item.code}`} className="rounded-xl bg-white px-3 py-2 text-xs ring-1 ring-gray-100">
-                      <span className="font-medium text-gray-800">{item.name}</span>
-                      <span className="ml-2 font-mono text-gray-400">{item.code}</span>
-                    </div>
-                  ))}
+                  {[...section.items, ...section.basic]
+                    .slice(0, 8)
+                    .map((item: any) => (
+                      <div
+                        key={`${section.title}-${item.code}`}
+                        className="rounded-xl bg-white px-3 py-2 text-xs ring-1 ring-gray-100"
+                      >
+                        <span className="font-medium text-gray-800">
+                          {item.name}
+                        </span>
+                        <span className="ml-2 font-mono text-gray-400">
+                          {item.code}
+                        </span>
+                      </div>
+                    ))}
                 </div>
               </div>
             ))}
@@ -388,12 +521,23 @@ export const ResourceAdvancedSearchPage: React.FC = () => {
           description="Récupère un équipement par code. Les quantités/prix ne sont pas modifiés ici."
           icon={Package}
         >
-          <input className={inputClass} placeholder="Code équipement" value={amenityCodeLookup} onChange={(e) => setAmenityCodeLookup(e.target.value)} />
+          <input
+            className={inputClass}
+            placeholder="Code équipement (ex: PROJECTEUR)"
+            value={amenityCodeLookup}
+            onChange={(e) => setAmenityCodeLookup(e.target.value)}
+          />
           {amenityLookupQuery.data && (
             <div className="mt-4 rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-100">
-              <p className="font-semibold text-gray-900">{amenityLookupQuery.data.name}</p>
-              <p className="font-mono text-xs text-gray-400">{amenityLookupQuery.data.code}</p>
-              <p className="mt-2 text-sm text-gray-600">{amenityLookupQuery.data.description || "Aucune description"}</p>
+              <p className="font-semibold text-gray-900">
+                {amenityLookupQuery.data.name}
+              </p>
+              <p className="font-mono text-xs text-gray-400">
+                {amenityLookupQuery.data.code}
+              </p>
+              <p className="mt-2 text-sm text-gray-600">
+                {amenityLookupQuery.data.description || "Aucune description"}
+              </p>
             </div>
           )}
         </SearchCard>
@@ -404,22 +548,72 @@ export const ResourceAdvancedSearchPage: React.FC = () => {
           icon={Link2}
         >
           {(linkMessage || linkError) && (
-            <div className={`mb-3 rounded-xl px-3 py-2 text-sm ${linkError ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
+            <div
+              className={`mb-3 rounded-xl px-3 py-2 text-sm ${linkError ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}
+            >
               {linkError || linkMessage}
             </div>
           )}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <input className={inputClass} placeholder="Code ressource" value={linkForm.resourceCode} onChange={(e) => setLinkForm({ ...linkForm, resourceCode: e.target.value })} />
-            <input className={inputClass} placeholder="Code équipement" value={linkForm.amenityCode} onChange={(e) => setLinkForm({ ...linkForm, amenityCode: e.target.value })} />
-            <input type="number" className={inputClass} placeholder="Quantité" value={linkForm.quantity} onChange={(e) => setLinkForm({ ...linkForm, quantity: Number(e.target.value) })} />
-            <input type="number" className={inputClass} placeholder="Supplément FCFA" value={linkForm.extraPrice} onChange={(e) => setLinkForm({ ...linkForm, extraPrice: Number(e.target.value) })} />
+            <input
+              className={inputClass}
+              placeholder="Code ressource (ex: SALLE-REUNION-01)"
+              value={linkForm.resourceCode}
+              onChange={(e) =>
+                setLinkForm({ ...linkForm, resourceCode: e.target.value })
+              }
+            />
+            <input
+              className={inputClass}
+              placeholder="Code équipement (ex: PROJECTEUR)"
+              value={linkForm.amenityCode}
+              onChange={(e) =>
+                setLinkForm({ ...linkForm, amenityCode: e.target.value })
+              }
+            />
+            <input
+              type="number"
+              className={inputClass}
+              placeholder="Quantité (ex: 2)"
+              value={linkForm.quantity}
+              onChange={(e) =>
+                setLinkForm({ ...linkForm, quantity: Number(e.target.value) })
+              }
+            />
+            <input
+              type="number"
+              className={inputClass}
+              placeholder="Supplément FCFA"
+              value={linkForm.extraPrice}
+              onChange={(e) =>
+                setLinkForm({ ...linkForm, extraPrice: Number(e.target.value) })
+              }
+            />
           </div>
           <label className="mt-3 flex items-center gap-2 text-sm text-gray-600">
-            <input type="checkbox" checked={linkForm.optional} onChange={(e) => setLinkForm({ ...linkForm, optional: e.target.checked })} />
+            <input
+              type="checkbox"
+              checked={linkForm.optional}
+              onChange={(e) =>
+                setLinkForm({ ...linkForm, optional: e.target.checked })
+              }
+            />
             Optionnel sur cette ressource
           </label>
-          <button className={`${primaryBtn} mt-4`} disabled={!linkForm.resourceCode || !linkForm.amenityCode || linkAmenityMutation.isPending} onClick={() => linkAmenityMutation.mutate()}>
-            {linkAmenityMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Link2 size={16} />}
+          <button
+            className={`${primaryBtn} mt-4`}
+            disabled={
+              !linkForm.resourceCode ||
+              !linkForm.amenityCode ||
+              linkAmenityMutation.isPending
+            }
+            onClick={() => linkAmenityMutation.mutate()}
+          >
+            {linkAmenityMutation.isPending ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Link2 size={16} />
+            )}
             Lier à la ressource
           </button>
         </SearchCard>

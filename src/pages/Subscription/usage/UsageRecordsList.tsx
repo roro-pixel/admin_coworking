@@ -247,7 +247,10 @@ export const UsageRecordsList: React.FC = () => {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filtered.map((r: UsageRecord) => (
-              <tr key={r.usageNumber} className="hover:bg-primary-50/40 transition-colors">
+              <tr
+                key={r.usageNumber}
+                className="hover:bg-primary-50/40 transition-colors"
+              >
                 <td className="px-6 py-4 text-sm font-mono">{r.usageNumber}</td>
                 <td className="px-6 py-4 text-sm">
                   <p className="font-mono">{r.ownerCode}</p>

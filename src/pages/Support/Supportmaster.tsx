@@ -120,7 +120,8 @@ export const SupportMaster: React.FC = () => {
 
   return (
     <div>
-      <div className="overflow-x-auto mb-6 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100 flex gap-1">
+      <div className="mb-6 overflow-x-auto rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-max gap-1">
         <button
           onClick={() => switchTab("tickets")}
           className={`px-4 py-2 text-sm font-medium rounded-xl flex items-center gap-2 ${activeTab === "tickets" ? "bg-primary-600 text-white shadow-sm" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"}`}
@@ -133,6 +134,7 @@ export const SupportMaster: React.FC = () => {
         >
           <BarChart3 size={16} /> Analytics
         </button>
+        </div>
       </div>
 
       {activeTab === "analytics" && visitedTabs.has("analytics") ? (
@@ -140,7 +142,7 @@ export const SupportMaster: React.FC = () => {
       ) : (
         <div>
           {metricsLoading ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
               {[0, 1, 2, 3].map((i) => (
                 <div
                   key={i}
@@ -150,7 +152,7 @@ export const SupportMaster: React.FC = () => {
             </div>
           ) : (
             metrics && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
                 <Metric
                   value={metrics.openTickets}
                   label="Tickets ouverts"
@@ -177,7 +179,7 @@ export const SupportMaster: React.FC = () => {
 
           <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-4">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
                 Tickets support
               </h2>
               <p className="text-sm text-gray-500">
@@ -186,7 +188,7 @@ export const SupportMaster: React.FC = () => {
             </div>
             <button
               onClick={() => navigate("/operations/support/create")}
-              className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2 text-sm"
+              className="w-full sm:w-auto justify-center bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2 text-sm"
             >
               <Plus size={18} /> Nouveau ticket
             </button>
@@ -284,7 +286,7 @@ export const SupportMaster: React.FC = () => {
                 <Loader2 className="animate-spin mx-auto text-primary-600" />
               </div>
             ) : (
-              <table className="w-full border-separate border-spacing-y-2 text-sm">
+              <table className="w-full border-separate border-spacing-y-2 text-sm max-md:block max-md:border-spacing-0 max-md:[&_thead]:hidden max-md:[&_tbody]:block max-md:[&_tr]:mb-3 max-md:[&_tr]:block max-md:[&_tr]:rounded-2xl max-md:[&_tr]:bg-gray-50 max-md:[&_tr]:p-3 max-md:[&_tr]:shadow-sm max-md:[&_tr]:ring-1 max-md:[&_tr]:ring-gray-100 max-md:[&_td]:block max-md:[&_td]:px-0 max-md:[&_td]:py-1.5 max-md:[&_td]:text-left max-md:[&_td]:text-xs max-md:[&_td]:break-words">
                 <thead className="bg-transparent">
                   <tr>
                     <th className="px-4 py-3 text-left">Ticket</th>
@@ -394,7 +396,7 @@ const Metric = ({
   color: string;
 }) => (
   <div className="bg-white rounded-xl p-4 shadow-sm">
-    <p className={`text-2xl font-bold ${color}`}>{value ?? 0}</p>
+    <p className={`text-lg sm:text-xl sm:text-2xl font-bold ${color}`}>{value ?? 0}</p>
     <p className="text-sm text-gray-500">{label}</p>
   </div>
 );

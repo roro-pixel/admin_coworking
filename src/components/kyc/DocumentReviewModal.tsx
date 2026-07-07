@@ -70,8 +70,10 @@ export const DocumentReviewModal: React.FC<DocumentReviewModalProps> = ({
   if (!document) return null;
 
   const sc = statusConfig[document.status];
-  const filePreviewUrl = document.previewUrl || document.fileUrl || document.downloadUrl;
-  const fileDownloadUrl = document.downloadUrl || document.fileUrl || document.previewUrl;
+  const filePreviewUrl =
+    document.previewUrl || document.fileUrl || document.downloadUrl;
+  const fileDownloadUrl =
+    document.downloadUrl || document.fileUrl || document.previewUrl;
   const isPdf = document.mimeType?.includes("pdf");
   const isImage = document.mimeType?.startsWith("image/");
   const isExpired =
@@ -176,7 +178,7 @@ export const DocumentReviewModal: React.FC<DocumentReviewModalProps> = ({
             <p className="text-sm text-gray-500">Format / Taille</p>
             <p className="font-medium">
               {document.mimeType?.split("/")[1]?.toUpperCase()} ·{" "}
-              {(((document.fileSize ?? 0) / 1024 / 1024).toFixed(2))} Mo
+              {((document.fileSize ?? 0) / 1024 / 1024).toFixed(2)} Mo
             </p>
           </div>
           {document.issueDate && (
@@ -355,7 +357,9 @@ export const DocumentReviewModal: React.FC<DocumentReviewModalProps> = ({
                   >
                     Statut : {v.uploadStatus}
                   </span>
-                  <span>Taille : {(((v.fileSizeBytes ?? 0) / 1024).toFixed(0))} Ko</span>
+                  <span>
+                    Taille : {((v.fileSizeBytes ?? 0) / 1024).toFixed(0)} Ko
+                  </span>
                   <span>Format : {v.fileExtension?.toUpperCase()}</span>
                 </div>
               </div>

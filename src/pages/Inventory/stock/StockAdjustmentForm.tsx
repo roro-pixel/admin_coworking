@@ -114,11 +114,19 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
       return;
     }
     if (formData.referenceType && !formData.referenceCode) {
-      setError("Le code de référence est obligatoire quand le type de référence est renseigné.");
+      setError(
+        "Le code de référence est obligatoire quand le type de référence est renseigné.",
+      );
       return;
     }
-    if (formData.quantityDelta < 0 && formData.reasonCode === "OTHER" && !formData.reasonDetails.trim()) {
-      setError("Le détail du motif est obligatoire pour un ajustement négatif avec motif Autre.");
+    if (
+      formData.quantityDelta < 0 &&
+      formData.reasonCode === "OTHER" &&
+      !formData.reasonDetails.trim()
+    ) {
+      setError(
+        "Le détail du motif est obligatoire pour un ajustement négatif avec motif Autre.",
+      );
       return;
     }
     if (
@@ -337,7 +345,9 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
                 !formData.itemCode ||
                 !formData.locationCode ||
                 formData.quantityDelta === 0 ||
-                formData.quantityDelta < 0 && formData.reasonCode === "OTHER" && !formData.reasonDetails
+                (formData.quantityDelta < 0 &&
+                  formData.reasonCode === "OTHER" &&
+                  !formData.reasonDetails)
               }
               className="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 text-base font-medium"
             >

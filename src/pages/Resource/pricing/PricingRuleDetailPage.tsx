@@ -17,10 +17,12 @@ const bookingUnitLabels: Record<ResourceBookingUnit, string> = {
   MONTH: "Mois",
 };
 
-const bookingUnits = Object.entries(bookingUnitLabels).map(([value, label]) => ({
-  value: value as ResourceBookingUnit,
-  label,
-}));
+const bookingUnits = Object.entries(bookingUnitLabels).map(
+  ([value, label]) => ({
+    value: value as ResourceBookingUnit,
+    label,
+  }),
+);
 
 const adjustmentLabels: Record<string, string> = {
   FIXED_PRICE: "Prix fixe",
@@ -148,7 +150,9 @@ export const PricingRuleDetailPage: React.FC = () => {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resource-pricing-rule", id] });
+      queryClient.invalidateQueries({
+        queryKey: ["resource-pricing-rule", id],
+      });
       queryClient.invalidateQueries({ queryKey: ["resource-pricing-rules"] });
       setIsEditing(false);
       setErrorMessage(null);
@@ -160,9 +164,12 @@ export const PricingRuleDetailPage: React.FC = () => {
   });
 
   const toggleActiveMutation = useMutation({
-    mutationFn: () => resourceService.updatePricingRuleActive(id, !rule?.active),
+    mutationFn: () =>
+      resourceService.updatePricingRuleActive(id, !rule?.active),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resource-pricing-rule", id] });
+      queryClient.invalidateQueries({
+        queryKey: ["resource-pricing-rule", id],
+      });
       queryClient.invalidateQueries({ queryKey: ["resource-pricing-rules"] });
     },
   });
@@ -297,7 +304,9 @@ export const PricingRuleDetailPage: React.FC = () => {
           {card("Unité", bookingUnitLabels[rule.bookingUnit])}
           {card(
             "Prix",
-            <span className="text-lg font-bold">{formatMoney(rule.price)}</span>,
+            <span className="text-lg font-bold">
+              {formatMoney(rule.price)}
+            </span>,
           )}
           {card("Libellé", rule.label || "—")}
           {card("Priorité", rule.priority ?? 0)}

@@ -3,7 +3,7 @@ import { AdminLayout } from "../../components/layout/AdminLayout";
 import { HeadphonesIcon, Users, TrendingUp, CheckSquare } from "lucide-react";
 import { SupportMaster } from "./Supportmaster";
 import { VisitorMaster } from "./Visitormaster";
-import { CrmMaster } from "./Crmmaster";
+import { CommercialCrmMaster } from "./CommercialCrmMaster";
 import { TaskMaster } from "./Taskmaster";
 
 type MainTab = "support" | "visitor" | "crm" | "task";
@@ -29,14 +29,15 @@ export const OperationsMaster: React.FC = () => {
   return (
     <AdminLayout>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Opérations</h1>
+        <h1 className="text-lg sm:text-xl sm:text-2xl font-bold text-gray-900">Opérations</h1>
         <p className="text-gray-600 mt-1">
           Support, Visiteurs, CRM et Gestion des tâches
         </p>
       </div>
 
       {/* Onglets principaux */}
-      <div className="overflow-x-auto mb-6 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100 flex flex-wrap gap-1">
+      <div className="mb-6 overflow-x-auto rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-max gap-1">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
@@ -54,6 +55,7 @@ export const OperationsMaster: React.FC = () => {
             </button>
           );
         })}
+        </div>
       </div>
 
       {/* Contenu — visitedTabs évite de remonter les composants */}
@@ -70,7 +72,7 @@ export const OperationsMaster: React.FC = () => {
         )}
         {visitedTabs.has("crm") && (
           <div className={activeTab !== "crm" ? "hidden" : ""}>
-            <CrmMaster />
+            <CommercialCrmMaster />
           </div>
         )}
         {visitedTabs.has("task") && (

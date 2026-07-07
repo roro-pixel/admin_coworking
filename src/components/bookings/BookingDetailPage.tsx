@@ -22,6 +22,7 @@ import {
   FileText,
   RefreshCw,
   Eye,
+  KeyRound,
 } from "lucide-react";
 import { bookingService } from "../../services/booking.service";
 import type {
@@ -113,6 +114,21 @@ const getQrCodeUrl = (value: string): string => {
   return `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(value)}`;
 };
 
+const extractAccessCode = (rawValue: string): string => {
+  const value = rawValue.trim();
+
+  if (!value) return "";
+
+  try {
+    const url = new URL(value);
+    const parts = url.pathname.split("/").filter(Boolean);
+    return parts[parts.length - 1] || value;
+  } catch {
+    const cleaned = value.replace(/^.*\/check-in\/scan\//i, "");
+    return cleaned.split(/[?#]/)[0].trim();
+  }
+};
+
 export const BookingDetailPage: React.FC = () => {
   const { bookingNumber } = useParams<{ bookingNumber: string }>();
   const navigate = useNavigate();
@@ -138,6 +154,10 @@ export const BookingDetailPage: React.FC = () => {
     paymentInstructions: "",
     internalNotes: "",
   });
+  const [isCheckInCodeModalOpen, setIsCheckInCodeModalOpen] = useState(false);
+  const [checkInAccessCode, setCheckInAccessCode] = useState("");
+  const [checkInNote, setCheckInNote] = useState("");
+  const [checkInSendEmail, setCheckInSendEmail] = useState(false);
 
   const {
     data: booking,
@@ -208,6 +228,40 @@ export const BookingDetailPage: React.FC = () => {
         error?.response?.data?.message || "Erreur lors du check-in.",
       ),
   });
+  const checkInByCodeMutation = useMutation({
+    mutationFn: () =>
+      bookingService.checkInByQrToken(extractAccessCode(checkInAccessCode), {
+        actor: "admin",
+        note: checkInNote || undefined,
+        sendEmail: checkInSendEmail,
+      }),
+    onSuccess: () => {
+      setIsCheckInCodeModalOpen(false);
+      setCheckInAccessCode("");
+      setCheckInNote("");
+      setCheckInSendEmail(false);
+      invalidateAndRefresh();
+    },
+    onError: (error: any) =>
+      setActionError(
+        error?.response?.data?.message ||
+          "Code d'accès invalide ou check-in impossible.",
+      ),
+  });
+  const earlyCheckInMutation = useMutation({
+    mutationFn: () =>
+      bookingService.earlyCheckIn(booking!.bookingNumber, {
+        actor: "admin",
+        note: "Check-in anticipé depuis l'administration",
+        sendEmail: false,
+      }),
+    onSuccess: invalidateAndRefresh,
+    onError: (error: any) =>
+      setActionError(
+        error?.response?.data?.message ||
+          "Erreur lors du check-in anticipé.",
+      ),
+  });
   const checkOutMutation = useMutation({
     mutationFn: () =>
       bookingService.checkOut(booking!.bookingNumber, { actor: "admin" }),
@@ -247,6 +301,8 @@ export const BookingDetailPage: React.FC = () => {
     rejectMutation.isPending ||
     startMutation.isPending ||
     checkInMutation.isPending ||
+    checkInByCodeMutation.isPending ||
+    earlyCheckInMutation.isPending ||
     checkOutMutation.isPending ||
     completeMutation.isPending ||
     cancelMutation.isPending ||
@@ -360,8 +416,8 @@ export const BookingDetailPage: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3 sm:items-center sm:gap-4">
           <button
             onClick={() => navigate("/bookings")}
             className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
@@ -369,7 +425,7 @@ export const BookingDetailPage: React.FC = () => {
             <ArrowLeft size={20} className="text-gray-600" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-xl font-black text-gray-900 sm:text-2xl">
               {booking.bookingNumber}
             </h1>
             <p className="text-gray-600 mt-1">{booking.resourceName}</p>
@@ -488,6 +544,33 @@ export const BookingDetailPage: React.FC = () => {
                   <LogIn size={14} />
                 )}
                 Check-in
+              </button>
+              <button
+                onClick={() => {
+                  setActionError(null);
+                  setCheckInAccessCode(booking.checkInToken || "");
+                  setIsCheckInCodeModalOpen(true);
+                }}
+                disabled={anyStatusPending}
+                className="px-3 py-1.5 bg-primary-100 text-primary-700 rounded-xl text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-primary-200 transition-colors"
+              >
+                <KeyRound size={14} />
+                Code d'accès
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm("Forcer le check-in anticipé ?"))
+                    earlyCheckInMutation.mutate();
+                }}
+                disabled={anyStatusPending}
+                className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-xl text-sm flex items-center gap-2 disabled:opacity-50 hover:bg-blue-200 transition-colors"
+              >
+                {earlyCheckInMutation.isPending ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <LogIn size={14} />
+                )}
+                Check-in anticipé
               </button>
               <button
                 onClick={() => {
@@ -731,7 +814,7 @@ export const BookingDetailPage: React.FC = () => {
                   <p className="text-xs text-gray-500 uppercase tracking-wide">
                     Montant
                   </p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-xl font-black text-gray-900 sm:text-2xl">
                     {booking.totalAmount.toLocaleString("fr-FR")}{" "}
                     {booking.currency}
                   </p>
@@ -1088,6 +1171,114 @@ export const BookingDetailPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {isCheckInCodeModalOpen && (
+        <ModalPortal onClose={() => setIsCheckInCodeModalOpen(false)}>
+          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+            <div>
+              <h3 className="text-xl font-bold">Check-in par code d'accès</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Scannez le QR code du membre ou saisissez le code affiché dans
+                son portail.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsCheckInCodeModalOpen(false)}
+              className="p-1 hover:bg-gray-100 rounded-xl"
+            >
+              <XCircle size={20} />
+            </button>
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div className="rounded-2xl bg-gray-50 p-4">
+              <p className="font-mono text-sm font-semibold text-gray-900">
+                {booking.bookingNumber}
+              </p>
+              <p className="mt-1 text-sm text-gray-500">
+                {booking.ownerName || booking.ownerCode} · {booking.resourceName}
+              </p>
+            </div>
+
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-gray-700">
+                Code d'accès ou URL QR *
+              </span>
+              <input
+                value={checkInAccessCode}
+                onChange={(e) => setCheckInAccessCode(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                placeholder="Ex : CHK-... ou https://.../scan/CHK-..."
+                autoFocus
+              />
+              {extractAccessCode(checkInAccessCode) &&
+                extractAccessCode(checkInAccessCode) !==
+                  checkInAccessCode.trim() && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Code détecté :{" "}
+                    <span className="font-mono text-primary-700">
+                      {extractAccessCode(checkInAccessCode)}
+                    </span>
+                  </p>
+                )}
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-gray-700">
+                Note
+              </span>
+              <textarea
+                value={checkInNote}
+                onChange={(e) => setCheckInNote(e.target.value)}
+                rows={2}
+                className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                placeholder="Ex : arrivé à l'accueil"
+              />
+            </label>
+
+            <label className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={checkInSendEmail}
+                onChange={(e) => setCheckInSendEmail(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-primary-600"
+              />
+              Envoyer une notification email
+            </label>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setIsCheckInCodeModalOpen(false)}
+                disabled={checkInByCodeMutation.isPending}
+                className="flex-1 rounded-xl border px-4 py-2 text-gray-700 disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => {
+                  if (!extractAccessCode(checkInAccessCode)) {
+                    setActionError("Le code d'accès est obligatoire.");
+                    return;
+                  }
+                  checkInByCodeMutation.mutate();
+                }}
+                disabled={
+                  checkInByCodeMutation.isPending ||
+                  !extractAccessCode(checkInAccessCode)
+                }
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary-600 py-2 text-white hover:bg-primary-700 disabled:opacity-50"
+              >
+                {checkInByCodeMutation.isPending ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <LogIn size={16} />
+                )}
+                Valider le check-in
+              </button>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
 
       {isInvoiceModalOpen && (
         <ModalPortal onClose={() => setIsInvoiceModalOpen(false)}>

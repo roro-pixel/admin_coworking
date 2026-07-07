@@ -146,9 +146,7 @@ export const NotificationsPage: React.FC = () => {
       <div className="space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-950">
-              Notifications
-            </h1>
+            <h1 className="text-2xl font-bold text-slate-950">Notifications</h1>
             <p className="mt-1 text-sm text-slate-500">
               Suivez les messages système, alertes, paiements et réservations.
             </p>
@@ -229,7 +227,8 @@ export const NotificationsPage: React.FC = () => {
               {filteredNotifications.map((notification) => {
                 const Icon = notificationIcons[notification.type] || Bell;
                 const tone =
-                  notificationTone[notification.type] || notificationTone.default;
+                  notificationTone[notification.type] ||
+                  notificationTone.default;
                 const isRead =
                   notification.status !== "SENT" || !!notification.readAt;
 

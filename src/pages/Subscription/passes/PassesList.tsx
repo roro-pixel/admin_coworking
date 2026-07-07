@@ -246,7 +246,9 @@ export const PassesList: React.FC = () => {
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 N° Pass
               </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Nom</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Nom
+              </th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Type
               </th>

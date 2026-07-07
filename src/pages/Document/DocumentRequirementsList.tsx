@@ -78,7 +78,8 @@ export const DocumentRequirementsList: React.FC = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: () => documentService.createDocumentRequirement(getRequirementPayload() as any),
+    mutationFn: () =>
+      documentService.createDocumentRequirement(getRequirementPayload() as any),
     onSuccess: () => {
       invalidate();
       setIsFormOpen(false);
@@ -88,7 +89,10 @@ export const DocumentRequirementsList: React.FC = () => {
   });
   const updateMutation = useMutation({
     mutationFn: () =>
-      documentService.updateDocumentRequirement(editing!.id, getRequirementPayload() as any),
+      documentService.updateDocumentRequirement(
+        editing!.id,
+        getRequirementPayload() as any,
+      ),
     onSuccess: () => {
       invalidate();
       setIsFormOpen(false);

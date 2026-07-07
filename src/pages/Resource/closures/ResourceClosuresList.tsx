@@ -160,7 +160,8 @@ export const ResourceClosuresList: React.FC = () => {
             Fermetures de ressources
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            Planifiez les indisponibilités liées à la maintenance, aux événements ou aux exceptions.
+            Planifiez les indisponibilités liées à la maintenance, aux
+            événements ou aux exceptions.
           </p>
         </div>
         <button
@@ -271,13 +272,9 @@ export const ResourceClosuresList: React.FC = () => {
                   <th className="px-4 py-2 text-left font-semibold">
                     Ressource
                   </th>
-                  <th className="px-4 py-2 text-left font-semibold">
-                    Période
-                  </th>
+                  <th className="px-4 py-2 text-left font-semibold">Période</th>
                   <th className="px-4 py-2 text-left font-semibold">Motif</th>
-                  <th className="px-4 py-2 text-center font-semibold">
-                    Durée
-                  </th>
+                  <th className="px-4 py-2 text-center font-semibold">Durée</th>
                   <th className="px-4 py-2 text-center font-semibold">
                     Statut
                   </th>
@@ -383,7 +380,8 @@ export const ResourceClosuresList: React.FC = () => {
                     Nouvelle fermeture
                   </h3>
                   <p className="text-sm text-gray-500 mt-1">
-                    Créez une période pendant laquelle une ressource ne pourra pas être réservée.
+                    Créez une période pendant laquelle une ressource ne pourra
+                    pas être réservée.
                   </p>
                 </div>
               </div>

@@ -120,11 +120,14 @@ export const PurchaseRequestsList: React.FC = () => {
       code: string;
       approvedBy: string;
       supplierCode?: string;
-    }) => inventoryService.approvePurchaseRequest(code, approvedBy, supplierCode),
+    }) =>
+      inventoryService.approvePurchaseRequest(code, approvedBy, supplierCode),
     onSuccess: (data: PurchaseRequest) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-requests"] });
       if (data.autoCreatedOrderCode) {
-        alert(`Demande approuvée. Bon de commande créé : ${data.autoCreatedOrderCode}`);
+        alert(
+          `Demande approuvée. Bon de commande créé : ${data.autoCreatedOrderCode}`,
+        );
       }
     },
   });
@@ -540,7 +543,9 @@ export const PurchaseRequestsList: React.FC = () => {
               )}
               {selectedRequest.autoCreatedOrderCode && (
                 <div className="p-4 bg-green-50 rounded-lg col-span-2">
-                  <p className="text-sm text-green-600 mb-1">Bon de commande créé automatiquement</p>
+                  <p className="text-sm text-green-600 mb-1">
+                    Bon de commande créé automatiquement
+                  </p>
                   <p className="text-base font-mono text-green-700">
                     {selectedRequest.autoCreatedOrderCode}
                   </p>

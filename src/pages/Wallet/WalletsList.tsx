@@ -29,8 +29,14 @@ interface WalletsListProps {
 const PAGE_SIZE = 20;
 
 const statusConfig: Record<string, { label: string; color: string }> = {
-  ACTIVE: { label: "Actif", color: "bg-green-50 text-green-700 ring-green-100" },
-  SUSPENDED: { label: "Suspendu", color: "bg-yellow-50 text-yellow-700 ring-yellow-100" },
+  ACTIVE: {
+    label: "Actif",
+    color: "bg-green-50 text-green-700 ring-green-100",
+  },
+  SUSPENDED: {
+    label: "Suspendu",
+    color: "bg-yellow-50 text-yellow-700 ring-yellow-100",
+  },
   LOCKED: { label: "Verrouillé", color: "bg-red-50 text-red-700 ring-red-100" },
   CLOSED: { label: "Fermé", color: "bg-gray-50 text-gray-500 ring-gray-100" },
   UNDER_REVIEW: {
@@ -127,28 +133,31 @@ export const WalletsList: React.FC<WalletsListProps> = ({
     <div>
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">Liste des portefeuilles</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Liste des portefeuilles
+          </h2>
           <p className="mt-0.5 text-sm text-gray-500">
-            {totalElements} portefeuille{totalElements > 1 ? "s" : ""} trouvé{totalElements > 1 ? "s" : ""}
+            {totalElements} portefeuille{totalElements > 1 ? "s" : ""} trouvé
+            {totalElements > 1 ? "s" : ""}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
           <button
             onClick={onOpenLookup}
-            className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-primary-700 shadow-sm ring-1 ring-primary-100 transition hover:bg-primary-50"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-primary-700 shadow-sm ring-1 ring-primary-100 transition hover:bg-primary-50 sm:w-auto"
           >
             <Search size={17} /> Rechercher / créer
           </button>
           <button
             onClick={onOpenTopUp}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 sm:w-auto"
           >
             <Plus size={17} /> Top-up
           </button>
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard
           label="Disponible sur la page"
           value={`${formatAmountOnly(totals.available)} XAF`}
@@ -169,7 +178,9 @@ export const WalletsList: React.FC<WalletsListProps> = ({
         />
         <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm font-medium text-gray-700">Répartition statut</p>
+            <p className="text-sm font-medium text-gray-700">
+              Répartition statut
+            </p>
             <Filter size={16} className="text-gray-400" />
           </div>
           <div className="space-y-2">
@@ -177,14 +188,18 @@ export const WalletsList: React.FC<WalletsListProps> = ({
               const count = statusCount[status] || 0;
               return (
                 <div key={status} className="flex items-center gap-2">
-                  <span className="w-20 text-xs text-gray-500">{cfg.label}</span>
+                  <span className="w-20 text-xs text-gray-500">
+                    {cfg.label}
+                  </span>
                   <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
                     <div
                       className="h-full rounded-full bg-primary-500"
                       style={{ width: `${(count / maxStatusCount) * 100}%` }}
                     />
                   </div>
-                  <span className="w-5 text-right text-xs font-semibold text-gray-700">{count}</span>
+                  <span className="w-5 text-right text-xs font-semibold text-gray-700">
+                    {count}
+                  </span>
                 </div>
               );
             })}
@@ -274,8 +289,23 @@ export const WalletsList: React.FC<WalletsListProps> = ({
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
-          <div className="overflow-x-auto">
+        <>
+          <div className="space-y-3 md:hidden">
+            {wallets.map((wallet) => (
+              <MobileWalletCard
+                key={wallet.walletNumber}
+                wallet={wallet}
+                status={statusConfig[wallet.status] || {
+                  label: wallet.status,
+                  color: "bg-gray-50 text-gray-500 ring-gray-100",
+                }}
+                onOpen={() => navigate(`/wallets/${wallet.walletNumber}`)}
+              />
+            ))}
+          </div>
+
+          <div className="hidden overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 md:block">
+            <div className="overflow-x-auto">
             <table className="w-full border-separate border-spacing-y-2 px-3 pb-3">
               <thead>
                 <tr>
@@ -312,7 +342,9 @@ export const WalletsList: React.FC<WalletsListProps> = ({
                     <tr
                       key={wallet.walletNumber}
                       className="group cursor-pointer rounded-xl bg-white shadow-sm ring-1 ring-gray-100 transition hover:bg-gray-50 hover:shadow-md"
-                      onClick={() => navigate(`/wallets/${wallet.walletNumber}`)}
+                      onClick={() =>
+                        navigate(`/wallets/${wallet.walletNumber}`)
+                      }
                     >
                       <td className="rounded-l-xl px-4 py-4">
                         <p className="font-mono text-sm font-semibold text-gray-900">
@@ -321,22 +353,30 @@ export const WalletsList: React.FC<WalletsListProps> = ({
                         <p className="text-xs text-gray-400">
                           Ouvert le{" "}
                           {wallet.openedAt
-                            ? new Date(wallet.openedAt).toLocaleDateString("fr-FR")
+                            ? new Date(wallet.openedAt).toLocaleDateString(
+                                "fr-FR",
+                              )
                             : "—"}
                         </p>
                       </td>
                       <td className="px-4 py-4">
-                        <p className="text-sm font-medium text-gray-900">{wallet.ownerCode}</p>
-                        <p className="text-xs text-gray-400">{wallet.ownerType}</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {wallet.ownerCode}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {wallet.ownerType}
+                        </p>
                       </td>
                       <td className="px-4 py-4 text-right font-semibold text-green-600">
-                        {formatAmountOnly(wallet.availableBalance)} {wallet.currency}
+                        {formatAmountOnly(wallet.availableBalance)}{" "}
+                        {wallet.currency}
                       </td>
                       <td className="px-4 py-4 text-right font-semibold text-orange-600">
                         {formatAmountOnly(wallet.heldBalance)} {wallet.currency}
                       </td>
                       <td className="px-4 py-4 text-right font-semibold text-gray-900">
-                        {formatAmountOnly(wallet.ledgerBalance)} {wallet.currency}
+                        {formatAmountOnly(wallet.ledgerBalance)}{" "}
+                        {wallet.currency}
                       </td>
                       <td className="px-4 py-4">
                         <span
@@ -362,12 +402,13 @@ export const WalletsList: React.FC<WalletsListProps> = ({
                 })}
               </tbody>
             </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {totalPages > 1 && (
-        <div className="mt-6 flex items-center justify-between px-2">
+        <div className="mt-6 flex flex-col gap-3 px-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-gray-500">
             Page {page + 1} / {totalPages}
           </p>
@@ -392,6 +433,62 @@ export const WalletsList: React.FC<WalletsListProps> = ({
     </div>
   );
 };
+
+const MobileWalletCard: React.FC<{
+  wallet: Wallet;
+  status: { label: string; color: string };
+  onOpen: () => void;
+}> = ({ wallet, status, onOpen }) => (
+  <button
+    type="button"
+    onClick={onOpen}
+    className="w-full rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-gray-100 transition active:scale-[0.99]"
+  >
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="truncate font-mono text-sm font-black text-gray-950">
+          {wallet.walletNumber}
+        </p>
+        <p className="mt-1 truncate text-xs font-semibold text-gray-400">
+          {wallet.ownerType} · {wallet.ownerCode}
+        </p>
+      </div>
+      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${status.color}`}>
+        {status.label}
+      </span>
+    </div>
+
+    <div className="mt-4 grid grid-cols-1 gap-2 min-[430px]:grid-cols-3">
+      <div className="rounded-xl bg-green-50 p-3">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-green-700/70">Disponible</p>
+        <p className="mt-1 break-words text-sm font-black text-green-700">
+          {formatAmountOnly(wallet.availableBalance)} {wallet.currency}
+        </p>
+      </div>
+      <div className="rounded-xl bg-orange-50 p-3">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-orange-700/70">Bloqué</p>
+        <p className="mt-1 break-words text-sm font-black text-orange-700">
+          {formatAmountOnly(wallet.heldBalance)} {wallet.currency}
+        </p>
+      </div>
+      <div className="rounded-xl bg-gray-50 p-3">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Ledger</p>
+        <p className="mt-1 break-words text-sm font-black text-gray-950">
+          {formatAmountOnly(wallet.ledgerBalance)} {wallet.currency}
+        </p>
+      </div>
+    </div>
+
+    <div className="mt-4 flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+      <span className="text-xs text-gray-400">
+        Ouvert le {wallet.openedAt ? new Date(wallet.openedAt).toLocaleDateString("fr-FR") : "—"}
+      </span>
+      <span className="inline-flex items-center gap-1 text-xs font-black text-primary-600">
+        Voir <Eye size={14} />
+      </span>
+    </div>
+  </button>
+);
 
 const SummaryCard: React.FC<{
   label: string;

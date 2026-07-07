@@ -99,10 +99,13 @@ export const ResourceGroupFormModal: React.FC<ResourceGroupFormModalProps> = ({
             </div>
             <div>
               <h3 className="text-xl font-bold text-gray-900">
-                {editingGroup ? "Modifier le groupe" : "Nouveau groupe de ressources"}
+                {editingGroup
+                  ? "Modifier le groupe"
+                  : "Nouveau groupe de ressources"}
               </h3>
               <p className="text-sm text-gray-500 mt-1">
-                Regroupez les ressources par zone, usage, bâtiment ou niveau de service.
+                Regroupez les ressources par zone, usage, bâtiment ou niveau de
+                service.
               </p>
             </div>
           </div>
@@ -200,7 +203,9 @@ export const ResourceGroupFormModal: React.FC<ResourceGroupFormModalProps> = ({
 
           <button
             type="button"
-            onClick={() => setFormData({ ...formData, active: !formData.active })}
+            onClick={() =>
+              setFormData({ ...formData, active: !formData.active })
+            }
             className={`rounded-2xl px-4 py-3 flex items-center justify-between transition-colors ${
               formData.active
                 ? "bg-green-50 text-green-700"

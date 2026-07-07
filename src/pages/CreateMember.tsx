@@ -237,23 +237,23 @@ export const CreateMember: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="mb-6 flex items-center bg-white rounded-2xl p-4 shadow-sm ring-1 ring-gray-100">
+      <div className="mb-6 flex items-center rounded-2xl bg-white p-3 shadow-sm ring-1 ring-gray-100 sm:p-4">
         <button
           onClick={() => navigate("/members")}
-          className="mr-4 p-2 hover:bg-gray-100 rounded-xl transition-colors"
+          className="mr-3 shrink-0 rounded-xl p-2 transition-colors hover:bg-gray-100 sm:mr-4"
         >
           <ArrowLeft size={20} className="text-gray-600" />
         </button>
-        <h1 className="text-2xl font-bold text-gray-900">Créer un member</h1>
+        <h1 className="text-xl font-black text-gray-900 sm:text-2xl">Créer un member</h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="max-w-5xl space-y-6">
+      <form onSubmit={handleSubmit} className="w-full max-w-5xl space-y-5 pb-24 sm:space-y-6 sm:pb-0">
         {/* Choix du mode */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:mb-6 sm:p-6">
+          <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">
             Rattachement customer
           </h2>
-          <div className="flex gap-4 mb-6">
+          <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             <button
               type="button"
               onClick={() => setMode("new")}
@@ -308,7 +308,7 @@ export const CreateMember: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Type de customer
               </label>
-              <div className="flex gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                 <button
                   type="button"
                   onClick={() => setCustomerType("PERSON")}
@@ -345,7 +345,7 @@ export const CreateMember: React.FC = () => {
                     name="companyName"
                     value={newCustomerData.companyName}
                     onChange={handleNewCustomerChange}
-                    className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                    className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
                   />
                   <label className="block text-sm font-medium text-gray-700 mt-3 mb-1">
                     Email de facturation
@@ -355,7 +355,7 @@ export const CreateMember: React.FC = () => {
                     name="billingEmail"
                     value={newCustomerData.billingEmail}
                     onChange={handleNewCustomerChange}
-                    className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                    className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
               )}
@@ -364,11 +364,11 @@ export const CreateMember: React.FC = () => {
         </div>
 
         {/* Informations du member */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:mb-6 sm:p-6">
+          <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">
             Informations du member
           </h2>
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Prénom *
@@ -378,7 +378,7 @@ export const CreateMember: React.FC = () => {
                 name="firstname"
                 value={formData.firstname}
                 onChange={handleChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
@@ -390,7 +390,7 @@ export const CreateMember: React.FC = () => {
                 name="lastname"
                 value={formData.lastname}
                 onChange={handleChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
@@ -402,7 +402,7 @@ export const CreateMember: React.FC = () => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
@@ -414,7 +414,7 @@ export const CreateMember: React.FC = () => {
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
@@ -427,18 +427,18 @@ export const CreateMember: React.FC = () => {
                 value={formData.whatsappPhone}
                 onChange={handleChange}
                 placeholder="Laissez vide = téléphone"
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             </div>
           </div>
         </div>
 
         {/* Accès portail */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:mb-6 sm:p-6">
+          <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">
             Accès portail
           </h2>
-          <div className="flex items-center gap-4 mb-4">
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="flex items-center">
               <input
                 type="radio"
@@ -479,7 +479,7 @@ export const CreateMember: React.FC = () => {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             </div>
           )}
@@ -487,11 +487,11 @@ export const CreateMember: React.FC = () => {
 
         {/* Adresse (si nouveau customer) */}
         {mode === "new" && (
-          <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:mb-6 sm:p-6">
+            <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">
               Adresse du customer
             </h2>
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Numéro rue
@@ -501,7 +501,7 @@ export const CreateMember: React.FC = () => {
                   name="streetNumber"
                   value={newCustomerData.address.streetNumber}
                   onChange={handleAddressChange}
-                  className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                  className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
                 />
               </div>
               <div>
@@ -513,7 +513,7 @@ export const CreateMember: React.FC = () => {
                   name="streetName"
                   value={newCustomerData.address.streetName}
                   onChange={handleAddressChange}
-                  className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                  className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
                 />
               </div>
               <div>
@@ -525,7 +525,7 @@ export const CreateMember: React.FC = () => {
                   name="district"
                   value={newCustomerData.address.district}
                   onChange={handleAddressChange}
-                  className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                  className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
                 />
               </div>
               <div>
@@ -537,7 +537,7 @@ export const CreateMember: React.FC = () => {
                   name="city"
                   value={newCustomerData.address.city}
                   onChange={handleAddressChange}
-                  className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                  className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
                 />
               </div>
               <div>
@@ -548,7 +548,7 @@ export const CreateMember: React.FC = () => {
                   name="countryCode"
                   value={newCustomerData.address.countryCode}
                   onChange={handleAddressChange}
-                  className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                  className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
                 >
                   <option value="">Sélectionner un pays</option>
                   {countries.map((country) => (
@@ -575,18 +575,18 @@ export const CreateMember: React.FC = () => {
         )}
 
         {/* Actions */}
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={() => navigate("/members")}
-            className="px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50/70"
+            className="inline-flex w-full items-center justify-center rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50/70 sm:w-auto"
           >
             Annuler
           </button>
           <button
             type="submit"
             disabled={isLoading}
-            className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 flex items-center"
+            className="inline-flex w-full items-center justify-center rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50 sm:w-auto"
           >
             {isLoading ? (
               <div className="animate-spin rounded-full h-5 w-5 -2 border-white mr-2"></div>

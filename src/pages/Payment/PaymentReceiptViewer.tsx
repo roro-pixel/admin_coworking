@@ -43,7 +43,7 @@ export const PaymentReceiptViewer: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="mx-auto w-full max-w-7xl space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-gray-900">
           Visualisation de reçu
@@ -56,7 +56,21 @@ export const PaymentReceiptViewer: React.FC = () => {
         <select
           value={mode}
           onChange={(e) => setMode(e.target.value as any)}
-          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
+          className="h-11 rounded-2xl
+border-0
+bg-white
+px-4
+text-sm
+font-medium
+text-gray-700
+shadow-sm
+ring-1
+ring-gray-200
+outline-none
+transition
+focus:ring-2
+focus:ring-primary-500
+"
         >
           <option value="transaction">Transaction</option>
           <option value="receipt">Reçu</option>
@@ -68,7 +82,23 @@ export const PaymentReceiptViewer: React.FC = () => {
             if (e.key === "Enter") search();
           }}
           placeholder={mode === "transaction" ? "N° transaction" : "N° reçu"}
-          className="flex-1 px-3 py-2 border rounded-lg font-mono"
+          className="
+flex-1
+h-11
+rounded-2xl
+border-0
+bg-white
+px-4
+font-mono
+text-sm
+shadow-sm
+ring-1
+ring-gray-200
+outline-none
+transition
+focus:ring-2
+focus:ring-primary-500
+"
         />
         <button
           onClick={search}

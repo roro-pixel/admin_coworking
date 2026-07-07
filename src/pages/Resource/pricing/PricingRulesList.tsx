@@ -1,14 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Plus,
-  Search,
-  DollarSign,
-  Power,
-  Calculator,
-  X,
-} from "lucide-react";
+import { Plus, Search, DollarSign, Power, Calculator, X } from "lucide-react";
 import { resourceService } from "../../../services/resource.service";
 import type {
   ResourcePricingRuleResponse,
@@ -35,7 +28,9 @@ const formatPeriod = (rule: ResourcePricingRuleResponse) => {
   if (rule.validUntil)
     parts.push(`au ${new Date(rule.validUntil).toLocaleDateString("fr-FR")}`);
   if (rule.startsAt || rule.endsAt)
-    parts.push(`${rule.startsAt?.slice(0, 5) ?? "--:--"}–${rule.endsAt?.slice(0, 5) ?? "--:--"}`);
+    parts.push(
+      `${rule.startsAt?.slice(0, 5) ?? "--:--"}–${rule.endsAt?.slice(0, 5) ?? "--:--"}`,
+    );
   return parts.length ? parts.join(" · ") : "Toujours applicable";
 };
 
@@ -104,7 +99,11 @@ export const PricingRulesList: React.FC = () => {
   });
 
   const handleDelete = (id: number) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer cette règle de tarification ?")) {
+    if (
+      confirm(
+        "Êtes-vous sûr de vouloir supprimer cette règle de tarification ?",
+      )
+    ) {
       deleteMutation.mutate(id);
     }
   };
@@ -123,7 +122,9 @@ export const PricingRulesList: React.FC = () => {
     <div>
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">Règles de tarification</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Règles de tarification
+          </h2>
           <p className="mt-1 text-sm text-gray-500">
             Gérez les prix par ressource, unité, période et règle dynamique.
           </p>
@@ -157,15 +158,21 @@ export const PricingRulesList: React.FC = () => {
         </div>
         <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
           <p className="text-xs font-medium text-gray-400">Actives</p>
-          <p className="mt-2 text-2xl font-bold text-green-700">{stats.active}</p>
+          <p className="mt-2 text-2xl font-bold text-green-700">
+            {stats.active}
+          </p>
         </div>
         <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
           <p className="text-xs font-medium text-gray-400">Dynamiques</p>
-          <p className="mt-2 text-2xl font-bold text-primary-700">{stats.dynamic}</p>
+          <p className="mt-2 text-2xl font-bold text-primary-700">
+            {stats.dynamic}
+          </p>
         </div>
         <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
           <p className="text-xs font-medium text-gray-400">Prix moyen</p>
-          <p className="mt-2 text-xl font-bold text-gray-900">{formatMoney(stats.avg)}</p>
+          <p className="mt-2 text-xl font-bold text-gray-900">
+            {formatMoney(stats.avg)}
+          </p>
         </div>
       </div>
 
@@ -228,9 +235,13 @@ export const PricingRulesList: React.FC = () => {
                   className={`group cursor-pointer transition hover:bg-primary-50/40 ${!rule.active ? "opacity-60" : ""}`}
                 >
                   <td className="px-6 py-4 align-top">
-                    <p className="font-mono text-sm font-medium text-gray-900">{rule.resourceCode}</p>
+                    <p className="font-mono text-sm font-medium text-gray-900">
+                      {rule.resourceCode}
+                    </p>
                     {rule.dayOfWeek && (
-                      <p className="mt-1 text-xs text-gray-400">Jour {rule.dayOfWeek}</p>
+                      <p className="mt-1 text-xs text-gray-400">
+                        Jour {rule.dayOfWeek}
+                      </p>
                     )}
                   </td>
                   <td className="px-6 py-4 align-top text-sm text-gray-700">
@@ -254,7 +265,9 @@ export const PricingRulesList: React.FC = () => {
                             : "Prix fixe"}
                       </p>
                     )}
-                    {!rule.label && !rule.adjustmentType && <span className="text-gray-400">—</span>}
+                    {!rule.label && !rule.adjustmentType && (
+                      <span className="text-gray-400">—</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 align-top text-xs text-gray-500">
                     {formatPeriod(rule)}
@@ -267,17 +280,25 @@ export const PricingRulesList: React.FC = () => {
                   <td className="px-6 py-4 align-top text-center">
                     <span
                       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                        rule.active ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"
+                        rule.active
+                          ? "bg-green-50 text-green-700"
+                          : "bg-gray-100 text-gray-500"
                       }`}
                     >
                       {rule.active ? "Actif" : "Inactif"}
                     </span>
                   </td>
                   <td className="px-6 py-4 align-top text-right">
-                    <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                    <div
+                      className="flex justify-end gap-2"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <button
                         onClick={() =>
-                          toggleActiveMutation.mutate({ id: rule.id, active: !rule.active })
+                          toggleActiveMutation.mutate({
+                            id: rule.id,
+                            active: !rule.active,
+                          })
                         }
                         disabled={toggleActiveMutation.isPending}
                         className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-800 disabled:opacity-40"
@@ -313,8 +334,12 @@ export const PricingRulesList: React.FC = () => {
         <ModalPortal onClose={() => setIsQuoteOpen(false)} size="lg">
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4 rounded-t-2xl">
             <div>
-              <h3 className="text-xl font-bold text-gray-900">Simulateur de prix</h3>
-              <p className="mt-0.5 text-sm text-gray-500">Calculez le prix appliqué pour une ressource.</p>
+              <h3 className="text-xl font-bold text-gray-900">
+                Simulateur de prix
+              </h3>
+              <p className="mt-0.5 text-sm text-gray-500">
+                Calculez le prix appliqué pour une ressource.
+              </p>
             </div>
             <button
               onClick={() => setIsQuoteOpen(false)}
@@ -330,11 +355,16 @@ export const PricingRulesList: React.FC = () => {
               </div>
             )}
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Ressource *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Ressource *
+              </label>
               <ResourceAutocomplete
                 selectedCode={quoteForm.resourceCode}
                 onSelect={(resource) =>
-                  setQuoteForm({ ...quoteForm, resourceCode: resource?.code || "" })
+                  setQuoteForm({
+                    ...quoteForm,
+                    resourceCode: resource?.code || "",
+                  })
                 }
                 placeholder="Rechercher une ressource..."
                 required
@@ -342,7 +372,9 @@ export const PricingRulesList: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Unité *</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Unité *
+                </label>
                 <select
                   value={quoteForm.bookingUnit}
                   onChange={(e) =>
@@ -362,26 +394,39 @@ export const PricingRulesList: React.FC = () => {
               </div>
               <div />
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Début *</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Début *
+                </label>
                 <input
                   type="datetime-local"
                   value={quoteForm.startedAt}
-                  onChange={(e) => setQuoteForm((f) => ({ ...f, startedAt: e.target.value }))}
+                  onChange={(e) =>
+                    setQuoteForm((f) => ({ ...f, startedAt: e.target.value }))
+                  }
                   className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Fin *</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Fin *
+                </label>
                 <input
                   type="datetime-local"
                   value={quoteForm.endedAt}
-                  onChange={(e) => setQuoteForm((f) => ({ ...f, endedAt: e.target.value }))}
+                  onChange={(e) =>
+                    setQuoteForm((f) => ({ ...f, endedAt: e.target.value }))
+                  }
                   className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
                 />
               </div>
             </div>
             <button
-              disabled={!quoteForm.resourceCode || !quoteForm.startedAt || !quoteForm.endedAt || quoteLoading}
+              disabled={
+                !quoteForm.resourceCode ||
+                !quoteForm.startedAt ||
+                !quoteForm.endedAt ||
+                quoteLoading
+              }
               onClick={async () => {
                 setQuoteLoading(true);
                 setQuoteError(null);
@@ -403,7 +448,9 @@ export const PricingRulesList: React.FC = () => {
               <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
                 <div className="flex justify-between text-sm text-gray-600">
                   <span>Prix de base</span>
-                  <span className="font-medium">{formatMoney(quoteResult.basePrice ?? 0)}</span>
+                  <span className="font-medium">
+                    {formatMoney(quoteResult.basePrice ?? 0)}
+                  </span>
                 </div>
                 <div className="mt-2 flex justify-between text-lg font-bold text-green-700">
                   <span>Prix final</span>
@@ -411,7 +458,10 @@ export const PricingRulesList: React.FC = () => {
                 </div>
                 {quoteResult.appliedRuleLabel && (
                   <p className="mt-2 text-xs text-gray-500">
-                    Règle appliquée : <span className="font-medium">{quoteResult.appliedRuleLabel}</span>
+                    Règle appliquée :{" "}
+                    <span className="font-medium">
+                      {quoteResult.appliedRuleLabel}
+                    </span>
                   </p>
                 )}
               </div>

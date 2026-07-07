@@ -69,7 +69,8 @@ export const AttachSignedDocumentModal: React.FC<
         file,
       });
 
-      const documentCode = docResponse.code || (docResponse as any).documentCode;
+      const documentCode =
+        docResponse.code || (docResponse as any).documentCode;
       if (!documentCode)
         throw new Error("Code document manquant dans la réponse.");
 

@@ -128,7 +128,10 @@ export const DocumentMaster: React.FC = () => {
 
       <div className="mb-6 space-y-3 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
         {groups.map((group) => (
-          <div key={group.title} className="grid gap-3 lg:grid-cols-[180px_1fr]">
+          <div
+            key={group.title}
+            className="grid gap-3 lg:grid-cols-[180px_1fr]"
+          >
             <div className="px-2 py-1">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
                 {group.title}

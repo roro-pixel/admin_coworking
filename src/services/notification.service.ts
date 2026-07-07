@@ -126,9 +126,12 @@ export const notificationService = {
   getUnreadNotifications: async (params?: {
     limit?: number;
   }): Promise<Notification[]> => {
-    const response = await apiClient.get("/sni/api/v1/admin/notifications/unread", {
-      params,
-    });
+    const response = await apiClient.get(
+      "/sni/api/v1/admin/notifications/unread",
+      {
+        params,
+      },
+    );
     if (Array.isArray(response.data)) return response.data;
     if (Array.isArray(response.data?.data)) return response.data.data;
     if (Array.isArray(response.data?.content)) return response.data.content;
@@ -136,7 +139,9 @@ export const notificationService = {
   },
 
   getUnreadCount: async (): Promise<number> => {
-    const response = await apiClient.get("/sni/api/v1/admin/notifications/unread-count");
+    const response = await apiClient.get(
+      "/sni/api/v1/admin/notifications/unread-count",
+    );
     return Number(response.data?.count ?? response.data ?? 0);
   },
 

@@ -186,27 +186,27 @@ export const CreateCustomer: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="mb-6 flex items-center bg-white rounded-2xl p-4 shadow-sm ring-1 ring-gray-100">
+      <div className="mb-5 flex items-center rounded-2xl bg-white p-3 shadow-sm ring-1 ring-gray-100 sm:p-4">
         <button
           onClick={() => navigate("/customers")}
-          className="mr-4 p-2 hover:bg-gray-100 rounded-xl transition-colors"
+          className="mr-3 rounded-xl p-2 transition-colors hover:bg-gray-100 sm:mr-4"
         >
           <ArrowLeft size={20} className="text-gray-600" />
         </button>
-        <h1 className="text-2xl font-bold text-gray-900">Créer un customer</h1>
+        <h1 className="text-xl font-black tracking-tight text-gray-900 sm:text-2xl">Créer un customer</h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="max-w-5xl space-y-6">
+      <form onSubmit={handleSubmit} className="w-full max-w-5xl space-y-5 pb-24 lg:pb-0">
         {/* Type de customer */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-6">
+          <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">
             Type de customer
           </h2>
-          <div className="flex gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             <button
               type="button"
               onClick={() => setType("PERSON")}
-              className={`flex-1 p-4 border-2 rounded-xl text-center transition-all ${
+              className={`rounded-xl border-2 p-4 text-center transition-all ${
                 type === "PERSON"
                   ? "border-primary-600 bg-primary-50 text-primary-700"
                   : "border-gray-200 hover:border-primary-200"
@@ -221,7 +221,7 @@ export const CreateCustomer: React.FC = () => {
             <button
               type="button"
               onClick={() => setType("COMPANY")}
-              className={`flex-1 p-4 border-2 rounded-xl text-center transition-all ${
+              className={`rounded-xl border-2 p-4 text-center transition-all ${
                 type === "COMPANY"
                   ? "border-primary-600 bg-primary-50 text-primary-700"
                   : "border-gray-200 hover:border-primary-200"
@@ -237,15 +237,15 @@ export const CreateCustomer: React.FC = () => {
         </div>
 
         {/* Informations principales */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-6">
+          <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">
             Informations principales
           </h2>
 
           {type === "PERSON" ? (
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-bold text-gray-700">
                   Prénom *
                 </label>
                 <input
@@ -253,11 +253,11 @@ export const CreateCustomer: React.FC = () => {
                   name="firstname"
                   value={formData.firstname}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                  className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-bold text-gray-700">
                   Nom *
                 </label>
                 <input
@@ -265,13 +265,13 @@ export const CreateCustomer: React.FC = () => {
                   name="lastname"
                   value={formData.lastname}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                  className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
                 />
               </div>
             </div>
           ) : (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-bold text-gray-700">
                 Nom de l'entreprise *
               </label>
               <input
@@ -279,18 +279,18 @@ export const CreateCustomer: React.FC = () => {
                 name="companyName"
                 value={formData.companyName}
                 onChange={handleChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             </div>
           )}
         </div>
 
         {/* Contact */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Contact</h2>
-          <div className="grid md:grid-cols-2 gap-4">
+        <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-6">
+          <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">Contact</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-bold text-gray-700">
                 Email *
               </label>
               <input
@@ -298,11 +298,11 @@ export const CreateCustomer: React.FC = () => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-bold text-gray-700">
                 Email de facturation
               </label>
               <input
@@ -310,11 +310,11 @@ export const CreateCustomer: React.FC = () => {
                 name="billingEmail"
                 value={formData.billingEmail}
                 onChange={handleChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-bold text-gray-700">
                 Téléphone *
               </label>
               <input
@@ -322,11 +322,11 @@ export const CreateCustomer: React.FC = () => {
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-bold text-gray-700">
                 WhatsApp
               </label>
               <input
@@ -335,18 +335,18 @@ export const CreateCustomer: React.FC = () => {
                 value={formData.whatsappPhone}
                 onChange={handleChange}
                 placeholder="Laissez vide pour utiliser le téléphone"
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             </div>
           </div>
         </div>
 
         {/* Adresse */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Adresse</h2>
-          <div className="grid md:grid-cols-2 gap-4">
+        <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-6">
+          <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">Adresse</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-bold text-gray-700">
                 Numéro rue
               </label>
               <input
@@ -354,11 +354,11 @@ export const CreateCustomer: React.FC = () => {
                 name="streetNumber"
                 value={formData.address.streetNumber}
                 onChange={handleAddressChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-bold text-gray-700">
                 Nom rue
               </label>
               <input
@@ -366,11 +366,11 @@ export const CreateCustomer: React.FC = () => {
                 name="streetName"
                 value={formData.address.streetName}
                 onChange={handleAddressChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-bold text-gray-700">
                 Quartier
               </label>
               <input
@@ -378,11 +378,11 @@ export const CreateCustomer: React.FC = () => {
                 name="district"
                 value={formData.address.district}
                 onChange={handleAddressChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-bold text-gray-700">
                 Ville
               </label>
               <input
@@ -390,18 +390,18 @@ export const CreateCustomer: React.FC = () => {
                 name="city"
                 value={formData.address.city}
                 onChange={handleAddressChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-bold text-gray-700">
                 Pays
               </label>
               <select
                 name="countryCode"
                 value={formData.address.countryCode}
                 onChange={handleAddressChange}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-2xl focus:ring-2 focus:ring-primary-500"
+                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
               >
                 <option value="">Sélectionner un pays</option>
                 {countries.map((country) => (
@@ -416,32 +416,32 @@ export const CreateCustomer: React.FC = () => {
 
         {/* Messages */}
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+          <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-600">
             {error}
           </div>
         )}
         {success && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl text-green-600 text-sm">
+          <div className="mb-5 rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-600">
             {success}
           </div>
         )}
 
         {/* Actions */}
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={() => navigate("/customers")}
-            className="px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50/70"
+            className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50/70 sm:w-auto"
           >
             Annuler
           </button>
           <button
             type="submit"
             disabled={isLoading}
-            className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 flex items-center"
+            className="flex w-full items-center justify-center rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50 sm:w-auto"
           >
             {isLoading ? (
-              <div className="animate-spin rounded-full h-5 w-5 -2 border-white mr-2"></div>
+              <div className="mr-2 h-5 w-5 animate-spin rounded-full border-b-2 border-white"></div>
             ) : (
               <Save size={16} className="mr-2" />
             )}

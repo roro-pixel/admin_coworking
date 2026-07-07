@@ -55,7 +55,9 @@ export const UnitsList: React.FC = () => {
   const filteredUnits = units.filter(
     (unit) =>
       unit.name.toLowerCase().includes(search.toLowerCase()) ||
-      (unit.code || unit.unitCode || "").toLowerCase().includes(search.toLowerCase()),
+      (unit.code || unit.unitCode || "")
+        .toLowerCase()
+        .includes(search.toLowerCase()),
   );
 
   const handleOpenModal = (unit?: InventoryUnit) => {
@@ -82,7 +84,10 @@ export const UnitsList: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingUnit) {
-      updateMutation.mutate({ code: (editingUnit.unitCode || editingUnit.code || ""), data: formData });
+      updateMutation.mutate({
+        code: editingUnit.unitCode || editingUnit.code || "",
+        data: formData,
+      });
     } else {
       createMutation.mutate(formData);
     }
@@ -143,7 +148,9 @@ export const UnitsList: React.FC = () => {
           <tbody className="divide-y">
             {filteredUnits.map((unit) => (
               <tr key={unit.unitCode || unit.code} className="hover:bg-gray-50">
-                <td className="px-6 py-4 font-mono text-sm">{unit.unitCode || unit.code}</td>
+                <td className="px-6 py-4 font-mono text-sm">
+                  {unit.unitCode || unit.code}
+                </td>
                 <td className="px-6 py-4 font-medium">{unit.name}</td>
                 <td className="px-6 py-4">
                   {unitTypes.find((t) => t.value === unit.unitType)?.label}
@@ -157,7 +164,9 @@ export const UnitsList: React.FC = () => {
                     <Edit size={18} />
                   </button>
                   <button
-                    onClick={() => handleDelete(unit.unitCode || unit.code || "")}
+                    onClick={() =>
+                      handleDelete(unit.unitCode || unit.code || "")
+                    }
                     className="p-1.5 text-red-600 hover:text-red-800"
                   >
                     <Trash2 size={18} />

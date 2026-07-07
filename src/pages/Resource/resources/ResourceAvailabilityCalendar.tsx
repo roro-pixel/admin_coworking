@@ -12,12 +12,18 @@ interface ResourceAvailabilityCalendarProps {
   closures?: ResourceClosureResponse[];
 }
 
-const toDateKey = (date: Date): string => date.toISOString().slice(0, 10);
+const pad2 = (value: number): string => String(value).padStart(2, "0");
+
+const toDateKey = (date: Date): string =>
+  `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+
+const toMonthKey = (date: Date): string =>
+  `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
 
 const addMonths = (month: string, delta: number): string => {
   const [year, m] = month.split("-").map(Number);
   const d = new Date(year, m - 1 + delta, 1);
-  return d.toISOString().slice(0, 7);
+  return toMonthKey(d);
 };
 
 const getMonthDays = (month: string): Date[] => {
@@ -49,7 +55,7 @@ export const ResourceAvailabilityCalendar: React.FC<
   ResourceAvailabilityCalendarProps
 > = ({ month, onMonthChange, slots, closures = [] }) => {
   const days = getMonthDays(month);
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = toDateKey(new Date());
 
   const slotsByDay = React.useMemo(() => {
     const map: Record<string, ResourceAvailabilityResponse[]> = {};
@@ -78,6 +84,17 @@ export const ResourceAvailabilityCalendar: React.FC<
     const key = toDateKey(date);
     const daySlots = slotsByDay[key] || [];
     const dayClosures = closuresByDay[key] || [];
+    const isPastDay = key < todayKey;
+
+    if (isPastDay) {
+      return {
+        label: "Bouclé",
+        dot: "bg-slate-400",
+        badge: "bg-slate-100 text-slate-600",
+        ring: "ring-slate-100",
+        count: daySlots.length || dayClosures.length,
+      };
+    }
 
     if (dayClosures.length > 0) {
       return {
@@ -136,7 +153,7 @@ export const ResourceAvailabilityCalendar: React.FC<
 
   return (
     <div className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-gray-100">
-      <div className="flex flex-col gap-4 bg-gradient-to-r from-gray-50 to-white p-5 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-4 bg-white p-5 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-600">
             <CalendarDays size={20} />
@@ -152,8 +169,10 @@ export const ResourceAvailabilityCalendar: React.FC<
         </div>
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => onMonthChange(addMonths(month, -1))}
             className="rounded-xl border border-gray-200 bg-white p-2 text-gray-600 transition hover:bg-gray-50"
+            aria-label="Mois précédent"
           >
             <ChevronLeft size={16} />
           </button>
@@ -164,8 +183,10 @@ export const ResourceAvailabilityCalendar: React.FC<
             className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary-300 focus:ring-2 focus:ring-primary-100"
           />
           <button
+            type="button"
             onClick={() => onMonthChange(addMonths(month, 1))}
             className="rounded-xl border border-gray-200 bg-white p-2 text-gray-600 transition hover:bg-gray-50"
+            aria-label="Mois suivant"
           >
             <ChevronRight size={16} />
           </button>
@@ -186,6 +207,7 @@ export const ResourceAvailabilityCalendar: React.FC<
           const dayStatus = getDayStatus(date);
           const isCurrentMonth = key.startsWith(month);
           const isToday = key === todayKey;
+          const isPastDay = key < todayKey;
           const daySlots = slotsByDay[key] || [];
           const totalRemaining = daySlots.reduce(
             (sum, slot) => sum + (slot.remainingCapacity || 0),
@@ -201,14 +223,12 @@ export const ResourceAvailabilityCalendar: React.FC<
               key={key}
               className={`min-h-[132px] bg-white p-2.5 transition hover:bg-primary-50/30 ${
                 !isCurrentMonth ? "opacity-45" : ""
-              }`}
+              } ${isPastDay ? "bg-slate-50/60" : ""}`}
             >
               <div className="mb-2 flex items-start justify-between gap-2">
                 <span
                   className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${
-                    isToday
-                      ? "bg-primary-600 text-white"
-                      : "text-gray-800"
+                    isToday ? "bg-primary-600 text-white" : "text-gray-800"
                   }`}
                 >
                   {date.getDate()}
@@ -258,6 +278,7 @@ export const ResourceAvailabilityCalendar: React.FC<
           ["bg-green-500", "Disponible"],
           ["bg-orange-500", "Partiel"],
           ["bg-red-500", "Complet"],
+          ["bg-slate-400", "Bouclé"],
           ["bg-gray-400", "Fermeture"],
         ].map(([color, label]) => (
           <span key={label} className="inline-flex items-center gap-2">

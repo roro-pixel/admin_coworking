@@ -49,6 +49,18 @@ const consumptionModeLabels: Record<string, string> = {
   RESERVE_THEN_CONSUME: "Réserver puis consommer",
 };
 
+const benefitCategoryLabels: Record<string, string> = {
+  ACCESS: "Accès",
+  SERVICE: "Service inclus",
+  SUPPORT: "Support",
+  FINANCIAL: "Avantage financier",
+  FLEXIBILITY: "Flexibilité",
+  COMFORT: "Confort",
+  COMMUNITY: "Communauté",
+  SECURITY: "Sécurité",
+  OTHER: "Autre",
+};
+
 const resetPolicyLabels: Record<string, string> = {
   NEVER: "Jamais",
   DAILY: "Quotidien",
@@ -148,16 +160,16 @@ export const PlanVersionDetailPage: React.FC<PlanVersionDetailPageProps> = ({
   return (
     <>
       {/* ── Breadcrumb ─────────────────────────────────────────────────────── */}
-      <div className="mb-6">
+      <div className="mb-6 rounded-[1.75rem] bg-white p-5 shadow-sm ring-1 ring-slate-100 md:p-6">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-4 transition-colors"
+          className="mb-4 inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900"
         >
           <ArrowLeft size={16} />
           Retour à {plan.name}
         </button>
 
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold text-gray-900">
@@ -228,8 +240,8 @@ export const PlanVersionDetailPage: React.FC<PlanVersionDetailPageProps> = ({
       </div>
 
       {/* ── Onglets ────────────────────────────────────────────────────────── */}
-      <div className="border-b border-gray-200 mb-6">
-        <div className="flex space-x-1">
+      <div className="mb-6 overflow-x-auto rounded-[1.35rem] bg-white p-1.5 shadow-sm ring-1 ring-slate-100">
+        <div className="flex min-w-max gap-1.5">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const count =
@@ -244,10 +256,10 @@ export const PlanVersionDetailPage: React.FC<PlanVersionDetailPageProps> = ({
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold transition-all ${
                   activeTab === tab.id
-                    ? "border-primary-600 text-primary-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200"
+                    ? "bg-primary-600 text-white shadow-md shadow-primary-600/20"
+                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
                 }`}
               >
                 <Icon size={15} />
@@ -256,7 +268,7 @@ export const PlanVersionDetailPage: React.FC<PlanVersionDetailPageProps> = ({
                   <span
                     className={`text-xs px-1.5 py-0.5 rounded-full ${
                       activeTab === tab.id
-                        ? "bg-primary-100 text-primary-700"
+                        ? "bg-white/20 text-white"
                         : "bg-gray-100 text-gray-500"
                     }`}
                   >
@@ -534,7 +546,7 @@ export const PlanVersionDetailPage: React.FC<PlanVersionDetailPageProps> = ({
                       )}
                       {benefit.category && (
                         <span className="inline-block text-xs bg-white border border-gray-200 text-gray-500 px-2 py-0.5 rounded-full mt-1">
-                          {benefit.category}
+                          {benefitCategoryLabels[benefit.category] ?? benefit.category}
                         </span>
                       )}
                     </div>

@@ -47,7 +47,7 @@ export const SupportAnalyticsPanel: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
             Analytics tickets
           </h2>
           <p className="text-sm text-gray-500 mt-1">
@@ -75,7 +75,7 @@ export const SupportAnalyticsPanel: React.FC = () => {
           </div>
           <button
             onClick={() => refetch()}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm flex items-center gap-2"
+            className="w-full sm:w-auto justify-center px-4 py-2 bg-primary-600 text-white rounded-lg text-sm flex items-center gap-2"
           >
             <BarChart3 size={16} /> Actualiser
           </button>
@@ -94,7 +94,7 @@ export const SupportAnalyticsPanel: React.FC = () => {
         </div>
       ) : data ? (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
             <Card label="Créés" value={fmt(data.totalCreated)} />
             <Card label="Résolus" value={fmt(data.totalResolved)} />
             <Card
@@ -121,7 +121,7 @@ export const SupportAnalyticsPanel: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:p-6">
             <Breakdown title="Par catégorie" data={data.byCategory} />
             <Breakdown title="Par priorité" data={data.byPriority} />
           </div>
@@ -133,11 +133,11 @@ export const SupportAnalyticsPanel: React.FC = () => {
           <h3 className="font-semibold">Performance agents</h3>
         </div>
         {agentsLoading ? (
-          <div className="p-6 text-center text-sm text-gray-500">
+          <div className="p-4 sm:p-6 text-center text-sm text-gray-500">
             Chargement...
           </div>
         ) : (
-          <table className="w-full border-separate border-spacing-y-2 text-sm">
+          <table className="w-full border-separate border-spacing-y-2 text-sm max-md:block max-md:border-spacing-0 max-md:[&_thead]:hidden max-md:[&_tbody]:block max-md:[&_tr]:mb-3 max-md:[&_tr]:block max-md:[&_tr]:rounded-2xl max-md:[&_tr]:bg-gray-50 max-md:[&_tr]:p-3 max-md:[&_tr]:shadow-sm max-md:[&_tr]:ring-1 max-md:[&_tr]:ring-gray-100 max-md:[&_td]:block max-md:[&_td]:px-0 max-md:[&_td]:py-1.5 max-md:[&_td]:text-left max-md:[&_td]:text-xs max-md:[&_td]:break-words">
             <thead className="bg-transparent">
               <tr>
                 <th className="px-4 py-3 text-left">Agent</th>
@@ -200,7 +200,7 @@ const Card = ({
 }) => (
   <div className="bg-white rounded-xl shadow-sm p-4">
     <p
-      className={`text-2xl font-bold ${danger ? "text-red-600" : "text-gray-900"}`}
+      className={`text-lg sm:text-xl sm:text-2xl font-bold ${danger ? "text-red-600" : "text-gray-900"}`}
     >
       {value}
     </p>

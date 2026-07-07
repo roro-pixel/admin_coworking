@@ -81,6 +81,8 @@ export interface BookingResponse {
   confirmedAt?: string;
   completedAt?: string;
   cancelledAt?: string;
+  checkedInAt?: string;
+  checkedOutAt?: string;
   createdAt: string;
   lines: BookingLine[];
   participants: BookingParticipant[];
@@ -176,6 +178,60 @@ export interface CreateBookingRequest {
 export interface BookingStatusChangeRequest {
   changedBy?: string;
   reason?: string;
+  sendEmail?: boolean;
+}
+
+export interface BookingCheckInRequest {
+  actor?: string;
+  note?: string;
+  sendEmail?: boolean;
+}
+
+export interface PublicSelfCheckInRequest {
+  token: string;
+  lat?: number;
+  lng?: number;
+}
+
+export interface PublicCheckInResponse {
+  success: boolean;
+  bookingNumber?: string;
+  resourceName?: string;
+  status?: BookingStatus | string;
+  error?: string;
+  message?: string;
+}
+
+export interface ScannerVerifyRequest {
+  token: string;
+  adminCode: string;
+  lat?: number;
+  lng?: number;
+}
+
+export interface TransferBookingRequest {
+  newOwnerType: "MEMBER" | "CUSTOMER" | "BUSINESS_ENTITY" | string;
+  newOwnerCode: string;
+  newContactName?: string;
+  newContactEmail?: string;
+  newContactPhone?: string;
+  actor?: string;
+  note?: string;
+  sendEmail?: boolean;
+}
+
+export interface RescheduleBookingRequest {
+  newStartedAt: string;
+  newEndedAt: string;
+  actor?: string;
+  note?: string;
+  sendEmail?: boolean;
+}
+
+export interface ChangeResourceRequest {
+  newResourceCode: string;
+  actor?: string;
+  note?: string;
   sendEmail?: boolean;
 }
 
@@ -379,7 +435,7 @@ export const bookingService = {
 
   checkIn: async (
     bookingNumber: string,
-    data?: { actor?: string; note?: string; sendEmail?: boolean },
+    data?: BookingCheckInRequest,
   ): Promise<BookingResponse> => {
     const response = await apiClient.patch(
       `/sni/api/v1/bookings/${bookingNumber}/check-in`,
@@ -388,9 +444,61 @@ export const bookingService = {
     return response.data;
   },
 
+  earlyCheckIn: async (
+    bookingNumber: string,
+    data?: BookingCheckInRequest,
+  ): Promise<BookingResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/bookings/${bookingNumber}/early-check-in`,
+      data || {},
+    );
+    return response.data;
+  },
+
+  checkInByQrToken: async (
+    token: string,
+    data?: BookingCheckInRequest,
+  ): Promise<BookingResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/bookings/check-in/qr/${encodeURIComponent(token)}`,
+      data || {},
+    );
+    return response.data;
+  },
+
+  selfCheckIn: async (
+    data: PublicSelfCheckInRequest,
+  ): Promise<PublicCheckInResponse> => {
+    const formData = new URLSearchParams();
+    formData.append("token", data.token);
+    if (data.lat !== undefined) formData.append("lat", String(data.lat));
+    if (data.lng !== undefined) formData.append("lng", String(data.lng));
+
+    const response = await apiClient.post(
+      "/sni/api/v1/public/bookings/check-in/self",
+      formData,
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      },
+    );
+    return response.data;
+  },
+
+  scannerVerify: async (
+    data: ScannerVerifyRequest,
+  ): Promise<PublicCheckInResponse> => {
+    const response = await apiClient.post(
+      "/sni/api/v1/public/bookings/check-in/scanner-verify",
+      data,
+    );
+    return response.data;
+  },
+
   checkOut: async (
     bookingNumber: string,
-    data?: { actor?: string; note?: string; sendEmail?: boolean },
+    data?: BookingCheckInRequest,
   ): Promise<BookingResponse> => {
     const response = await apiClient.patch(
       `/sni/api/v1/bookings/${bookingNumber}/check-out`,
@@ -428,6 +536,39 @@ export const bookingService = {
     const response = await apiClient.patch(
       `/sni/api/v1/bookings/${bookingNumber}/no-show`,
       data || {},
+    );
+    return response.data;
+  },
+
+  transferBooking: async (
+    bookingNumber: string,
+    data: TransferBookingRequest,
+  ): Promise<BookingResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/bookings/${bookingNumber}/transfer`,
+      data,
+    );
+    return response.data;
+  },
+
+  rescheduleBooking: async (
+    bookingNumber: string,
+    data: RescheduleBookingRequest,
+  ): Promise<BookingResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/bookings/${bookingNumber}/reschedule`,
+      data,
+    );
+    return response.data;
+  },
+
+  changeBookingResource: async (
+    bookingNumber: string,
+    data: ChangeResourceRequest,
+  ): Promise<BookingResponse> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/bookings/${bookingNumber}/change-resource`,
+      data,
     );
     return response.data;
   },

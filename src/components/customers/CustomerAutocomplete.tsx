@@ -76,8 +76,8 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
   };
 
   return (
-    <div ref={wrapperRef} className="relative">
-      <div className="relative">
+    <div ref={wrapperRef} className="relative w-full">
+      <div className="relative w-full">
         <Search
           size={18}
           className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -88,7 +88,7 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => query.length >= 2 && setShowResults(true)}
           placeholder={placeholder}
-          className={`w-full pl-10 pr-10 py-2 ring-1 ring-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+          className={`w-full rounded-2xl py-2.5 pl-10 pr-10 text-sm ring-1 ring-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 ${
             required && !selectedCustomer ? "border-red-300" : ""
           }`}
         />
@@ -104,36 +104,36 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
       </div>
 
       {isLoading && (
-        <div className="absolute z-10 mt-1 w-full bg-white ring-1 ring-gray-100 rounded-2xl shadow-xl p-4">
+        <div className="absolute z-30 mt-2 w-full rounded-2xl bg-white p-4 shadow-xl ring-1 ring-gray-100">
           <div className="flex justify-center">
-            <div className="animate-spin rounded-full h-5 w-5 -2 border-primary-600"></div>
+            <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-primary-600"></div>
           </div>
         </div>
       )}
 
       {showResults && results.length > 0 && (
-        <div className="absolute z-10 mt-1 w-full bg-white ring-1 ring-gray-100 rounded-2xl shadow-xl max-h-60 overflow-y-auto">
+        <div className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-gray-100">
           {results.map((customer) => (
             <button
               key={customer.customerId}
               onClick={() => handleSelect(customer)}
-              className="w-full px-4 py-3 text-left hover:bg-gray-50/70 transition-colors flex items-center space-x-3  border-gray-100 last:border-0"
+              className="flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-gray-50/70 sm:px-4"
             >
-              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-100">
                 {typeFilter === "COMPANY" ? (
                   <Building2 size={16} className="text-gray-500" />
                 ) : (
                   <User size={16} className="text-gray-500" />
                 )}
               </div>
-              <div className="flex-1">
-                <p className="font-medium text-gray-900">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-gray-900">
                   {customer.displayName}
                 </p>
-                <p className="text-xs text-gray-500">{customer.email}</p>
+                <p className="truncate text-xs text-gray-500">{customer.email}</p>
               </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-500">{customer.customerId}</p>
+              <div className="hidden shrink-0 text-right sm:block">
+                <p className="truncate text-xs text-gray-500">{customer.customerId}</p>
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full ${
                     customer.status === "ACTIVE"
@@ -150,16 +150,16 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
       )}
 
       {selectedCustomer && (
-        <div className="mt-2 p-3 bg-primary-50 rounded-xl">
-          <div className="flex items-center justify-between">
+        <div className="mt-2 rounded-xl bg-primary-50 p-3 ring-1 ring-primary-100">
+          <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-medium text-gray-900">
                 Customer sélectionné
               </p>
-              <p className="text-sm text-gray-700">
+              <p className="truncate text-sm font-semibold text-gray-700">
                 {selectedCustomer.displayName}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="truncate text-xs text-gray-500">
                 {selectedCustomer.customerId} • {selectedCustomer.email}
               </p>
             </div>

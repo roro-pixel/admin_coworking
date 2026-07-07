@@ -95,9 +95,12 @@ export const CreateKycCaseModal: React.FC<CreateKycCaseModalProps> = ({
           // Pour BUSINESS, utiliser l'endpoint de recherche business
           // Si l'endpoint n'existe pas encore, on peut faire une recherche par code
           // À adapter selon ton API business
-          const response = await apiClient.get("/sni/api/v1/business/search/basic", {
-            params: { query: debouncedQuery },
-          });
+          const response = await apiClient.get(
+            "/sni/api/v1/business/search/basic",
+            {
+              params: { query: debouncedQuery },
+            },
+          );
           const raw = response.data;
           const businesses = Array.isArray(raw)
             ? raw
@@ -108,7 +111,12 @@ export const CreateKycCaseModal: React.FC<CreateKycCaseModalProps> = ({
                 : [];
           results = businesses.map((b: any) => ({
             code: String(b.code || b.businessCode || b.id || ""),
-            name: b.name || b.businessName || b.displayName || b.code || "Entreprise",
+            name:
+              b.name ||
+              b.businessName ||
+              b.displayName ||
+              b.code ||
+              "Entreprise",
             email: b.email,
             phone: b.phone,
             type: "BUSINESS",

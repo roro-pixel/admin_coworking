@@ -4,7 +4,6 @@ import {
   CalendarDays,
   CheckCircle,
   Clock,
-  Image,
   Loader2,
   Lock,
   RefreshCw,
@@ -29,7 +28,13 @@ const primaryBtn =
 const softBtn =
   "inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50";
 
-const bookingUnits: ResourceBookingUnit[] = ["HOUR", "HALF_DAY", "DAY", "WEEK", "MONTH"];
+const bookingUnits: ResourceBookingUnit[] = [
+  "HOUR",
+  "HALF_DAY",
+  "DAY",
+  "WEEK",
+  "MONTH",
+];
 const occupancyLabel: Record<string, string> = {
   FREE: "Libre",
   PARTIALLY_OCCUPIED: "Partiel",
@@ -72,18 +77,28 @@ const toDate = (month: string, end = false) => {
 
 const formatDateTime = (value?: string) =>
   value
-    ? new Date(value).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })
+    ? new Date(value).toLocaleString("fr-FR", {
+        dateStyle: "short",
+        timeStyle: "short",
+      })
     : "—";
 
 export const ResourcePlanningAdminPage: React.FC = () => {
   const queryClient = useQueryClient();
-  const [selectedResource, setSelectedResource] = useState<ResourceSummaryResponse | null>(null);
+  const [selectedResource, setSelectedResource] =
+    useState<ResourceSummaryResponse | null>(null);
   const [resourceCode, setResourceCode] = useState("");
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(() =>
+    new Date().toISOString().slice(0, 7),
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [remainingForm, setRemainingForm] = useState({ from: "", to: "", durationMinutes: 60 });
+  const [remainingForm, setRemainingForm] = useState({
+    from: "",
+    to: "",
+    durationMinutes: 60,
+  });
   const [availabilityForm, setAvailabilityForm] = useState({
     startedAt: "",
     endedAt: "",
@@ -97,32 +112,27 @@ export const ResourcePlanningAdminPage: React.FC = () => {
     startedAt: "",
     endedAt: "",
   });
-  const [photoForm, setPhotoForm] = useState({
-    documentCode: "",
-    caption: "",
-    cover: false,
-    displayOrder: 0,
-  });
-  const [editingPhotoId, setEditingPhotoId] = useState<number | null>(null);
-  const [photoEditForm, setPhotoEditForm] = useState({
-    documentCode: "",
-    caption: "",
-    cover: false,
-    displayOrder: 0,
-  });
 
   const fromDate = toDate(month, false);
   const toDateValue = toDate(month, true);
 
   const adminCalendarQuery = useQuery({
     queryKey: ["resource-admin-calendar", resourceCode, month],
-    queryFn: () => resourceService.getAdminCalendar(resourceCode, { fromDate, toDate: toDateValue }),
+    queryFn: () =>
+      resourceService.getAdminCalendar(resourceCode, {
+        fromDate,
+        toDate: toDateValue,
+      }),
     enabled: !!resourceCode,
   });
 
   const publicCalendarQuery = useQuery({
     queryKey: ["resource-public-calendar", resourceCode, month],
-    queryFn: () => resourceService.getPublicCalendar(resourceCode, { fromDate, toDate: toDateValue }),
+    queryFn: () =>
+      resourceService.getPublicCalendar(resourceCode, {
+        fromDate,
+        toDate: toDateValue,
+      }),
     enabled: !!resourceCode,
   });
 
@@ -149,7 +159,13 @@ export const ResourcePlanningAdminPage: React.FC = () => {
   });
 
   const remainingQuery = useQuery({
-    queryKey: ["resource-remaining-slots", resourceCode, remainingForm.from, remainingForm.to, remainingForm.durationMinutes],
+    queryKey: [
+      "resource-remaining-slots",
+      resourceCode,
+      remainingForm.from,
+      remainingForm.to,
+      remainingForm.durationMinutes,
+    ],
     queryFn: () =>
       resourceService.searchRemainingSlots({
         resourceCode,
@@ -160,11 +176,6 @@ export const ResourcePlanningAdminPage: React.FC = () => {
     enabled: false,
   });
 
-  const photosQuery = useQuery({
-    queryKey: ["resource-photos", resourceCode],
-    queryFn: () => resourceService.getResourcePhotos(resourceCode),
-    enabled: !!resourceCode,
-  });
 
   const quoteQuery = useQuery({
     queryKey: ["resource-price-quote", resourceCode, quoteForm],
@@ -181,18 +192,20 @@ export const ResourcePlanningAdminPage: React.FC = () => {
   const adminSlots: AdminCalendarSlot[] = useMemo(() => {
     const data: any = adminCalendarQuery.data;
     if (Array.isArray(data?.slots)) return data.slots;
-    if (Array.isArray(data?.days)) return data.days.flatMap((day: any) => day.slots || []);
+    if (Array.isArray(data?.days))
+      return data.days.flatMap((day: any) => day.slots || []);
     return [];
   }, [adminCalendarQuery.data]);
 
   const days = publicCalendarQuery.data?.days || [];
   const occupied = occupiedQuery.data?.content || [];
   const grouped = groupedAvailabilityQuery.data || [];
-  const photos = photosQuery.data || [];
 
   const stats = useMemo(() => {
     const total = adminSlots.length;
-    const full = adminSlots.filter((s) => s.occupancyLevel === "FULL" || !s.available).length;
+    const full = adminSlots.filter(
+      (s) => s.occupancyLevel === "FULL" || !s.available,
+    ).length;
     const available = adminSlots.filter((s) => s.available).length;
     const occupiedSlots = occupied.length;
     return { total, full, available, occupiedSlots };
@@ -220,15 +233,27 @@ export const ResourcePlanningAdminPage: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resource-admin-calendar"] });
       queryClient.invalidateQueries({ queryKey: ["resource-public-calendar"] });
-      queryClient.invalidateQueries({ queryKey: ["resource-availability-grouped"] });
-      setAvailabilityForm({ startedAt: "", endedAt: "", slotDurationMinutes: 60, totalCapacity: 1, active: true });
+      queryClient.invalidateQueries({
+        queryKey: ["resource-availability-grouped"],
+      });
+      setAvailabilityForm({
+        startedAt: "",
+        endedAt: "",
+        slotDurationMinutes: 60,
+        totalCapacity: 1,
+        active: true,
+      });
       success("Créneau créé.");
     },
     onError: (e) => fail(e, "Erreur création disponibilité."),
   });
 
   const reserveMutation = useMutation({
-    mutationFn: () => resourceService.reserveAvailabilitySlot(Number(slotActionForm.id), Number(slotActionForm.quantity) || 1),
+    mutationFn: () =>
+      resourceService.reserveAvailabilitySlot(
+        Number(slotActionForm.id),
+        Number(slotActionForm.quantity) || 1,
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resource-admin-calendar"] });
       queryClient.invalidateQueries({ queryKey: ["resource-occupied-slots"] });
@@ -238,7 +263,11 @@ export const ResourcePlanningAdminPage: React.FC = () => {
   });
 
   const releaseMutation = useMutation({
-    mutationFn: () => resourceService.releaseAvailabilitySlot(Number(slotActionForm.id), Number(slotActionForm.quantity) || 1),
+    mutationFn: () =>
+      resourceService.releaseAvailabilitySlot(
+        Number(slotActionForm.id),
+        Number(slotActionForm.quantity) || 1,
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resource-admin-calendar"] });
       queryClient.invalidateQueries({ queryKey: ["resource-occupied-slots"] });
@@ -247,54 +276,19 @@ export const ResourcePlanningAdminPage: React.FC = () => {
     onError: (e) => fail(e, "Erreur libération capacité."),
   });
 
-  const addPhotoMutation = useMutation({
-    mutationFn: () =>
-      resourceService.addResourcePhoto(resourceCode, {
-        documentCode: photoForm.documentCode,
-        caption: photoForm.caption || undefined,
-        cover: photoForm.cover,
-        displayOrder: Number(photoForm.displayOrder) || 0,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resource-photos"] });
-      setPhotoForm({ documentCode: "", caption: "", cover: false, displayOrder: 0 });
-      success("Photo ajoutée.");
-    },
-    onError: (e) => fail(e, "Erreur ajout photo."),
-  });
-
-  const updatePhotoMutation = useMutation({
-    mutationFn: () => {
-      if (!editingPhotoId) throw new Error("Aucune photo sélectionnée.");
-      return resourceService.updateResourcePhoto(resourceCode, editingPhotoId, {
-        documentCode: photoEditForm.documentCode,
-        caption: photoEditForm.caption || undefined,
-        cover: photoEditForm.cover,
-        displayOrder: Number(photoEditForm.displayOrder) || 0,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resource-photos"] });
-      setEditingPhotoId(null);
-      setPhotoEditForm({ documentCode: "", caption: "", cover: false, displayOrder: 0 });
-      success("Photo mise à jour.");
-    },
-    onError: (e) => fail(e, "Erreur modification photo."),
-  });
-
-  const deletePhotoMutation = useMutation({
-    mutationFn: (id: number) => resourceService.deleteResourcePhoto(resourceCode, id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resource-photos"] });
-      success("Photo supprimée.");
-    },
-    onError: (e) => fail(e, "Erreur suppression photo."),
-  });
 
   const selectedCode = (code: string) => {
     setResourceCode(code);
-    setRemainingForm({ from: `${fromDate}T08:00`, to: `${toDateValue}T18:00`, durationMinutes: 60 });
-    setQuoteForm({ bookingUnit: "HOUR", startedAt: `${fromDate}T08:00`, endedAt: `${fromDate}T09:00` });
+    setRemainingForm({
+      from: `${fromDate}T08:00`,
+      to: `${toDateValue}T18:00`,
+      durationMinutes: 60,
+    });
+    setQuoteForm({
+      bookingUnit: "HOUR",
+      startedAt: `${fromDate}T08:00`,
+      endedAt: `${fromDate}T09:00`,
+    });
   };
 
   return (
@@ -302,14 +296,19 @@ export const ResourcePlanningAdminPage: React.FC = () => {
       <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-600">Planning ressources</p>
-            <h2 className="mt-2 text-2xl font-bold text-gray-950">Calendrier admin, occupation et disponibilité</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-600">
+              Planning ressources
+            </p>
+            <h2 className="mt-2 text-2xl font-bold text-gray-950">
+              Calendrier admin, occupation et disponibilité
+            </h2>
             <p className="mt-1 text-sm text-gray-500">
-              Visualisez l'occupation, les créneaux publics, les réservations, les disponibilités restantes, le devis tarifaire et la galerie.
+              Visualisez l'occupation, les créneaux publics, les réservations,
+              les disponibilités restantes et le devis tarifaire.
             </p>
           </div>
-          <div className="flex flex-col gap-3 md:flex-row md:items-center">
-            <div className="w-full md:w-80">
+          <div className="flex w-full flex-col gap-3 lg:w-auto lg:flex-row lg:items-center">
+            <div className="w-full lg:w-[560px] xl:w-[680px]">
               <ResourceAutocomplete
                 selectedResource={selectedResource}
                 selectedCode={resourceCode}
@@ -320,8 +319,21 @@ export const ResourcePlanningAdminPage: React.FC = () => {
                 placeholder="Sélectionner une ressource..."
               />
             </div>
-            <input type="month" className={inputClass} value={month} onChange={(e) => setMonth(e.target.value)} />
-            <button className={softBtn} onClick={() => { adminCalendarQuery.refetch(); publicCalendarQuery.refetch(); occupiedQuery.refetch(); }} disabled={!resourceCode}>
+            <input
+              type="month"
+              className={inputClass}
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+            />
+            <button
+              className={softBtn}
+              onClick={() => {
+                adminCalendarQuery.refetch();
+                publicCalendarQuery.refetch();
+                occupiedQuery.refetch();
+              }}
+              disabled={!resourceCode}
+            >
               <RefreshCw size={16} /> Actualiser
             </button>
           </div>
@@ -329,7 +341,9 @@ export const ResourcePlanningAdminPage: React.FC = () => {
       </div>
 
       {(message || error) && (
-        <div className={`rounded-2xl px-4 py-3 text-sm ${error ? "bg-red-50 text-red-700 ring-1 ring-red-100" : "bg-green-50 text-green-700 ring-1 ring-green-100"}`}>
+        <div
+          className={`rounded-2xl px-4 py-3 text-sm ${error ? "bg-red-50 text-red-700 ring-1 ring-red-100" : "bg-green-50 text-green-700 ring-1 ring-green-100"}`}
+        >
           {error || message}
         </div>
       )}
@@ -337,25 +351,52 @@ export const ResourcePlanningAdminPage: React.FC = () => {
       {!resourceCode && (
         <div className="rounded-3xl bg-white p-12 text-center shadow-sm ring-1 ring-gray-100">
           <Search size={44} className="mx-auto mb-3 text-gray-300" />
-          <p className="font-medium text-gray-700">Sélectionnez une ressource pour charger son planning complet.</p>
+          <p className="font-medium text-gray-700">
+            Sélectionnez une ressource pour charger son planning complet.
+          </p>
         </div>
       )}
 
       {resourceCode && (
         <>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-            <Metric label="Créneaux admin" value={stats.total} icon={CalendarDays} />
-            <Metric label="Disponibles" value={stats.available} icon={CheckCircle} />
-            <Metric label="Occupés/complets" value={stats.full} icon={XCircle} />
-            <Metric label="Réservations" value={stats.occupiedSlots} icon={Users} />
+            <Metric
+              label="Créneaux admin"
+              value={stats.total}
+              icon={CalendarDays}
+            />
+            <Metric
+              label="Disponibles"
+              value={stats.available}
+              icon={CheckCircle}
+            />
+            <Metric
+              label="Occupés/complets"
+              value={stats.full}
+              icon={XCircle}
+            />
+            <Metric
+              label="Réservations"
+              value={stats.occupiedSlots}
+              icon={Users}
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-            <SectionCard title="Calendrier admin avec occupation" description="Créneaux détaillés avec niveau d'occupation et capacité restante." icon={CalendarDays}>
+            <SectionCard
+              title="Calendrier admin avec occupation"
+              description="Créneaux détaillés avec niveau d'occupation et capacité restante."
+              icon={CalendarDays}
+            >
               {adminCalendarQuery.isLoading ? (
-                <div className="py-10 text-center text-sm text-gray-500"><Loader2 className="mx-auto mb-2 animate-spin" /> Chargement...</div>
+                <div className="py-10 text-center text-sm text-gray-500">
+                  <Loader2 className="mx-auto mb-2 animate-spin" />{" "}
+                  Chargement...
+                </div>
               ) : adminSlots.length === 0 ? (
-                <p className="rounded-2xl bg-gray-50 p-6 text-center text-sm text-gray-500">Aucun créneau sur ce mois.</p>
+                <p className="rounded-2xl bg-gray-50 p-6 text-center text-sm text-gray-500">
+                  Aucun créneau sur ce mois.
+                </p>
               ) : (
                 <div className="max-h-[640px] overflow-auto rounded-2xl ring-1 ring-gray-100">
                   <table className="w-full border-separate border-spacing-y-2 p-2">
@@ -370,15 +411,29 @@ export const ResourcePlanningAdminPage: React.FC = () => {
                     </thead>
                     <tbody>
                       {adminSlots.map((slot: any, index) => {
-                        const level = (slot.occupancyLevel || (slot.available ? "FREE" : "FULL")) as OccupancyLevel;
+                        const level = (slot.occupancyLevel ||
+                          (slot.available ? "FREE" : "FULL")) as OccupancyLevel;
                         return (
-                          <tr key={`${slot.startedAt}-${index}`} className="bg-gray-50/70 hover:bg-primary-50/40">
-                            <td className="rounded-l-2xl px-4 py-3 text-sm text-gray-800">{formatDateTime(slot.startedAt)}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{formatDateTime(slot.endedAt)}</td>
-                            <td className="px-4 py-3 text-center text-sm font-medium">{slot.remainingCapacity}/{slot.totalCapacity}</td>
-                            <td className="px-4 py-3 text-center text-sm">{Math.round(slot.occupancyRate ?? 0)}%</td>
+                          <tr
+                            key={`${slot.startedAt}-${index}`}
+                            className="bg-gray-50/70 hover:bg-primary-50/40"
+                          >
+                            <td className="rounded-l-2xl px-4 py-3 text-sm text-gray-800">
+                              {formatDateTime(slot.startedAt)}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              {formatDateTime(slot.endedAt)}
+                            </td>
+                            <td className="px-4 py-3 text-center text-sm font-medium">
+                              {slot.remainingCapacity}/{slot.totalCapacity}
+                            </td>
+                            <td className="px-4 py-3 text-center text-sm">
+                              {Math.round(slot.occupancyRate ?? 0)}%
+                            </td>
                             <td className="rounded-r-2xl px-4 py-3 text-center">
-                              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${occupancyClass[level] || occupancyClass.FREE}`}>
+                              <span
+                                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${occupancyClass[level] || occupancyClass.FREE}`}
+                              >
                                 {occupancyLabel[level] || level}
                               </span>
                             </td>
@@ -391,148 +446,379 @@ export const ResourcePlanningAdminPage: React.FC = () => {
               )}
             </SectionCard>
 
-            <SectionCard title="Créneaux publics" description="Synthèse de disponibilité visible côté portail." icon={Clock}>
+            <SectionCard
+              title="Créneaux publics"
+              description="Synthèse de disponibilité visible côté portail."
+              icon={Clock}
+            >
               <div className="space-y-2">
-                {days.length === 0 ? <p className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-500">Aucune donnée publique.</p> : days.map((day) => (
-                  <div key={day.date} className="flex items-center justify-between rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-100">
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{new Date(day.date).toLocaleDateString("fr-FR")}</p>
-                      <p className="text-xs text-gray-400">{day.availableSlots}/{day.totalSlots} créneaux · {day.remainingCapacity}/{day.totalCapacity} places</p>
+                {days.length === 0 ? (
+                  <p className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-500">
+                    Aucune donnée publique.
+                  </p>
+                ) : (
+                  days.map((day) => (
+                    <div
+                      key={day.date}
+                      className="flex items-center justify-between rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-100"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">
+                          {new Date(day.date).toLocaleDateString("fr-FR")}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {day.availableSlots}/{day.totalSlots} créneaux ·{" "}
+                          {day.remainingCapacity}/{day.totalCapacity} places
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${day.status === "FULL" ? "bg-red-50 text-red-700" : day.status === "PARTIAL" ? "bg-yellow-50 text-yellow-700" : "bg-green-50 text-green-700"}`}
+                      >
+                        {day.status}
+                      </span>
                     </div>
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${day.status === "FULL" ? "bg-red-50 text-red-700" : day.status === "PARTIAL" ? "bg-yellow-50 text-yellow-700" : "bg-green-50 text-green-700"}`}>{day.status}</span>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </SectionCard>
           </div>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <SectionCard title="Création de disponibilités" description="Créer des créneaux avec durée et capacité." icon={CheckCircle}>
+            <SectionCard
+              title="Création de disponibilités"
+              description="Créer des créneaux avec durée et capacité."
+              icon={CheckCircle}
+            >
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <input type="datetime-local" className={inputClass} value={availabilityForm.startedAt} onChange={(e) => setAvailabilityForm({ ...availabilityForm, startedAt: e.target.value })} />
-                <input type="datetime-local" className={inputClass} value={availabilityForm.endedAt} onChange={(e) => setAvailabilityForm({ ...availabilityForm, endedAt: e.target.value })} />
-                <input type="number" className={inputClass} value={availabilityForm.slotDurationMinutes} onChange={(e) => setAvailabilityForm({ ...availabilityForm, slotDurationMinutes: Number(e.target.value) })} placeholder="Durée créneau minutes" />
-                <input type="number" className={inputClass} value={availabilityForm.totalCapacity} onChange={(e) => setAvailabilityForm({ ...availabilityForm, totalCapacity: Number(e.target.value) })} placeholder="Capacité" />
+                <input
+                  type="datetime-local"
+                  className={inputClass}
+                  value={availabilityForm.startedAt}
+                  onChange={(e) =>
+                    setAvailabilityForm({
+                      ...availabilityForm,
+                      startedAt: e.target.value,
+                    })
+                  }
+                />
+                <input
+                  type="datetime-local"
+                  className={inputClass}
+                  value={availabilityForm.endedAt}
+                  onChange={(e) =>
+                    setAvailabilityForm({
+                      ...availabilityForm,
+                      endedAt: e.target.value,
+                    })
+                  }
+                />
+                <input
+                  type="number"
+                  className={inputClass}
+                  value={availabilityForm.slotDurationMinutes}
+                  onChange={(e) =>
+                    setAvailabilityForm({
+                      ...availabilityForm,
+                      slotDurationMinutes: Number(e.target.value),
+                    })
+                  }
+                  placeholder="Durée créneau minutes"
+                />
+                <input
+                  type="number"
+                  className={inputClass}
+                  value={availabilityForm.totalCapacity}
+                  onChange={(e) =>
+                    setAvailabilityForm({
+                      ...availabilityForm,
+                      totalCapacity: Number(e.target.value),
+                    })
+                  }
+                  placeholder="Capacité"
+                />
               </div>
-              <label className="mt-3 flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" checked={availabilityForm.active} onChange={(e) => setAvailabilityForm({ ...availabilityForm, active: e.target.checked })} /> Active</label>
-              <button className={`${primaryBtn} mt-4`} disabled={!availabilityForm.startedAt || !availabilityForm.endedAt || createAvailabilityMutation.isPending} onClick={() => createAvailabilityMutation.mutate()}>
-                {createAvailabilityMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />} Créer disponibilité
+              <label className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={availabilityForm.active}
+                  onChange={(e) =>
+                    setAvailabilityForm({
+                      ...availabilityForm,
+                      active: e.target.checked,
+                    })
+                  }
+                />{" "}
+                Active
+              </label>
+              <button
+                className={`${primaryBtn} mt-4`}
+                disabled={
+                  !availabilityForm.startedAt ||
+                  !availabilityForm.endedAt ||
+                  createAvailabilityMutation.isPending
+                }
+                onClick={() => createAvailabilityMutation.mutate()}
+              >
+                {createAvailabilityMutation.isPending ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <CheckCircle size={16} />
+                )}{" "}
+                Créer disponibilité
               </button>
             </SectionCard>
 
-            <SectionCard title="Disponibilités restantes" description="Rechercher les fenêtres libres pour une durée donnée." icon={Search}>
+            <SectionCard
+              title="Disponibilités restantes"
+              description="Rechercher les fenêtres libres pour une durée donnée."
+              icon={Search}
+            >
               <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_120px]">
-                <input type="datetime-local" className={inputClass} value={remainingForm.from} onChange={(e) => setRemainingForm({ ...remainingForm, from: e.target.value })} />
-                <input type="datetime-local" className={inputClass} value={remainingForm.to} onChange={(e) => setRemainingForm({ ...remainingForm, to: e.target.value })} />
-                <input type="number" className={inputClass} value={remainingForm.durationMinutes} onChange={(e) => setRemainingForm({ ...remainingForm, durationMinutes: Number(e.target.value) })} />
+                <input
+                  type="datetime-local"
+                  className={inputClass}
+                  value={remainingForm.from}
+                  onChange={(e) =>
+                    setRemainingForm({ ...remainingForm, from: e.target.value })
+                  }
+                />
+                <input
+                  type="datetime-local"
+                  className={inputClass}
+                  value={remainingForm.to}
+                  onChange={(e) =>
+                    setRemainingForm({ ...remainingForm, to: e.target.value })
+                  }
+                />
+                <input
+                  type="number"
+                  className={inputClass}
+                  value={remainingForm.durationMinutes}
+                  onChange={(e) =>
+                    setRemainingForm({
+                      ...remainingForm,
+                      durationMinutes: Number(e.target.value),
+                    })
+                  }
+                />
               </div>
-              <button className={`${softBtn} mt-3`} disabled={!remainingForm.from || !remainingForm.to || remainingQuery.isFetching} onClick={() => remainingQuery.refetch()}>
+              <button
+                className={`${softBtn} mt-3`}
+                disabled={
+                  !remainingForm.from ||
+                  !remainingForm.to ||
+                  remainingQuery.isFetching
+                }
+                onClick={() => remainingQuery.refetch()}
+              >
                 Rechercher
               </button>
               <div className="mt-4 max-h-60 space-y-2 overflow-auto">
                 {(remainingQuery.data || []).map((w, index) => (
-                  <div key={`${w.startedAt}-${index}`} className="rounded-2xl bg-gray-50 p-3 text-sm ring-1 ring-gray-100">
-                    <p className="font-medium text-gray-900">{formatDateTime(w.startedAt)} → {formatDateTime(w.endedAt)}</p>
-                    <p className="text-xs text-gray-400">{w.durationMinutes} min · capacité restante {w.remainingCapacity} · {w.slotCount} créneau(x)</p>
+                  <div
+                    key={`${w.startedAt}-${index}`}
+                    className="rounded-2xl bg-gray-50 p-3 text-sm ring-1 ring-gray-100"
+                  >
+                    <p className="font-medium text-gray-900">
+                      {formatDateTime(w.startedAt)} →{" "}
+                      {formatDateTime(w.endedAt)}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {w.durationMinutes} min · capacité restante{" "}
+                      {w.remainingCapacity} · {w.slotCount} créneau(x)
+                    </p>
                   </div>
                 ))}
-                {remainingQuery.isFetched && (remainingQuery.data || []).length === 0 && <p className="rounded-xl bg-gray-50 p-4 text-sm text-gray-500">Aucune fenêtre libre.</p>}
+                {remainingQuery.isFetched &&
+                  (remainingQuery.data || []).length === 0 && (
+                    <p className="rounded-xl bg-gray-50 p-4 text-sm text-gray-500">
+                      Aucune fenêtre libre.
+                    </p>
+                  )}
               </div>
             </SectionCard>
 
-            <SectionCard title="Réservation / libération de capacité" description="Action admin sur un créneau par ID." icon={Lock}>
+            <SectionCard
+              title="Réservation / libération de capacité"
+              description="Action admin sur un créneau par ID."
+              icon={Lock}
+            >
               <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_120px_auto_auto]">
-                <input className={inputClass} value={slotActionForm.id} onChange={(e) => setSlotActionForm({ ...slotActionForm, id: e.target.value })} placeholder="ID disponibilité" />
-                <input type="number" className={inputClass} value={slotActionForm.quantity} onChange={(e) => setSlotActionForm({ ...slotActionForm, quantity: Number(e.target.value) })} />
-                <button className={primaryBtn} disabled={!slotActionForm.id || reserveMutation.isPending} onClick={() => reserveMutation.mutate()}><Lock size={16} /> Réserver</button>
-                <button className={softBtn} disabled={!slotActionForm.id || releaseMutation.isPending} onClick={() => releaseMutation.mutate()}><Unlock size={16} /> Libérer</button>
+                <input
+                  className={inputClass}
+                  value={slotActionForm.id}
+                  onChange={(e) =>
+                    setSlotActionForm({ ...slotActionForm, id: e.target.value })
+                  }
+                  placeholder="ID disponibilité"
+                />
+                <input
+                  type="number"
+                  className={inputClass}
+                  value={slotActionForm.quantity}
+                  onChange={(e) =>
+                    setSlotActionForm({
+                      ...slotActionForm,
+                      quantity: Number(e.target.value),
+                    })
+                  }
+                />
+                <button
+                  className={primaryBtn}
+                  disabled={!slotActionForm.id || reserveMutation.isPending}
+                  onClick={() => reserveMutation.mutate()}
+                >
+                  <Lock size={16} /> Réserver
+                </button>
+                <button
+                  className={softBtn}
+                  disabled={!slotActionForm.id || releaseMutation.isPending}
+                  onClick={() => releaseMutation.mutate()}
+                >
+                  <Unlock size={16} /> Libérer
+                </button>
               </div>
             </SectionCard>
 
-            <SectionCard title="Devis tarifaire" description="Calculer le prix d'une période selon les règles tarifaires." icon={Clock}>
+            <SectionCard
+              title="Devis tarifaire"
+              description="Calculer le prix d'une période selon les règles tarifaires."
+              icon={Clock}
+            >
               <div className="grid grid-cols-1 gap-3 md:grid-cols-[160px_1fr_1fr_auto]">
-                <select className={inputClass} value={quoteForm.bookingUnit} onChange={(e) => setQuoteForm({ ...quoteForm, bookingUnit: e.target.value as ResourceBookingUnit })}>{bookingUnits.map((u) => <option key={u}>{u}</option>)}</select>
-                <input type="datetime-local" className={inputClass} value={quoteForm.startedAt} onChange={(e) => setQuoteForm({ ...quoteForm, startedAt: e.target.value })} />
-                <input type="datetime-local" className={inputClass} value={quoteForm.endedAt} onChange={(e) => setQuoteForm({ ...quoteForm, endedAt: e.target.value })} />
-                <button className={primaryBtn} disabled={!quoteForm.startedAt || !quoteForm.endedAt || quoteQuery.isFetching} onClick={() => quoteQuery.refetch()}>Calculer</button>
+                <select
+                  className={inputClass}
+                  value={quoteForm.bookingUnit}
+                  onChange={(e) =>
+                    setQuoteForm({
+                      ...quoteForm,
+                      bookingUnit: e.target.value as ResourceBookingUnit,
+                    })
+                  }
+                >
+                  {bookingUnits.map((u) => (
+                    <option key={u}>{u}</option>
+                  ))}
+                </select>
+                <input
+                  type="datetime-local"
+                  className={inputClass}
+                  value={quoteForm.startedAt}
+                  onChange={(e) =>
+                    setQuoteForm({ ...quoteForm, startedAt: e.target.value })
+                  }
+                />
+                <input
+                  type="datetime-local"
+                  className={inputClass}
+                  value={quoteForm.endedAt}
+                  onChange={(e) =>
+                    setQuoteForm({ ...quoteForm, endedAt: e.target.value })
+                  }
+                />
+                <button
+                  className={primaryBtn}
+                  disabled={
+                    !quoteForm.startedAt ||
+                    !quoteForm.endedAt ||
+                    quoteQuery.isFetching
+                  }
+                  onClick={() => quoteQuery.refetch()}
+                >
+                  Calculer
+                </button>
               </div>
               {quoteQuery.data && (
                 <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-                  <Metric label="Base" value={quoteQuery.data.basePrice} suffix=" FCFA" icon={Clock} />
-                  <Metric label="Final" value={quoteQuery.data.finalPrice} suffix=" FCFA" icon={CheckCircle} />
-                  <Metric label="Règle" value={quoteQuery.data.appliedRuleId || 0} icon={Search} />
+                  <Metric
+                    label="Base"
+                    value={quoteQuery.data.basePrice}
+                    suffix=" FCFA"
+                    icon={Clock}
+                  />
+                  <Metric
+                    label="Final"
+                    value={quoteQuery.data.finalPrice}
+                    suffix=" FCFA"
+                    icon={CheckCircle}
+                  />
+                  <Metric
+                    label="Règle"
+                    value={quoteQuery.data.appliedRuleId || 0}
+                    icon={Search}
+                  />
                 </div>
               )}
             </SectionCard>
 
-            <SectionCard title="Créneaux occupés" description="Liste des réservations/occupations sur la période." icon={Users}>
+            <SectionCard
+              title="Créneaux occupés"
+              description="Liste des réservations/occupations sur la période."
+              icon={Users}
+            >
               <div className="max-h-72 space-y-2 overflow-auto">
-                {occupied.length === 0 ? <p className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-500">Aucun créneau occupé.</p> : occupied.map((slot: any, index) => (
-                  <div key={`${slot.bookingCode || index}-${slot.startedAt}`} className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-100">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{slot.customerName || slot.memberName || slot.bookingCode || "Occupation"}</p>
-                        <p className="text-xs text-gray-400">{formatDateTime(slot.startedAt)} → {formatDateTime(slot.endedAt)}</p>
-                      </div>
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">Qté {slot.quantity || 1}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Galerie photos" description="Associer les documents GED comme photos de ressource." icon={Image}>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_100px]">
-                <input className={inputClass} value={photoForm.documentCode} onChange={(e) => setPhotoForm({ ...photoForm, documentCode: e.target.value })} placeholder="Code document GED" />
-                <input className={inputClass} value={photoForm.caption} onChange={(e) => setPhotoForm({ ...photoForm, caption: e.target.value })} placeholder="Légende" />
-                <input type="number" className={inputClass} value={photoForm.displayOrder} onChange={(e) => setPhotoForm({ ...photoForm, displayOrder: Number(e.target.value) })} />
-              </div>
-              <label className="mt-3 flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" checked={photoForm.cover} onChange={(e) => setPhotoForm({ ...photoForm, cover: e.target.checked })} /> Photo de couverture</label>
-              <button className={`${primaryBtn} mt-3`} disabled={!photoForm.documentCode || addPhotoMutation.isPending} onClick={() => addPhotoMutation.mutate()}><Image size={16} /> Ajouter photo</button>
-              <div className="mt-4 space-y-2">
-                {photos.length === 0 ? <p className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-500">Aucune photo associée.</p> : photos.map((photo) => (
-                  <div key={photo.id} className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-100">
-                    {editingPhotoId === photo.id ? (
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_100px]">
-                          <input className={inputClass} value={photoEditForm.documentCode} onChange={(e) => setPhotoEditForm({ ...photoEditForm, documentCode: e.target.value })} placeholder="Document GED" />
-                          <input className={inputClass} value={photoEditForm.caption} onChange={(e) => setPhotoEditForm({ ...photoEditForm, caption: e.target.value })} placeholder="Légende" />
-                          <input type="number" className={inputClass} value={photoEditForm.displayOrder} onChange={(e) => setPhotoEditForm({ ...photoEditForm, displayOrder: Number(e.target.value) })} />
-                        </div>
-                        <label className="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" checked={photoEditForm.cover} onChange={(e) => setPhotoEditForm({ ...photoEditForm, cover: e.target.checked })} /> Photo de couverture</label>
-                        <div className="flex gap-2">
-                          <button className={primaryBtn} onClick={() => updatePhotoMutation.mutate()} disabled={updatePhotoMutation.isPending}>Enregistrer</button>
-                          <button className={softBtn} onClick={() => setEditingPhotoId(null)}>Annuler</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between gap-3">
+                {occupied.length === 0 ? (
+                  <p className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-500">
+                    Aucun créneau occupé.
+                  </p>
+                ) : (
+                  occupied.map((slot: any, index) => (
+                    <div
+                      key={`${slot.bookingCode || index}-${slot.startedAt}`}
+                      className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-100"
+                    >
+                      <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{photo.caption || photo.documentCode}</p>
-                          <p className="font-mono text-xs text-gray-400">{photo.documentCode} · ordre {photo.displayOrder}{photo.cover ? " · couverture" : ""}</p>
+                          <p className="text-sm font-medium text-gray-900">
+                            {slot.customerName ||
+                              slot.memberName ||
+                              slot.bookingCode ||
+                              "Occupation"}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {formatDateTime(slot.startedAt)} →{" "}
+                            {formatDateTime(slot.endedAt)}
+                          </p>
                         </div>
-                        <div className="flex gap-1">
-                          <button className="rounded-xl px-3 py-2 text-xs text-blue-600 hover:bg-blue-50" onClick={() => { setEditingPhotoId(photo.id); setPhotoEditForm({ documentCode: photo.documentCode, caption: photo.caption || "", cover: photo.cover, displayOrder: photo.displayOrder || 0 }); }}>Modifier</button>
-                          {!photo.cover && <button className="rounded-xl px-3 py-2 text-xs text-primary-600 hover:bg-primary-50" onClick={() => { setEditingPhotoId(photo.id); setPhotoEditForm({ documentCode: photo.documentCode, caption: photo.caption || "", cover: true, displayOrder: photo.displayOrder || 0 }); setTimeout(() => updatePhotoMutation.mutate(), 0); }}>Couverture</button>}
-                          <button className="rounded-xl p-2 text-red-600 hover:bg-red-50" onClick={() => deletePhotoMutation.mutate(photo.id)}><XCircle size={16} /></button>
-                        </div>
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                          Qté {slot.quantity || 1}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                ))}
+                    </div>
+                  ))
+                )}
               </div>
             </SectionCard>
           </div>
 
-          <SectionCard title="Disponibilités groupées" description="Vue synthétique multi-ressources sur le mois." icon={CalendarDays}>
+          <SectionCard
+            title="Disponibilités groupées"
+            description="Vue synthétique multi-ressources sur le mois."
+            icon={CalendarDays}
+          >
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {grouped.length === 0 ? <p className="text-sm text-gray-500">Aucune disponibilité groupée.</p> : grouped.map((group) => (
-                <div key={group.resourceCode} className="rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-100">
-                  <p className="font-medium text-gray-900">{group.resourceName}</p>
-                  <p className="font-mono text-xs text-gray-400">{group.resourceCode}</p>
-                  <p className="mt-2 text-sm text-gray-500">{group.availabilities.length} créneau(x)</p>
-                </div>
-              ))}
+              {grouped.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  Aucune disponibilité groupée.
+                </p>
+              ) : (
+                grouped.map((group) => (
+                  <div
+                    key={group.resourceCode}
+                    className="rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-100"
+                  >
+                    <p className="font-medium text-gray-900">
+                      {group.resourceName}
+                    </p>
+                    <p className="font-mono text-xs text-gray-400">
+                      {group.resourceCode}
+                    </p>
+                    <p className="mt-2 text-sm text-gray-500">
+                      {group.availabilities.length} créneau(x)
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
           </SectionCard>
         </>
@@ -541,12 +827,20 @@ export const ResourcePlanningAdminPage: React.FC = () => {
   );
 };
 
-const Metric: React.FC<{ label: string; value: number; suffix?: string; icon: React.ElementType }> = ({ label, value, suffix = "", icon: Icon }) => (
+const Metric: React.FC<{
+  label: string;
+  value: number;
+  suffix?: string;
+  icon: React.ElementType;
+}> = ({ label, value, suffix = "", icon: Icon }) => (
   <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
     <div className="flex items-center justify-between text-sm text-gray-500">
       <span>{label}</span>
       <Icon size={17} className="text-gray-400" />
     </div>
-    <p className="mt-2 text-2xl font-bold text-gray-950">{value.toLocaleString("fr-FR")}{suffix}</p>
+    <p className="mt-2 text-2xl font-bold text-gray-950">
+      {value.toLocaleString("fr-FR")}
+      {suffix}
+    </p>
   </div>
 );

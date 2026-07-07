@@ -128,7 +128,6 @@ export const TicketDetailPage: React.FC = () => {
     onMessage: handleRealtimeTicketMessage,
   });
 
-
   const assignMutation = useMutation({
     mutationFn: (agent: string) =>
       operationsService.assignTicket(ticketNumber!, agent),
@@ -298,9 +297,9 @@ export const TicketDetailPage: React.FC = () => {
         )}
 
         <div className="bg-white rounded-2xl shadow-sm">
-          <div className="border-b px-6 py-4 flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+          <div className="border-b px-4 py-3 sm:px-6 sm:py-4 flex flex-col lg:flex-row lg:items-start justify-between gap-4">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900">
                 {ticket.title}
               </h2>
               <p className="text-sm text-gray-500 font-mono mt-1">
@@ -367,7 +366,7 @@ export const TicketDetailPage: React.FC = () => {
               </p>
             </div>
           </div>
-          <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div className="px-4 py-3 sm:px-6 sm:py-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
             <Info
               label="Propriétaire"
               value={`${ticket.ownerType || "—"} ${ticket.ownerCode || ""}`}
@@ -451,7 +450,7 @@ export const TicketDetailPage: React.FC = () => {
           </div>
 
           {activeTab === "conversation" && (
-            <div className="p-6 space-y-5">
+            <div className="p-4 sm:p-6 space-y-5">
               <div
                 className="prose max-w-none text-sm"
                 dangerouslySetInnerHTML={{ __html: ticket.description }}
@@ -488,7 +487,7 @@ export const TicketDetailPage: React.FC = () => {
                   placeholder="Écrire une réponse ou une note interne..."
                   minHeight="140px"
                 />
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <label className="text-sm flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -502,7 +501,7 @@ export const TicketDetailPage: React.FC = () => {
                     disabled={
                       !messageContent.trim() || messageMutation.isPending
                     }
-                    className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50 flex items-center gap-2 text-sm"
+                    className="w-full sm:w-auto justify-center px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50 flex items-center gap-2 text-sm"
                   >
                     <Send size={16} /> Envoyer
                   </button>
@@ -512,9 +511,9 @@ export const TicketDetailPage: React.FC = () => {
           )}
 
           {activeTab === "timeline" && (
-            <div className="p-6 space-y-3">
+            <div className="p-4 sm:p-6 space-y-3">
               {timeline.map((e: any, i) => (
-                <div key={e.id || i} className="flex gap-3">
+                <div key={e.id || i} className="flex flex-col sm:flex-row gap-3">
                   <div className="mt-1 w-2 h-2 rounded-full bg-primary-600" />
                   <div>
                     <p className="font-medium text-sm">{e.eventType}</p>
@@ -535,7 +534,7 @@ export const TicketDetailPage: React.FC = () => {
           )}
 
           {activeTab === "attachments" && (
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4">
               <div className="flex flex-wrap items-center gap-3">
                 <input
                   type="file"
@@ -558,7 +557,7 @@ export const TicketDetailPage: React.FC = () => {
                 {attachments.map((a: any) => (
                   <div
                     key={a.id}
-                    className="flex items-center justify-between bg-gray-50 rounded-lg p-3"
+                    className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-gray-50 rounded-lg p-3"
                   >
                     <div>
                       <p className="font-medium text-sm">{a.fileName}</p>
@@ -591,7 +590,7 @@ export const TicketDetailPage: React.FC = () => {
           )}
 
           {activeTab === "tags" && (
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4">
               <div className="flex gap-2">
                 <input
                   value={newTag}
@@ -603,7 +602,7 @@ export const TicketDetailPage: React.FC = () => {
                   onClick={() =>
                     newTag.trim() && tagMutation.mutate(newTag.trim())
                   }
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm"
+                  className="w-full sm:w-auto justify-center px-4 py-2 bg-primary-600 text-white rounded-lg text-sm"
                 >
                   Ajouter
                 </button>
@@ -628,7 +627,7 @@ export const TicketDetailPage: React.FC = () => {
           )}
 
           {activeTab === "task" && (
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <button
                 onClick={() => {
                   setTaskForm({
@@ -640,7 +639,7 @@ export const TicketDetailPage: React.FC = () => {
                   });
                   setIsTaskOpen(true);
                 }}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm flex items-center gap-2"
+                className="w-full sm:w-auto justify-center px-4 py-2 bg-primary-600 text-white rounded-lg text-sm flex items-center gap-2"
               >
                 <CheckSquare size={16} /> Convertir le ticket en tâche
               </button>
@@ -659,7 +658,7 @@ export const TicketDetailPage: React.FC = () => {
               <X size={20} />
             </button>
           </div>
-          <div className="p-6 space-y-4">
+          <div className="p-4 sm:p-6 space-y-4">
             <Input
               label="Titre"
               value={taskForm.title}
@@ -676,7 +675,7 @@ export const TicketDetailPage: React.FC = () => {
                 className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
               />
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="text-sm font-medium">Agent</label>
                 <AgentAutocomplete
@@ -724,7 +723,7 @@ export const TicketDetailPage: React.FC = () => {
               <button
                 onClick={() => taskMutation.mutate()}
                 disabled={!taskForm.title || taskMutation.isPending}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
+                className="w-full sm:w-auto justify-center px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
               >
                 Créer
               </button>

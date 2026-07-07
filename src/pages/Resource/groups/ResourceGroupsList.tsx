@@ -50,7 +50,9 @@ export const ResourceGroupsList: React.FC = () => {
     : groups;
 
   const activeCount = groups.filter((group) => group.active).length;
-  const portalVisibleCount = groups.filter((group) => group.portalVisible).length;
+  const portalVisibleCount = groups.filter(
+    (group) => group.portalVisible,
+  ).length;
 
   const handleDelete = (code: string) => {
     if (confirm("Êtes-vous sûr de vouloir supprimer ce groupe ?")) {
@@ -70,7 +72,8 @@ export const ResourceGroupsList: React.FC = () => {
             Groupes de ressources
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            Structurez vos ressources par zones, équipes, bâtiments ou espaces métier.
+            Structurez vos ressources par zones, équipes, bâtiments ou espaces
+            métier.
           </p>
         </div>
         <button
@@ -187,7 +190,11 @@ export const ResourceGroupsList: React.FC = () => {
                             : "bg-gray-100 text-gray-500"
                         }`}
                       >
-                        {group.portalVisible ? <Eye size={12} /> : <EyeOff size={12} />}
+                        {group.portalVisible ? (
+                          <Eye size={12} />
+                        ) : (
+                          <EyeOff size={12} />
+                        )}
                         {group.portalVisible ? "Visible" : "Masqué"}
                       </span>
                     </td>

@@ -36,6 +36,35 @@ const currencies = [
   { value: "XOF", label: "CFA (XOF)" },
 ];
 
+const benefitCategories = [
+  { value: "ACCESS", label: "Accès" },
+  { value: "SERVICE", label: "Service inclus" },
+  { value: "SUPPORT", label: "Support" },
+  { value: "FINANCIAL", label: "Avantage financier" },
+  { value: "FLEXIBILITY", label: "Flexibilité" },
+  { value: "COMFORT", label: "Confort" },
+  { value: "COMMUNITY", label: "Communauté" },
+  { value: "SECURITY", label: "Sécurité" },
+  { value: "BOOKING", label: "Réservation" },
+  { value: "BUSINESS_SERVICE", label: "Service pour business" },
+  { value: "DISCOUNT", label: "Réduction" },
+  { value: "INVENTORY", label: "Inventaire" },
+  { value: "CUSTOM", label: "Personnalisé" },
+  { value: "OTHER", label: "Autre" },
+];
+
+const fieldClass =
+  "h-11 w-full rounded-2xl border-0 bg-white px-4 text-sm font-semibold text-gray-800 shadow-sm ring-1 ring-slate-200 outline-none transition placeholder:text-slate-400 focus:ring-4 focus:ring-primary-100";
+
+const compactFieldClass =
+  "h-10 w-full rounded-xl border-0 bg-white px-3 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-slate-200 outline-none transition placeholder:text-slate-400 focus:ring-4 focus:ring-primary-100";
+
+const centeredFieldClass =
+  "h-10 rounded-xl border-0 bg-white px-2 text-center text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-slate-200 outline-none transition disabled:bg-slate-100 disabled:text-slate-400 focus:ring-4 focus:ring-primary-100";
+
+const checkboxClass =
+  "h-4 w-4 rounded border-0 text-primary-600 shadow-sm ring-1 ring-slate-300 focus:ring-4 focus:ring-primary-100";
+
 const ENTITLEMENTS_PER_PAGE = 8;
 
 interface KeyValuePair {
@@ -82,7 +111,7 @@ const buildFormData = (v: PlanVersion | null) => ({
           title: "",
           description: "",
           icon: "",
-          category: "",
+          category: "OTHER",
           displayOrder: 1,
           highlighted: false,
           included: true,
@@ -278,7 +307,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
           title: "",
           description: "",
           icon: "",
-          category: "",
+          category: "OTHER",
           displayOrder: formData.benefits.length + 1,
           highlighted: false,
           included: true,
@@ -332,16 +361,16 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
   return (
     <>
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="mb-6">
+      <div className="mb-6 rounded-[1.75rem] bg-white p-5 shadow-sm ring-1 ring-slate-100 md:p-6">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-4 transition-colors"
+          className="mb-4 inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900"
         >
           <ArrowLeft size={16} />
           Retour à {plan.name}
         </button>
 
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
               Nouvelle version de plan
@@ -354,18 +383,18 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
             {baseVersion && (
               <div className="mt-2 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 w-fit">
                 <AlertCircle size={13} className="flex-shrink-0" />
-                Basée sur la version {baseVersion.versionNumber} — les versions
+                Basée sur la version {baseVersion.versionNumber} - les versions
                 publiées ne sont pas modifiables.
               </div>
             )}
           </div>
 
-          <div className="flex gap-2 flex-shrink-0">
+          <div className="flex flex-col gap-2 sm:flex-row lg:flex-shrink-0">
             <button
               type="button"
               onClick={onBack}
               disabled={createMutation.isPending}
-              className="px-4 py-2 border border-slate-200 rounded-xl text-gray-700 hover:bg-slate-50/80 disabled:opacity-50"
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 transition hover:bg-slate-50 disabled:opacity-50"
             >
               Annuler
             </button>
@@ -373,7 +402,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
               form="version-form"
               type="submit"
               disabled={createMutation.isPending}
-              className="px-5 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2 font-medium"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-primary-700 disabled:opacity-50"
             >
               {createMutation.isPending ? (
                 <>
@@ -409,7 +438,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                     setFormData({ ...formData, name: e.target.value })
                   }
                   placeholder="ex: Version mensuelle 2026"
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500"
+                  className={fieldClass}
                 />
               </Field>
               <Field label="Description">
@@ -420,7 +449,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                     setFormData({ ...formData, description: e.target.value })
                   }
                   placeholder="Description courte"
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500"
+                  className={fieldClass}
                 />
               </Field>
               <Field label="Date d'effet *">
@@ -431,7 +460,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                   onChange={(e) =>
                     setFormData({ ...formData, effectiveFrom: e.target.value })
                   }
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl"
+                  className={fieldClass}
                 />
               </Field>
               <Field label="Date de fin">
@@ -442,7 +471,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                   onChange={(e) =>
                     setFormData({ ...formData, effectiveTo: e.target.value })
                   }
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl"
+                  className={fieldClass}
                 />
               </Field>
             </div>
@@ -455,7 +484,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
               <button
                 type="button"
                 onClick={addPrice}
-                className="text-primary-600 text-sm flex items-center gap-1 hover:text-primary-700"
+                className="inline-flex items-center gap-2 rounded-2xl bg-primary-50 px-3 py-2 text-sm font-black text-primary-700 transition hover:bg-primary-100"
               >
                 <Plus size={14} /> Ajouter un tarif
               </button>
@@ -465,7 +494,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
               {formData.prices.map((price, idx) => (
                 <div
                   key={idx}
-                  className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 p-4 bg-gray-50 rounded-xl items-end"
+                  className="grid grid-cols-1 gap-3 rounded-3xl bg-slate-50/70 p-4 ring-1 ring-slate-100 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7 xl:items-end"
                 >
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">
@@ -476,7 +505,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                       onChange={(e) =>
                         updatePrice(idx, "billingCycle", e.target.value)
                       }
-                      className="w-full px-2 py-2 border rounded-lg text-sm bg-white"
+                      className={compactFieldClass}
                     >
                       {billingCycles.map((c) => (
                         <option key={c.value} value={c.value}>
@@ -494,7 +523,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                       onChange={(e) =>
                         updatePrice(idx, "currency", e.target.value)
                       }
-                      className="w-full px-2 py-2 border rounded-lg text-sm bg-white"
+                      className={compactFieldClass}
                     >
                       {currencies.map((c) => (
                         <option key={c.value} value={c.value}>
@@ -520,7 +549,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                         );
                       }}
                       placeholder="0"
-                      className="w-full px-2 py-2 border rounded-lg text-sm"
+                      className={compactFieldClass}
                     />
                   </div>
                   <div>
@@ -539,7 +568,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                           parseFloat(e.target.value) || 0,
                         )
                       }
-                      className="w-full px-2 py-2 border rounded-lg text-sm"
+                      className={compactFieldClass}
                     />
                   </div>
                   <div>
@@ -561,7 +590,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                         );
                       }}
                       placeholder="0"
-                      className="w-full px-2 py-2 border rounded-lg text-sm"
+                      className={compactFieldClass}
                     />
                   </div>
                   <div>
@@ -585,7 +614,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                         );
                       }}
                       placeholder="0"
-                      className="w-full px-2 py-2 border rounded-lg text-sm"
+                      className={compactFieldClass}
                     />
                   </div>
                   <div className="flex items-end gap-2">
@@ -596,7 +625,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                         onChange={(e) =>
                           updatePrice(idx, "taxIncluded", e.target.checked)
                         }
-                        className="rounded"
+                        className={checkboxClass}
                       />
                       TTC
                     </label>
@@ -639,7 +668,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
               <button
                 type="button"
                 onClick={addBenefit}
-                className="text-primary-600 text-sm flex items-center gap-1 hover:text-primary-700"
+                className="inline-flex items-center gap-2 rounded-2xl bg-primary-50 px-3 py-2 text-sm font-black text-primary-700 transition hover:bg-primary-100"
               >
                 <Plus size={14} /> Ajouter
               </button>
@@ -654,16 +683,16 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                 {formData.benefits.map((b, idx) => (
                   <div
                     key={idx}
-                    className="grid grid-cols-2 md:grid-cols-6 gap-2 items-center p-3 bg-gray-50 rounded-xl"
+                    className="grid grid-cols-1 gap-3 rounded-3xl bg-slate-50/70 p-4 ring-1 ring-slate-100 md:grid-cols-[84px_1fr_1fr_200px_auto] md:items-end"
                   >
                     <input
                       type="text"
-                      placeholder="Icône (emoji)"
+                      placeholder="Icône"
                       value={b.icon ?? ""}
                       onChange={(e) =>
                         updateBenefit(idx, "icon", e.target.value)
                       }
-                      className="px-2 py-1.5 border rounded-lg text-sm"
+                      className={compactFieldClass}
                     />
                     <input
                       type="text"
@@ -672,7 +701,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                       onChange={(e) =>
                         updateBenefit(idx, "title", e.target.value)
                       }
-                      className="md:col-span-2 px-2 py-1.5 border rounded-lg text-sm"
+                      className={compactFieldClass}
                     />
                     <input
                       type="text"
@@ -681,18 +710,22 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                       onChange={(e) =>
                         updateBenefit(idx, "description", e.target.value)
                       }
-                      className="px-2 py-1.5 border rounded-lg text-sm"
+                      className={compactFieldClass}
                     />
-                    <input
-                      type="text"
-                      placeholder="Catégorie"
-                      value={b.category ?? ""}
+                    <select
+                      value={b.category ?? "OTHER"}
                       onChange={(e) =>
                         updateBenefit(idx, "category", e.target.value)
                       }
-                      className="px-2 py-1.5 border rounded-lg text-sm"
-                    />
-                    <div className="flex items-center gap-2 justify-end">
+                      className={compactFieldClass}
+                    >
+                      {benefitCategories.map((category) => (
+                        <option key={category.value} value={category.value}>
+                          {category.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex items-center justify-end gap-3">
                       <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer whitespace-nowrap">
                         <input
                           type="checkbox"
@@ -700,7 +733,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                           onChange={(e) =>
                             updateBenefit(idx, "highlighted", e.target.checked)
                           }
-                          className="rounded"
+                          className={checkboxClass}
                         />
                         Favori
                       </label>
@@ -711,7 +744,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                           onChange={(e) =>
                             updateBenefit(idx, "included", e.target.checked)
                           }
-                          className="rounded"
+                          className={checkboxClass}
                         />
                         Inclus
                       </label>
@@ -736,13 +769,13 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
               <button
                 type="button"
                 onClick={addEntitlement}
-                className="text-primary-600 text-sm flex items-center gap-1 hover:text-primary-700"
+                className="inline-flex items-center gap-2 rounded-2xl bg-primary-50 px-3 py-2 text-sm font-black text-primary-700 transition hover:bg-primary-100"
               >
                 <Plus size={14} /> Ajouter un droit
               </button>
             }
           >
-            <div className="rounded-2xl bg-white ring-1 ring-slate-100 overflow-hidden">
+            <div className="overflow-hidden rounded-2xl bg-slate-50/70 p-3 ring-1 ring-slate-100">
               <table className="w-full">
                 <thead className="bg-slate-50/80">
                   <tr>
@@ -779,7 +812,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                                 e.target.value,
                               )
                             }
-                            className="w-full px-2 py-1.5 border rounded-lg text-sm bg-white"
+                            className={compactFieldClass}
                           >
                             <option value="">Sélectionner un droit</option>
                             {entDefs.map((d) => (
@@ -802,7 +835,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                               )
                             }
                             disabled={ent.unlimited}
-                            className="w-20 px-2 py-1.5 border rounded-lg text-sm text-center disabled:bg-gray-50"
+                            className={`${centeredFieldClass} w-20`}
                           />
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -816,7 +849,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                                 e.target.checked,
                               )
                             }
-                            className="rounded"
+                            className={checkboxClass}
                           />
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -831,7 +864,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                                   e.target.checked,
                                 )
                               }
-                              className="rounded"
+                              className={checkboxClass}
                             />
                             <input
                               type="number"
@@ -846,7 +879,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                                 )
                               }
                               disabled={!ent.rolloverAllowed}
-                              className="w-16 px-1 py-1.5 border rounded text-sm text-center disabled:bg-gray-50"
+                              className={`${centeredFieldClass} w-16`}
                             />
                           </div>
                         </td>
@@ -862,7 +895,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                                 parseInt(e.target.value) || 0,
                               )
                             }
-                            className="w-24 px-2 py-1.5 border rounded-lg text-sm text-center"
+                            className={`${centeredFieldClass} w-24`}
                           />
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -897,7 +930,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                     type="button"
                     onClick={() => setEntPage((p) => Math.max(0, p - 1))}
                     disabled={entPage === 0}
-                    className="p-1 rounded border disabled:opacity-40 hover:bg-gray-100"
+                    className="rounded-xl bg-white p-2 text-slate-500 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:opacity-40"
                   >
                     <ChevronLeft size={15} />
                   </button>
@@ -910,7 +943,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
                       setEntPage((p) => Math.min(totalEntPages - 1, p + 1))
                     }
                     disabled={entPage >= totalEntPages - 1}
-                    className="p-1 rounded border disabled:opacity-40 hover:bg-gray-100"
+                    className="rounded-xl bg-white p-2 text-slate-500 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:opacity-40"
                   >
                     <ChevronRight size={15} />
                   </button>
@@ -941,7 +974,7 @@ export const PlanVersionFormPage: React.FC<PlanVersionFormPageProps> = ({
             type="button"
             onClick={onBack}
             disabled={createMutation.isPending}
-            className="flex-1 max-w-xs px-4 py-2.5 border rounded-xl text-gray-700 hover:bg-slate-50/80 disabled:opacity-50"
+            className="max-w-xs flex-1 rounded-2xl bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:opacity-50"
           >
             Annuler
           </button>
@@ -972,16 +1005,16 @@ const Section: React.FC<{
   action?: React.ReactNode;
   children: React.ReactNode;
 }> = ({ title, subtitle, action, children }) => (
-  <div className="rounded-2xl bg-white shadow-[0_18px_45px_rgba(15,23,42,0.06)] ring-1 ring-slate-100 overflow-hidden">
-    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+  <section className="overflow-hidden rounded-[1.75rem] bg-white shadow-sm ring-1 ring-slate-100">
+    <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h3 className="font-semibold text-gray-800">{title}</h3>
-        {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+        <h3 className="text-base font-black text-gray-900">{title}</h3>
+        {subtitle && <p className="mt-1 text-xs font-medium text-gray-500">{subtitle}</p>}
       </div>
       {action}
     </div>
     <div className="p-5">{children}</div>
-  </div>
+  </section>
 );
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({
@@ -1014,76 +1047,58 @@ const KVTable: React.FC<KVTableProps> = ({
   keyPlaceholder = "Clé",
   valuePlaceholder = "Valeur",
 }) => (
-  <div className="border border-gray-100 rounded-lg overflow-hidden">
-    <table className="w-full">
-      <thead className="bg-gray-50">
-        <tr>
-          <th className="px-4 py-2 text-left text-xs text-gray-500 font-medium">
-            Clé
-          </th>
-          <th className="px-4 py-2 text-left text-xs text-gray-500 font-medium">
-            Valeur
-          </th>
-          <th className="w-12" />
-        </tr>
-      </thead>
-      <tbody className="[&>tr+tr]:border-t [&>tr+tr]:border-slate-100">
+  <div className="overflow-hidden rounded-2xl bg-slate-50/70 p-3 ring-1 ring-slate-100">
+    {rows.length > 0 && (
+      <div className="mb-3 space-y-2">
         {rows.map((row, i) => (
-          <tr key={i}>
-            <td className="px-4 py-2 text-sm font-mono">{row.key}</td>
-            <td className="px-4 py-2 text-sm">{row.value}</td>
-            <td className="px-4 py-2 text-center">
-              <button
-                type="button"
-                onClick={() => onRemove(i)}
-                className="text-red-500 hover:text-red-700"
-              >
-                <Trash2 size={14} />
-              </button>
-            </td>
-          </tr>
-        ))}
-        <tr className="bg-gray-50">
-          <td className="px-4 py-2">
-            <input
-              type="text"
-              placeholder={keyPlaceholder}
-              value={newRow.key}
-              onChange={(e) =>
-                onNewRowChange({ ...newRow, key: e.target.value })
-              }
-              onKeyDown={(e) =>
-                e.key === "Enter" && (e.preventDefault(), onAdd())
-              }
-              className="w-full px-2 py-1 border rounded text-sm"
-            />
-          </td>
-          <td className="px-4 py-2">
-            <input
-              type="text"
-              placeholder={valuePlaceholder}
-              value={newRow.value}
-              onChange={(e) =>
-                onNewRowChange({ ...newRow, value: e.target.value })
-              }
-              onKeyDown={(e) =>
-                e.key === "Enter" && (e.preventDefault(), onAdd())
-              }
-              className="w-full px-2 py-1 border rounded text-sm"
-            />
-          </td>
-          <td className="px-4 py-2 text-center">
+          <div
+            key={i}
+            className="grid grid-cols-1 gap-2 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-100 md:grid-cols-[220px_1fr_auto] md:items-center"
+          >
+            <div className="rounded-xl bg-slate-50 px-3 py-2 font-mono text-xs font-bold text-slate-700">
+              {row.key}
+            </div>
+            <div className="min-w-0 rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+              {row.value}
+            </div>
             <button
               type="button"
-              onClick={onAdd}
-              disabled={!newRow.key || !newRow.value}
-              className="text-primary-600 hover:text-primary-800 disabled:opacity-30"
+              onClick={() => onRemove(i)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-red-500 transition hover:bg-red-50 hover:text-red-700"
             >
-              <Plus size={16} />
+              <Trash2 size={15} />
             </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+          </div>
+        ))}
+      </div>
+    )}
+
+    <div className="grid grid-cols-1 gap-2 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-100 md:grid-cols-[220px_1fr_auto] md:items-center">
+      <input
+        type="text"
+        placeholder={keyPlaceholder}
+        value={newRow.key}
+        onChange={(e) => onNewRowChange({ ...newRow, key: e.target.value })}
+        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), onAdd())}
+        className={compactFieldClass}
+      />
+      <input
+        type="text"
+        placeholder={valuePlaceholder}
+        value={newRow.value}
+        onChange={(e) => onNewRowChange({ ...newRow, value: e.target.value })}
+        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), onAdd())}
+        className={compactFieldClass}
+      />
+      <button
+        type="button"
+        onClick={onAdd}
+        disabled={!newRow.key || !newRow.value}
+        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 text-sm font-black text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-30"
+      >
+        <Plus size={16} />
+        Ajouter
+      </button>
+    </div>
   </div>
 );

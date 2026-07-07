@@ -37,7 +37,7 @@ export const BookingMetrics: React.FC = () => {
   if (isLoading) {
     return (
       <div>
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">
               Métriques des réservations
@@ -51,9 +51,9 @@ export const BookingMetrics: React.FC = () => {
           {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={i}
-              className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100 animate-pulse"
+              className="rounded-2xl bg-white p-4 sm:p-5 shadow-sm ring-1 ring-gray-100 animate-pulse"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-3">
                   <div className="h-3 bg-gray-200 rounded w-28" />
                   <div className="h-8 bg-gray-200 rounded w-20" />
@@ -208,7 +208,8 @@ export const BookingMetrics: React.FC = () => {
                 Répartition par statut
               </h3>
               <p className="text-sm text-gray-500">
-                {totalBookings} réservation{totalBookings > 1 ? "s" : ""} au total.
+                {totalBookings} réservation{totalBookings > 1 ? "s" : ""} au
+                total.
               </p>
             </div>
             <Activity size={20} className="text-primary-500" />
@@ -219,12 +220,16 @@ export const BookingMetrics: React.FC = () => {
               <div key={bar.label}>
                 <div className="mb-1.5 flex items-center justify-between text-sm">
                   <span className="font-medium text-gray-700">{bar.label}</span>
-                  <span className="text-gray-500">{formatNumber(bar.value)}</span>
+                  <span className="text-gray-500">
+                    {formatNumber(bar.value)}
+                  </span>
                 </div>
                 <div className="h-3 overflow-hidden rounded-full bg-gray-100">
                   <div
                     className="h-full rounded-full bg-primary-500"
-                    style={{ width: `${Math.max(4, (bar.value / maxStatus) * 100)}%` }}
+                    style={{
+                      width: `${Math.max(4, (bar.value / maxStatus) * 100)}%`,
+                    }}
                   />
                 </div>
               </div>
@@ -235,7 +240,9 @@ export const BookingMetrics: React.FC = () => {
         <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
           <div className="mb-5">
             <h3 className="font-semibold text-gray-900">Revenus réservation</h3>
-            <p className="text-sm text-gray-500">Montants confirmés et complétés.</p>
+            <p className="text-sm text-gray-500">
+              Montants confirmés et complétés.
+            </p>
           </div>
           <div className="space-y-5">
             {revenueBars.map((bar) => (
@@ -249,7 +256,9 @@ export const BookingMetrics: React.FC = () => {
                 <div className="h-12 rounded-2xl bg-gray-50 p-1.5">
                   <div
                     className="h-full rounded-xl bg-primary-500"
-                    style={{ width: `${Math.max(6, (bar.value / maxRevenue) * 100)}%` }}
+                    style={{
+                      width: `${Math.max(6, (bar.value / maxRevenue) * 100)}%`,
+                    }}
                   />
                 </div>
               </div>

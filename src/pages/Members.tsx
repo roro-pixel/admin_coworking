@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "../components/layout/AdminLayout";
 import {
   Search,
@@ -14,7 +14,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Trash2,
 } from "lucide-react";
+import { toast } from "react-toastify";
 import { memberService } from "../services/member.service";
 import type {
   MemberSummaryResponse,
@@ -87,8 +89,135 @@ const statusBadge = (status: string) => {
   }
 };
 
+
+const portalBadge = (portalAccess: boolean) =>
+  portalAccess ? (
+    <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700">
+      <Unlock size={11} /> Actif
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-500">
+      <Lock size={11} /> Désactivé
+    </span>
+  );
+
+const MobileInfoRow: React.FC<{
+  label: string;
+  value: React.ReactNode;
+}> = ({ label, value }) => (
+  <div className="flex items-start justify-between gap-4 border-t border-gray-100 py-2 first:border-t-0 first:pt-0 last:pb-0">
+    <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-gray-400">
+      {label}
+    </span>
+    <div className="min-w-0 text-right text-xs font-semibold text-gray-700">
+      {value}
+    </div>
+  </div>
+);
+
+const MemberMobileCard: React.FC<{
+  member: MemberSummaryResponse;
+  onOpen: (memberId: string) => void;
+  onOpenCustomer: (customerId: string) => void;
+  onDelete: (event: React.MouseEvent<HTMLButtonElement>, memberId: string) => void;
+  deleting?: boolean;
+}> = ({ member, onOpen, onOpenCustomer, onDelete, deleting }) => (
+  <article
+    onClick={() => onOpen(member.memberId)}
+    className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-100 transition active:scale-[0.99]"
+  >
+    <div className="mb-3 flex items-start gap-3">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary-100 text-primary-600">
+        <User size={18} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-black text-gray-950">
+          {member.fullName || "—"}
+        </p>
+        <p className="mt-0.5 truncate font-mono text-[11px] font-medium text-gray-400">
+          {member.memberId}
+        </p>
+      </div>
+      {statusBadge(member.status)}
+    </div>
+
+    <MobileInfoRow
+      label="Email"
+      value={<span className="break-all">{member.email || "—"}</span>}
+    />
+    <MobileInfoRow label="Téléphone" value={member.phone || "—"} />
+    <MobileInfoRow label="Portail" value={portalBadge(member.portalAccess)} />
+    <MobileInfoRow
+      label="Customer"
+      value={
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenCustomer(member.customerId);
+          }}
+          className="break-all font-mono text-[11px] font-bold text-primary-600"
+        >
+          {member.customerId}
+        </button>
+      }
+    />
+
+    <div className="mt-3 grid grid-cols-2 gap-2 border-t border-gray-100 pt-3">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen(member.memberId);
+        }}
+        className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-bold text-primary-700 ring-1 ring-primary-100"
+      >
+        <Eye size={15} /> Voir
+      </button>
+      <button
+        type="button"
+        onClick={(e) => onDelete(e, member.memberId)}
+        disabled={deleting}
+        className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-bold text-red-600 ring-1 ring-red-100 disabled:opacity-50"
+      >
+        <Trash2 size={15} /> Supprimer
+      </button>
+    </div>
+  </article>
+);
+
 export const AdminMembers: React.FC = () => {
   const navigate = useNavigate();
+
+  const queryClient = useQueryClient();
+
+const deleteMutation = useMutation({
+  mutationFn: (memberId: string) => memberService.deleteMember(memberId),
+  onSuccess: () => {
+    toast.success("Membre supprimé avec succès.");
+    queryClient.invalidateQueries({ queryKey: ["members-list"] });
+    queryClient.invalidateQueries({ queryKey: ["members-basic"] });
+    queryClient.invalidateQueries({ queryKey: ["members-advanced"] });
+  },
+  onError: () => {
+    toast.error("Impossible de supprimer ce membre.");
+  },
+});
+
+const handleDeleteMember = (
+  event: React.MouseEvent<HTMLButtonElement>,
+  memberId: string,
+) => {
+  event.stopPropagation();
+
+  const confirmed = window.confirm(
+    "Voulez-vous vraiment supprimer ce membre ? Cette action est irréversible.",
+  );
+
+  if (!confirmed) return;
+
+  deleteMutation.mutate(memberId);
+};
 
   // Champ de saisie libre (affiché immédiatement)
   const [searchTerm, setSearchTerm] = useState("");
@@ -238,10 +367,10 @@ export const AdminMembers: React.FC = () => {
   return (
     <AdminLayout>
       <div className="mb-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Membres</h1>
-            <p className="text-gray-600 mt-1">
+            <h1 className="text-xl font-black text-gray-900 sm:text-2xl">Membres</h1>
+            <p className="mt-1 text-sm text-gray-600 sm:text-base">
               Gérez tous les membres
               {totalElements > 0 && (
                 <span className="ml-2 text-sm">
@@ -252,35 +381,43 @@ export const AdminMembers: React.FC = () => {
           </div>
           <button
             onClick={() => navigate("/members/create")}
-            className="mt-4 md:mt-0 bg-primary-600 text-white px-4 py-2 rounded-xl hover:bg-primary-700 flex items-center gap-2"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary-700 md:w-auto"
           >
             <Plus size={18} /> Créer un membre
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
-          <p className="text-sm text-gray-500">Total affiché</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{members.length}</p>
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-5">
+          <p className="text-xs font-semibold text-gray-500 sm:text-sm">Total affiché</p>
+          <p className="mt-1 text-xl font-black text-gray-900 sm:text-2xl">
+            {members.length}
+          </p>
         </div>
-        <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
-          <p className="text-sm text-gray-500">Actifs</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{members.filter((m) => m.status === "ACTIVE").length}</p>
+        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-5">
+          <p className="text-xs font-semibold text-gray-500 sm:text-sm">Actifs</p>
+          <p className="mt-1 text-xl font-black text-gray-900 sm:text-2xl">
+            {members.filter((m) => m.status === "ACTIVE").length}
+          </p>
         </div>
-        <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
-          <p className="text-sm text-gray-500">Portail activé</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{members.filter((m) => m.portalAccess).length}</p>
+        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-5">
+          <p className="text-xs font-semibold text-gray-500 sm:text-sm">Portail activé</p>
+          <p className="mt-1 text-xl font-black text-gray-900 sm:text-2xl">
+            {members.filter((m) => m.portalAccess).length}
+          </p>
         </div>
-        <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
-          <p className="text-sm text-gray-500">Résultats</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{totalElements || members.length}</p>
+        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-5">
+          <p className="text-xs font-semibold text-gray-500 sm:text-sm">Résultats</p>
+          <p className="mt-1 text-xl font-black text-gray-900 sm:text-2xl">
+            {totalElements || members.length}
+          </p>
         </div>
       </div>
 
       {/* Filtres */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100 mb-6">
-        <div className="flex flex-col md:flex-row gap-3">
+      <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row">
           {/* Recherche texte */}
           <div className="flex-1 relative">
             <Search
@@ -308,7 +445,7 @@ export const AdminMembers: React.FC = () => {
             onChange={(e) =>
               handleFilterChange(setStatusFilter, e.target.value)
             }
-            className="px-4 py-2 ring-1 ring-gray-100 rounded-2xl bg-white"
+            className="w-full rounded-2xl bg-white px-4 py-2.5 text-sm ring-1 ring-gray-100 lg:w-auto"
           >
             <option value="">Tous les statuts</option>
             <option value="ACTIVE">Actif</option>
@@ -323,7 +460,7 @@ export const AdminMembers: React.FC = () => {
             onChange={(e) =>
               handleFilterChange(setPortalFilter, e.target.value)
             }
-            className="px-4 py-2 ring-1 ring-gray-100 rounded-2xl bg-white"
+            className="w-full rounded-2xl bg-white px-4 py-2.5 text-sm ring-1 ring-gray-100 lg:w-auto"
           >
             <option value="">Accès portail (tous)</option>
             <option value="active">Avec accès</option>
@@ -338,7 +475,7 @@ export const AdminMembers: React.FC = () => {
             onChange={(e) =>
               handleFilterChange(setCustomerIdFilter, e.target.value)
             }
-            className="px-4 py-2 ring-1 ring-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 w-44"
+            className="w-full rounded-2xl px-4 py-2.5 text-sm ring-1 ring-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 lg:w-44"
           />
 
           {hasAnyFilter && (
@@ -367,7 +504,7 @@ export const AdminMembers: React.FC = () => {
 
       {/* Tableau */}
       <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full border-separate border-spacing-y-1">
             <thead className="bg-gray-50/70 text-gray-500">
               <tr>
@@ -421,15 +558,7 @@ export const AdminMembers: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">{statusBadge(member.status)}</td>
                   <td className="px-6 py-4">
-                    {member.portalAccess ? (
-                      <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700 inline-flex items-center gap-1">
-                        <Unlock size={11} /> Actif
-                      </span>
-                    ) : (
-                      <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-500 inline-flex items-center gap-1">
-                        <Lock size={11} /> Désactivé
-                      </span>
-                    )}
+                    {portalBadge(member.portalAccess)}
                   </td>
                   <td className="px-6 py-4">
                     <span
@@ -443,21 +572,45 @@ export const AdminMembers: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/members/${member.memberId}`);
-                      }}
-                      className="p-1 text-primary-600 hover:text-primary-800"
-                      title="Voir le détail"
-                    >
-                      <Eye size={17} />
-                    </button>
-                  </td>
+  <div className="flex items-center justify-end gap-2">
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        navigate(`/members/${member.memberId}`);
+      }}
+      className="rounded-xl p-2 text-primary-600 transition hover:bg-primary-50 hover:text-primary-800"
+      title="Voir le détail"
+    >
+      <Eye size={17} />
+    </button>
+
+    <button
+      onClick={(e) => handleDeleteMember(e, member.memberId)}
+      disabled={deleteMutation.isPending}
+      className="rounded-xl p-2 text-red-600 transition hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+      title="Supprimer le membre"
+    >
+      <Trash2 size={17} />
+    </button>
+  </div>
+</td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="space-y-3 p-3 md:hidden">
+          {members.map((member) => (
+            <MemberMobileCard
+              key={member.memberId}
+              member={member}
+              onOpen={(memberId) => navigate(`/members/${memberId}`)}
+              onOpenCustomer={(customerId) => navigate(`/customers/${customerId}`)}
+              onDelete={handleDeleteMember}
+              deleting={deleteMutation.isPending}
+            />
+          ))}
         </div>
 
         {members.length === 0 && !isFetching && (
@@ -495,8 +648,8 @@ export const AdminMembers: React.FC = () => {
 
         {/* Pagination — uniquement pour listing paginé et recherche avancée */}
         {totalPages > 1 && !hasTextSearch && (
-          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-            <p className="text-sm text-gray-500">
+          <div className="flex flex-col gap-3 border-t border-gray-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <p className="text-xs font-semibold text-gray-500 sm:text-sm">
               {totalElements} membre{totalElements > 1 ? "s" : ""} — Page{" "}
               {page + 1} / {totalPages}
             </p>

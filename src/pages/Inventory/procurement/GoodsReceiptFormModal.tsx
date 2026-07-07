@@ -59,7 +59,8 @@ export const GoodsReceiptFormModal: React.FC<GoodsReceiptFormModalProps> = ({
         locationCode: formData.locationCode,
         receivedBy: admin?.email || "admin",
         invoiceDocumentCode: formData.invoiceDocumentCode || undefined,
-        deliveryNoteDocumentCode: formData.deliveryNoteDocumentCode || undefined,
+        deliveryNoteDocumentCode:
+          formData.deliveryNoteDocumentCode || undefined,
         proofDocumentCode: formData.proofDocumentCode || undefined,
         lines: formData.lines,
       }),
@@ -199,7 +200,6 @@ export const GoodsReceiptFormModal: React.FC<GoodsReceiptFormModalProps> = ({
             </select>
           </div>
 
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-base font-medium text-gray-700 mb-2">
@@ -208,7 +208,10 @@ export const GoodsReceiptFormModal: React.FC<GoodsReceiptFormModalProps> = ({
               <input
                 value={formData.invoiceDocumentCode}
                 onChange={(e) =>
-                  setFormData({ ...formData, invoiceDocumentCode: e.target.value })
+                  setFormData({
+                    ...formData,
+                    invoiceDocumentCode: e.target.value,
+                  })
                 }
                 className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
                 placeholder="DOC-..."
@@ -221,7 +224,10 @@ export const GoodsReceiptFormModal: React.FC<GoodsReceiptFormModalProps> = ({
               <input
                 value={formData.deliveryNoteDocumentCode}
                 onChange={(e) =>
-                  setFormData({ ...formData, deliveryNoteDocumentCode: e.target.value })
+                  setFormData({
+                    ...formData,
+                    deliveryNoteDocumentCode: e.target.value,
+                  })
                 }
                 className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
                 placeholder="DOC-..."
@@ -234,7 +240,10 @@ export const GoodsReceiptFormModal: React.FC<GoodsReceiptFormModalProps> = ({
               <input
                 value={formData.proofDocumentCode}
                 onChange={(e) =>
-                  setFormData({ ...formData, proofDocumentCode: e.target.value })
+                  setFormData({
+                    ...formData,
+                    proofDocumentCode: e.target.value,
+                  })
                 }
                 className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
                 placeholder="DOC-..."

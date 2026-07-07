@@ -56,7 +56,11 @@ export const WalletTopUpPanel: React.FC = () => {
     setChecking(true);
     setError(null);
     try {
-      const w = await walletService.getOrCreateWallet(ownerType, ownerCode, currency);
+      const w = await walletService.getOrCreateWallet(
+        ownerType,
+        ownerCode,
+        currency,
+      );
       setWallet(w);
     } catch (e: any) {
       setWallet(null);
@@ -91,11 +95,17 @@ export const WalletTopUpPanel: React.FC = () => {
       );
       setError(null);
       queryClient.invalidateQueries({ queryKey: ["wallets"] });
-      queryClient.invalidateQueries({ queryKey: ["wallet", updatedWallet.walletNumber] });
-      queryClient.invalidateQueries({ queryKey: ["wallet-ledger", updatedWallet.walletNumber] });
+      queryClient.invalidateQueries({
+        queryKey: ["wallet", updatedWallet.walletNumber],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["wallet-ledger", updatedWallet.walletNumber],
+      });
     },
     onError: (e: any) =>
-      setError(e?.response?.data?.message || e?.message || "Erreur lors du top-up."),
+      setError(
+        e?.response?.data?.message || e?.message || "Erreur lors du top-up.",
+      ),
   });
 
   const changeOwnerType = (ownerType: OwnerType) => {
@@ -108,8 +118,10 @@ export const WalletTopUpPanel: React.FC = () => {
   };
 
   const submit = () => {
-    if (!form.ownerCode) return setError("Veuillez sélectionner ou saisir un propriétaire.");
-    if (form.amount <= 0) return setError("Le montant doit être supérieur à 0.");
+    if (!form.ownerCode)
+      return setError("Veuillez sélectionner ou saisir un propriétaire.");
+    if (form.amount <= 0)
+      return setError("Le montant doit être supérieur à 0.");
     if (form.metadataJson.trim()) {
       try {
         JSON.parse(form.metadataJson);
@@ -123,20 +135,29 @@ export const WalletTopUpPanel: React.FC = () => {
   };
 
   const projectedBalance = wallet ? wallet.availableBalance + form.amount : 0;
-  const progressBase = wallet ? Math.max(wallet.availableBalance + form.amount, 1) : 1;
-  const currentPct = wallet ? Math.max(0, Math.min(100, (wallet.availableBalance / progressBase) * 100)) : 0;
-  const topupPct = wallet ? Math.max(0, Math.min(100, (form.amount / progressBase) * 100)) : 0;
+  const progressBase = wallet
+    ? Math.max(wallet.availableBalance + form.amount, 1)
+    : 1;
+  const currentPct = wallet
+    ? Math.max(0, Math.min(100, (wallet.availableBalance / progressBase) * 100))
+    : 0;
+  const topupPct = wallet
+    ? Math.max(0, Math.min(100, (form.amount / progressBase) * 100))
+    : 0;
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-      <div className="xl:col-span-2 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+      <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-6 xl:col-span-2">
         <div className="mb-6">
           <p className="mb-2 inline-flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
             <PlusCircle size={13} /> Crédit manuel
           </p>
-          <h2 className="text-xl font-semibold text-gray-900">Top-up admin automatisé</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Top-up admin automatisé
+          </h2>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">
-            Le top-up crée automatiquement le wallet si nécessaire, crédite le solde et écrit une ligne ledger ADMIN_TOPUP.
+            Le top-up crée automatiquement le wallet si nécessaire, crédite le
+            solde et écrit une ligne ledger ADMIN_TOPUP.
           </p>
         </div>
 
@@ -157,29 +178,37 @@ export const WalletTopUpPanel: React.FC = () => {
               Type de propriétaire
             </label>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              {(["CUSTOMER", "MEMBER", "BUSINESS_ENTITY"] as OwnerType[]).map((type) => {
-                const selected = form.ownerType === type;
-                const Icon = type === "MEMBER" ? User : Building2;
-                return (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => changeOwnerType(type)}
-                    className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${
-                      selected
-                        ? "bg-primary-50 text-primary-700 ring-2 ring-primary-200"
-                        : "bg-gray-50 text-gray-600 ring-1 ring-gray-100 hover:bg-gray-100"
-                    }`}
-                  >
-                    <span className={`rounded-xl p-2 ${selected ? "bg-primary-100" : "bg-white"}`}>
-                      <Icon size={17} />
-                    </span>
-                    <span className="text-sm font-semibold">
-                      {type === "CUSTOMER" ? "Customer" : type === "MEMBER" ? "Membre" : "Entreprise"}
-                    </span>
-                  </button>
-                );
-              })}
+              {(["CUSTOMER", "MEMBER", "BUSINESS_ENTITY"] as OwnerType[]).map(
+                (type) => {
+                  const selected = form.ownerType === type;
+                  const Icon = type === "MEMBER" ? User : Building2;
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => changeOwnerType(type)}
+                      className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${
+                        selected
+                          ? "bg-primary-50 text-primary-700 ring-2 ring-primary-200"
+                          : "bg-gray-50 text-gray-600 ring-1 ring-gray-100 hover:bg-gray-100"
+                      }`}
+                    >
+                      <span
+                        className={`rounded-xl p-2 ${selected ? "bg-primary-100" : "bg-white"}`}
+                      >
+                        <Icon size={17} />
+                      </span>
+                      <span className="text-sm font-semibold">
+                        {type === "CUSTOMER"
+                          ? "Customer"
+                          : type === "MEMBER"
+                            ? "Membre"
+                            : "Entreprise"}
+                      </span>
+                    </button>
+                  );
+                },
+              )}
             </div>
           </div>
 
@@ -197,10 +226,14 @@ export const WalletTopUpPanel: React.FC = () => {
               />
             </Field>
           ) : (
-            <Field label={`${form.ownerType === "BUSINESS_ENTITY" ? "Entreprise" : "Customer"} *`}>
+            <Field
+              label={`${form.ownerType === "BUSINESS_ENTITY" ? "Entreprise" : "Customer"} *`}
+            >
               <CustomerAutocomplete
                 selectedCustomer={selectedCustomer}
-                typeFilter={form.ownerType === "BUSINESS_ENTITY" ? "COMPANY" : undefined}
+                typeFilter={
+                  form.ownerType === "BUSINESS_ENTITY" ? "COMPANY" : undefined
+                }
                 onSelect={(customer) => {
                   setSelectedCustomer(customer);
                   const code = customer?.customerId || "";
@@ -221,9 +254,14 @@ export const WalletTopUpPanel: React.FC = () => {
               <input
                 value={form.currency}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, currency: e.target.value.toUpperCase() }))
+                  setForm((f) => ({
+                    ...f,
+                    currency: e.target.value.toUpperCase(),
+                  }))
                 }
-                onBlur={() => resolveWallet(form.ownerType, form.ownerCode, form.currency)}
+                onBlur={() =>
+                  resolveWallet(form.ownerType, form.ownerCode, form.currency)
+                }
                 className="w-full rounded-xl border border-gray-200 px-3 py-2.5 font-mono text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
               />
             </Field>
@@ -234,7 +272,10 @@ export const WalletTopUpPanel: React.FC = () => {
                 value={form.amount === 0 ? "" : form.amount}
                 onChange={(e) => {
                   const val = e.target.value.replace(/[^\d.]/g, "");
-                  setForm((f) => ({ ...f, amount: val === "" ? 0 : Number(val) }));
+                  setForm((f) => ({
+                    ...f,
+                    amount: val === "" ? 0 : Number(val),
+                  }));
                 }}
                 className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
                 placeholder="100000"
@@ -243,7 +284,9 @@ export const WalletTopUpPanel: React.FC = () => {
             <Field label="Référence">
               <input
                 value={form.reference}
-                onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, reference: e.target.value }))
+                }
                 className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
                 placeholder="CASH-TOPUP-001"
               />
@@ -253,7 +296,9 @@ export const WalletTopUpPanel: React.FC = () => {
           <Field label="Metadata JSON">
             <textarea
               value={form.metadataJson}
-              onChange={(e) => setForm((f) => ({ ...f, metadataJson: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, metadataJson: e.target.value }))
+              }
               rows={3}
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 font-mono text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
               placeholder='{"cashSessionNumber":"CSS-202604-000001"}'
@@ -265,8 +310,13 @@ export const WalletTopUpPanel: React.FC = () => {
 
           <button
             onClick={submit}
-            disabled={topUpMutation.isPending || checking || !form.ownerCode || form.amount <= 0}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 disabled:opacity-50"
+            disabled={
+              topUpMutation.isPending ||
+              checking ||
+              !form.ownerCode ||
+              form.amount <= 0
+            }
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 disabled:opacity-50 sm:w-auto"
           >
             {topUpMutation.isPending ? (
               <Loader2 size={16} className="animate-spin" />
@@ -278,9 +328,11 @@ export const WalletTopUpPanel: React.FC = () => {
         </div>
       </div>
 
-      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+      <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-6">
         <h3 className="font-semibold text-gray-900">Wallet cible</h3>
-        <p className="mt-1 text-sm text-gray-500">Aperçu du solde avant validation.</p>
+        <p className="mt-1 text-sm text-gray-500">
+          Aperçu du solde avant validation.
+        </p>
 
         <div className="mt-5">
           {checking ? (
@@ -290,7 +342,9 @@ export const WalletTopUpPanel: React.FC = () => {
           ) : wallet ? (
             <div className="space-y-4">
               <div className="rounded-2xl bg-primary-50 p-4 ring-1 ring-primary-100">
-                <p className="font-mono font-semibold text-primary-900">{wallet.walletNumber}</p>
+                <p className="font-mono font-semibold text-primary-900">
+                  {wallet.walletNumber}
+                </p>
                 <p className="mt-1 text-xs text-primary-600">
                   {wallet.ownerType} · {wallet.ownerCode}
                 </p>
@@ -300,7 +354,8 @@ export const WalletTopUpPanel: React.FC = () => {
                 <div className="mb-3 flex items-center justify-between text-sm">
                   <span className="text-gray-500">Solde actuel</span>
                   <span className="font-semibold text-green-600">
-                    {formatAmountOnly(wallet.availableBalance)} {wallet.currency}
+                    {formatAmountOnly(wallet.availableBalance)}{" "}
+                    {wallet.currency}
                   </span>
                 </div>
                 <div className="mb-3 flex items-center justify-between text-sm">
@@ -310,7 +365,9 @@ export const WalletTopUpPanel: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-sm">
-                  <span className="font-medium text-gray-900">Après opération</span>
+                  <span className="font-medium text-gray-900">
+                    Après opération
+                  </span>
                   <span className="font-bold text-primary-700">
                     {formatAmountOnly(projectedBalance)} {wallet.currency}
                   </span>
@@ -319,8 +376,14 @@ export const WalletTopUpPanel: React.FC = () => {
                 {form.amount > 0 && (
                   <div className="mt-4 h-2 overflow-hidden rounded-full bg-gray-200">
                     <div className="flex h-full">
-                      <div className="bg-green-500" style={{ width: `${currentPct}%` }} />
-                      <div className="bg-primary-500" style={{ width: `${topupPct}%` }} />
+                      <div
+                        className="bg-green-500"
+                        style={{ width: `${currentPct}%` }}
+                      />
+                      <div
+                        className="bg-primary-500"
+                        style={{ width: `${topupPct}%` }}
+                      />
                     </div>
                   </div>
                 )}
@@ -350,7 +413,9 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({
   children,
 }) => (
   <label className="block">
-    <span className="mb-1.5 block text-sm font-medium text-gray-700">{label}</span>
+    <span className="mb-1.5 block text-sm font-medium text-gray-700">
+      {label}
+    </span>
     {children}
   </label>
 );

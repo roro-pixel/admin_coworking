@@ -8,10 +8,10 @@ import {
   Shield,
   Package,
   DollarSign,
-  Calendar,
   XCircle,
   CalendarDays,
   Search,
+  Clock,
 } from "lucide-react";
 import { ResourcesList } from "./resources/ResourcesList";
 import { ResourceTypesList } from "./types/ResourceTypesList";
@@ -36,10 +36,11 @@ type TabId =
   | "policies"
   | "amenities"
   | "pricing"
-  | "availability"
+  | "schedule"
   | "closures"
-  | "planning"
   | "advancedSearch";
+
+type ScheduleSubTab = "availability" | "planning";
 
 const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "resources", label: "Ressources", icon: Building2 },
@@ -48,8 +49,7 @@ const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "policies", label: "Politiques", icon: Shield },
   { id: "amenities", label: "Équipements", icon: Package },
   { id: "pricing", label: "Tarifs", icon: DollarSign },
-  { id: "availability", label: "Disponibilités", icon: Calendar },
-  { id: "planning", label: "Planning admin", icon: CalendarDays },
+  { id: "schedule", label: "Agenda ressources", icon: CalendarDays },
   { id: "advancedSearch", label: "Recherche avancée", icon: Search },
   { id: "closures", label: "Fermetures", icon: XCircle },
 ];
@@ -57,9 +57,91 @@ const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
 const isTabId = (value: unknown): value is TabId =>
   typeof value === "string" && tabs.some((tab) => tab.id === value);
 
+const isLegacyScheduleTab = (value: unknown): value is ScheduleSubTab =>
+  value === "availability" || value === "planning";
+
 const RoutedWithLayout: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => <AdminLayout>{children}</AdminLayout>;
+
+const ResourceSchedulePage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const subTabParam = searchParams.get("view");
+  const [activeSubTab, setActiveSubTab] = useState<ScheduleSubTab>(
+    subTabParam === "planning" ? "planning" : "availability",
+  );
+  const [visitedSubTabs, setVisitedSubTabs] = useState<Set<ScheduleSubTab>>(
+    new Set([activeSubTab]),
+  );
+
+  useEffect(() => {
+    const next = searchParams.get("view");
+    if ((next === "availability" || next === "planning") && next !== activeSubTab) {
+      setActiveSubTab(next);
+      setVisitedSubTabs((prev) => new Set([...prev, next]));
+    }
+  }, [activeSubTab, searchParams]);
+
+  const handleSubTabChange = (tab: ScheduleSubTab) => {
+    setActiveSubTab(tab);
+    setVisitedSubTabs((prev) => new Set([...prev, tab]));
+    setSearchParams({ tab: "schedule", view: tab });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">
+              Agenda ressources
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Gérez les créneaux disponibles et le planning d'occupation depuis un seul espace.
+            </p>
+          </div>
+
+          <div className="inline-flex rounded-2xl bg-gray-100 p-1">
+            {[
+              { id: "availability", label: "Disponibilités", icon: CalendarDays },
+              { id: "planning", label: "Planning admin", icon: Clock },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const active = activeSubTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => handleSubTabChange(tab.id as ScheduleSubTab)}
+                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
+                    active
+                      ? "bg-white text-primary-700 shadow-sm"
+                      : "text-gray-500 hover:text-gray-900"
+                  }`}
+                >
+                  <Icon size={16} />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {visitedSubTabs.has("availability") && (
+        <div className={activeSubTab !== "availability" ? "hidden" : ""}>
+          <ResourceAvailability />
+        </div>
+      )}
+
+      {visitedSubTabs.has("planning") && (
+        <div className={activeSubTab !== "planning" ? "hidden" : ""}>
+          <ResourcePlanningAdminPage />
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ResourceTabs: React.FC = () => {
   const location = useLocation();
@@ -71,9 +153,13 @@ const ResourceTabs: React.FC = () => {
 
   const initialTab: TabId = isTabId(tabFromQuery)
     ? tabFromQuery
-    : isTabId(tabFromState)
-      ? tabFromState
-      : "resources";
+    : isLegacyScheduleTab(tabFromQuery)
+      ? "schedule"
+      : isTabId(tabFromState)
+        ? tabFromState
+        : isLegacyScheduleTab(tabFromState)
+          ? "schedule"
+          : "resources";
 
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(
@@ -86,9 +172,13 @@ const ResourceTabs: React.FC = () => {
       ?.activeTab;
     const next = isTabId(nextFromQuery)
       ? nextFromQuery
-      : isTabId(nextFromState)
-        ? nextFromState
-        : null;
+      : isLegacyScheduleTab(nextFromQuery)
+        ? "schedule"
+        : isTabId(nextFromState)
+          ? nextFromState
+          : isLegacyScheduleTab(nextFromState)
+            ? "schedule"
+            : null;
 
     if (next && next !== activeTab) {
       setActiveTab(next);
@@ -109,8 +199,8 @@ const ResourceTabs: React.FC = () => {
           Gestion des espaces
         </h1>
         <p className="mt-1 text-gray-600">
-          Gérez les ressources, types, groupes, politiques, équipements,
-          tarifs, disponibilités et fermetures.
+          Gérez les ressources, types, groupes, politiques, équipements, tarifs,
+          agenda et fermetures.
         </p>
       </div>
 
@@ -123,7 +213,7 @@ const ResourceTabs: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all whitespace-nowrap ${
+                className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${
                   active
                     ? "bg-primary-600 text-white shadow-sm"
                     : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
@@ -168,14 +258,9 @@ const ResourceTabs: React.FC = () => {
             <PricingRulesList />
           </div>
         )}
-        {visitedTabs.has("availability") && (
-          <div className={activeTab !== "availability" ? "hidden" : ""}>
-            <ResourceAvailability />
-          </div>
-        )}
-        {visitedTabs.has("planning") && (
-          <div className={activeTab !== "planning" ? "hidden" : ""}>
-            <ResourcePlanningAdminPage />
+        {visitedTabs.has("schedule") && (
+          <div className={activeTab !== "schedule" ? "hidden" : ""}>
+            <ResourceSchedulePage />
           </div>
         )}
         {visitedTabs.has("advancedSearch") && (

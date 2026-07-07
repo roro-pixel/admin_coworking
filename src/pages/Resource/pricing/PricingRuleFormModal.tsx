@@ -126,7 +126,9 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
         adjustmentValue: formData.adjustmentType
           ? Number(formData.adjustmentValue) || 0
           : undefined,
-        lastMinuteMinutes: formData.lastMinuteMinutes ? Number(formData.lastMinuteMinutes) : null,
+        lastMinuteMinutes: formData.lastMinuteMinutes
+          ? Number(formData.lastMinuteMinutes)
+          : null,
         priority: formData.priority || undefined,
         validFrom: formData.validFrom || undefined,
         validUntil: formData.validUntil || undefined,
@@ -160,7 +162,9 @@ export const PricingRuleFormModal: React.FC<PricingRuleFormModalProps> = ({
         adjustmentValue: formData.adjustmentType
           ? Number(formData.adjustmentValue) || 0
           : undefined,
-        lastMinuteMinutes: formData.lastMinuteMinutes ? Number(formData.lastMinuteMinutes) : null,
+        lastMinuteMinutes: formData.lastMinuteMinutes
+          ? Number(formData.lastMinuteMinutes)
+          : null,
         priority: formData.priority || undefined,
         validFrom: formData.validFrom || undefined,
         validUntil: formData.validUntil || undefined,

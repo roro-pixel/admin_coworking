@@ -49,7 +49,9 @@ export const CategoriesList: React.FC = () => {
   const filteredCategories = categories.filter(
     (cat) =>
       cat.name.toLowerCase().includes(search.toLowerCase()) ||
-      (cat.code || cat.categoryCode || "").toLowerCase().includes(search.toLowerCase()),
+      (cat.code || cat.categoryCode || "")
+        .toLowerCase()
+        .includes(search.toLowerCase()),
   );
 
   const handleOpenModal = (category?: InventoryCategory) => {
@@ -76,7 +78,10 @@ export const CategoriesList: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingCategory) {
-      updateMutation.mutate({ code: (editingCategory.categoryCode || editingCategory.code || ""), data: formData });
+      updateMutation.mutate({
+        code: editingCategory.categoryCode || editingCategory.code || "",
+        data: formData,
+      });
     } else {
       createMutation.mutate(formData);
     }
@@ -139,8 +144,13 @@ export const CategoriesList: React.FC = () => {
             </thead>
             <tbody className="divide-y">
               {filteredCategories.map((cat) => (
-                <tr key={cat.categoryCode || cat.code} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 font-mono text-sm">{cat.categoryCode || cat.code}</td>
+                <tr
+                  key={cat.categoryCode || cat.code}
+                  className="hover:bg-gray-50"
+                >
+                  <td className="px-6 py-4 font-mono text-sm">
+                    {cat.categoryCode || cat.code}
+                  </td>
                   <td className="px-6 py-4 font-medium">{cat.name}</td>
                   <td className="px-6 py-4 text-gray-500">
                     {cat.description || "-"}
@@ -155,7 +165,9 @@ export const CategoriesList: React.FC = () => {
                       <Edit size={18} />
                     </button>
                     <button
-                      onClick={() => handleDelete(cat.categoryCode || cat.code || "")}
+                      onClick={() =>
+                        handleDelete(cat.categoryCode || cat.code || "")
+                      }
                       className="p-1.5 text-red-600 hover:text-red-800"
                       title="Supprimer"
                     >

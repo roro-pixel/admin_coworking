@@ -107,12 +107,17 @@ export const ResourceAvailability: React.FC = () => {
     isLoading: remainingLoading,
     refetch: refetchRemaining,
   } = useQuery({
-    queryKey: ["resource-availabilities-remaining", selectedResource, calendarMonth],
-    queryFn: () => resourceService.searchRemainingSlots({
-      resourceCode: selectedResource,
-      from: `${calendarMonth}-01T00:00:00`,
-      to: `${calendarMonth}-31T23:59:59`,
-    }),
+    queryKey: [
+      "resource-availabilities-remaining",
+      selectedResource,
+      calendarMonth,
+    ],
+    queryFn: () =>
+      resourceService.searchRemainingSlots({
+        resourceCode: selectedResource,
+        from: `${calendarMonth}-01T00:00:00`,
+        to: `${calendarMonth}-31T23:59:59`,
+      }),
     enabled: !!selectedResource,
   });
 
@@ -128,14 +133,18 @@ export const ResourceAvailability: React.FC = () => {
   const [isReserveOpen, setIsReserveOpen] = useState(false);
 
   const reserveMutation = useMutation({
-    mutationFn: () =>
-      {
-        const slot = availabilities.find((item) =>
-          item.startedAt === reserveForm.startedAt && item.endedAt === reserveForm.endedAt,
-        );
-        if (!slot) throw new Error("Créneau introuvable pour la réservation.");
-        return resourceService.reserveAvailabilitySlot(slot.id, reserveForm.quantity);
-      },
+    mutationFn: () => {
+      const slot = availabilities.find(
+        (item) =>
+          item.startedAt === reserveForm.startedAt &&
+          item.endedAt === reserveForm.endedAt,
+      );
+      if (!slot) throw new Error("Créneau introuvable pour la réservation.");
+      return resourceService.reserveAvailabilitySlot(
+        slot.id,
+        reserveForm.quantity,
+      );
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["resource-availabilities", selectedResource],
@@ -164,14 +173,18 @@ export const ResourceAvailability: React.FC = () => {
   const [isReleaseOpen, setIsReleaseOpen] = useState(false);
 
   const releaseMutation = useMutation({
-    mutationFn: () =>
-      {
-        const slot = availabilities.find((item) =>
-          item.startedAt === releaseForm.startedAt && item.endedAt === releaseForm.endedAt,
-        );
-        if (!slot) throw new Error("Créneau introuvable pour la libération.");
-        return resourceService.releaseAvailabilitySlot(slot.id, releaseForm.quantity);
-      },
+    mutationFn: () => {
+      const slot = availabilities.find(
+        (item) =>
+          item.startedAt === releaseForm.startedAt &&
+          item.endedAt === releaseForm.endedAt,
+      );
+      if (!slot) throw new Error("Créneau introuvable pour la libération.");
+      return resourceService.releaseAvailabilitySlot(
+        slot.id,
+        releaseForm.quantity,
+      );
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["resource-availabilities", selectedResource],
@@ -286,8 +299,13 @@ export const ResourceAvailability: React.FC = () => {
       {selectedResource && (
         <div className="mb-6 flex flex-col gap-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-sm font-semibold text-gray-900">Mode d’affichage</p>
-            <p className="mt-0.5 text-xs text-gray-500">Basculez entre la vue calendrier et la liste détaillée des créneaux.</p>
+            <p className="text-sm font-semibold text-gray-900">
+              Mode d’affichage
+            </p>
+            <p className="mt-0.5 text-xs text-gray-500">
+              Basculez entre la vue calendrier et la liste détaillée des
+              créneaux.
+            </p>
           </div>
           <div className="inline-flex rounded-xl bg-gray-100 p-1">
             <button
@@ -378,7 +396,10 @@ export const ResourceAvailability: React.FC = () => {
                   </thead>
                   <tbody>
                     {filteredAvailabilities.map((slot) => (
-                      <tr key={slot.id} className="transition hover:bg-primary-50/40">
+                      <tr
+                        key={slot.id}
+                        className="transition hover:bg-primary-50/40"
+                      >
                         <td className="px-4 py-2 text-sm">
                           {new Date(slot.startedAt).toLocaleString("fr-FR")}
                         </td>

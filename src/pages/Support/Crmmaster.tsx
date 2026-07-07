@@ -346,7 +346,7 @@ export const CrmMaster: React.FC = () => {
   return (
     <div>
       {metricsLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6">
           {[0, 1, 2, 3, 4].map((i) => (
             <div
               key={i}
@@ -355,7 +355,7 @@ export const CrmMaster: React.FC = () => {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6">
           <Metric label="Total leads" value={metrics?.totalLeads ?? 0} />
           <Metric
             label="Gagnés"
@@ -379,7 +379,8 @@ export const CrmMaster: React.FC = () => {
           />
         </div>
       )}
-      <div className="overflow-x-auto mb-6 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100 flex flex-wrap gap-1">
+      <div className="mb-6 overflow-x-auto rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-max gap-1">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -390,6 +391,7 @@ export const CrmMaster: React.FC = () => {
             {label}
           </button>
         ))}
+        </div>
       </div>
       {actionError && (
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex justify-between">
@@ -415,7 +417,7 @@ export const CrmMaster: React.FC = () => {
           {boardLoading ? (
             <div className="py-12 text-center">Chargement...</div>
           ) : (
-            <div className="flex gap-4 overflow-x-auto pb-4">
+            <div className="flex flex-col sm:flex-row gap-4 overflow-x-auto pb-4">
               {stages.map((stage) => {
                 const col = board?.columns?.find((c) => c.stage === stage);
                 return (
@@ -470,7 +472,7 @@ export const CrmMaster: React.FC = () => {
 
       {activeTab === "list" && (
         <div>
-          <div className="flex gap-3 mb-4">
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
             <div className="relative flex-1">
               <Search
                 size={16}
@@ -500,7 +502,7 @@ export const CrmMaster: React.FC = () => {
             <div className="py-12 text-center">Chargement...</div>
           ) : (
             <div className="bg-white rounded-xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-              <table className="w-full border-separate border-spacing-y-2 text-sm">
+              <table className="w-full border-separate border-spacing-y-2 text-sm max-md:block max-md:border-spacing-0 max-md:[&_thead]:hidden max-md:[&_tbody]:block max-md:[&_tr]:mb-3 max-md:[&_tr]:block max-md:[&_tr]:rounded-2xl max-md:[&_tr]:bg-gray-50 max-md:[&_tr]:p-3 max-md:[&_tr]:shadow-sm max-md:[&_tr]:ring-1 max-md:[&_tr]:ring-gray-100 max-md:[&_td]:block max-md:[&_td]:px-0 max-md:[&_td]:py-1.5 max-md:[&_td]:text-left max-md:[&_td]:text-xs max-md:[&_td]:break-words">
                 <tbody className="divide-y-0">
                   {leads.map((lead) => (
                     <tr
@@ -548,7 +550,7 @@ export const CrmMaster: React.FC = () => {
 
       {activeTab === "analytics" && (
         <div className="space-y-6">
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <input
               type="date"
               value={analyticsFrom}
@@ -567,7 +569,7 @@ export const CrmMaster: React.FC = () => {
           ) : (
             analytics && (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
                   <Metric label="Créés" value={analytics.totalCreated} />
                   <Metric
                     label="Gagnés"
@@ -588,7 +590,7 @@ export const CrmMaster: React.FC = () => {
                     value={Number(analytics.avgDaysToWin ?? 0).toFixed(1)}
                   />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:p-6">
                   <Breakdown title="Par source" data={analytics.bySource} />
                   <Breakdown title="Par stage" data={analytics.byStage} />
                 </div>
@@ -603,7 +605,7 @@ export const CrmMaster: React.FC = () => {
       )}
 
       {activeTab === "public" && (
-        <div className="bg-white rounded-xl shadow-sm p-6 max-w-3xl space-y-4">
+        <div className="mx-auto w-full max-w-6xl rounded-3xl bg-white p-8 shadow-sm ring-1 ring-gray-100 space-y-6">
           <h3 className="font-semibold">
             Test intégration formulaire site vitrine
           </h3>
@@ -624,7 +626,7 @@ export const CrmMaster: React.FC = () => {
           <button
             onClick={() => publicCaptureMutation.mutate()}
             disabled={!publicForm.fullName || publicCaptureMutation.isPending}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
+            className="w-full sm:w-auto justify-center px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
           >
             Envoyer au CRM
           </button>
@@ -632,12 +634,12 @@ export const CrmMaster: React.FC = () => {
       )}
 
       {activeTab === "create" && (
-        <div className="bg-white rounded-xl shadow-sm p-6 max-w-4xl space-y-4">
+        <div className="mx-auto w-full max-w-6xl rounded-3xl bg-white p-8 shadow-sm ring-1 ring-gray-100 space-y-6">
           <LeadForm form={createForm} setForm={setCreateForm as any} />
           <button
             onClick={() => createMutation.mutate()}
             disabled={!createForm.fullName || createMutation.isPending}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
+            className="w-full sm:w-auto justify-center px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
           >
             Créer le lead
           </button>
@@ -648,7 +650,7 @@ export const CrmMaster: React.FC = () => {
         <ModalPortal onClose={() => setIsDetailOpen(false)}>
           <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-start rounded-t-2xl">
             <div>
-              <h3 className="text-xl font-bold">{currentLead.fullName}</h3>
+              <h3 className="text-lg sm:text-xl font-bold">{currentLead.fullName}</h3>
               <p className="text-sm text-gray-500 font-mono">
                 {currentLead.leadNumber}
               </p>
@@ -657,7 +659,7 @@ export const CrmMaster: React.FC = () => {
               <X size={20} />
             </button>
           </div>
-          <div className="p-6 space-y-6">
+          <div className="p-4 sm:p-6 space-y-6">
             <div className="flex flex-wrap gap-2">
               <span
                 className={`px-2 py-1 rounded-full text-xs ${stageConfig[currentLead.stage].color}`}
@@ -675,7 +677,7 @@ export const CrmMaster: React.FC = () => {
                 Probabilité agent {currentLead.probability ?? 0}%
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <Info label="Email" value={currentLead.email || "—"} />
               <Info label="Téléphone" value={currentLead.phone || "—"} />
               <Info label="Société" value={currentLead.company || "—"} />
@@ -811,7 +813,7 @@ export const CrmMaster: React.FC = () => {
                   <X size={20} />
                 </button>
               </div>
-              <div className="p-6 space-y-4">
+              <div className="p-4 sm:p-6 space-y-4">
                 <select
                   value={convertForm.ownerType}
                   onChange={(e) =>
@@ -833,7 +835,7 @@ export const CrmMaster: React.FC = () => {
                 <button
                   onClick={() => convertMutation.mutate()}
                   disabled={!convertForm.ownerCode}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
+                  className="w-full sm:w-auto justify-center px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
                 >
                   Convertir
                 </button>
@@ -856,7 +858,7 @@ const Metric = ({
   color?: string;
 }) => (
   <div className="bg-white rounded-xl p-4 shadow-sm">
-    <p className={`text-xl font-bold ${color}`}>{value}</p>
+    <p className={`text-lg sm:text-xl font-bold ${color}`}>{value}</p>
     <p className="text-xs text-gray-500">{label}</p>
   </div>
 );

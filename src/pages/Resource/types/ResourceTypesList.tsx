@@ -74,7 +74,8 @@ export const ResourceTypesList: React.FC = () => {
             Types de ressources
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            Organisez les espaces par typologie : bureaux, salles, postes ou zones dédiées.
+            Organisez les espaces par typologie : bureaux, salles, postes ou
+            zones dédiées.
           </p>
         </div>
         <button
@@ -95,7 +96,9 @@ export const ResourceTypesList: React.FC = () => {
             <p className="text-sm text-gray-500">Total</p>
             <Layers size={18} className="text-gray-400" />
           </div>
-          <p className="text-2xl font-bold text-gray-900 mt-2">{types.length}</p>
+          <p className="text-2xl font-bold text-gray-900 mt-2">
+            {types.length}
+          </p>
         </div>
         <div className="bg-white rounded-2xl border border-green-100 p-4">
           <div className="flex items-center justify-between">
