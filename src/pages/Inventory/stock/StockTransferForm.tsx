@@ -232,16 +232,16 @@ export const StockTransferForm: React.FC<StockTransferFormProps> = ({
 
   return (
     <ModalPortal onClose={onClose} size="2xl">
-      <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
-        <h3 className="text-2xl font-bold">Transfert de stock</h3>
-        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+      <div className="sticky top-0 bg-white ring-1 ring-gray-100 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
+        <h3 className="text-lg sm:text-xl sm:text-2xl font-bold">Transfert de stock</h3>
+        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-2xl">
           <X size={24} />
         </button>
       </div>
       <div className="overflow-y-auto max-h-[80vh]">
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
           <div>
-            <label className="block text-base font-medium text-gray-700 mb-2">
+            <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
               Article *
             </label>
             <div className="relative">
@@ -257,18 +257,18 @@ export const StockTransferForm: React.FC<StockTransferFormProps> = ({
                   setShowItemResults(true);
                 }}
                 placeholder="Rechercher un article..."
-                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg text-base"
+                className="w-full pl-12 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
               />
             </div>
             {showItemResults && items.length > 0 && (
               <div className="relative">
-                <div className="absolute z-20 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                <div className="absolute z-20 mt-1 w-full bg-white ring-1 rounded-2xl shadow-lg max-h-60 overflow-y-auto">
                   {items.map((item) => (
                     <button
                       key={item.itemCode}
                       type="button"
                       onClick={() => selectItem(item)}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b text-base"
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 ring-1 ring-gray-100 text-sm sm:text-base"
                     >
                       <p className="font-medium">{item.name}</p>
                       <p className="text-sm text-gray-500">{item.itemCode}</p>
@@ -278,8 +278,8 @@ export const StockTransferForm: React.FC<StockTransferFormProps> = ({
               </div>
             )}
             {selectedItem && (
-              <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                <p className="font-medium text-base">{selectedItem.name}</p>
+              <div className="mt-3 p-3 bg-gray-50 rounded-2xl">
+                <p className="font-medium text-sm sm:text-base">{selectedItem.name}</p>
                 <p className="text-sm text-gray-500">
                   {selectedItem.itemCode} · {selectedItem.trackingType}
                 </p>
@@ -288,14 +288,14 @@ export const StockTransferForm: React.FC<StockTransferFormProps> = ({
           </div>
 
           <div>
-            <label className="block text-base font-medium text-gray-700 mb-2">
+            <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
               Emplacement source *
             </label>
             <select
               value={formData.locationFromCode}
               onChange={(e) => updateFromLocation(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base bg-white"
+              className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base bg-white"
             >
               <option value="">Sélectionner</option>
               {locations.map((loc: any) => (
@@ -307,10 +307,10 @@ export const StockTransferForm: React.FC<StockTransferFormProps> = ({
           </div>
 
           {formData.locationFromCode && (
-            <div className="p-3 bg-gray-50 rounded-lg text-center">
+            <div className="p-3 bg-gray-50 rounded-2xl text-center">
               <p className="text-base text-gray-600">
                 Stock disponible source :{" "}
-                <span className="font-bold text-xl">{availableStock}</span>
+                <span className="font-bold text-lg sm:text-xl">{availableStock}</span>
               </p>
             </div>
           )}
@@ -320,7 +320,7 @@ export const StockTransferForm: React.FC<StockTransferFormProps> = ({
           </div>
 
           <div>
-            <label className="block text-base font-medium text-gray-700 mb-2">
+            <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
               Emplacement destination *
             </label>
             <select
@@ -329,7 +329,7 @@ export const StockTransferForm: React.FC<StockTransferFormProps> = ({
                 setFormData({ ...formData, locationToCode: e.target.value })
               }
               required
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base bg-white"
+              className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base bg-white"
             >
               <option value="">Sélectionner</option>
               {locations
@@ -346,7 +346,7 @@ export const StockTransferForm: React.FC<StockTransferFormProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Quantité *
               </label>
               <input
@@ -360,11 +360,11 @@ export const StockTransferForm: React.FC<StockTransferFormProps> = ({
                   })
                 }
                 required
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
               />
             </div>
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Motif *
               </label>
               <select
@@ -375,7 +375,7 @@ export const StockTransferForm: React.FC<StockTransferFormProps> = ({
                     reasonCode: e.target.value as StockOutReasonCode,
                   })
                 }
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base bg-white"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base bg-white"
               >
                 {reasonOptions.map((r) => (
                   <option key={r.value} value={r.value}>
@@ -388,7 +388,7 @@ export const StockTransferForm: React.FC<StockTransferFormProps> = ({
 
           {selectedItem?.requiresLotNumber && formData.locationFromCode && (
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Lot *
               </label>
               <select
@@ -396,7 +396,7 @@ export const StockTransferForm: React.FC<StockTransferFormProps> = ({
                 onChange={(e) =>
                   setFormData({ ...formData, lotNumber: e.target.value })
                 }
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base bg-white"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base bg-white"
               >
                 <option value="">Sélectionner un lot existant</option>
                 {lots.map((lot) => (
@@ -413,10 +413,10 @@ export const StockTransferForm: React.FC<StockTransferFormProps> = ({
 
           {selectedItem?.requiresSerialNumber && formData.locationFromCode && (
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Numéros de série disponibles *
               </label>
-              <div className="border rounded-lg divide-y max-h-56 overflow-y-auto">
+              <div className="border rounded-2xl space-y-2 md:space-y-0 max-h-56 overflow-y-auto">
                 {serials.map((s) => (
                   <label
                     key={s.serialNumber}
@@ -444,7 +444,7 @@ export const StockTransferForm: React.FC<StockTransferFormProps> = ({
           )}
 
           <div>
-            <label className="block text-base font-medium text-gray-700 mb-2">
+            <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
               Détail du motif
             </label>
             <textarea
@@ -453,20 +453,20 @@ export const StockTransferForm: React.FC<StockTransferFormProps> = ({
                 setFormData({ ...formData, reasonDetails: e.target.value })
               }
               rows={3}
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+              className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
               placeholder="Raison du transfert..."
             />
           </div>
 
           {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
+            <div className="p-4 bg-red-50 ring-1 ring-1 ring-red-100 rounded-2xl flex items-center gap-2 text-red-700">
               <AlertTriangle size={18} />
               <span className="text-base">{error}</span>
               {lotNotFound && (
                 <button
                   type="button"
                   onClick={() => createMutation.mutate(true)}
-                  className="ml-auto px-3 py-2 bg-amber-600 text-white rounded-lg"
+                  className="ml-auto px-3 py-2 bg-amber-600 text-white rounded-2xl"
                 >
                   Créer le lot et relancer
                 </button>
@@ -474,11 +474,11 @@ export const StockTransferForm: React.FC<StockTransferFormProps> = ({
             </div>
           )}
 
-          <div className="flex gap-4 pt-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 pt-6">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-5 py-3 border rounded-lg text-gray-700 hover:bg-gray-50 text-base"
+              className="flex-1 px-4 py-3 sm:px-5 ring-1 rounded-2xl text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
             >
               Annuler
             </button>
@@ -491,7 +491,7 @@ export const StockTransferForm: React.FC<StockTransferFormProps> = ({
                 !formData.locationToCode ||
                 formData.quantity <= 0
               }
-              className="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 text-base font-medium"
+              className="flex-1 bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base font-medium w-full sm:w-auto justify-center"
             >
               {createMutation.isPending ? (
                 <Loader2 size={20} className="animate-spin" />

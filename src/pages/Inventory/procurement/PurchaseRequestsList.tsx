@@ -196,13 +196,13 @@ export const PurchaseRequestsList: React.FC = () => {
 
   return (
     <div className="p-4">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-2xl font-semibold text-gray-900">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
+        <h2 className="text-lg sm:text-xl sm:text-2xl font-semibold text-gray-900">
           Demandes d'achat
         </h2>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-primary-600 text-white px-5 py-2.5 rounded-lg hover:bg-primary-700 flex items-center gap-2 text-base font-medium"
+          className="bg-primary-600 text-white px-4 py-2.5 sm:px-5 rounded-2xl hover:bg-primary-700 flex items-center gap-2 text-sm sm:text-base font-medium w-full sm:w-auto justify-center"
         >
           <Plus size={20} />
           Nouvelle demande
@@ -221,13 +221,13 @@ export const PurchaseRequestsList: React.FC = () => {
             placeholder="Rechercher une demande..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg text-base"
+            className="w-full pl-12 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-5 py-3 border border-gray-200 rounded-lg bg-white text-base min-w-[180px]"
+          className="px-5 py-3 ring-1 ring-gray-100 rounded-2xl bg-white text-sm sm:text-base min-w-[180px]"
         >
           <option value="">Tous les statuts</option>
           <option value="DRAFT">Brouillon</option>
@@ -239,20 +239,20 @@ export const PurchaseRequestsList: React.FC = () => {
       </div>
 
       {/* Tableau - AGRANDI */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-base">
-          <thead className="bg-gray-50 border-b">
+      <div className="bg-white rounded-3xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+        <table className="w-full text-sm sm:text-base block md:table">
+          <thead className="bg-gray-50 ring-1 ring-gray-100 hidden md:table-header-group">
             <tr>
-              <th className="px-5 py-4 text-left font-semibold">Code</th>
-              <th className="px-5 py-4 text-left font-semibold">Emplacement</th>
-              <th className="px-5 py-4 text-left font-semibold">Demandeur</th>
-              <th className="px-5 py-4 text-right font-semibold">Montant</th>
-              <th className="px-5 py-4 text-left font-semibold">Statut</th>
-              <th className="px-5 py-4 text-left font-semibold">Date</th>
-              <th className="px-5 py-4 text-center font-semibold">Actions</th>
+              <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Code</th>
+              <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Emplacement</th>
+              <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Demandeur</th>
+              <th className="px-5 py-4 text-right font-semibold hidden md:table-cell">Montant</th>
+              <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Statut</th>
+              <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Date</th>
+              <th className="px-5 py-4 text-center font-semibold hidden md:table-cell">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="space-y-2 md:space-y-0 block md:table-row-group">
             {filteredRequests.map((req: PurchaseRequest) => {
               const status = statusConfig[req.status];
               const StatusIcon = status?.icon;
@@ -262,16 +262,16 @@ export const PurchaseRequestsList: React.FC = () => {
                   0,
                 ) || 0;
               return (
-                <tr key={req.requestCode} className="hover:bg-gray-50">
-                  <td className="px-5 py-4 font-mono text-sm">
+                <tr key={req.requestCode} className="hover:bg-gray-50 block md:table-row rounded-3xl bg-white p-4 mb-3 shadow-sm ring-1 ring-gray-100">
+                  <td className="px-5 py-4 font-mono text-sm flex justify-between gap-4 md:table-cell text-sm">
                     {req.requestCode}
                   </td>
-                  <td className="px-5 py-4">{req.locationName}</td>
-                  <td className="px-5 py-4">{req.requestedBy}</td>
-                  <td className="px-5 py-4 text-right font-medium">
+                  <td className="px-5 py-4 flex justify-between gap-4 md:table-cell text-sm">{req.locationName}</td>
+                  <td className="px-5 py-4 flex justify-between gap-4 md:table-cell text-sm">{req.requestedBy}</td>
+                  <td className="px-5 py-4 text-right font-medium flex justify-between gap-4 md:table-cell text-sm">
                     {totalAmount.toLocaleString()} FCFA
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-5 py-4 flex justify-between gap-4 md:table-cell text-sm">
                     <span
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs ${status?.color}`}
                     >
@@ -279,10 +279,10 @@ export const PurchaseRequestsList: React.FC = () => {
                       {status?.label}
                     </span>
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-5 py-4 flex justify-between gap-4 md:table-cell text-sm">
                     {new Date(req.createdAt).toLocaleDateString("fr-FR")}
                   </td>
-                  <td className="px-5 py-4 text-center">
+                  <td className="px-5 py-4 text-center flex justify-between gap-4 md:table-cell text-sm">
                     <div className="flex justify-center gap-2">
                       <button
                         onClick={() => handleViewDetail(req)}
@@ -340,26 +340,26 @@ export const PurchaseRequestsList: React.FC = () => {
       </div>
 
       {filteredRequests.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-xl">
-          <p className="text-gray-500 text-base">Aucune demande trouvée</p>
+        <div className="text-center py-16 bg-white rounded-3xl">
+          <p className="text-gray-500 text-sm sm:text-base">Aucune demande trouvée</p>
         </div>
       )}
 
       {/* ========== MODAL CRÉATION DEMANDE - AGRANDI ========== */}
       {isModalOpen && (
         <ModalPortal onClose={() => setIsModalOpen(false)} size="2xl">
-          <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-2xl font-bold">Nouvelle demande d'achat</h3>
+          <div className="sticky top-0 bg-white ring-1 ring-gray-100 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
+            <h3 className="text-lg sm:text-xl sm:text-2xl font-bold">Nouvelle demande d'achat</h3>
             <button
               onClick={() => setIsModalOpen(false)}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              className="p-2 hover:bg-gray-100 rounded-2xl"
             >
               <X size={24} />
             </button>
           </div>
           <div className="p-8 space-y-6">
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Emplacement *
               </label>
               <select
@@ -367,7 +367,7 @@ export const PurchaseRequestsList: React.FC = () => {
                 onChange={(e) =>
                   setFormData({ ...formData, locationCode: e.target.value })
                 }
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
               >
                 <option value="">Sélectionner</option>
                 {locations.map((loc: any) => (
@@ -379,11 +379,11 @@ export const PurchaseRequestsList: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-3">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-3">
                 Articles
               </label>
               {formData.lines.map((line, idx) => (
-                <div key={idx} className="flex gap-3 mb-3">
+                <div key={idx} className="flex flex-col gap-2 sm:flex-row sm:gap-3 mb-3">
                   <div className="flex-1 relative">
                     <input
                       type="text"
@@ -393,10 +393,10 @@ export const PurchaseRequestsList: React.FC = () => {
                         setItemSearch(e.target.value);
                         setShowItemResults(true);
                       }}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                      className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                     />
                     {showItemResults && items.length > 0 && (
-                      <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <div className="absolute z-10 mt-1 w-full bg-white ring-1 rounded-2xl shadow-lg max-h-60 overflow-y-auto">
                         {items.map((item: InventoryItem) => (
                           <button
                             key={item.itemCode}
@@ -406,7 +406,7 @@ export const PurchaseRequestsList: React.FC = () => {
                               setItemSearch("");
                               setShowItemResults(false);
                             }}
-                            className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b text-base"
+                            className="w-full px-4 py-3 text-left hover:bg-gray-50 ring-1 ring-gray-100 text-sm sm:text-base"
                           >
                             <p className="font-medium">{item.name}</p>
                             <p className="text-sm text-gray-500">
@@ -430,7 +430,7 @@ export const PurchaseRequestsList: React.FC = () => {
                         val === "" ? 0 : parseInt(val),
                       );
                     }}
-                    className="w-28 px-4 py-3 border border-gray-200 rounded-lg text-base text-center"
+                    className="w-28 px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base text-center"
                   />
                   <input
                     type="text"
@@ -445,7 +445,7 @@ export const PurchaseRequestsList: React.FC = () => {
                         val === "" ? 0 : parseInt(val),
                       );
                     }}
-                    className="w-36 px-4 py-3 border border-gray-200 rounded-lg text-base text-right"
+                    className="w-36 px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base text-right"
                   />
                   <button
                     type="button"
@@ -459,16 +459,16 @@ export const PurchaseRequestsList: React.FC = () => {
               <button
                 type="button"
                 onClick={addLine}
-                className="mt-3 text-primary-600 text-base flex items-center gap-1 hover:text-primary-700"
+                className="mt-3 text-primary-600 text-sm sm:text-base flex items-center gap-1 hover:text-primary-700"
               >
                 <Plus size={18} /> Ajouter un article
               </button>
             </div>
 
-            <div className="flex gap-4 pt-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 pt-6">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="flex-1 px-5 py-3 border rounded-lg text-gray-700 hover:bg-gray-50 text-base"
+                className="flex-1 px-4 py-3 sm:px-5 ring-1 rounded-2xl text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
               >
                 Annuler
               </button>
@@ -479,7 +479,7 @@ export const PurchaseRequestsList: React.FC = () => {
                   formData.lines.length === 0 ||
                   createMutation.isPending
                 }
-                className="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 text-base font-medium flex items-center justify-center gap-2"
+                className="flex-1 bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 text-sm sm:text-base font-medium flex items-center justify-center gap-2 w-full sm:w-auto justify-center"
               >
                 {createMutation.isPending ? (
                   <Loader2 size={20} className="animate-spin" />
@@ -495,23 +495,23 @@ export const PurchaseRequestsList: React.FC = () => {
       {/* ========== MODAL DÉTAIL DEMANDE - AGRANDI ========== */}
       {isDetailOpen && selectedRequest && (
         <ModalPortal onClose={() => setIsDetailOpen(false)} size="2xl">
-          <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
+          <div className="sticky top-0 bg-white ring-1 ring-gray-100 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
             <div>
-              <h3 className="text-2xl font-bold">
+              <h3 className="text-lg sm:text-xl sm:text-2xl font-bold">
                 {selectedRequest.requestCode}
               </h3>
               <p className="text-base text-gray-500 mt-1">Demande d'achat</p>
             </div>
             <button
               onClick={() => setIsDetailOpen(false)}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              className="p-2 hover:bg-gray-100 rounded-2xl"
             >
               <X size={24} />
             </button>
           </div>
           <div className="p-8 space-y-6">
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-gray-50 rounded-2xl">
                 <p className="text-sm text-gray-500 mb-1">Statut</p>
                 <span
                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs ${statusConfig[selectedRequest.status]?.color}`}
@@ -519,30 +519,30 @@ export const PurchaseRequestsList: React.FC = () => {
                   {statusConfig[selectedRequest.status]?.label}
                 </span>
               </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-gray-50 rounded-2xl">
                 <p className="text-sm text-gray-500 mb-1">Date de création</p>
                 <p className="text-base">
                   {new Date(selectedRequest.createdAt).toLocaleString("fr-FR")}
                 </p>
               </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-gray-50 rounded-2xl">
                 <p className="text-sm text-gray-500 mb-1">Emplacement</p>
-                <p className="font-medium text-base">
+                <p className="font-medium text-sm sm:text-base">
                   {selectedRequest.locationName}
                 </p>
               </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-gray-50 rounded-2xl">
                 <p className="text-sm text-gray-500 mb-1">Demandeur</p>
                 <p className="text-base">{selectedRequest.requestedBy}</p>
               </div>
               {selectedRequest.approvedBy && (
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-2xl">
                   <p className="text-sm text-gray-500 mb-1">Approuvé par</p>
                   <p className="text-base">{selectedRequest.approvedBy}</p>
                 </div>
               )}
               {selectedRequest.autoCreatedOrderCode && (
-                <div className="p-4 bg-green-50 rounded-lg col-span-2">
+                <div className="p-4 bg-green-50 rounded-2xl col-span-2">
                   <p className="text-sm text-green-600 mb-1">
                     Bon de commande créé automatiquement
                   </p>
@@ -552,7 +552,7 @@ export const PurchaseRequestsList: React.FC = () => {
                 </div>
               )}
               {selectedRequest.rejectionReason && (
-                <div className="p-4 bg-red-50 rounded-lg col-span-2">
+                <div className="p-4 bg-red-50 rounded-2xl col-span-2">
                   <p className="text-sm text-red-500 mb-1">Motif de rejet</p>
                   <p className="text-base text-red-700">
                     {selectedRequest.rejectionReason}
@@ -569,10 +569,10 @@ export const PurchaseRequestsList: React.FC = () => {
                 {selectedRequest.lines?.map((line, idx) => (
                   <div
                     key={idx}
-                    className="flex justify-between items-center p-4 bg-gray-50 rounded-lg"
+                    className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 sm:p-5 bg-gray-50 rounded-2xl"
                   >
                     <div>
-                      <p className="font-medium text-base">
+                      <p className="font-medium text-sm sm:text-base">
                         {line.itemName || line.itemCode}
                       </p>
                       <p className="text-sm text-gray-500 font-mono">
@@ -583,7 +583,7 @@ export const PurchaseRequestsList: React.FC = () => {
                       <p className="text-base">
                         {line.quantity} × {line.unitCost.toLocaleString()} FCFA
                       </p>
-                      <p className="font-bold text-base">
+                      <p className="font-bold text-sm sm:text-base">
                         {(line.quantity * line.unitCost).toLocaleString()} FCFA
                       </p>
                     </div>
@@ -591,7 +591,7 @@ export const PurchaseRequestsList: React.FC = () => {
                 ))}
               </div>
               {selectedRequest.lines && selectedRequest.lines.length > 0 && (
-                <div className="flex justify-between font-bold text-lg pt-4 border-t mt-3">
+                <div className="flex justify-between font-bold text-lg pt-4 ring-1 ring-gray-100 mt-3">
                   <span>Total</span>
                   <span>
                     {selectedRequest.lines
@@ -609,18 +609,18 @@ export const PurchaseRequestsList: React.FC = () => {
       {/* ========== MODAL REJET - AGRANDI ========== */}
       {rejectModal && (
         <ModalPortal onClose={() => setRejectModal(null)}>
-          <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-2xl font-bold">Rejeter la demande</h3>
+          <div className="sticky top-0 bg-white ring-1 ring-gray-100 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
+            <h3 className="text-lg sm:text-xl sm:text-2xl font-bold">Rejeter la demande</h3>
             <button
               onClick={() => setRejectModal(null)}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              className="p-2 hover:bg-gray-100 rounded-2xl"
             >
               <X size={24} />
             </button>
           </div>
           <div className="p-8 space-y-6">
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Motif du rejet *
               </label>
               <textarea
@@ -628,13 +628,13 @@ export const PurchaseRequestsList: React.FC = () => {
                 onChange={(e) => setRejectReason(e.target.value)}
                 rows={4}
                 placeholder="Expliquez le motif du rejet..."
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg resize-none text-base"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl resize-none text-sm sm:text-base"
               />
             </div>
-            <div className="flex gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
               <button
                 onClick={() => setRejectModal(null)}
-                className="flex-1 px-5 py-3 border rounded-lg text-gray-700 hover:bg-gray-50 text-base"
+                className="flex-1 px-4 py-3 sm:px-5 ring-1 rounded-2xl text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
               >
                 Annuler
               </button>
@@ -649,7 +649,7 @@ export const PurchaseRequestsList: React.FC = () => {
                   }
                 }}
                 disabled={!rejectReason || rejectMutation.isPending}
-                className="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2 text-base font-medium"
+                className="flex-1 bg-red-600 text-white py-3 rounded-2xl hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base font-medium"
               >
                 {rejectMutation.isPending ? (
                   <Loader2 size={20} className="animate-spin" />

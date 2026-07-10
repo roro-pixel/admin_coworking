@@ -45,8 +45,8 @@ export const LotsList: React.FC = () => {
 
   return (
     <div className="p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-semibold text-gray-900">Lots traçables</h3>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+        <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Lots traçables</h3>
       </div>
 
       {/* Filtres - AGRANDIS */}
@@ -61,7 +61,7 @@ export const LotsList: React.FC = () => {
             placeholder="Rechercher un lot..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg text-base"
+            className="w-full pl-12 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
           />
         </div>
         <input
@@ -69,45 +69,45 @@ export const LotsList: React.FC = () => {
           placeholder="Code article"
           value={itemCode}
           onChange={(e) => setItemCode(e.target.value)}
-          className="px-4 py-3 border border-gray-200 rounded-lg text-base min-w-[180px]"
+          className="px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base min-w-[180px]"
         />
         <input
           type="text"
           placeholder="Emplacement"
           value={locationCode}
           onChange={(e) => setLocationCode(e.target.value)}
-          className="px-4 py-3 border border-gray-200 rounded-lg text-base min-w-[180px]"
+          className="px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base min-w-[180px]"
         />
       </div>
 
       {/* Tableau - AGRANDI */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-base">
-          <thead className="bg-gray-50 border-b">
+      <div className="bg-white rounded-3xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+        <table className="w-full text-sm sm:text-base block md:table">
+          <thead className="bg-gray-50 ring-1 ring-gray-100 hidden md:table-header-group">
             <tr>
-              <th className="px-5 py-4 text-left font-semibold">Lot</th>
-              <th className="px-5 py-4 text-left font-semibold">Article</th>
-              <th className="px-5 py-4 text-left font-semibold">Emplacement</th>
-              <th className="px-5 py-4 text-right font-semibold">Quantité</th>
-              <th className="px-5 py-4 text-left font-semibold">Expiration</th>
-              <th className="px-5 py-4 text-left font-semibold">Statut</th>
+              <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Lot</th>
+              <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Article</th>
+              <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Emplacement</th>
+              <th className="px-5 py-4 text-right font-semibold hidden md:table-cell">Quantité</th>
+              <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Expiration</th>
+              <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Statut</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="space-y-2 md:space-y-0 block md:table-row-group">
             {filteredLots.map((lot: any) => {
               const expired = isExpired(lot.expiryDate);
               const expiringSoon = isExpiringSoon(lot.expiryDate);
               return (
-                <tr key={lot.lotCode} className="hover:bg-gray-50">
-                  <td className="px-5 py-4 font-mono text-sm">
+                <tr key={lot.lotCode} className="hover:bg-gray-50 block md:table-row rounded-3xl bg-white p-4 mb-3 shadow-sm ring-1 ring-gray-100">
+                  <td className="px-5 py-4 font-mono text-sm flex justify-between gap-4 md:table-cell text-sm">
                     {lot.lotNumber}
                   </td>
-                  <td className="px-5 py-4 font-medium">{lot.itemName}</td>
-                  <td className="px-5 py-4">{lot.locationName}</td>
-                  <td className="px-5 py-4 text-right font-medium">
+                  <td className="px-5 py-4 font-medium flex justify-between gap-4 md:table-cell text-sm">{lot.itemName}</td>
+                  <td className="px-5 py-4 flex justify-between gap-4 md:table-cell text-sm">{lot.locationName}</td>
+                  <td className="px-5 py-4 text-right font-medium flex justify-between gap-4 md:table-cell text-sm">
                     {lot.quantityAvailable}
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-5 py-4 flex justify-between gap-4 md:table-cell text-sm">
                     {lot.expiryDate ? (
                       <span
                         className={
@@ -124,19 +124,19 @@ export const LotsList: React.FC = () => {
                       "-"
                     )}
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-5 py-4 flex justify-between gap-4 md:table-cell text-sm">
                     {expired ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-red-100 text-red-700">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-red-100 text-red-700 w-full sm:w-auto justify-center">
                         <AlertTriangle size={14} />
                         Expiré
                       </span>
                     ) : expiringSoon ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-orange-100 text-orange-700">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-orange-100 text-orange-700 w-full sm:w-auto justify-center">
                         <AlertTriangle size={14} />
                         Expire bientôt
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-green-100 text-green-700">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-green-100 text-green-700 w-full sm:w-auto justify-center">
                         <Package size={14} />
                         Valide
                       </span>
@@ -150,8 +150,8 @@ export const LotsList: React.FC = () => {
       </div>
 
       {filteredLots.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-xl">
-          <p className="text-gray-500 text-base">Aucun lot trouvé</p>
+        <div className="text-center py-16 bg-white rounded-3xl">
+          <p className="text-gray-500 text-sm sm:text-base">Aucun lot trouvé</p>
         </div>
       )}
     </div>

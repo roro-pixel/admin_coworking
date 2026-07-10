@@ -78,23 +78,23 @@ export const ImportPage: React.FC = () => {
   };
 
   return (
-    <div className="p-4">
-      <h2 className="text-xl font-semibold text-gray-900 mb-8 text-2xl">
+    <div className="p-3 sm:p-4">
+      <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-8">
         Import massif
       </h2>
 
-      <div className="bg-white rounded-xl p-8 shadow-sm max-w-6xl mx-auto">
-        <div className="grid md:grid-cols-2 gap-12">
+      <div className="bg-white rounded-3xl p-5 sm:p-5 sm:p-8 shadow-sm ring-1 ring-gray-100 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
           {/* Formulaire d'import - AGRANDI */}
           <div className="space-y-8">
             <div className="mb-8">
-              <label className="block text-base font-medium text-gray-700 mb-3">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-3">
                 Type d'import *
               </label>
               <select
                 value={importType}
                 onChange={(e) => setImportType(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
               >
                 {importTypes.map((type) => (
                   <option key={type.value} value={type.value}>
@@ -105,13 +105,13 @@ export const ImportPage: React.FC = () => {
             </div>
 
             <div className="mb-8">
-              <label className="block text-base font-medium text-gray-700 mb-3">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-3">
                 Fichier CSV/Excel
               </label>
               <div
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors ${
+                className={`border-2 border-dashed rounded-2xl p-12 text-center transition-colors ${
                   file
                     ? "border-green-500 bg-green-50"
                     : "border-gray-300 hover:border-primary-400"
@@ -121,7 +121,7 @@ export const ImportPage: React.FC = () => {
                   <div className="flex items-center justify-center gap-4">
                     <CheckCircle size={40} className="text-green-600" />
                     <div>
-                      <p className="font-medium text-base">{file.name}</p>
+                      <p className="font-medium text-sm sm:text-base">{file.name}</p>
                       <p className="text-sm text-gray-500">
                         {(file.size / 1024).toFixed(0)} KB
                       </p>
@@ -136,10 +136,10 @@ export const ImportPage: React.FC = () => {
                 ) : (
                   <>
                     <Upload size={64} className="mx-auto text-gray-400 mb-6" />
-                    <p className="text-gray-600 mb-3 text-base">
+                    <p className="text-gray-600 mb-3 text-sm sm:text-base">
                       Glissez-déposez votre fichier ici ou
                     </p>
-                    <label className="inline-block px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 cursor-pointer text-base">
+                    <label className="inline-block px-4 py-3 bg-primary-600 text-white rounded-2xl hover:bg-primary-700 cursor-pointer text-sm sm:text-base">
                       Parcourir
                       <input
                         type="file"
@@ -156,10 +156,10 @@ export const ImportPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <button
                 onClick={downloadTemplate}
-                className="flex-1 px-6 py-3 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2 text-base"
+                className="flex-1 px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2 text-sm sm:text-base"
               >
                 <Download size={20} />
                 Télécharger le template
@@ -167,7 +167,7 @@ export const ImportPage: React.FC = () => {
               <button
                 onClick={() => importMutation.mutate()}
                 disabled={!file || importMutation.isPending}
-                className="flex-1 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 text-base"
+                className="flex-1 justify-center bg-primary-600 text-white px-4 py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
               >
                 {importMutation.isPending ? (
                   <Loader2 size={20} className="animate-spin" />
@@ -179,7 +179,7 @@ export const ImportPage: React.FC = () => {
             </div>
 
             {error && (
-              <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-base">
+              <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-2 text-red-700 text-sm sm:text-base">
                 <AlertTriangle size={20} />
                 {error}
               </div>
@@ -188,22 +188,22 @@ export const ImportPage: React.FC = () => {
 
           {/* Résultat - AGRANDI */}
           {result && (
-            <div className="border-l border-gray-200 pl-12">
+            <div className="border-l ring-gray-100 pl-12">
               <h3 className="font-semibold text-gray-900 mb-6 text-xl">
                 Résultat de l'import
               </h3>
               <div className="space-y-4">
-                <div className="flex justify-between p-4 bg-gray-50 rounded-lg text-base">
+                <div className="flex justify-between p-4 bg-gray-50 rounded-2xl text-sm sm:text-base">
                   <span>Total lignes</span>
                   <span className="font-medium">{result.totalRows}</span>
                 </div>
-                <div className="flex justify-between p-4 bg-green-50 rounded-lg text-base">
+                <div className="flex justify-between p-4 bg-green-50 rounded-2xl text-sm sm:text-base">
                   <span>Importées avec succès</span>
                   <span className="font-medium text-green-700">
                     {result.successCount}
                   </span>
                 </div>
-                <div className="flex justify-between p-4 bg-red-50 rounded-lg text-base">
+                <div className="flex justify-between p-4 bg-red-50 rounded-2xl text-sm sm:text-base">
                   <span>En erreur</span>
                   <span className="font-medium text-red-700">
                     {result.errorCount}
@@ -212,14 +212,14 @@ export const ImportPage: React.FC = () => {
 
                 {result.rows && result.rows.length > 0 && (
                   <div className="mt-6">
-                    <h4 className="font-medium text-gray-900 mb-3 text-base">
+                    <h4 className="font-medium text-gray-900 mb-3 text-sm sm:text-base">
                       Détail des erreurs
                     </h4>
                     <div className="max-h-64 overflow-y-auto space-y-2">
                       {result.rows.map((row: any, idx: number) => (
                         <div
                           key={idx}
-                          className="p-3 bg-red-50 rounded-lg text-sm"
+                          className="p-3 bg-red-50 rounded-2xl text-sm"
                         >
                           <p className="font-mono text-xs">
                             Ligne {row.rowNumber}

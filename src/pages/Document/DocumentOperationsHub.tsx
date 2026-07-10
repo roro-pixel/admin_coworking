@@ -182,7 +182,7 @@ export const DocumentOperationsHub: React.FC = () => {
 
   const pendingApprovalsQuery = useQuery({
     queryKey: ["document-workflow-pending"],
-    queryFn: () => documentService.getMyPendingWorkflowApprovals({ size: 10 }),
+    queryFn: () => documentService.getMyPendingWorkflowApprovals(),
   });
 
   const permissionsQuery = useQuery({
@@ -213,7 +213,7 @@ export const DocumentOperationsHub: React.FC = () => {
 
   const folders = foldersQuery.data || [];
   const workflows = workflowsQuery.data || [];
-  const pendingApprovals = pendingApprovalsQuery.data?.content || [];
+  const pendingApprovals = pendingApprovalsQuery.data || [];
 
   const selectedWorkflow = useMemo(
     () =>
@@ -240,7 +240,6 @@ export const DocumentOperationsHub: React.FC = () => {
         space,
         parentCode: folderForm.parentCode || undefined,
         description: folderForm.description || undefined,
-        active: true,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["document-folders-roots"] });
@@ -299,12 +298,17 @@ export const DocumentOperationsHub: React.FC = () => {
       documentService.createWorkflow({
         name: workflowForm.name,
         description: workflowForm.description || undefined,
+        workflowType: "SEQUENTIAL",
         space,
-        active: true,
         steps: [workflowForm.step1, workflowForm.step2]
           .filter(Boolean)
-          .map((name, index) => ({ name, order: index + 1, required: true })),
-      }),
+          .map((stepName, index) => ({
+            stepName,
+            approverType: "ROLE",
+            approverValue: index === 0 ? "DOCUMENT_REVIEWER" : "COMPLIANCE",
+            required: true,
+          })),
+      } as any),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["document-workflows"] });
       setWorkflowForm({
@@ -361,11 +365,10 @@ export const DocumentOperationsHub: React.FC = () => {
   const shareMutation = useMutation({
     mutationFn: () => {
       const payload = {
-        expiresAt: shareForm.expiresAt || undefined,
+        expiresInHours: shareForm.expiresAt ? Number(shareForm.expiresAt) : 72,
         allowDownload: shareForm.allowDownload,
         password: shareForm.password || undefined,
-        note: shareForm.note || undefined,
-      };
+      } as any;
       return shareForm.targetType === "DOCUMENT"
         ? documentService.shareDocument(shareForm.targetCode, payload)
         : documentService.shareFolder(shareForm.targetCode, payload);

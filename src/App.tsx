@@ -42,6 +42,7 @@ import { SubscriptionDetailPage } from "./pages/Subscription/subscriptions/Subsc
 
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { KycCaseDetailPage } from "./pages/Document/KycCaseDetailPage";
 
 const queryClient = new QueryClient();
 
@@ -281,6 +282,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <BillingDocumentDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/documents/kyc/cases/:code"
+              element={
+                <ProtectedRoute>
+                  <KycCaseDetailPage />
                 </ProtectedRoute>
               }
             />

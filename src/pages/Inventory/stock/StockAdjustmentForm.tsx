@@ -163,16 +163,16 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
 
   return (
     <ModalPortal onClose={onClose} size="2xl">
-      <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
-        <h3 className="text-2xl font-bold">Ajustement de stock</h3>
-        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+      <div className="sticky top-0 bg-white ring-1 ring-gray-100 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
+        <h3 className="text-lg sm:text-xl sm:text-2xl font-bold">Ajustement de stock</h3>
+        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-2xl">
           <X size={24} />
         </button>
       </div>
       <div className="overflow-y-auto max-h-[80vh]">
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
           <div>
-            <label className="block text-base font-medium text-gray-700 mb-2">
+            <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
               Article *
             </label>
             <div className="relative">
@@ -188,17 +188,17 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
                   setShowItemResults(true);
                 }}
                 placeholder="Rechercher un article..."
-                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg text-base"
+                className="w-full pl-12 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
               />
             </div>
             {showItemResults && items.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute z-10 mt-1 w-full bg-white ring-1 rounded-2xl shadow-lg max-h-60 overflow-y-auto">
                 {items.map((item: InventoryItem) => (
                   <button
                     key={item.itemCode}
                     type="button"
                     onClick={() => selectItem(item)}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b text-base"
+                    className="w-full px-4 py-3 text-left hover:bg-gray-50 ring-1 ring-gray-100 text-sm sm:text-base"
                   >
                     <p className="font-medium">{item.name}</p>
                     <p className="text-sm text-gray-500">{item.itemCode}</p>
@@ -207,7 +207,7 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
               </div>
             )}
             {selectedItem && (
-              <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+              <div className="mt-3 p-3 bg-gray-50 rounded-2xl">
                 <p className="text-base font-medium">{selectedItem.name}</p>
                 <p className="text-sm text-gray-500">
                   Code: {selectedItem.itemCode}
@@ -217,14 +217,14 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
           </div>
 
           <div>
-            <label className="block text-base font-medium text-gray-700 mb-2">
+            <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
               Emplacement *
             </label>
             <select
               value={formData.locationCode}
               onChange={(e) => updateLocation(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+              className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
             >
               <option value="">Sélectionner</option>
               {locations.map((loc: any) => (
@@ -236,16 +236,16 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
           </div>
 
           {formData.locationCode && (
-            <div className="p-3 bg-gray-50 rounded-lg text-center">
+            <div className="p-3 bg-gray-50 rounded-2xl text-center">
               <p className="text-base text-gray-600">
                 Stock actuel:{" "}
-                <span className="font-bold text-xl">{currentStock}</span>
+                <span className="font-bold text-lg sm:text-xl">{currentStock}</span>
               </p>
             </div>
           )}
 
           <div>
-            <label className="block text-base font-medium text-gray-700 mb-2">
+            <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
               Variation (+, -) *
             </label>
             <input
@@ -258,12 +258,12 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
                 })
               }
               required
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+              className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
               placeholder="Ex: +10 ou -5"
             />
             {formData.quantityDelta !== 0 && (
               <div
-                className={`mt-3 p-3 rounded-lg text-base ${isIncrease ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
+                className={`mt-3 p-3 rounded-2xl text-sm sm:text-base ${isIncrease ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
               >
                 {isIncrease ? (
                   <>
@@ -288,7 +288,7 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Motif d'ajustement
               </label>
               <select
@@ -299,7 +299,7 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
                     reasonCode: e.target.value as StockOutReasonCode,
                   })
                 }
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base bg-white"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base bg-white"
               >
                 {reasonOptions.map((reason) => (
                   <option key={reason.value} value={reason.value}>
@@ -309,7 +309,7 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Détail du motif
               </label>
               <input
@@ -317,24 +317,24 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
                 onChange={(e) =>
                   setFormData({ ...formData, reasonDetails: e.target.value })
                 }
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                 placeholder="Correction après comptage, perte, casse..."
               />
             </div>
           </div>
 
           {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
+            <div className="p-4 bg-red-50 ring-1 ring-1 ring-red-100 rounded-2xl flex items-center gap-2 text-red-700">
               <AlertTriangle size={18} />
               <span className="text-base">{error}</span>
             </div>
           )}
 
-          <div className="flex gap-4 pt-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 pt-6">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-5 py-3 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 text-base"
+              className="flex-1 px-4 py-3 sm:px-5 ring-1 ring-gray-100 rounded-2xl text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
             >
               Annuler
             </button>
@@ -349,7 +349,7 @@ export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
                   formData.reasonCode === "OTHER" &&
                   !formData.reasonDetails)
               }
-              className="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 text-base font-medium"
+              className="flex-1 bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base font-medium w-full sm:w-auto justify-center"
             >
               {createMutation.isPending ? (
                 <Loader2 size={20} className="animate-spin" />

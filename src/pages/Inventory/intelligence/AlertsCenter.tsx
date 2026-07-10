@@ -158,18 +158,18 @@ export const AlertsCenter: React.FC = () => {
 
   return (
     <div className="p-4">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-2xl font-semibold text-gray-900">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
+        <h2 className="text-lg sm:text-xl sm:text-2xl font-semibold text-gray-900">
           Centre d'alertes
         </h2>
-        <div className="flex gap-4">
-          <div className="px-4 py-1.5 bg-red-100 text-red-700 rounded-full text-base font-medium">
+        <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
+          <div className="px-4 py-1.5 bg-red-100 text-red-700 rounded-full text-sm sm:text-base font-medium">
             {openCount} ouvertes
           </div>
-          <div className="px-4 py-1.5 bg-yellow-100 text-yellow-700 rounded-full text-base font-medium">
+          <div className="px-4 py-1.5 bg-yellow-100 text-yellow-700 rounded-full text-sm sm:text-base font-medium">
             {acknowledgedCount} accusées
           </div>
-          <div className="px-4 py-1.5 bg-green-100 text-green-700 rounded-full text-base font-medium">
+          <div className="px-4 py-1.5 bg-green-100 text-green-700 rounded-full text-sm sm:text-base font-medium">
             {resolvedCount} résolues
           </div>
         </div>
@@ -187,13 +187,13 @@ export const AlertsCenter: React.FC = () => {
             placeholder="Rechercher une alerte..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
+            className="w-full pl-12 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm sm:text-base"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-5 py-3 border border-gray-200 rounded-lg bg-white text-base min-w-[160px]"
+          className="px-5 py-3 ring-1 ring-gray-100 rounded-2xl bg-white text-sm sm:text-base min-w-[160px]"
         >
           <option value="">Tous les statuts</option>
           <option value="OPEN">Ouvertes</option>
@@ -204,7 +204,7 @@ export const AlertsCenter: React.FC = () => {
         <select
           value={alertTypeFilter}
           onChange={(e) => setAlertTypeFilter(e.target.value)}
-          className="px-5 py-3 border border-gray-200 rounded-lg bg-white text-base min-w-[200px]"
+          className="px-5 py-3 ring-1 ring-gray-100 rounded-2xl bg-white text-sm sm:text-base min-w-[200px]"
         >
           <option value="">Tous les types</option>
           <option value="LOW_STOCK">Stock bas</option>
@@ -231,7 +231,7 @@ export const AlertsCenter: React.FC = () => {
           return (
             <div
               key={alert.alertCode}
-              className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all"
+              className="bg-white rounded-3xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-all"
             >
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-5">
                 <div className="flex-1">
@@ -250,7 +250,7 @@ export const AlertsCenter: React.FC = () => {
                       {statusConfig[alert.status]?.label || alert.status}
                     </span>
                   </div>
-                  <p className="text-gray-800 text-base mb-3">
+                  <p className="text-gray-800 text-sm sm:text-base mb-3">
                     {alert.message}
                   </p>
                   <div className="flex flex-wrap gap-5 text-sm text-gray-500">
@@ -269,13 +269,13 @@ export const AlertsCenter: React.FC = () => {
                     </span>
                   </div>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
                   {alert.status === "OPEN" && (
                     <button
                       onClick={() =>
                         acknowledgeMutation.mutate(alert.alertCode)
                       }
-                      className="px-4 py-2 text-sm bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 font-medium"
+                      className="px-4 py-2 text-sm bg-yellow-100 text-yellow-700 rounded-2xl hover:bg-yellow-200 font-medium"
                     >
                       Accuser réception
                     </button>
@@ -287,7 +287,7 @@ export const AlertsCenter: React.FC = () => {
                         setResolveModal({ alertCode: alert.alertCode });
                         setResolveNote("");
                       }}
-                      className="px-4 py-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium"
+                      className="px-4 py-2 text-sm bg-green-100 text-green-700 rounded-2xl hover:bg-green-200 font-medium"
                     >
                       Résoudre
                     </button>
@@ -295,7 +295,7 @@ export const AlertsCenter: React.FC = () => {
                   {alert.status !== "DISMISSED" && (
                     <button
                       onClick={() => dismissMutation.mutate(alert.alertCode)}
-                      className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+                      className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-2xl hover:bg-gray-200 font-medium"
                     >
                       Ignorer
                     </button>
@@ -308,9 +308,9 @@ export const AlertsCenter: React.FC = () => {
       </div>
 
       {filteredAlerts.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-xl">
+        <div className="text-center py-16 bg-white rounded-3xl">
           <CheckCircle size={64} className="mx-auto text-green-300 mb-4" />
-          <p className="text-gray-500 text-base">Aucune alerte trouvée</p>
+          <p className="text-gray-500 text-sm sm:text-base">Aucune alerte trouvée</p>
           <p className="text-sm text-gray-400 mt-2">Tout est sous contrôle !</p>
         </div>
       )}
@@ -318,18 +318,18 @@ export const AlertsCenter: React.FC = () => {
       {/* Modal de résolution - AGRANDI */}
       {resolveModal && (
         <ModalPortal onClose={() => setResolveModal(null)}>
-          <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-2xl font-bold">Résoudre l'alerte</h3>
+          <div className="sticky top-0 bg-white ring-1 ring-gray-100 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
+            <h3 className="text-lg sm:text-xl sm:text-2xl font-bold">Résoudre l'alerte</h3>
             <button
               onClick={() => setResolveModal(null)}
-              className="p-2 hover:bg-gray-100 rounded-lg text-xl"
+              className="p-2 hover:bg-gray-100 rounded-2xl text-lg sm:text-xl"
             >
               ✕
             </button>
           </div>
           <div className="p-8 space-y-6">
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Note de résolution *
               </label>
               <textarea
@@ -337,13 +337,13 @@ export const AlertsCenter: React.FC = () => {
                 onChange={(e) => setResolveNote(e.target.value)}
                 rows={4}
                 placeholder="Décrivez comment le problème a été résolu..."
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg resize-none text-base"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl resize-none text-sm sm:text-base"
               />
             </div>
-            <div className="flex gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
               <button
                 onClick={() => setResolveModal(null)}
-                className="flex-1 px-5 py-3 border rounded-lg text-gray-700 hover:bg-gray-50 text-base"
+                className="flex-1 px-4 py-3 sm:px-5 ring-1 rounded-2xl text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
               >
                 Annuler
               </button>
@@ -358,7 +358,7 @@ export const AlertsCenter: React.FC = () => {
                   }
                 }}
                 disabled={!resolveNote || resolveMutation.isPending}
-                className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 text-base font-medium"
+                className="flex-1 bg-green-600 text-white py-3 rounded-2xl hover:bg-green-700 disabled:opacity-50 text-sm sm:text-base font-medium"
               >
                 Confirmer
               </button>

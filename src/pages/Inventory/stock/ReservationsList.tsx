@@ -52,14 +52,14 @@ export const ReservationsList: React.FC = () => {
 
   return (
     <div className="p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-semibold text-gray-900">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+        <h3 className="text-lg sm:text-xl font-semibold text-gray-900">
           Réservations de stock
         </h3>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-5 py-2.5 border border-gray-200 rounded-lg bg-white text-base"
+          className="px-5 py-2.5 ring-1 ring-gray-100 rounded-2xl bg-white text-sm sm:text-base"
         >
           <option value="">Tous les statuts</option>
           <option value="ACTIVE">Actives</option>
@@ -79,42 +79,42 @@ export const ReservationsList: React.FC = () => {
           placeholder="Rechercher une réservation..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg text-base"
+          className="w-full pl-12 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
         />
       </div>
 
       {/* Tableau - AGRANDI */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-base">
-          <thead className="bg-gray-50 border-b">
+      <div className="bg-white rounded-3xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+        <table className="w-full text-sm sm:text-base block md:table">
+          <thead className="bg-gray-50 ring-1 ring-gray-100 hidden md:table-header-group">
             <tr>
-              <th className="px-5 py-4 text-left font-semibold">Code</th>
-              <th className="px-5 py-4 text-left font-semibold">Article</th>
-              <th className="px-5 py-4 text-left font-semibold">Emplacement</th>
-              <th className="px-5 py-4 text-right font-semibold">Quantité</th>
-              <th className="px-5 py-4 text-left font-semibold">Référence</th>
-              <th className="px-5 py-4 text-left font-semibold">Statut</th>
-              <th className="px-5 py-4 text-left font-semibold">Date</th>
+              <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Code</th>
+              <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Article</th>
+              <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Emplacement</th>
+              <th className="px-5 py-4 text-right font-semibold hidden md:table-cell">Quantité</th>
+              <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Référence</th>
+              <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Statut</th>
+              <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Date</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="space-y-2 md:space-y-0 block md:table-row-group">
             {filteredReservations.map((res: any) => {
               const status = statusConfig[res.status] || statusConfig.ACTIVE;
               const StatusIcon = status.icon;
               return (
-                <tr key={res.reservationCode} className="hover:bg-gray-50">
-                  <td className="px-5 py-4 font-mono text-sm">
+                <tr key={res.reservationCode} className="hover:bg-gray-50 block md:table-row rounded-3xl bg-white p-4 mb-3 shadow-sm ring-1 ring-gray-100">
+                  <td className="px-5 py-4 font-mono text-sm flex justify-between gap-4 md:table-cell text-sm">
                     {res.reservationCode}
                   </td>
-                  <td className="px-5 py-4 font-medium">{res.itemName}</td>
-                  <td className="px-5 py-4">{res.locationName}</td>
-                  <td className="px-5 py-4 text-right font-medium">
+                  <td className="px-5 py-4 font-medium flex justify-between gap-4 md:table-cell text-sm">{res.itemName}</td>
+                  <td className="px-5 py-4 flex justify-between gap-4 md:table-cell text-sm">{res.locationName}</td>
+                  <td className="px-5 py-4 text-right font-medium flex justify-between gap-4 md:table-cell text-sm">
                     {res.quantity}
                   </td>
-                  <td className="px-5 py-4 text-gray-500">
+                  <td className="px-5 py-4 text-gray-500 flex justify-between gap-4 md:table-cell text-sm">
                     {res.referenceCode || "-"}
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-5 py-4 flex justify-between gap-4 md:table-cell text-sm">
                     <span
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs ${status.color}`}
                     >
@@ -122,7 +122,7 @@ export const ReservationsList: React.FC = () => {
                       {status.label}
                     </span>
                   </td>
-                  <td className="px-5 py-4 text-gray-500">
+                  <td className="px-5 py-4 text-gray-500 flex justify-between gap-4 md:table-cell text-sm">
                     {new Date(res.createdAt).toLocaleDateString("fr-FR")}
                   </td>
                 </tr>
@@ -133,8 +133,8 @@ export const ReservationsList: React.FC = () => {
       </div>
 
       {filteredReservations.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-xl">
-          <p className="text-gray-500 text-base">Aucune réservation trouvée</p>
+        <div className="text-center py-16 bg-white rounded-3xl">
+          <p className="text-gray-500 text-sm sm:text-base">Aucune réservation trouvée</p>
         </div>
       )}
     </div>

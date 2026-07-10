@@ -206,84 +206,84 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
 
   return (
     <ModalPortal onClose={onClose} size="2xl">
-      <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
-        <h3 className="text-2xl font-bold">
+      <div className="sticky top-0 bg-white p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
+        <h3 className="text-xl sm:text-2xl font-bold">
           {asset.assetCode} - {asset.itemName}
         </h3>
-        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-2xl">
           <X size={24} />
         </button>
       </div>
 
       {/* Onglets - AGRANDIS */}
-      <div className="border-b border-gray-200 px-8">
-        <div className="flex space-x-8">
+      <div className="ring-0 ring-gray-100 px-8">
+        <div className="flex min-w-max gap-2 sm:gap-4">
           <button
             onClick={() => setActiveTab("info")}
-            className={`py-4 text-base font-medium border-b-2 transition-colors ${activeTab === "info" ? "border-primary-600 text-primary-600" : "border-transparent text-gray-500"}`}
+            className={`py-4 text-sm sm:text-base font-medium ring-0-2 transition-colors ${activeTab === "info" ? "border-primary-600 text-primary-600" : "ring-0ransparent text-gray-500"}`}
           >
             Informations
           </button>
           <button
             onClick={() => setActiveTab("maintenance")}
-            className={`py-4 text-base font-medium border-b-2 transition-colors ${activeTab === "maintenance" ? "border-primary-600 text-primary-600" : "border-transparent text-gray-500"}`}
+            className={`py-4 text-sm sm:text-base font-medium ring-0-2 transition-colors ${activeTab === "maintenance" ? "border-primary-600 text-primary-600" : "ring-0ransparent text-gray-500"}`}
           >
             Maintenances
           </button>
           <button
             onClick={() => setActiveTab("history")}
-            className={`py-4 text-base font-medium border-b-2 transition-colors ${activeTab === "history" ? "border-primary-600 text-primary-600" : "border-transparent text-gray-500"}`}
+            className={`py-4 text-sm sm:text-base font-medium ring-0-2 transition-colors ${activeTab === "history" ? "border-primary-600 text-primary-600" : "ring-0ransparent text-gray-500"}`}
           >
             Historique
           </button>
         </div>
       </div>
 
-      <div className="p-8">
+      <div className="p-5 sm:p-8">
         {activeTab === "info" && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-6">
-              <div className="p-4 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:p-6">
+              <div className="p-4 bg-gray-50 rounded-2xl">
                 <p className="text-sm text-gray-500 mb-1">Statut</p>
-                <p className="font-medium text-base">
+                <p className="font-medium text-sm sm:text-base">
                   {statusOptions.find((s) => s.value === asset.status)?.label}
                 </p>
               </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-gray-50 rounded-2xl">
                 <p className="text-sm text-gray-500 mb-1">Condition</p>
-                <p className="font-medium text-base">{asset.condition}</p>
+                <p className="font-medium text-sm sm:text-base">{asset.condition}</p>
               </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-gray-50 rounded-2xl">
                 <p className="text-sm text-gray-500 mb-1">Emplacement</p>
-                <p className="font-medium text-base">{asset.locationName}</p>
+                <p className="font-medium text-sm sm:text-base">{asset.locationName}</p>
               </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-gray-50 rounded-2xl">
                 <p className="text-sm text-gray-500 mb-1">Numéro de série</p>
-                <p className="font-medium text-base">
+                <p className="font-medium text-sm sm:text-base">
                   {asset.serialNumber || "-"}
                 </p>
               </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-gray-50 rounded-2xl">
                 <p className="text-sm text-gray-500 mb-1">Tag</p>
-                <p className="font-medium text-base">{asset.assetTag || "-"}</p>
+                <p className="font-medium text-sm sm:text-base">{asset.assetTag || "-"}</p>
               </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-gray-50 rounded-2xl">
                 <p className="text-sm text-gray-500 mb-1">Coût d'achat</p>
-                <p className="font-medium text-base">
+                <p className="font-medium text-sm sm:text-base">
                   {asset.purchaseCost.toLocaleString()} FCFA
                 </p>
               </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-gray-50 rounded-2xl">
                 <p className="text-sm text-gray-500 mb-1">Date d'achat</p>
-                <p className="font-medium text-base">
+                <p className="font-medium text-sm sm:text-base">
                   {asset.purchaseDate
                     ? new Date(asset.purchaseDate).toLocaleDateString("fr-FR")
                     : "-"}
                 </p>
               </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-gray-50 rounded-2xl">
                 <p className="text-sm text-gray-500 mb-1">Fin garantie</p>
-                <p className="font-medium text-base">
+                <p className="font-medium text-sm sm:text-base">
                   {asset.warrantyEndDate
                     ? new Date(asset.warrantyEndDate).toLocaleDateString(
                         "fr-FR",
@@ -294,18 +294,18 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
             </div>
 
             {asset.notes && (
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-gray-50 rounded-2xl">
                 <p className="text-sm text-gray-500 mb-1">Notes</p>
-                <p className="text-base">{asset.notes}</p>
+                <p className="text-sm sm:text-base">{asset.notes}</p>
               </div>
             )}
 
             {/* Actions - AGRANDIES */}
-            <div className="flex flex-wrap gap-4 pt-6 border-t">
+            <div className="flex flex-wrap gap-4 pt-6 ring-0">
               {canAssign && (
                 <button
                   onClick={() => setShowAssignForm(!showAssignForm)}
-                  className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-base"
+                  className="px-4 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 text-sm sm:text-base"
                 >
                   Attribuer
                 </button>
@@ -313,7 +313,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
               {canReturn && (
                 <button
                   onClick={() => setShowReturnForm(!showReturnForm)}
-                  className="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-base"
+                  className="px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 text-sm sm:text-base"
                 >
                   Retourner
                 </button>
@@ -321,7 +321,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
               {canMaintain && (
                 <button
                   onClick={() => setShowMaintenanceForm(!showMaintenanceForm)}
-                  className="px-5 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-base"
+                  className="px-4 py-3 bg-orange-600 text-white rounded-2xl hover:bg-orange-700 text-sm sm:text-base"
                 >
                   Maintenance
                 </button>
@@ -329,7 +329,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
               {canReserve && (
                 <button
                   onClick={() => reserveMutation.mutate()}
-                  className="px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-base"
+                  className="px-4 py-3 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 text-sm sm:text-base"
                 >
                   Réserver
                 </button>
@@ -337,7 +337,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
               {canMarkDamaged && (
                 <button
                   onClick={() => markDamagedMutation.mutate()}
-                  className="px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-base"
+                  className="px-4 py-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 text-sm sm:text-base"
                 >
                   Marquer endommagé
                 </button>
@@ -345,7 +345,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
               {canRetire && (
                 <button
                   onClick={() => retireMutation.mutate()}
-                  className="px-5 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-base"
+                  className="px-4 py-3 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 text-sm sm:text-base"
                 >
                   Retirer
                 </button>
@@ -354,7 +354,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
 
             {/* Formulaire d'attribution - AGRANDI */}
             {showAssignForm && (
-              <div className="p-6 bg-gray-50 rounded-lg space-y-4">
+              <div className="p-5 sm:p-6 bg-gray-50 rounded-2xl space-y-4">
                 <h4 className="font-semibold text-lg">Attribuer l'actif</h4>
                 <select
                   value={assignData.assigneeType}
@@ -364,7 +364,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                       assigneeType: e.target.value,
                     })
                   }
-                  className="w-full px-4 py-3 border rounded-lg text-base"
+                  className="w-full px-4 py-3 border rounded-2xl text-sm sm:text-base"
                 >
                   <option value="MEMBER">Membre</option>
                   <option value="CUSTOMER">Customer</option>
@@ -382,7 +382,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                       assigneeCode: e.target.value,
                     })
                   }
-                  className="w-full px-4 py-3 border rounded-lg text-base"
+                  className="w-full px-4 py-3 border rounded-2xl text-sm sm:text-base"
                 />
                 <input
                   type="datetime-local"
@@ -393,7 +393,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                       expectedReturnAt: e.target.value,
                     })
                   }
-                  className="w-full px-4 py-3 border rounded-lg text-base"
+                  className="w-full px-4 py-3 border rounded-2xl text-sm sm:text-base"
                 />
                 <input
                   type="text"
@@ -402,7 +402,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                   onChange={(e) =>
                     setAssignData({ ...assignData, purpose: e.target.value })
                   }
-                  className="w-full px-4 py-3 border rounded-lg text-base"
+                  className="w-full px-4 py-3 border rounded-2xl text-sm sm:text-base"
                 />
                 <textarea
                   placeholder="Notes (optionnel)"
@@ -411,12 +411,12 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                     setAssignData({ ...assignData, notes: e.target.value })
                   }
                   rows={3}
-                  className="w-full px-4 py-3 border rounded-lg text-base"
+                  className="w-full px-4 py-3 border rounded-2xl text-sm sm:text-base"
                 />
-                <div className="flex gap-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
                   <button
                     onClick={() => setShowAssignForm(false)}
-                    className="flex-1 px-5 py-3 border rounded-lg text-gray-700 text-base"
+                    className="flex-1 px-5 py-3 border rounded-2xl text-gray-700 text-sm sm:text-base"
                   >
                     Annuler
                   </button>
@@ -428,7 +428,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                       !assignData.purpose ||
                       assignMutation.isPending
                     }
-                    className="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 text-base"
+                    className="flex-1 justify-center bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 text-sm sm:text-base"
                   >
                     {assignMutation.isPending ? (
                       <Loader2 size={20} className="animate-spin" />
@@ -442,7 +442,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
 
             {/* Formulaire maintenance - AGRANDI */}
             {showMaintenanceForm && (
-              <div className="p-6 bg-gray-50 rounded-lg space-y-4">
+              <div className="p-5 sm:p-6 bg-gray-50 rounded-2xl space-y-4">
                 <h4 className="font-semibold text-lg">
                   Demande de maintenance
                 </h4>
@@ -454,7 +454,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                       maintenanceType: e.target.value,
                     })
                   }
-                  className="w-full px-4 py-3 border rounded-lg text-base"
+                  className="w-full px-4 py-3 border rounded-2xl text-sm sm:text-base"
                 >
                   <option value="PREVENTIVE">Préventive</option>
                   <option value="CORRECTIVE">Corrective</option>
@@ -470,7 +470,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                     })
                   }
                   rows={4}
-                  className="w-full px-4 py-3 border rounded-lg text-base"
+                  className="w-full px-4 py-3 border rounded-2xl text-sm sm:text-base"
                   required
                 />
                 <input
@@ -483,12 +483,12 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                       scheduledDate: e.target.value,
                     })
                   }
-                  className="w-full px-4 py-3 border rounded-lg text-base"
+                  className="w-full px-4 py-3 border rounded-2xl text-sm sm:text-base"
                 />
-                <div className="flex gap-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
                   <button
                     onClick={() => setShowMaintenanceForm(false)}
-                    className="flex-1 px-5 py-3 border rounded-lg text-gray-700 text-base"
+                    className="flex-1 px-5 py-3 border rounded-2xl text-gray-700 text-sm sm:text-base"
                   >
                     Annuler
                   </button>
@@ -498,7 +498,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                       !maintenanceData.description ||
                       createMaintenanceMutation.isPending
                     }
-                    className="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 text-base"
+                    className="flex-1 justify-center bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 text-sm sm:text-base"
                   >
                     {createMaintenanceMutation.isPending ? (
                       <Loader2 size={20} className="animate-spin" />
@@ -511,7 +511,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
             )}
 
             {lastAssignment?.assignmentId && (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div className="p-4 bg-green-50 border border-green-200 rounded-2xl flex flex-col lg:flex-row md:items-center md:justify-between gap-3">
                 <div>
                   <p className="font-medium text-green-800">
                     Actif attribué avec succès
@@ -522,7 +522,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                 </div>
                 <button
                   onClick={() => downloadLoanSheet(lastAssignment.assignmentId)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                  className="px-4 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 text-sm"
                 >
                   Télécharger la fiche de prêt
                 </button>
@@ -531,7 +531,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
 
             {/* Formulaire de retour - AGRANDI */}
             {showReturnForm && (
-              <div className="p-6 bg-gray-50 rounded-lg space-y-4">
+              <div className="p-5 sm:p-6 bg-gray-50 rounded-2xl space-y-4">
                 <h4 className="font-semibold text-lg">Retourner l'actif</h4>
                 <select
                   value={returnData.returnedToLocationCode}
@@ -541,7 +541,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                       returnedToLocationCode: e.target.value,
                     })
                   }
-                  className="w-full px-4 py-3 border rounded-lg text-base"
+                  className="w-full px-4 py-3 border rounded-2xl text-sm sm:text-base"
                 >
                   {locations.map((loc: any) => (
                     <option key={loc.locationCode} value={loc.locationCode}>
@@ -554,7 +554,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                   onChange={(e) =>
                     setReturnData({ ...returnData, condition: e.target.value })
                   }
-                  className="w-full px-4 py-3 border rounded-lg text-base"
+                  className="w-full px-4 py-3 border rounded-2xl text-sm sm:text-base"
                 >
                   <option value="NEW">Neuf</option>
                   <option value="GOOD">Bon</option>
@@ -569,19 +569,19 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                     setReturnData({ ...returnData, notes: e.target.value })
                   }
                   rows={3}
-                  className="w-full px-4 py-3 border rounded-lg text-base"
+                  className="w-full px-4 py-3 border rounded-2xl text-sm sm:text-base"
                 />
-                <div className="flex gap-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
                   <button
                     onClick={() => setShowReturnForm(false)}
-                    className="flex-1 px-5 py-3 border rounded-lg text-gray-700 text-base"
+                    className="flex-1 px-5 py-3 border rounded-2xl text-gray-700 text-sm sm:text-base"
                   >
                     Annuler
                   </button>
                   <button
                     onClick={() => returnMutation.mutate()}
                     disabled={returnMutation.isPending}
-                    className="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 text-base"
+                    className="flex-1 justify-center bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 text-sm sm:text-base"
                   >
                     {returnMutation.isPending ? (
                       <Loader2 size={20} className="animate-spin" />
@@ -598,7 +598,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
         {activeTab === "maintenance" && (
           <div className="text-center py-12 text-gray-500">
             <Wrench size={64} className="mx-auto mb-6 text-gray-300" />
-            <p className="text-base">Liste des maintenances à venir...</p>
+            <p className="text-sm sm:text-base">Liste des maintenances à venir...</p>
           </div>
         )}
 
@@ -608,15 +608,15 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
               locationHistory.map((h: any, idx: number) => (
                 <div
                   key={idx}
-                  className="flex justify-between items-center p-4 bg-gray-50 rounded-lg"
+                  className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-gray-50 rounded-2xl"
                 >
                   <div>
-                    <p className="font-medium text-base">{h.locationName}</p>
+                    <p className="font-medium text-sm sm:text-base">{h.locationName}</p>
                     <p className="text-sm text-gray-500">
                       Déplacé par: {h.movedBy}
                     </p>
                   </div>
-                  <p className="text-base text-gray-500">
+                  <p className="text-sm sm:text-base text-gray-500">
                     {new Date(h.movedAt).toLocaleDateString("fr-FR")}
                   </p>
                 </div>
@@ -624,7 +624,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
             ) : (
               <div className="text-center py-12 text-gray-500">
                 <Clock size={64} className="mx-auto mb-6 text-gray-300" />
-                <p className="text-base">Aucun historique de localisation</p>
+                <p className="text-sm sm:text-base">Aucun historique de localisation</p>
               </div>
             )}
           </div>

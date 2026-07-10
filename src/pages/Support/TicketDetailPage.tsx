@@ -36,6 +36,31 @@ const statusConfig: Record<TicketStatus, { label: string; color: string }> = {
   RESOLVED: { label: "Résolu", color: "bg-green-100 text-green-700" },
   CLOSED: { label: "Fermé", color: "bg-gray-100 text-gray-600" },
 };
+const ticketStatusOptions: TicketStatus[] = [
+  "OPEN",
+  "IN_PROGRESS",
+  "WAITING_CLIENT",
+  "RESOLVED",
+  "CLOSED",
+];
+
+const getNextTicketStatuses = (status: TicketStatus): TicketStatus[] => {
+  switch (status) {
+    case "OPEN":
+      return ["IN_PROGRESS", "WAITING_CLIENT", "RESOLVED", "CLOSED"];
+    case "IN_PROGRESS":
+      return ["WAITING_CLIENT", "RESOLVED", "CLOSED"];
+    case "WAITING_CLIENT":
+      return ["IN_PROGRESS", "RESOLVED", "CLOSED"];
+    case "RESOLVED":
+      return ["CLOSED", "OPEN"];
+    case "CLOSED":
+      return ["OPEN"];
+    default:
+      return [];
+  }
+};
+
 const priorityConfig: Record<string, { label: string; color: string }> = {
   LOW: { label: "Faible", color: "bg-gray-100 text-gray-600" },
   MEDIUM: { label: "Moyen", color: "bg-blue-100 text-blue-700" },
@@ -112,6 +137,8 @@ export const TicketDetailPage: React.FC = () => {
       queryKey: ["support-ticket", ticketNumber],
     });
     queryClient.invalidateQueries({ queryKey: ["support-tickets"] });
+    queryClient.invalidateQueries({ queryKey: ["support-metrics"] });
+    queryClient.invalidateQueries({ queryKey: ["support-ticket-analytics"] });
     refetch();
   };
 
@@ -126,6 +153,19 @@ export const TicketDetailPage: React.FC = () => {
   useTicketRealtime(ticketNumber, {
     enabled: activeTab === "conversation",
     onMessage: handleRealtimeTicketMessage,
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: (status: TicketStatus) =>
+      operationsService.updateTicketStatus(ticketNumber!, status),
+    onSuccess: () => {
+      invalidate();
+      refetchTimeline();
+    },
+    onError: (e: any) =>
+      setActionError(
+        e?.response?.data?.message || "Erreur changement statut du ticket",
+      ),
   });
 
   const assignMutation = useMutation({
@@ -361,6 +401,49 @@ export const TicketDetailPage: React.FC = () => {
                   <Shuffle size={15} /> Aléatoire
                 </button>
               </div>
+              <div className="rounded-xl bg-gray-50 p-3 ring-1 ring-gray-100">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500">
+                      Statut du ticket
+                    </p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {statusConfig[ticket.status]?.label}
+                    </p>
+                  </div>
+                  <select
+                    value={ticket.status}
+                    onChange={(e) =>
+                      statusMutation.mutate(e.target.value as TicketStatus)
+                    }
+                    disabled={statusMutation.isPending}
+                    className="w-full rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-100 disabled:opacity-50 sm:w-auto"
+                  >
+                    {ticketStatusOptions.map((status) => (
+                      <option key={status} value={status}>
+                        {statusConfig[status]?.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {getNextTicketStatuses(ticket.status).map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => statusMutation.mutate(status)}
+                      disabled={statusMutation.isPending}
+                      className={`rounded-full px-3 py-1 text-xs font-medium disabled:opacity-50 ${statusConfig[status]?.color}`}
+                    >
+                      {statusMutation.isPending
+                        ? "Mise à jour..."
+                        : statusConfig[status]?.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <p className="text-xs text-gray-500">
                 Assigné : {ticket.assignedTo || "non assigné"}
               </p>
@@ -513,7 +596,10 @@ export const TicketDetailPage: React.FC = () => {
           {activeTab === "timeline" && (
             <div className="p-4 sm:p-6 space-y-3">
               {timeline.map((e: any, i) => (
-                <div key={e.id || i} className="flex flex-col sm:flex-row gap-3">
+                <div
+                  key={e.id || i}
+                  className="flex flex-col sm:flex-row gap-3"
+                >
                   <div className="mt-1 w-2 h-2 rounded-full bg-primary-600" />
                   <div>
                     <p className="font-medium text-sm">{e.eventType}</p>

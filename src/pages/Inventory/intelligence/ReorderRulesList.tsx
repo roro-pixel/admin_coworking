@@ -161,21 +161,21 @@ export const ReorderRulesList: React.FC = () => {
 
   return (
     <div className="p-4">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-2xl font-semibold text-gray-900">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
+        <h2 className="text-lg sm:text-xl sm:text-2xl font-semibold text-gray-900">
           Règles de réapprovisionnement
         </h2>
-        <div className="flex gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
           <button
             onClick={() => setShowSuggestions(!showSuggestions)}
-            className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 flex items-center gap-2 text-base font-medium"
+            className="bg-blue-600 text-white px-4 py-2.5 sm:px-5 rounded-2xl hover:bg-blue-700 flex items-center gap-2 text-sm sm:text-base font-medium"
           >
             <TrendingUp size={20} />
             Suggestions
           </button>
           <button
             onClick={() => handleOpenModal()}
-            className="bg-primary-600 text-white px-5 py-2.5 rounded-lg hover:bg-primary-700 flex items-center gap-2 text-base font-medium"
+            className="bg-primary-600 text-white px-4 py-2.5 sm:px-5 rounded-2xl hover:bg-primary-700 flex items-center gap-2 text-sm sm:text-base font-medium w-full sm:w-auto justify-center"
           >
             <Plus size={20} />
             Nouvelle règle
@@ -194,26 +194,26 @@ export const ReorderRulesList: React.FC = () => {
           placeholder="Rechercher une règle..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
+          className="w-full pl-12 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm sm:text-base"
         />
       </div>
 
       {/* Suggestions de réapprovisionnement - AGRANDIES */}
       {showSuggestions && (
         <div className="mb-8">
-          <h3 className="text-xl font-semibold text-gray-900 mb-5">
+          <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-5">
             Suggestions de réapprovisionnement
           </h3>
           <div className="space-y-4">
             {suggestions.map((suggestion: any) => (
               <div
                 key={suggestion.suggestionCode}
-                className="bg-yellow-50 border border-yellow-200 rounded-xl p-5"
+                className="bg-yellow-50 ring-1 border-yellow-200 rounded-2xl p-4 sm:p-5"
               >
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 flex-wrap">
-                      <p className="font-semibold text-base">
+                      <p className="font-semibold text-sm sm:text-base">
                         {suggestion.itemName}
                       </p>
                       {suggestion.severity && (
@@ -273,7 +273,7 @@ export const ReorderRulesList: React.FC = () => {
                       createRequestFromSuggestionMutation.mutate(suggestion)
                     }
                     disabled={createRequestFromSuggestionMutation.isPending}
-                    className="px-5 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-base font-medium"
+                    className="px-5 py-2.5 bg-primary-600 text-white rounded-2xl hover:bg-primary-700 disabled:opacity-50 text-sm sm:text-base font-medium w-full sm:w-auto justify-center"
                   >
                     Créer une demande d'achat
                   </button>
@@ -281,9 +281,9 @@ export const ReorderRulesList: React.FC = () => {
               </div>
             ))}
             {suggestions.length === 0 && (
-              <div className="text-center py-12 bg-gray-50 rounded-xl">
+              <div className="text-center py-12 bg-gray-50 rounded-2xl">
                 <Package size={64} className="mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-500 text-base">
+                <p className="text-gray-500 text-sm sm:text-base">
                   Aucune suggestion de réapprovisionnement
                 </p>
               </div>
@@ -293,39 +293,39 @@ export const ReorderRulesList: React.FC = () => {
       )}
 
       {/* Liste des règles - AGRANDIE */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-base">
-          <thead className="bg-gray-50 border-b">
+      <div className="bg-white rounded-3xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+        <table className="w-full text-sm sm:text-base block md:table">
+          <thead className="bg-gray-50 ring-1 ring-gray-100 hidden md:table-header-group">
             <tr>
-              <th className="px-6 py-4 text-left font-semibold">Article</th>
-              <th className="px-6 py-4 text-left font-semibold">Emplacement</th>
-              <th className="px-6 py-4 text-right font-semibold">Seuil min</th>
-              <th className="px-6 py-4 text-right font-semibold">
+              <th className="px-6 py-4 text-left font-semibold hidden md:table-cell">Article</th>
+              <th className="px-6 py-4 text-left font-semibold hidden md:table-cell">Emplacement</th>
+              <th className="px-6 py-4 text-right font-semibold hidden md:table-cell">Seuil min</th>
+              <th className="px-6 py-4 text-right font-semibold hidden md:table-cell">
                 Qté réappro
               </th>
-              <th className="px-6 py-4 text-center font-semibold">Actif</th>
-              <th className="px-6 py-4 text-right font-semibold">Actions</th>
+              <th className="px-6 py-4 text-center font-semibold hidden md:table-cell">Actif</th>
+              <th className="px-6 py-4 text-right font-semibold hidden md:table-cell">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="space-y-2 md:space-y-0 block md:table-row-group">
             {filteredRules.map((rule: ReorderRule) => (
-              <tr key={rule.ruleCode} className="hover:bg-gray-50">
-                <td className="px-6 py-4 font-medium">
+              <tr key={rule.ruleCode} className="hover:bg-gray-50 block md:table-row rounded-3xl bg-white p-4 mb-3 shadow-sm ring-1 ring-gray-100">
+                <td className="px-6 py-4 font-medium flex justify-between gap-4 md:table-cell text-sm">
                   {rule.itemName} ({rule.itemCode})
                 </td>
-                <td className="px-6 py-4">{rule.locationName}</td>
-                <td className="px-6 py-4 text-right font-medium">
+                <td className="px-6 py-4 flex justify-between gap-4 md:table-cell text-sm">{rule.locationName}</td>
+                <td className="px-6 py-4 text-right font-medium flex justify-between gap-4 md:table-cell text-sm">
                   {rule.minimumQuantity}
                 </td>
-                <td className="px-6 py-4 text-right">{rule.reorderQuantity}</td>
-                <td className="px-6 py-4 text-center">
+                <td className="px-6 py-4 text-right flex justify-between gap-4 md:table-cell text-sm">{rule.reorderQuantity}</td>
+                <td className="px-6 py-4 text-center flex justify-between gap-4 md:table-cell text-sm">
                   <span
                     className={`px-2.5 py-1 rounded-full text-xs ${rule.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
                   >
                     {rule.active ? "Actif" : "Inactif"}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-right">
+                <td className="px-6 py-4 text-right flex justify-between gap-4 md:table-cell text-sm">
                   <button
                     onClick={() => handleOpenModal(rule)}
                     className="p-1.5 text-blue-600 hover:text-blue-800 mr-2"
@@ -346,9 +346,9 @@ export const ReorderRulesList: React.FC = () => {
       </div>
 
       {filteredRules.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-xl">
+        <div className="text-center py-16 bg-white rounded-3xl">
           <Package size={64} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500 text-base">
+          <p className="text-gray-500 text-sm sm:text-base">
             Aucune règle de réapprovisionnement configurée
           </p>
         </div>
@@ -357,21 +357,21 @@ export const ReorderRulesList: React.FC = () => {
       {/* Modal de création/édition - AGRANDI */}
       {isModalOpen && (
         <ModalPortal onClose={handleCloseModal} size="2xl">
-          <div className="relative bg-white rounded-2xl w-full max-w-lg">
-            <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
-              <h3 className="text-2xl font-bold">
+          <div className="relative bg-white rounded-3xl w-full max-w-lg">
+            <div className="sticky top-0 bg-white ring-1 ring-gray-100 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
+              <h3 className="text-lg sm:text-xl sm:text-2xl font-bold">
                 {editingRule ? "Modifier" : "Nouvelle"} règle
               </h3>
               <button
                 onClick={handleCloseModal}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-2 hover:bg-gray-100 rounded-2xl"
               >
                 <X size={24} />
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-8 space-y-6">
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Article *
                 </label>
                 <div className="relative">
@@ -383,16 +383,16 @@ export const ReorderRulesList: React.FC = () => {
                       setShowItemResults(true);
                     }}
                     placeholder="Rechercher un article..."
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                    className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                   />
                   {showItemResults && items.length > 0 && (
-                    <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <div className="absolute z-10 mt-1 w-full bg-white ring-1 rounded-2xl shadow-lg max-h-60 overflow-y-auto">
                       {items.map((item: InventoryItem) => (
                         <button
                           key={item.itemCode}
                           type="button"
                           onClick={() => selectItem(item)}
-                          className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b text-base"
+                          className="w-full px-4 py-3 text-left hover:bg-gray-50 ring-1 ring-gray-100 text-sm sm:text-base"
                         >
                           <p className="font-medium">{item.name}</p>
                           <p className="text-sm text-gray-500">
@@ -405,7 +405,7 @@ export const ReorderRulesList: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Emplacement *
                 </label>
                 <select
@@ -414,7 +414,7 @@ export const ReorderRulesList: React.FC = () => {
                     setFormData({ ...formData, locationCode: e.target.value })
                   }
                   required
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                 >
                   <option value="">Sélectionner</option>
                   {locations.map((loc: any) => (
@@ -426,7 +426,7 @@ export const ReorderRulesList: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-base font-medium text-gray-700 mb-2">
+                  <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                     Seuil minimum *
                   </label>
                   <input
@@ -440,11 +440,11 @@ export const ReorderRulesList: React.FC = () => {
                     }
                     required
                     min="0"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                    className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                   />
                 </div>
                 <div>
-                  <label className="block text-base font-medium text-gray-700 mb-2">
+                  <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                     Quantité de réappro *
                   </label>
                   <input
@@ -458,7 +458,7 @@ export const ReorderRulesList: React.FC = () => {
                     }
                     required
                     min="0"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                    className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                   />
                 </div>
               </div>
@@ -473,11 +473,11 @@ export const ReorderRulesList: React.FC = () => {
                 />
                 <span className="text-base">Actif</span>
               </label>
-              <div className="flex gap-4 pt-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 pt-6">
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="flex-1 px-5 py-3 border rounded-lg text-gray-700 hover:bg-gray-50 text-base"
+                  className="flex-1 px-4 py-3 sm:px-5 ring-1 rounded-2xl text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
                 >
                   Annuler
                 </button>
@@ -489,7 +489,7 @@ export const ReorderRulesList: React.FC = () => {
                     createMutation.isPending ||
                     updateMutation.isPending
                   }
-                  className="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 text-base font-medium"
+                  className="flex-1 bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 text-sm sm:text-base font-medium w-full sm:w-auto justify-center"
                 >
                   {editingRule ? "Mettre à jour" : "Créer"}
                 </button>

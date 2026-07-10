@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Eye,
@@ -10,10 +11,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { kycService } from "../../services/document.service";
-import { KycCaseDetailModal } from "../../components/kyc/KycCaseDetailModal";
 import { useAuth } from "../../contexts/AuthContext";
 import { ModalPortal } from "../../components/ui/ModalPortal";
-import type { KycCaseResponse } from "../../services/document.service";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   DRAFT: { label: "Brouillon", color: "bg-gray-100 text-gray-700" },
@@ -35,9 +34,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 export const KycMyQueuePage: React.FC = () => {
   const { admin } = useAuth();
   const queryClient = useQueryClient();
-  const [selectedCase, setSelectedCase] = useState<KycCaseResponse | null>(
-    null,
-  );
+  const navigate = useNavigate();
   const [decisionModal, setDecisionModal] = useState<{
     action: "approve" | "reject";
     code: string;
@@ -165,7 +162,7 @@ export const KycMyQueuePage: React.FC = () => {
                   </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setSelectedCase(kycCase)}
+                      onClick={() => navigate(`/documents/kyc/cases/${kycCase.code}`)}
                       className="px-4 py-2 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
                     >
                       <Eye size={14} /> Examiner
@@ -267,17 +264,6 @@ export const KycMyQueuePage: React.FC = () => {
             </div>
           </div>
         </ModalPortal>
-      )}
-
-      {selectedCase && (
-        <KycCaseDetailModal
-          kycCase={selectedCase}
-          onClose={() => setSelectedCase(null)}
-          onRefresh={() => {
-            queryClient.invalidateQueries({ queryKey: ["kyc-my-queue"] });
-            setSelectedCase(null);
-          }}
-        />
       )}
     </div>
   );

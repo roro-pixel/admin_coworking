@@ -98,14 +98,14 @@ export const CategoriesList: React.FC = () => {
   }
 
   return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-2xl font-semibold text-gray-900">
+    <div className="p-3 sm:p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
+        <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">
           Catégories d'articles
         </h2>
         <button
           onClick={() => handleOpenModal()}
-          className="bg-primary-600 text-white px-5 py-2.5 rounded-lg hover:bg-primary-700 flex items-center gap-2 text-base"
+          className="w-full sm:w-auto justify-center bg-primary-600 text-white px-4 py-3 rounded-2xl hover:bg-primary-700 flex items-center gap-2 text-sm sm:text-base"
         >
           <Plus size={20} />
           Nouvelle catégorie
@@ -123,40 +123,40 @@ export const CategoriesList: React.FC = () => {
           placeholder="Rechercher une catégorie..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
+          className="w-full pl-11 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
         />
       </div>
 
       {/* Tableau - AGRANDI */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-3xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-base">
-            <thead className="bg-gray-50 border-b">
+          <table className="min-w-full text-sm sm:text-base">
+            <thead className="bg-gray-50/70">
               <tr>
-                <th className="px-6 py-4 text-left font-semibold">Code</th>
-                <th className="px-6 py-4 text-left font-semibold">Nom</th>
-                <th className="px-6 py-4 text-left font-semibold">
+                <th className="px-4 py-4 text-left font-semibold">Code</th>
+                <th className="px-4 py-4 text-left font-semibold">Nom</th>
+                <th className="px-4 py-4 text-left font-semibold">
                   Description
                 </th>
-                <th className="px-6 py-4 text-left font-semibold">Articles</th>
-                <th className="px-6 py-4 text-right font-semibold">Actions</th>
+                <th className="px-4 py-4 text-left font-semibold">Articles</th>
+                <th className="px-4 py-4 text-right font-semibold">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="">
               {filteredCategories.map((cat) => (
                 <tr
                   key={cat.categoryCode || cat.code}
-                  className="hover:bg-gray-50"
+                  className="transition hover:bg-gray-50/70"
                 >
-                  <td className="px-6 py-4 font-mono text-sm">
+                  <td className="px-4 py-4 font-mono text-sm">
                     {cat.categoryCode || cat.code}
                   </td>
-                  <td className="px-6 py-4 font-medium">{cat.name}</td>
-                  <td className="px-6 py-4 text-gray-500">
+                  <td className="px-4 py-4 font-medium">{cat.name}</td>
+                  <td className="px-4 py-4 text-gray-500">
                     {cat.description || "-"}
                   </td>
-                  <td className="px-6 py-4">{cat.itemCount || 0}</td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-4 py-4">{cat.itemCount || 0}</td>
+                  <td className="px-4 py-4 text-right">
                     <button
                       onClick={() => handleOpenModal(cat)}
                       className="p-1.5 text-blue-600 hover:text-blue-800 mr-2"
@@ -182,28 +182,28 @@ export const CategoriesList: React.FC = () => {
       </div>
 
       {filteredCategories.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-xl">
-          <p className="text-gray-500 text-base">Aucune catégorie trouvée</p>
+        <div className="text-center py-16 bg-white rounded-2xl">
+          <p className="text-gray-500 text-sm sm:text-base">Aucune catégorie trouvée</p>
         </div>
       )}
 
       {/* ========== MODAL AVEC ModalPortal - AGRANDI ========== */}
       {isModalOpen && (
         <ModalPortal onClose={handleCloseModal} size="2xl">
-          <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-2xl font-bold">
+          <div className="sticky top-0 bg-white p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
+            <h3 className="text-xl sm:text-2xl font-bold">
               {editingCategory ? "Modifier la catégorie" : "Nouvelle catégorie"}
             </h3>
             <button
               onClick={handleCloseModal}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              className="p-2 hover:bg-gray-100 rounded-2xl"
             >
               <X size={24} />
             </button>
           </div>
-          <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          <form onSubmit={handleSubmit} className="p-5 sm:p-8 space-y-6">
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Code *
               </label>
               <input
@@ -214,12 +214,12 @@ export const CategoriesList: React.FC = () => {
                 }
                 disabled={!!editingCategory}
                 required
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 text-base"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 disabled:bg-gray-100 text-sm sm:text-base"
                 placeholder="ex: MOBILIER"
               />
             </div>
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Nom *
               </label>
               <input
@@ -229,12 +229,12 @@ export const CategoriesList: React.FC = () => {
                   setFormData({ ...formData, name: e.target.value })
                 }
                 required
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 text-base"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
                 placeholder="ex: Mobilier"
               />
             </div>
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Description
               </label>
               <textarea
@@ -243,22 +243,22 @@ export const CategoriesList: React.FC = () => {
                   setFormData({ ...formData, description: e.target.value })
                 }
                 rows={4}
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 text-base"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
                 placeholder="Description optionnelle"
               />
             </div>
-            <div className="flex gap-4 pt-6">
+            <div className="flex flex-col gap-3 sm:flex-row pt-6">
               <button
                 type="button"
                 onClick={handleCloseModal}
-                className="flex-1 px-5 py-3 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 text-base"
+                className="flex-1 px-5 py-3 ring-1 ring-gray-100 rounded-2xl text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
               >
                 Annuler
               </button>
               <button
                 type="submit"
                 disabled={createMutation.isPending || updateMutation.isPending}
-                className="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 text-base"
+                className="flex-1 justify-center bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 text-sm sm:text-base"
               >
                 {editingCategory ? "Mettre à jour" : "Créer"}
               </button>

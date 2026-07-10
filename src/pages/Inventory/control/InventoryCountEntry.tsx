@@ -77,12 +77,12 @@ export const InventoryCountEntry: React.FC<InventoryCountEntryProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-5">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center">
+      <div className="relative bg-white rounded-3xl w-full max-w-5xl w-full max-h-[92vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white ring-1 ring-gray-100 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-2xl font-bold">
+            <h3 className="text-lg sm:text-xl sm:text-2xl font-bold">
               Comptage physique - {count.countCode}
             </h3>
             <p className="text-base text-gray-500 mt-1">
@@ -91,7 +91,7 @@ export const InventoryCountEntry: React.FC<InventoryCountEntryProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg"
+            className="p-2 hover:bg-gray-100 rounded-2xl"
           >
             <X size={24} />
           </button>
@@ -100,7 +100,7 @@ export const InventoryCountEntry: React.FC<InventoryCountEntryProps> = ({
         <div className="p-8">
           {/* Barre de progression - AGRANDIE */}
           <div className="mb-8">
-            <div className="flex justify-between text-base text-gray-600 mb-3">
+            <div className="flex justify-between text-sm sm:text-base text-gray-600 mb-3">
               <span>Progression</span>
               <span>
                 {completedCount} / {totalCount} articles
@@ -108,7 +108,7 @@ export const InventoryCountEntry: React.FC<InventoryCountEntryProps> = ({
             </div>
             <div className="w-full bg-gray-200 rounded-full h-3">
               <div
-                className="bg-primary-600 h-3 rounded-full transition-all duration-500"
+                className="bg-primary-600 h-3 rounded-full transition-all duration-500 w-full sm:w-auto justify-center"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -125,7 +125,7 @@ export const InventoryCountEntry: React.FC<InventoryCountEntryProps> = ({
               placeholder="Rechercher un article..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg text-base"
+              className="w-full pl-12 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
             />
           </div>
 
@@ -142,11 +142,11 @@ export const InventoryCountEntry: React.FC<InventoryCountEntryProps> = ({
               return (
                 <div
                   key={item.itemCode}
-                  className="border rounded-lg p-5 hover:bg-gray-50"
+                  className="border rounded-2xl p-4 sm:p-5 hover:bg-gray-50"
                 >
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div className="flex-1">
-                      <p className="font-medium text-base">{item.itemName}</p>
+                      <p className="font-medium text-sm sm:text-base">{item.itemName}</p>
                       <p className="text-sm text-gray-500 mt-1">
                         Code: {item.itemCode}
                       </p>
@@ -179,7 +179,7 @@ export const InventoryCountEntry: React.FC<InventoryCountEntryProps> = ({
                           );
                         }}
                         placeholder="Quantité comptée"
-                        className="w-40 px-4 py-3 border border-gray-200 rounded-lg text-center text-base"
+                        className="w-40 px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-center text-sm sm:text-base"
                       />
                       <button
                         onClick={() =>
@@ -193,7 +193,7 @@ export const InventoryCountEntry: React.FC<InventoryCountEntryProps> = ({
                           item.countedQuantity === null ||
                           item.countedQuantity === undefined
                         }
-                        className="px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2 text-base"
+                        className="px-4 py-3 bg-primary-600 text-white rounded-2xl hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2 text-sm sm:text-base w-full sm:w-auto justify-center"
                       >
                         {saving ? (
                           <Loader2 size={18} className="animate-spin" />
@@ -211,13 +211,13 @@ export const InventoryCountEntry: React.FC<InventoryCountEntryProps> = ({
 
           {filteredItems.length === 0 && (
             <div className="text-center py-16">
-              <p className="text-gray-500 text-base">Aucun article trouvé</p>
+              <p className="text-gray-500 text-sm sm:text-base">Aucun article trouvé</p>
             </div>
           )}
 
           {/* Résumé des écarts - AGRANDI */}
           {completedCount === totalCount && totalCount > 0 && (
-            <div className="mt-8 p-5 bg-yellow-50 rounded-lg">
+            <div className="mt-8 p-4 sm:p-5 bg-yellow-50 rounded-2xl">
               <div className="flex items-center gap-3">
                 <AlertTriangle size={24} className="text-yellow-600" />
                 <p className="text-base text-yellow-800">

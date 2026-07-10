@@ -74,7 +74,7 @@ export const InventoryMaster: React.FC = () => {
   return (
     <AdminLayout>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-lg sm:text-xl sm:text-2xl font-bold text-gray-900">
           Gestion d'inventaire
         </h1>
         <p className="text-gray-600 mt-1">
@@ -83,7 +83,7 @@ export const InventoryMaster: React.FC = () => {
       </div>
 
       {/* Onglets principaux - version responsive avec wrap */}
-      <div className="flex flex-wrap gap-1 border-b border-gray-200 mb-6">
+      <div className="flex flex-wrap gap-1 ring-1 ring-gray-100 ring-gray-100 mb-6">
         {mainTabs.map((tab) => {
           const Icon = tab.icon;
           return (
@@ -94,7 +94,7 @@ export const InventoryMaster: React.FC = () => {
                 flex items-center gap-2 px-4 py-2 rounded-t-lg transition-all whitespace-nowrap
                 ${
                   activeTab === tab.id
-                    ? "bg-primary-50 text-primary-600 border-b-2 border-primary-600"
+                    ? "bg-primary-50 text-primary-600 ring-1 ring-gray-100-2 border-primary-600"
                     : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                 }
               `}
@@ -115,14 +115,14 @@ export const InventoryMaster: React.FC = () => {
         )}
         {visitedTabs.has("catalog") && (
           <div className={activeTab !== "catalog" ? "hidden" : ""}>
-            <div className="flex flex-wrap gap-2 border-b border-gray-200 mb-6">
+            <div className="flex flex-wrap gap-2 ring-1 ring-gray-100 ring-gray-100 mb-6">
               {catalogSubTabs.map((subTab) => {
                 const Icon = subTab.icon;
                 return (
                   <button
                     key={subTab.id}
                     onClick={() => setActiveCatalogSubTab(subTab.id)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-t-lg transition-colors ${activeCatalogSubTab === subTab.id ? "bg-primary-50 text-primary-600 border-b-2 border-primary-600" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-t-lg transition-colors ${activeCatalogSubTab === subTab.id ? "bg-primary-50 text-primary-600 ring-1 ring-gray-100-2 border-primary-600" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
                   >
                     <Icon size={16} />
                     {subTab.label}
@@ -158,14 +158,14 @@ export const InventoryMaster: React.FC = () => {
         )}
         {visitedTabs.has("procurement") && (
           <div className={activeTab !== "procurement" ? "hidden" : ""}>
-            <div className="flex flex-wrap gap-2 border-b border-gray-200 mb-6">
+            <div className="flex flex-wrap gap-2 ring-1 ring-gray-100 ring-gray-100 mb-6">
               {procurementSubTabs.map((subTab) => {
                 const Icon = subTab.icon;
                 return (
                   <button
                     key={subTab.id}
                     onClick={() => setActiveProcurementSubTab(subTab.id)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-t-lg transition-colors ${activeProcurementSubTab === subTab.id ? "bg-primary-50 text-primary-600 border-b-2 border-primary-600" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-t-lg transition-colors ${activeProcurementSubTab === subTab.id ? "bg-primary-50 text-primary-600 ring-1 ring-gray-100-2 border-primary-600" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
                   >
                     <Icon size={16} />
                     {subTab.label}

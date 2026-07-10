@@ -71,20 +71,20 @@ export const InventoryDashboard: React.FC = () => {
         Tableau de bord inventaire
       </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:p-6">
         {cards.map((card, index) => {
           const Icon = card.icon;
           return (
             <div
               key={index}
-              className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all"
+              className="bg-white rounded-3xl p-5 sm:p-5 sm:p-6 shadow-sm ring-1 ring-gray-100 hover:shadow-md transition-all"
             >
               <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-lg ${card.color}`}>
+                <div className={`p-3 rounded-2xl ${card.color}`}>
                   <Icon size={24} />
                 </div>
               </div>
-              <p className="text-2xl font-bold text-gray-900 mb-1">
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
                 {card.value}
               </p>
               <p className="text-sm text-gray-600">{card.title}</p>

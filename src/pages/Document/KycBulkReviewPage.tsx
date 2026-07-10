@@ -18,18 +18,17 @@ export const KycBulkReviewPage: React.FC = () => {
   const queryClient = useQueryClient();
   const adminId = Number(admin?.id) || 1;
 
-  const [selectedDocs, setSelectedDocs] = useState<Array<string | number>>([]);
+  const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
   const [bulkResult, setBulkResult] = useState<any>(null);
 
   const { data: documentsData, isLoading } = useQuery({
-    queryKey: ["documents-pending-review"],
-    queryFn: () =>
-      documentService.getAllDocuments({ status: "PENDING_REVIEW", size: 100 }),
+    queryKey: ["kyc-documents-review-queue"],
+    queryFn: () => documentService.getKycDocumentReviewQueue(),
   });
 
-  const documents = documentsData?.content || [];
+  const documents = documentsData || [];
 
   const bulkApproveMutation = useMutation({
     mutationFn: () =>
@@ -37,7 +36,7 @@ export const KycBulkReviewPage: React.FC = () => {
     onSuccess: (data) => {
       setBulkResult(data);
       setSelectedDocs([]);
-      queryClient.invalidateQueries({ queryKey: ["documents-pending-review"] });
+      queryClient.invalidateQueries({ queryKey: ["kyc-documents-review-queue"] });
     },
     onError: (e: any) =>
       setActionError(e?.response?.data?.message || "Erreur bulk approve."),
@@ -46,17 +45,13 @@ export const KycBulkReviewPage: React.FC = () => {
   const bulkRejectMutation = useMutation({
     mutationFn: (reason: string) =>
       documentService.bulkRejectDocuments(
-        selectedDocs.map((id) =>
-          typeof id === "number"
-            ? { documentId: id, reason }
-            : { documentCode: String(id), reason },
-        ),
+        selectedDocs.map((id) => ({ documentCode: String(id), reason })),
         adminId,
       ),
     onSuccess: (data) => {
       setBulkResult(data);
       setSelectedDocs([]);
-      queryClient.invalidateQueries({ queryKey: ["documents-pending-review"] });
+      queryClient.invalidateQueries({ queryKey: ["kyc-documents-review-queue"] });
     },
     onError: (e: any) =>
       setActionError(e?.response?.data?.message || "Erreur bulk reject."),
@@ -66,22 +61,30 @@ export const KycBulkReviewPage: React.FC = () => {
     if (selectedDocs.length === documents.length) {
       setSelectedDocs([]);
     } else {
-      setSelectedDocs(documents.map((d: any) => d.id ?? d.code));
+      setSelectedDocs(documents.map((d: any) => d.documentCode ?? d.code ?? d.id));
     }
   };
 
-  const toggleDoc = (code: string | number) => {
+  const toggleDoc = (code: string) => {
     setSelectedDocs((prev) =>
       prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
     );
   };
 
-  const filteredDocs = documents.filter(
-    (doc: any) =>
-      doc.title.toLowerCase().includes(search.toLowerCase()) ||
-      doc.documentTypeName.toLowerCase().includes(search.toLowerCase()) ||
-      doc.code.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filteredDocs = documents.filter((doc: any) => {
+    const haystack = [
+      doc.title,
+      doc.documentTypeName,
+      doc.documentType,
+      doc.documentCode,
+      doc.code,
+      doc.fileName,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(search.toLowerCase());
+  });
 
   if (isLoading) {
     return (
@@ -225,20 +228,20 @@ export const KycBulkReviewPage: React.FC = () => {
           <tbody className="divide-y divide-gray-100">
             {filteredDocs.map((doc: any) => (
               <tr
-                key={doc.code}
-                className={`hover:bg-gray-100 cursor-pointer ${selectedDocs.includes(doc.code) ? "bg-blue-50" : ""}`}
-                onClick={() => toggleDoc(doc.code)}
+                key={doc.documentCode || doc.code || doc.id}
+                className={`hover:bg-gray-100 cursor-pointer ${selectedDocs.includes(doc.documentCode || doc.code || doc.id) ? "bg-blue-50" : ""}`}
+                onClick={() => toggleDoc(doc.documentCode || doc.code || doc.id)}
               >
                 <td className="px-4 py-3 text-center">
-                  {selectedDocs.includes(doc.code) ? (
+                  {selectedDocs.includes(doc.documentCode || doc.code || doc.id) ? (
                     <CheckSquare size={18} className="text-primary-600" />
                   ) : (
                     <Square size={18} className="text-gray-400" />
                   )}
                 </td>
-                <td className="px-4 py-3 text-sm font-mono">{doc.code}</td>
-                <td className="px-4 py-3 text-sm font-medium">{doc.title}</td>
-                <td className="px-4 py-3 text-sm">{doc.documentTypeName}</td>
+                <td className="px-4 py-3 text-sm font-mono">{doc.documentCode || doc.code || doc.id}</td>
+                <td className="px-4 py-3 text-sm font-medium">{doc.title || doc.fileName || "Document KYC"}</td>
+                <td className="px-4 py-3 text-sm">{doc.documentTypeName || doc.documentType}</td>
                 <td className="px-4 py-3 text-sm">
                   {doc.ownerType}
                   {doc.ownerCode ? ` · ${doc.ownerCode}` : ""}

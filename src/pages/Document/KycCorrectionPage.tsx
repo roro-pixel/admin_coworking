@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -13,20 +14,13 @@ import {
   Building2,
 } from "lucide-react";
 import { kycService, documentService } from "../../services/document.service";
-import { KycCaseDetailModal } from "../../components/kyc/KycCaseDetailModal";
-import { useAuth } from "../../contexts/AuthContext";
-import type { KycCaseResponse } from "../../services/document.service";
 
 export const KycCorrectionPage: React.FC = () => {
-  const { admin } = useAuth();
   const queryClient = useQueryClient();
-  const [selectedCase, setSelectedCase] = useState<KycCaseResponse | null>(
-    null,
-  );
+  const navigate = useNavigate();
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const adminId = Number(admin?.id) || 1;
 
   // Récupérer les dossiers en correction
   const { data, isLoading, refetch } = useQuery({
@@ -54,12 +48,10 @@ export const KycCorrectionPage: React.FC = () => {
       ownerType: string;
       ownerCode: string;
     }) => {
-      return documentService.uploadDocument({
+      return documentService.uploadKycDocumentAsAdmin({
         ownerType,
         ownerCode,
         documentTypeCode,
-        title: `Document ${documentTypeCode}`,
-        uploadedBy: admin?.email || adminId,
         file,
       });
     },
@@ -182,7 +174,7 @@ export const KycCorrectionPage: React.FC = () => {
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => setSelectedCase(kycCase)}
+                        onClick={() => navigate(`/documents/kyc/cases/${kycCase.code}`)}
                         className="px-4 py-2 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
                       >
                         <Eye size={14} /> Voir détails
@@ -255,11 +247,14 @@ export const KycCorrectionPage: React.FC = () => {
                                 className="hidden"
                                 accept="application/pdf,image/jpeg,image/png,image/webp"
                                 onChange={(e) => {
-                                  if (e.target.files?.[0]) {
-                                    setUploadingDocType(doc.documentTypeCode);
+                                  const documentTypeCode =
+                                    doc.documentTypeCode || doc.documentType;
+                                  const file = e.target.files?.[0];
+                                  if (file && documentTypeCode) {
+                                    setUploadingDocType(documentTypeCode);
                                     uploadMutation.mutate({
-                                      documentTypeCode: doc.documentTypeCode,
-                                      file: e.target.files[0],
+                                      documentTypeCode,
+                                      file,
                                       ownerType: kycCase.ownerType,
                                       ownerCode:
                                         kycCase.ownerCode ||
@@ -325,18 +320,6 @@ export const KycCorrectionPage: React.FC = () => {
       )}
 
       {/* Modal détail */}
-      {selectedCase && (
-        <KycCaseDetailModal
-          kycCase={selectedCase}
-          onClose={() => setSelectedCase(null)}
-          onRefresh={() => {
-            queryClient.invalidateQueries({
-              queryKey: ["kyc-cases-pending-correction"],
-            });
-            setSelectedCase(null);
-          }}
-        />
-      )}
     </div>
   );
 };

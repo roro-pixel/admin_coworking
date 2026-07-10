@@ -45,6 +45,25 @@ const downloadBlob = async (url: string, params?: any): Promise<Blob> => {
   return response.data;
 };
 
+const appendFormData = (formData: FormData, data: Record<string, any>) => {
+  Object.entries(data).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item !== undefined && item !== null && item !== "") {
+          formData.append(key, String(item));
+        }
+      });
+      return;
+    }
+    if (typeof value === "object" && !(value instanceof File) && !(value instanceof Blob)) {
+      formData.append(key, JSON.stringify(value));
+      return;
+    }
+    formData.append(key, String(value));
+  });
+};
+
 // ==================== ENUMS ====================
 export type DocumentStatus =
   | "DRAFT"
@@ -63,6 +82,9 @@ export type DocumentSpace =
   | "CONTRACT_SPACE"
   | "FINANCIAL_SPACE"
   | "ASSET_SPACE"
+  | "ADMINISTRATIVE_SPACE"
+  | "GENERAL_SPACE"
+  // Compat anciens écrans / backend transitional values
   | "ADMINISTRATIVE"
   | "GENERIC";
 
@@ -111,19 +133,35 @@ export type DocumentRetentionAction = "ARCHIVE" | "PURGE_FLAG";
 export interface DocumentType {
   code: string;
   name: string;
-  category: DocumentCategory;
-  ownerType: DocumentOwnerType;
+  category: DocumentCategory | string;
+  ownerType?: DocumentOwnerType | string;
   description?: string;
   helpText?: string;
   documentDetails?: string;
   required: boolean;
   requiresExpiryDate: boolean;
+  requiresIssueDate?: boolean;
+  requiresDocumentNumber?: boolean;
   requiresReview: boolean;
+  autoApprove?: boolean;
+  autoApproveAfterDays?: number;
   requiresSignature?: boolean;
   multipleAllowed: boolean;
-  allowedMimeTypes: string;
+  requiresBackSide?: boolean;
+  allowedMimeTypes: string[] | string;
   maxFileSizeBytes: number;
   active: boolean;
+}
+
+export interface DocumentUploadConfigResponse {
+  helpText?: string;
+  requiresDocumentNumber?: boolean;
+  requiresIssueDate?: boolean;
+  requiresExpiryDate?: boolean;
+  requiresBackSide?: boolean;
+  allowedMimeTypes?: string[];
+  maxFileSizeBytes?: number;
+  category?: DocumentCategory | string;
 }
 
 export type DocumentTypeRequest = Omit<DocumentType, "active"> & {
@@ -272,6 +310,7 @@ export interface DocumentRetentionPolicy {
 // ==================== KYC ====================
 export interface KycCaseResponse {
   code: string;
+  ownerName?: string;
   ownerType: DocumentOwnerType | string;
   ownerId?: number;
   ownerCode?: string;
@@ -279,16 +318,19 @@ export interface KycCaseResponse {
   startedAt?: string;
   submittedAt?: string | null;
   completedAt?: string | null;
-  reviewedBy?: string | null;
+  reviewedBy?: number | string | null;
+  reviewedByEmail?: string | null;
   reviewedAt?: string | null;
   decisionComment?: string | null;
   complete?: boolean;
   approved?: boolean;
   missingDocumentTypeCodes?: string[];
-  documents: DocumentResponse[];
+  requirements?: KycRequirementStatus[];
+  documents: KycDocumentResponse[];
   riskLevel?: KycRiskLevel | string;
   kycLevel?: number;
-  assignedTo?: number;
+  assignedTo?: number | null;
+  assignedToEmail?: string | null;
   assignedAt?: string;
   slaDeadline?: string;
   lastReminderSentAt?: string;
@@ -335,12 +377,15 @@ export interface KycNote {
 }
 
 export interface KycTimelineEvent {
-  id: number;
-  eventType: string;
+  id?: number;
+  eventType?: string;
+  action?: string;
   description: string;
   actorId?: number;
   actorName?: string;
-  occurredAt: string;
+  actor?: string;
+  occurredAt?: string;
+  timestamp?: string;
   metadata?: any;
 }
 
@@ -353,47 +398,106 @@ export interface KycOcrResult {
 }
 
 // ==================== GED V3 - FOLDERS / WORKFLOWS / SHARING ====================
-export interface DocumentFolderTreeResponse {
+export interface FolderDetailResponse {
   code: string;
   name: string;
-  space: DocumentSpace | string;
-  parentCode?: string | null;
-  path?: string;
   description?: string | null;
+  parentCode?: string | null;
+  space?: DocumentSpace | string;
+  ownerType?: DocumentOwnerType | string;
+  ownerCode?: string;
+  ownerName?: string;
+  color?: string;
+  icon?: string;
+  path?: string;
+  depth?: number;
+  sortOrder?: number;
+  childrenCount?: number;
+  documentsCount?: number;
   active?: boolean;
-  children?: DocumentFolderTreeResponse[];
+}
+
+export interface DocumentFolderTreeNode extends FolderDetailResponse {
+  children?: DocumentFolderTreeNode[];
+}
+
+export type DocumentFolderTreeResponse = DocumentFolderTreeNode;
+
+export interface BreadcrumbItem {
+  code: string;
+  name: string;
+  depth: number;
 }
 
 export interface DocumentFolderRequest {
   name: string;
-  space: DocumentSpace | string;
-  parentCode?: string;
   description?: string;
-  displayOrder?: number;
-  active?: boolean;
+  parentCode?: string | null;
+  space?: DocumentSpace | string;
+  ownerType?: DocumentOwnerType | string;
+  ownerCode?: string;
+  color?: string;
+  icon?: string;
+  sortOrder?: number;
 }
 
 export interface DocumentBatchUploadRequest {
   ownerType: DocumentOwnerType | string;
   ownerCode: string;
   documentTypeCode?: string;
+  space?: DocumentSpace | string;
   folderCode?: string;
+  referenceCode?: string;
+  tagCodes?: string[];
+  tags?: string[]; // compat ancienne UI
   titlePrefix?: string;
-  tags?: string[];
   metadata?: Record<string, string>;
+}
+
+export interface DocumentBulkActionResult {
+  code?: string;
+  fileName?: string;
+  status?: string;
+  success?: boolean;
+  reason?: string;
+}
+
+export interface DocumentBulkActionResponse {
+  total?: number;
+  succeeded?: number;
+  failed?: number;
+  results?: DocumentBulkActionResult[];
+  [key: string]: any;
+}
+
+export interface ZipImportResponse {
+  totalFiles: number;
+  succeeded: number;
+  failed: number;
+  foldersCreated?: number;
+  items?: any[];
+}
+
+export interface DocumentWorkflowStepRequest {
+  stepName: string;
+  approverType: string;
+  approverValue: string;
+  required?: boolean;
+  autoApproveDays?: number;
+  // Compat anciens écrans
+  name?: string;
+  order?: number;
+  assignedTo?: number;
+  roleCode?: string;
 }
 
 export interface DocumentWorkflowRequest {
   name: string;
   description?: string;
+  workflowType?: string;
   space?: DocumentSpace | string;
-  steps?: Array<{
-    name: string;
-    order: number;
-    assignedTo?: number;
-    roleCode?: string;
-    required?: boolean;
-  }>;
+  documentTypeCode?: string;
+  steps: DocumentWorkflowStepRequest[];
   active?: boolean;
 }
 
@@ -404,37 +508,55 @@ export interface DocumentWorkflowResponse extends DocumentWorkflowRequest {
 }
 
 export interface DocumentWorkflowStatusResponse {
-  documentCode: string;
-  workflowCode: string;
+  documentCode?: string;
+  workflowCode?: string;
   status: string;
   currentStep?: string;
   startedAt?: string;
   completedAt?: string;
   steps?: any[];
+  [key: string]: any;
 }
 
+export type WorkflowInstanceResponse = DocumentWorkflowStatusResponse;
+
 export interface DocumentShareRequest {
-  expiresAt?: string;
-  allowDownload?: boolean;
+  expiresInHours: number;
   password?: string;
+  allowDownload?: boolean;
+  maxAccessCount?: number;
+  // Compat ancienne UI
+  expiresAt?: string;
   note?: string;
 }
 
 export interface DocumentShareResponse {
   token: string;
+  shareUrl?: string;
+  documentCode?: string;
+  folderCode?: string;
+  allowDownload?: boolean;
+  passwordProtected?: boolean;
+  maxAccessCount?: number;
+  accessCount?: number;
+  expiresAt?: string | null;
+  createdAt?: string;
+  createdBy?: string;
+  active?: boolean;
+  // Compat ancienne UI
   targetType?: "DOCUMENT" | "FOLDER" | string;
   targetCode?: string;
   publicUrl?: string;
-  expiresAt?: string | null;
-  allowDownload?: boolean;
   revoked?: boolean;
-  createdAt?: string;
 }
 
 export type DocumentPermission =
+  | "VIEW"
+  | "EDIT"
+  | "DOWNLOAD"
+  | "DELETE"
   | "READ"
   | "WRITE"
-  | "DELETE"
   | "SHARE"
   | "REVIEW"
   | string;
@@ -445,7 +567,7 @@ export interface DocumentPermissionRequest {
   targetType: DocumentPermissionTargetType;
   targetCode: string;
   granteeType: DocumentPermissionGranteeType;
-  granteeId: number;
+  granteeId: number | string;
   permission: DocumentPermission;
   grantedBy?: number;
 }
@@ -457,27 +579,92 @@ export interface DocumentPermissionResponse extends DocumentPermissionRequest {
   createdAt?: string;
 }
 
-export interface KycRequirementResponse {
+export interface KycRequirementStatus {
+  documentTypeCode: string;
+  documentTypeName?: string;
+  required: boolean;
+  requiresBackSide?: boolean;
+  status?: string;
+  documentCode?: string | null;
+  backDocumentCode?: string | null;
+}
+
+export interface KycCaseRequirementResponse {
   id?: number;
+  kycCaseCode?: string;
   caseCode?: string;
   documentTypeCode: string;
   documentTypeName?: string;
   required: boolean;
+  requiresBackSide?: boolean;
+  active?: boolean;
   fulfilled?: boolean;
 }
 
+export type KycRequirementResponse = KycCaseRequirementResponse;
+
 export interface KycCrossValidationRuleRequest {
-  name: string;
-  sourceField: string;
-  targetField: string;
-  operator?: string;
+  documentTypeCode1: string;
+  documentTypeCode2: string;
+  fieldToCompare: string;
+  blocking?: boolean;
   active?: boolean;
+  // Compat ancienne UI
+  name?: string;
+  sourceField?: string;
+  targetField?: string;
+  operator?: string;
 }
 
 export interface KycCrossValidationRuleResponse extends KycCrossValidationRuleRequest {
   id: number;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface KycDocumentResponse {
+  id?: number | string;
+  documentCode: string;
+  documentType?: string;
+  documentTypeCode?: string;
+  documentTypeName?: string;
+  ownerName?: string;
+  documentNumber?: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
+  previewUrl?: string;
+  downloadUrl?: string;
+  requiresBackSide?: boolean;
+  backDocumentCode?: string;
+  backFileName?: string;
+  backFileSize?: number;
+  backMimeType?: string;
+  backPreviewUrl?: string;
+  backDownloadUrl?: string;
+  issueDate?: string;
+  expiryDate?: string;
+  status: KycDocumentVerificationStatus | string;
+  uploadedBy?: number | string;
+  uploadedByEmail?: string;
+  uploadedAt?: string;
+  [key: string]: any;
+}
+
+export interface KycBulkActionResponse {
+  processed?: number;
+  total?: number;
+  succeeded?: number;
+  failed?: number;
+  results?: Array<{
+    documentCode?: string;
+    code?: string;
+    success?: boolean;
+    status?: string;
+    reason?: string;
+    error?: string | null;
+  }>;
+  [key: string]: any;
 }
 
 // ==================== LABELS ====================
@@ -530,6 +717,12 @@ export const documentService = {
 
   getDocumentType: async (code: string): Promise<DocumentType> =>
     (await apiClient.get(`/sni/api/v1/document-types/${code}`)).data,
+
+  getDocumentTypeUploadConfig: async (
+    code: string,
+  ): Promise<DocumentUploadConfigResponse> =>
+    (await apiClient.get(`/sni/api/v1/document-types/${code}/upload-config`))
+      .data,
 
   getDocumentTypes: async (
     ownerType?: string,
@@ -728,7 +921,8 @@ export const documentService = {
     (
       await apiClient.post(`/sni/api/v1/documents/${code}/request-correction`, {
         reviewedBy,
-        correctionInstructions,
+        correctionNote: correctionInstructions,
+        comment: correctionInstructions,
       })
     ).data,
 
@@ -862,7 +1056,13 @@ export const documentService = {
   // ---------- Signatures ----------
   createDocumentSignature: async (
     documentCode: string,
-    data: { signerName: string; signerEmail?: string; expiresAt?: string },
+    data: {
+      signerType?: string;
+      signerId?: string | number;
+      signerName: string;
+      signerEmail?: string;
+      expiresAt?: string;
+    },
   ): Promise<DocumentSignature> =>
     (
       await apiClient.post(
@@ -882,12 +1082,16 @@ export const documentService = {
   signDocumentSignature: async (
     documentCode: string,
     signatureId: number,
-    data: { signatureImageBase64: string; signerName?: string },
+    data: { accepted?: boolean; signatureData?: string; signatureImageBase64?: string; signerName?: string },
   ): Promise<DocumentSignature> =>
     (
       await apiClient.patch(
         `/sni/api/v1/documents/${documentCode}/signatures/${signatureId}/sign`,
-        data,
+        {
+          accepted: data.accepted ?? true,
+          signatureData: data.signatureData ?? data.signatureImageBase64,
+          signerName: data.signerName,
+        },
       )
     ).data,
 
@@ -900,7 +1104,7 @@ export const documentService = {
     category?: string;
   }): Promise<PaginatedResponse<DocumentResponse>> =>
     toPage<DocumentResponse>(
-      (await apiClient.get("/sni/api/v1/documents/review-queue", { params }))
+      (await apiClient.get("/sni/api/v1/review/queue", { params }))
         .data,
     ),
 
@@ -963,15 +1167,21 @@ export const documentService = {
       | {
           ownerType: string;
           ownerCode: string;
+          documentTypeCodes?: string[];
           riskLevel?: string;
           kycLevel?: number;
         }
       | string,
     maybeOwnerCode?: string,
+    maybeDocumentTypeCodes?: string[],
   ): Promise<KycCaseResponse> => {
     const data =
       typeof dataOrOwnerType === "string"
-        ? { ownerType: dataOrOwnerType, ownerCode: maybeOwnerCode! }
+        ? {
+            ownerType: dataOrOwnerType,
+            ownerCode: maybeOwnerCode!,
+            documentTypeCodes: maybeDocumentTypeCodes,
+          }
         : dataOrOwnerType;
     return (await apiClient.post("/sni/api/v1/kyc/cases", data)).data;
   },
@@ -983,6 +1193,11 @@ export const documentService = {
     ownerType?: string;
     ownerCode?: string;
     status?: string;
+    submittedAfter?: string;
+    submittedBefore?: string;
+    reviewedBy?: number;
+    pendingReviewOnly?: boolean;
+    expiringWithinDays?: number;
     assignedTo?: number;
     riskLevel?: string;
     searchText?: string;
@@ -1011,7 +1226,7 @@ export const documentService = {
 
   getMyQueue: async (
     userId?: number,
-    params?: { page?: number; size?: number },
+    params?: { page?: number; size?: number; sort?: string },
   ): Promise<PaginatedResponse<KycCaseResponse>> =>
     toPage<KycCaseResponse>(
       (
@@ -1027,29 +1242,59 @@ export const documentService = {
   approveKycCase: async (
     code: string,
     reviewedBy: number,
-    decisionComment?: string,
+    comment?: string,
   ): Promise<KycCaseResponse> =>
     (
       await apiClient.post(`/sni/api/v1/kyc/cases/${code}/approve`, {
         reviewedBy,
-        comment: decisionComment,
+        comment,
       })
     ).data,
 
   rejectKycCase: async (
     code: string,
     reviewedBy: number,
-    decisionComment: string,
+    comment: string,
   ): Promise<KycCaseResponse> =>
     (
       await apiClient.post(`/sni/api/v1/kyc/cases/${code}/reject`, {
         reviewedBy,
-        comment: decisionComment,
+        comment,
       })
     ).data,
 
-  getKycMissingRequirements: async (code: string): Promise<string[]> =>
-    toList<string>(
+  assignKycCase: async (
+    code: string,
+    dataOrAssignedTo:
+      | number
+      | { assignedTo?: number | null; email?: string | null },
+  ): Promise<KycCaseResponse> => {
+    const data =
+      typeof dataOrAssignedTo === "number"
+        ? { assignedTo: dataOrAssignedTo }
+        : dataOrAssignedTo;
+    return (await apiClient.patch(`/sni/api/v1/kyc/cases/${code}/assign`, data))
+      .data;
+  },
+
+  updateRiskLevel: async (
+    code: string,
+    riskLevel: KycRiskLevel | string,
+    reviewedBy?: number,
+    comment?: string,
+  ): Promise<KycCaseResponse> =>
+    (
+      await apiClient.patch(`/sni/api/v1/kyc/cases/${code}/risk-level`, {
+        riskLevel,
+        reviewedBy,
+        comment,
+      })
+    ).data,
+
+  getKycMissingRequirements: async (
+    code: string,
+  ): Promise<KycRequirementStatus[]> =>
+    toList<KycRequirementStatus>(
       (
         await apiClient.get(
           `/sni/api/v1/kyc/cases/${code}/missing-requirements`,
@@ -1057,14 +1302,88 @@ export const documentService = {
       ).data,
     ),
 
-  assignKycCase: async (
+  getKycCaseRequirements: async (
     code: string,
-    assignedTo: number,
-  ): Promise<KycCaseResponse> =>
+  ): Promise<KycCaseRequirementResponse[]> =>
+    toList<KycCaseRequirementResponse>(
+      (await apiClient.get(`/sni/api/v1/kyc/cases/${code}/requirements`)).data,
+    ),
+
+  addKycCaseRequirement: async (
+    code: string,
+    data: {
+      documentTypeCode: string;
+      documentTypeName?: string;
+      required?: boolean;
+    },
+  ): Promise<KycCaseRequirementResponse> =>
     (
-      await apiClient.patch(`/sni/api/v1/kyc/cases/${code}/assign`, {
-        assignedTo,
+      await apiClient.post(`/sni/api/v1/kyc/cases/${code}/requirements`, {
+        ...data,
+        required: data.required ?? true,
       })
+    ).data,
+
+  removeKycCaseRequirement: async (
+    code: string,
+    documentTypeCode: string,
+  ): Promise<void> => {
+    await apiClient.delete(
+      `/sni/api/v1/kyc/cases/${code}/requirements/${encodeURIComponent(
+        documentTypeCode,
+      )}`,
+    );
+  },
+
+  getKycCaseReviewQueue: async (code: string): Promise<KycDocumentResponse[]> =>
+    toList<KycDocumentResponse>(
+      (await apiClient.get(`/sni/api/v1/kyc/cases/${code}/review-queue`)).data,
+    ),
+
+  bulkApproveKycCaseDocuments: async (
+    code: string,
+    documentCodes: string[],
+    reviewedBy: number,
+  ): Promise<KycBulkActionResponse> =>
+    (
+      await apiClient.post(
+        `/sni/api/v1/kyc/cases/${code}/documents/bulk-approve`,
+        {
+          documentCodes,
+          reviewedBy,
+        },
+      )
+    ).data,
+
+  bulkRejectKycCaseDocuments: async (
+    code: string,
+    items: Array<{ documentCode: string; reason: string }>,
+    reviewedBy: number,
+  ): Promise<KycBulkActionResponse> =>
+    (
+      await apiClient.post(
+        `/sni/api/v1/kyc/cases/${code}/documents/bulk-reject`,
+        {
+          items,
+          reviewedBy,
+        },
+      )
+    ).data,
+
+  requestKycCaseDocumentCorrection: async (
+    code: string,
+    data: {
+      documentCode: string;
+      reviewedBy: number;
+      correctionNote: string;
+      deadlineDays?: number;
+    },
+  ): Promise<KycDocumentResponse> =>
+    (
+      await apiClient.post(
+        `/sni/api/v1/kyc/cases/${code}/documents/request-correction`,
+        { ...data, deadlineDays: data.deadlineDays ?? 7 },
+      )
     ).data,
 
   addNote: async (
@@ -1085,9 +1404,9 @@ export const documentService = {
         ? {
             content: dataOrContent,
             authorId: maybeAuthorId!,
-            internal: maybeInternal,
+            internal: maybeInternal ?? true,
           }
-        : dataOrContent;
+        : { ...dataOrContent, internal: dataOrContent.internal ?? true };
     return (await apiClient.post(`/sni/api/v1/kyc/cases/${code}/notes`, data))
       .data;
   },
@@ -1107,96 +1426,101 @@ export const documentService = {
       (await apiClient.get(`/sni/api/v1/kyc/cases/${code}/expiry-status`)).data,
     ),
 
-  updateRiskLevel: async (
+  exportPdf: async (
     code: string,
-    riskLevel: KycRiskLevel | string,
-    reviewedBy?: number,
-    note?: string,
-  ): Promise<KycCaseResponse> =>
-    (
-      await apiClient.patch(`/sni/api/v1/kyc/cases/${code}/risk-level`, {
-        riskLevel,
-        reviewedBy,
-        note,
-      })
-    ).data,
-
-  exportPdf: async (code: string): Promise<Blob> =>
-    downloadBlob(`/sni/api/v1/kyc/cases/${code}/export/pdf`),
+    includeInternalNotes = true,
+  ): Promise<Blob> =>
+    downloadBlob(`/sni/api/v1/kyc/cases/${code}/export/pdf`, {
+      includeInternalNotes,
+    }),
 
   // ---------- KYC document review ----------
   bulkApproveDocuments: async (
-    documentIds: Array<string | number>,
+    documentCodes: string[],
     reviewedBy: number,
-    comment?: string,
-  ): Promise<any> =>
+  ): Promise<KycBulkActionResponse> =>
     (
       await apiClient.post("/sni/api/v1/kyc/documents/bulk-approve", {
-        documentIds,
+        documentIds: documentCodes,
         reviewedBy,
-        comment,
       })
     ).data,
 
   bulkRejectDocuments: async (
-    items: {
-      documentId?: string | number;
-      documentCode?: string;
-      reason: string;
-    }[],
+    items: Array<{ documentCode: string; reason: string }>,
     reviewedBy: number,
-  ): Promise<any> =>
+  ): Promise<KycBulkActionResponse> =>
     (
       await apiClient.post("/sni/api/v1/kyc/documents/bulk-reject", {
-        reviewedBy,
         items,
+        reviewedBy,
       })
     ).data,
 
-  getKycDocumentReviewQueue: async (params?: {
-    page?: number;
-    size?: number;
-    sort?: string;
-  }): Promise<PaginatedResponse<DocumentResponse>> =>
-    toPage<DocumentResponse>(
-      (
-        await apiClient.get("/sni/api/v1/kyc/documents/review-queue", {
-          params,
-        })
-      ).data,
+  getKycDocumentReviewQueue: async (): Promise<KycDocumentResponse[]> =>
+    toList<KycDocumentResponse>(
+      (await apiClient.get("/sni/api/v1/kyc/documents/review-queue")).data,
     ),
 
   getReviewedKycDocuments: async (params?: {
-    page?: number;
-    size?: number;
-  }): Promise<PaginatedResponse<DocumentResponse>> =>
-    toPage<DocumentResponse>(
+    status?:
+      | "APPROVED"
+      | "VERIFIED"
+      | "REJECTED"
+      | "DISAPPROVED"
+      | "DESAPPROVED"
+      | string;
+  }): Promise<KycDocumentResponse[]> =>
+    toList<KycDocumentResponse>(
       (await apiClient.get("/sni/api/v1/kyc/documents/reviewed", { params }))
         .data,
     ),
 
-  getApprovedKycDocuments: async (params?: {
-    page?: number;
-    size?: number;
-  }): Promise<PaginatedResponse<DocumentResponse>> =>
-    toPage<DocumentResponse>(
-      (await apiClient.get("/sni/api/v1/kyc/documents/approved", { params }))
-        .data,
+  getApprovedKycDocuments: async (): Promise<KycDocumentResponse[]> =>
+    toList<KycDocumentResponse>(
+      (await apiClient.get("/sni/api/v1/kyc/documents/approved")).data,
     ),
 
-  getRejectedKycDocuments: async (params?: {
-    page?: number;
-    size?: number;
-  }): Promise<PaginatedResponse<DocumentResponse>> =>
-    toPage<DocumentResponse>(
-      (await apiClient.get("/sni/api/v1/kyc/documents/rejected", { params }))
-        .data,
+  getRejectedKycDocuments: async (): Promise<KycDocumentResponse[]> =>
+    toList<KycDocumentResponse>(
+      (await apiClient.get("/sni/api/v1/kyc/documents/rejected")).data,
     ),
 
   getOcrResult: async (documentCode: string): Promise<KycOcrResult> =>
     (
       await apiClient.get(
         `/sni/api/v1/kyc/documents/${documentCode}/ocr-result`,
+      )
+    ).data,
+
+  uploadKycDocumentAsAdmin: async (data: {
+    ownerType: string;
+    ownerCode: string;
+    documentTypeCode: string;
+    side?: "FRONT" | "BACK" | string;
+    documentNumber?: string;
+    issueDate?: string;
+    expiryDate?: string;
+    file: File;
+  }): Promise<KycDocumentResponse> => {
+    const formData = new FormData();
+    formData.append("file", data.file);
+    appendFormData(formData, { ...data, file: undefined });
+    return (
+      await apiClient.post("/sni/api/v1/kyc/documents/admin/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+    ).data;
+  },
+
+  updateKycDocumentAdminDetails: async (
+    kycDocumentId: string | number,
+    data: { documentNumber?: string; issueDate?: string; expiryDate?: string },
+  ): Promise<KycDocumentResponse> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/kyc/documents/admin/${kycDocumentId}/details`,
+        data,
       )
     ).data,
 
@@ -1211,13 +1535,13 @@ export const documentService = {
 
   bulkApproveBySpace: async (
     space: DocumentSpace | string,
-    documentCodes: string[],
-    reviewedBy: number,
+    codes: string[],
+    reviewedBy: number | string,
     comment?: string,
-  ): Promise<any> =>
+  ): Promise<DocumentBulkActionResponse> =>
     (
       await apiClient.post(`/sni/api/v1/review/${space}/bulk-approve`, {
-        documentCodes,
+        codes,
         reviewedBy,
         comment,
       })
@@ -1225,30 +1549,47 @@ export const documentService = {
 
   bulkRejectBySpace: async (
     space: DocumentSpace | string,
-    items: Array<{ documentCode: string; reason: string }>,
-    reviewedBy: number,
-  ): Promise<any> =>
-    (
+    codesOrItems: string[] | Array<{ documentCode: string; reason?: string }>,
+    reviewedBy: number | string,
+    rejectionReasonCode?: string,
+    rejectionReasonDetail?: string,
+    comment?: string,
+  ): Promise<DocumentBulkActionResponse> => {
+    const codes = Array.isArray(codesOrItems)
+      ? codesOrItems.map((item: any) =>
+          typeof item === "string" ? item : item.documentCode,
+        )
+      : [];
+    return (
       await apiClient.post(`/sni/api/v1/review/${space}/bulk-reject`, {
-        items,
+        codes,
         reviewedBy,
+        rejectionReasonCode,
+        rejectionReasonDetail,
+        comment,
       })
-    ).data,
+    ).data;
+  },
 
   bulkRequestCorrectionBySpace: async (
     space: DocumentSpace | string,
-    items: Array<{ documentCode: string; reason: string }>,
-    reviewedBy: number,
-  ): Promise<any> =>
-    (
+    codesOrItems: string[] | Array<{ documentCode: string; reason?: string }>,
+    reviewedBy: number | string,
+    correctionNote?: string,
+    deadlineDays = 7,
+  ): Promise<DocumentBulkActionResponse> => {
+    const codes = Array.isArray(codesOrItems)
+      ? codesOrItems.map((item: any) =>
+          typeof item === "string" ? item : item.documentCode,
+        )
+      : [];
+    return (
       await apiClient.post(
         `/sni/api/v1/review/${space}/bulk-request-correction`,
-        {
-          items,
-          reviewedBy,
-        },
+        { codes, reviewedBy, correctionNote, deadlineDays },
       )
-    ).data,
+    ).data;
+  },
 
   // ---------- Document spaces ----------
   uploadSpaceDocument: async (
@@ -1259,21 +1600,30 @@ export const documentService = {
       | "administrative"
       | "general",
     file: File,
-    metadata: Record<string, any>,
+    metadata: {
+      ownerType: string;
+      ownerCode: string;
+      documentTypeCode: string;
+      title: string;
+      description?: string;
+      documentNumber?: string;
+      issueDate?: string;
+      expiryDate?: string;
+      referenceCode?: string;
+      folderCode?: string;
+      tagCodes?: string[];
+      metadata?: Record<string, string>;
+      [key: string]: any;
+    },
   ): Promise<DocumentResponse> => {
     const formData = new FormData();
     formData.append("file", file);
-    formData.append(
-      "metadata",
-      new Blob([JSON.stringify(metadata)], { type: "application/json" }),
-    );
+    appendFormData(formData, metadata);
     return (
       await apiClient.post(
         `/sni/api/v1/spaces/${spaceSlug}/documents/upload`,
         formData,
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-        },
+        { headers: { "Content-Type": "multipart/form-data" } },
       )
     ).data;
   },
@@ -1288,8 +1638,10 @@ export const documentService = {
     params?: {
       ownerType?: string;
       ownerCode?: string;
-      statuses?: string;
+      statuses?: string[] | string;
       q?: string;
+      uploadedAfter?: string;
+      uploadedBefore?: string;
       from?: string;
       to?: string;
       page?: number;
@@ -1340,7 +1692,7 @@ export const documentService = {
   ): Promise<DocumentFolderTreeResponse> =>
     (
       await apiClient.post(`/sni/api/v1/document-folders/${code}/move`, {
-        parentCode,
+        targetParentCode: parentCode ?? null,
       })
     ).data,
 
@@ -1377,8 +1729,8 @@ export const documentService = {
 
   getFolderBreadcrumb: async (
     code: string,
-  ): Promise<DocumentFolderTreeResponse[]> =>
-    toList<DocumentFolderTreeResponse>(
+  ): Promise<BreadcrumbItem[]> =>
+    toList<BreadcrumbItem>(
       (await apiClient.get(`/sni/api/v1/document-folders/${code}/breadcrumb`))
         .data,
     ),
@@ -1398,33 +1750,26 @@ export const documentService = {
   uploadBatch: async (
     files: File[],
     metadata: DocumentBatchUploadRequest,
-  ): Promise<DocumentResponse[]> => {
+  ): Promise<DocumentBulkActionResponse> => {
     const formData = new FormData();
     files.forEach((file) => formData.append("files", file));
-    formData.append(
-      "metadata",
-      new Blob([JSON.stringify(metadata)], { type: "application/json" }),
-    );
-    return toList<DocumentResponse>(
-      (
-        await apiClient.post("/sni/api/v1/documents/upload-batch", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        })
-      ).data,
-    );
+    const payload = { ...metadata, tagCodes: metadata.tagCodes ?? metadata.tags };
+    delete (payload as any).tags;
+    appendFormData(formData, payload);
+    return (
+      await apiClient.post("/sni/api/v1/documents/upload-batch", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+    ).data;
   },
 
   importZip: async (
     file: File,
-    metadata?: Record<string, any>,
-  ): Promise<any> => {
+    metadata?: DocumentBatchUploadRequest | Record<string, any>,
+  ): Promise<ZipImportResponse> => {
     const formData = new FormData();
     formData.append("file", file);
-    if (metadata)
-      formData.append(
-        "metadata",
-        new Blob([JSON.stringify(metadata)], { type: "application/json" }),
-      );
+    if (metadata) appendFormData(formData, metadata);
     return (
       await apiClient.post("/sni/api/v1/documents/import-zip", formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -1479,12 +1824,12 @@ export const documentService = {
 
   rejectWorkflowStep: async (
     documentCode: string,
-    reason: string,
+    comment?: string,
   ): Promise<DocumentWorkflowStatusResponse> =>
     (
       await apiClient.post(
         `/sni/api/v1/documents/${documentCode}/workflow/reject`,
-        { reason },
+        { comment },
       )
     ).data,
 
@@ -1497,16 +1842,9 @@ export const documentService = {
       )
     ).data,
 
-  getMyPendingWorkflowApprovals: async (params?: {
-    page?: number;
-    size?: number;
-  }): Promise<PaginatedResponse<DocumentResponse>> =>
-    toPage<DocumentResponse>(
-      (
-        await apiClient.get("/sni/api/v1/document-workflows/my-pending", {
-          params,
-        })
-      ).data,
+  getMyPendingWorkflowApprovals: async (): Promise<WorkflowInstanceResponse[]> =>
+    toList<WorkflowInstanceResponse>(
+      (await apiClient.get("/sni/api/v1/document-workflows/my-pending")).data,
     ),
 
   // ---------- Sharing ----------
@@ -1581,97 +1919,16 @@ export const documentService = {
     code: string,
     reason?: string,
   ): Promise<DocumentResponse> =>
-    (await apiClient.post(`/sni/api/v1/documents/${code}/lock`, { reason }))
-      .data,
+    (
+      await apiClient.post(`/sni/api/v1/documents/${code}/lock`, null, {
+        params: { reason },
+      })
+    ).data,
 
   unlockDocument: async (code: string): Promise<DocumentResponse> =>
     (await apiClient.post(`/sni/api/v1/documents/${code}/unlock`)).data,
 
-  // ---------- KYC case requirements ----------
-  getKycCaseRequirements: async (
-    code: string,
-  ): Promise<KycRequirementResponse[]> =>
-    toList<KycRequirementResponse>(
-      (await apiClient.get(`/sni/api/v1/kyc/cases/${code}/requirements`)).data,
-    ),
-
-  addKycCaseRequirement: async (
-    code: string,
-    data: { documentTypeCode: string; required?: boolean },
-  ): Promise<KycRequirementResponse> =>
-    (await apiClient.post(`/sni/api/v1/kyc/cases/${code}/requirements`, data))
-      .data,
-
-  removeKycCaseRequirement: async (
-    code: string,
-    documentTypeCode: string,
-  ): Promise<void> => {
-    await apiClient.delete(
-      `/sni/api/v1/kyc/cases/${code}/requirements/${documentTypeCode}`,
-    );
-  },
-
-  getKycCaseReviewQueue: async (
-    code: string,
-    params?: { page?: number; size?: number },
-  ): Promise<PaginatedResponse<DocumentResponse>> =>
-    toPage<DocumentResponse>(
-      (
-        await apiClient.get(`/sni/api/v1/kyc/cases/${code}/review-queue`, {
-          params,
-        })
-      ).data,
-    ),
-
-  bulkApproveKycCaseDocuments: async (
-    code: string,
-    documentCodes: string[],
-    reviewedBy: number,
-    comment?: string,
-  ): Promise<any> =>
-    (
-      await apiClient.post(
-        `/sni/api/v1/kyc/cases/${code}/documents/bulk-approve`,
-        { documentCodes, reviewedBy, comment },
-      )
-    ).data,
-
-  bulkRejectKycCaseDocuments: async (
-    code: string,
-    items: Array<{ documentCode: string; reason: string }>,
-    reviewedBy: number,
-  ): Promise<any> =>
-    (
-      await apiClient.post(
-        `/sni/api/v1/kyc/cases/${code}/documents/bulk-reject`,
-        { items, reviewedBy },
-      )
-    ).data,
-
-  requestCorrectionKycCaseDocument: async (
-    code: string,
-    documentCode: string,
-    reason: string,
-    reviewedBy?: number,
-  ): Promise<any> =>
-    (
-      await apiClient.post(
-        `/sni/api/v1/kyc/cases/${code}/documents/request-correction`,
-        { documentCode, reason, reviewedBy },
-      )
-    ).data,
-
-  bulkDisapproveKycDocuments: async (
-    items: Array<{ documentCode: string; reason: string }>,
-    reviewedBy: number,
-  ): Promise<any> =>
-    (
-      await apiClient.post("/sni/api/v1/kyc/documents/bulk-disapprove", {
-        items,
-        reviewedBy,
-      })
-    ).data,
-
+  // ---------- KYC cross-validation rules ----------
   getKycCrossValidationRules: async (params?: {
     activeOnly?: boolean;
   }): Promise<KycCrossValidationRuleResponse[]> =>
@@ -1693,7 +1950,7 @@ export const documentService = {
     data: Partial<KycCrossValidationRuleRequest>,
   ): Promise<KycCrossValidationRuleResponse> =>
     (
-      await apiClient.patch(
+      await apiClient.put(
         `/sni/api/v1/kyc/cross-validation-rules/${id}`,
         data,
       )

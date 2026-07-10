@@ -100,13 +100,13 @@ export const ApprovalRulesList: React.FC = () => {
 
   return (
     <div className="p-4">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-2xl font-semibold text-gray-900">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
+        <h2 className="text-lg sm:text-xl sm:text-2xl font-semibold text-gray-900">
           Règles d'approbation
         </h2>
         <button
           onClick={() => handleOpenModal()}
-          className="bg-primary-600 text-white px-5 py-2.5 rounded-lg hover:bg-primary-700 flex items-center gap-2 text-base font-medium"
+          className="bg-primary-600 text-white px-4 py-2.5 sm:px-5 rounded-2xl hover:bg-primary-700 flex items-center gap-2 text-sm sm:text-base font-medium w-full sm:w-auto justify-center"
         >
           <Plus size={20} />
           Nouvelle règle
@@ -114,52 +114,52 @@ export const ApprovalRulesList: React.FC = () => {
       </div>
 
       {/* Tableau - AGRANDI */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-base">
-          <thead className="bg-gray-50 border-b">
+      <div className="bg-white rounded-3xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+        <table className="w-full text-sm sm:text-base block md:table">
+          <thead className="bg-gray-50 ring-1 ring-gray-100 hidden md:table-header-group">
             <tr>
-              <th className="px-6 py-4 text-left font-semibold">Niveau</th>
-              <th className="px-6 py-4 text-right font-semibold">
+              <th className="px-6 py-4 text-left font-semibold hidden md:table-cell">Niveau</th>
+              <th className="px-6 py-4 text-right font-semibold hidden md:table-cell">
                 Montant min
               </th>
-              <th className="px-6 py-4 text-right font-semibold">
+              <th className="px-6 py-4 text-right font-semibold hidden md:table-cell">
                 Montant max
               </th>
-              <th className="px-6 py-4 text-center font-semibold">
+              <th className="px-6 py-4 text-center font-semibold hidden md:table-cell">
                 Approbations requises
               </th>
-              <th className="px-6 py-4 text-center font-semibold">Actif</th>
-              <th className="px-6 py-4 text-right font-semibold">Actions</th>
+              <th className="px-6 py-4 text-center font-semibold hidden md:table-cell">Actif</th>
+              <th className="px-6 py-4 text-right font-semibold hidden md:table-cell">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="space-y-2 md:space-y-0 block md:table-row-group">
             {rules.map((rule: any) => (
-              <tr key={rule.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 font-medium">
+              <tr key={rule.id} className="hover:bg-gray-50 block md:table-row rounded-3xl bg-white p-4 mb-3 shadow-sm ring-1 ring-gray-100">
+                <td className="px-6 py-4 font-medium flex justify-between gap-4 md:table-cell text-sm">
                   {
                     approvalLevels.find((l) => l.value === rule.approvalLevel)
                       ?.label
                   }
                 </td>
-                <td className="px-6 py-4 text-right">
+                <td className="px-6 py-4 text-right flex justify-between gap-4 md:table-cell text-sm">
                   {rule.minAmount.toLocaleString()} FCFA
                 </td>
-                <td className="px-6 py-4 text-right">
+                <td className="px-6 py-4 text-right flex justify-between gap-4 md:table-cell text-sm">
                   {rule.maxAmount
                     ? `${rule.maxAmount.toLocaleString()} FCFA`
                     : "∞"}
                 </td>
-                <td className="px-6 py-4 text-center">
+                <td className="px-6 py-4 text-center flex justify-between gap-4 md:table-cell text-sm">
                   {rule.requiredApprovals}
                 </td>
-                <td className="px-6 py-4 text-center">
+                <td className="px-6 py-4 text-center flex justify-between gap-4 md:table-cell text-sm">
                   <span
                     className={`px-2.5 py-1 rounded-full text-xs ${rule.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
                   >
                     {rule.active ? "Actif" : "Inactif"}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-right">
+                <td className="px-6 py-4 text-right flex justify-between gap-4 md:table-cell text-sm">
                   <button
                     onClick={() => handleOpenModal(rule)}
                     className="p-1.5 text-blue-600 hover:text-blue-800 mr-2"
@@ -180,8 +180,8 @@ export const ApprovalRulesList: React.FC = () => {
       </div>
 
       {rules.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-xl">
-          <p className="text-gray-500 text-base">
+        <div className="text-center py-16 bg-white rounded-3xl">
+          <p className="text-gray-500 text-sm sm:text-base">
             Aucune règle d'approbation configurée
           </p>
         </div>
@@ -190,21 +190,21 @@ export const ApprovalRulesList: React.FC = () => {
       {/* Modal - AGRANDI */}
       {isModalOpen && (
         <ModalPortal onClose={handleCloseModal} size="2xl">
-          <div className="relative bg-white rounded-2xl w-full max-w-lg">
-            <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
-              <h3 className="text-2xl font-bold">
+          <div className="relative bg-white rounded-3xl w-full max-w-lg">
+            <div className="sticky top-0 bg-white ring-1 ring-gray-100 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
+              <h3 className="text-lg sm:text-xl sm:text-2xl font-bold">
                 {editingRule ? "Modifier" : "Nouvelle"} règle
               </h3>
               <button
                 onClick={handleCloseModal}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-2 hover:bg-gray-100 rounded-2xl"
               >
                 <X size={24} />
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-8 space-y-6">
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Niveau *
                 </label>
                 <select
@@ -212,7 +212,7 @@ export const ApprovalRulesList: React.FC = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, approvalLevel: e.target.value })
                   }
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                 >
                   {approvalLevels.map((level) => (
                     <option key={level.value} value={level.value}>
@@ -223,7 +223,7 @@ export const ApprovalRulesList: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-base font-medium text-gray-700 mb-2">
+                  <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                     Montant min (FCFA)
                   </label>
                   <input
@@ -238,11 +238,11 @@ export const ApprovalRulesList: React.FC = () => {
                       });
                     }}
                     placeholder="0"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                    className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                   />
                 </div>
                 <div>
-                  <label className="block text-base font-medium text-gray-700 mb-2">
+                  <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                     Montant max (FCFA)
                   </label>
                   <input
@@ -257,12 +257,12 @@ export const ApprovalRulesList: React.FC = () => {
                       });
                     }}
                     placeholder="Illimité"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                    className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Approbations requises *
                 </label>
                 <input
@@ -275,7 +275,7 @@ export const ApprovalRulesList: React.FC = () => {
                     })
                   }
                   min="1"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                 />
               </div>
               <label className="flex items-center gap-3">
@@ -289,11 +289,11 @@ export const ApprovalRulesList: React.FC = () => {
                 />
                 <span className="text-base">Actif</span>
               </label>
-              <div className="flex gap-4 pt-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 pt-6">
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="flex-1 px-5 py-3 border rounded-lg text-gray-700 hover:bg-gray-50 text-base"
+                  className="flex-1 px-4 py-3 sm:px-5 ring-1 rounded-2xl text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
                 >
                   Annuler
                 </button>
@@ -302,7 +302,7 @@ export const ApprovalRulesList: React.FC = () => {
                   disabled={
                     createMutation.isPending || updateMutation.isPending
                   }
-                  className="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 text-base font-medium"
+                  className="flex-1 bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 text-sm sm:text-base font-medium w-full sm:w-auto justify-center"
                 >
                   {editingRule ? "Mettre à jour" : "Créer"}
                 </button>

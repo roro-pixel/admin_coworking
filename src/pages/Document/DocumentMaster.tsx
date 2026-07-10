@@ -31,6 +31,7 @@ import { DocumentOwnerFolderPage } from "./DocumentOwnerFolderPage";
 import { DocumentGovernancePage } from "./DocumentGovernancePage";
 import { DocumentAnalyticsExportPage } from "./DocumentAnalyticsExportPage";
 import { DocumentOperationsHub } from "./DocumentOperationsHub";
+import { KycOperationsHub } from "./KycOperationsHub";
 
 type TabId =
   | "dashboard"
@@ -47,7 +48,8 @@ type TabId =
   | "folder"
   | "governance"
   | "analytics"
-  | "operations";
+  | "operations"
+  | "kycOperations";
 
 const groups: {
   title: string;
@@ -64,6 +66,7 @@ const groups: {
       { id: "corrections", label: "Corrections", icon: AlertTriangle },
       { id: "expiring", label: "Expirations", icon: Calendar },
       { id: "bulk", label: "Revue masse", icon: CheckSquare },
+      { id: "kycOperations", label: "API KYC", icon: ShieldCheck },
     ],
   },
   {
@@ -193,6 +196,11 @@ export const DocumentMaster: React.FC = () => {
         {visitedTabs.has("bulk") && (
           <div className={activeTab !== "bulk" ? "hidden" : ""}>
             <KycBulkReviewPage />
+          </div>
+        )}
+        {visitedTabs.has("kycOperations") && (
+          <div className={activeTab !== "kycOperations" ? "hidden" : ""}>
+            <KycOperationsHub />
           </div>
         )}
         {visitedTabs.has("gedDashboard") && (

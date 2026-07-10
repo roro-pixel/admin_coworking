@@ -86,49 +86,49 @@ export const StockLevels: React.FC = () => {
   return (
     <div className="p-4">
       {/* En-tête avec tous les boutons - AGRANDIS */}
-      <div className="flex flex-wrap justify-between items-center gap-4 mb-8">
-        <h3 className="text-xl font-semibold text-gray-900">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-4 mb-8">
+        <h3 className="text-lg sm:text-xl font-semibold text-gray-900">
           Niveaux de stock
         </h3>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
           <button
             onClick={() => setShowStockInForm(true)}
-            className="bg-green-600 text-white px-4 py-2.5 rounded-lg hover:bg-green-700 flex items-center gap-2 text-base font-medium"
+            className="bg-green-600 text-white px-4 py-2.5 rounded-2xl hover:bg-green-700 flex items-center gap-2 text-sm sm:text-base font-medium"
           >
             <ArrowUp size={18} />
             Entrée
           </button>
           <button
             onClick={() => setShowStockOutForm(true)}
-            className="bg-red-600 text-white px-4 py-2.5 rounded-lg hover:bg-red-700 flex items-center gap-2 text-base font-medium"
+            className="bg-red-600 text-white px-4 py-2.5 rounded-2xl hover:bg-red-700 flex items-center gap-2 text-sm sm:text-base font-medium"
           >
             <ArrowDown size={18} />
             Sortie
           </button>
           <button
             onClick={() => setShowTransferForm(true)}
-            className="bg-blue-600 text-white px-4 py-2.5 rounded-lg hover:bg-blue-700 flex items-center gap-2 text-base font-medium"
+            className="bg-blue-600 text-white px-4 py-2.5 rounded-2xl hover:bg-blue-700 flex items-center gap-2 text-sm sm:text-base font-medium"
           >
             <Repeat size={18} />
             Transfert
           </button>
           <button
             onClick={() => setShowAdjustmentForm(true)}
-            className="bg-orange-600 text-white px-4 py-2.5 rounded-lg hover:bg-orange-700 flex items-center gap-2 text-base font-medium"
+            className="bg-orange-600 text-white px-4 py-2.5 rounded-2xl hover:bg-orange-700 flex items-center gap-2 text-sm sm:text-base font-medium"
           >
             <Settings size={18} />
             Ajustement
           </button>
           <button
             onClick={() => setShowReservations(true)}
-            className="bg-purple-600 text-white px-4 py-2.5 rounded-lg hover:bg-purple-700 flex items-center gap-2 text-base font-medium"
+            className="bg-purple-600 text-white px-4 py-2.5 rounded-2xl hover:bg-purple-700 flex items-center gap-2 text-sm sm:text-base font-medium"
           >
             <Package size={18} />
             Réservations
           </button>
           <button
             onClick={() => setShowLotsList(true)}
-            className="bg-indigo-600 text-white px-4 py-2.5 rounded-lg hover:bg-indigo-700 flex items-center gap-2 text-base font-medium"
+            className="bg-indigo-600 text-white px-4 py-2.5 rounded-2xl hover:bg-indigo-700 flex items-center gap-2 text-sm sm:text-base font-medium"
           >
             <Package size={18} />
             Lots
@@ -159,13 +159,13 @@ export const StockLevels: React.FC = () => {
             placeholder="Rechercher un article..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg text-base"
+            className="w-full pl-12 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
           />
         </div>
         <select
           value={locationFilter}
           onChange={(e) => setLocationFilter(e.target.value)}
-          className="px-5 py-3 border border-gray-200 rounded-lg bg-white text-base min-w-[200px]"
+          className="px-5 py-3 ring-1 ring-gray-100 rounded-2xl bg-white text-sm sm:text-base min-w-[200px]"
         >
           <option value="">Tous les emplacements</option>
           {locations.map((loc: any) => (
@@ -177,44 +177,44 @@ export const StockLevels: React.FC = () => {
       </div>
 
       {/* Tableau des stocks - AGRANDI */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-base">
-            <thead className="bg-gray-50 border-b">
+      <div className="bg-white rounded-3xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+        <div className="overflow-visible md:overflow-x-auto">
+          <table className="w-full text-sm sm:text-base block md:table">
+            <thead className="bg-gray-50 ring-1 ring-gray-100 hidden md:table-header-group">
               <tr>
-                <th className="px-5 py-4 text-left font-semibold">Article</th>
-                <th className="px-5 py-4 text-left font-semibold">
+                <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Article</th>
+                <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">
                   Emplacement
                 </th>
-                <th className="px-5 py-4 text-right font-semibold">En stock</th>
-                <th className="px-5 py-4 text-right font-semibold">Réservé</th>
-                <th className="px-5 py-4 text-right font-semibold">
+                <th className="px-5 py-4 text-right font-semibold hidden md:table-cell">En stock</th>
+                <th className="px-5 py-4 text-right font-semibold hidden md:table-cell">Réservé</th>
+                <th className="px-5 py-4 text-right font-semibold hidden md:table-cell">
                   Disponible
                 </th>
-                <th className="px-5 py-4 text-left font-semibold">Statut</th>
+                <th className="px-5 py-4 text-left font-semibold hidden md:table-cell">Statut</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="space-y-2 md:space-y-0 block md:table-row-group">
               {filteredLevels.map((level: StockLevel, idx: number) => {
                 const status = getStockStatus(level);
                 const StatusIcon = status.icon;
                 return (
-                  <tr key={idx} className="hover:bg-gray-50">
-                    <td className="px-5 py-4">
+                  <tr key={idx} className="hover:bg-gray-50 block md:table-row rounded-3xl bg-white p-4 mb-3 shadow-sm ring-1 ring-gray-100">
+                    <td className="px-5 py-4 flex justify-between gap-4 md:table-cell text-sm">
                       <p className="font-medium">{level.itemName}</p>
                       <p className="text-sm text-gray-500">{level.itemCode}</p>
                     </td>
-                    <td className="px-5 py-4">{level.locationName}</td>
-                    <td className="px-5 py-4 text-right font-medium">
+                    <td className="px-5 py-4 flex justify-between gap-4 md:table-cell text-sm">{level.locationName}</td>
+                    <td className="px-5 py-4 text-right font-medium flex justify-between gap-4 md:table-cell text-sm">
                       {level.quantityOnHand}
                     </td>
-                    <td className="px-5 py-4 text-right text-gray-500">
+                    <td className="px-5 py-4 text-right text-gray-500 flex justify-between gap-4 md:table-cell text-sm">
                       {level.quantityReserved}
                     </td>
-                    <td className="px-5 py-4 text-right font-bold">
+                    <td className="px-5 py-4 text-right font-bold flex justify-between gap-4 md:table-cell text-sm">
                       {level.quantityAvailable}
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4 flex justify-between gap-4 md:table-cell text-sm">
                       <span
                         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs ${status.color}`}
                       >
@@ -231,8 +231,8 @@ export const StockLevels: React.FC = () => {
       </div>
 
       {filteredLevels.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-xl">
-          <p className="text-gray-500 text-base">
+        <div className="text-center py-16 bg-white rounded-3xl">
+          <p className="text-gray-500 text-sm sm:text-base">
             Aucun niveau de stock trouvé
           </p>
         </div>
@@ -258,11 +258,11 @@ export const StockLevels: React.FC = () => {
 
       {showReservations && (
         <ModalPortal onClose={() => setShowReservations(false)} size="2xl">
-          <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-2xl font-bold">Réservations de stock</h3>
+          <div className="sticky top-0 bg-white ring-1 ring-gray-100 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
+            <h3 className="text-lg sm:text-xl sm:text-2xl font-bold">Réservations de stock</h3>
             <button
               onClick={() => setShowReservations(false)}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              className="p-2 hover:bg-gray-100 rounded-2xl"
             >
               <X size={24} />
             </button>
@@ -275,11 +275,11 @@ export const StockLevels: React.FC = () => {
 
       {showLotsList && (
         <ModalPortal onClose={() => setShowLotsList(false)} size="2xl">
-          <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-2xl font-bold">Lots traçables</h3>
+          <div className="sticky top-0 bg-white ring-1 ring-gray-100 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
+            <h3 className="text-lg sm:text-xl sm:text-2xl font-bold">Lots traçables</h3>
             <button
               onClick={() => setShowLotsList(false)}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              className="p-2 hover:bg-gray-100 rounded-2xl"
             >
               <X size={24} />
             </button>

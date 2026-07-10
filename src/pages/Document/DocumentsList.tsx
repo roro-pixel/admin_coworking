@@ -87,15 +87,18 @@ export const DocumentsList: React.FC = () => {
       ownerTypeFilter,
       statusFilter,
       categoryFilter,
+      search,
       page,
     ],
     queryFn: () =>
-      documentService.getAllDocuments({
+      documentService.searchDocuments({
+        q: search || undefined,
         ownerType: ownerTypeFilter !== "all" ? ownerTypeFilter : undefined,
-        status: statusFilter !== "all" ? statusFilter : undefined,
+        statuses: statusFilter !== "all" ? [statusFilter] : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
         page,
         size: 50,
+        sort: "uploadedAt,desc",
       }),
   });
 

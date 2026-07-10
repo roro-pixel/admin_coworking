@@ -38,8 +38,13 @@ const defaultForm = {
   documentDetails: "",
   required: true,
   requiresExpiryDate: false,
+  requiresIssueDate: false,
+  requiresDocumentNumber: false,
   requiresReview: true,
+  autoApprove: false,
+  autoApproveAfterDays: 0,
   requiresSignature: false,
+  requiresBackSide: false,
   multipleAllowed: false,
   allowedMimeTypes: "application/pdf,image/jpeg,image/png",
   maxFileSizeBytes: 10485760,
@@ -65,16 +70,32 @@ export const DocumentTypesList: React.FC = () => {
 
   useEffect(() => {
     if (!isFormOpen) return;
-    if (editing)
+    if (editing) {
       setForm({
-        ...defaultForm,
-        ...editing,
+        code: editing.code,
+        name: editing.name,
+        category: editing.category as DocumentCategory,
+        ownerType: editing.ownerType as DocumentOwnerType,
         description: editing.description || "",
         helpText: editing.helpText || "",
         documentDetails: editing.documentDetails || "",
-        requiresSignature: editing.requiresSignature || false,
+        required: Boolean(editing.required),
+        requiresExpiryDate: Boolean(editing.requiresExpiryDate),
+        requiresIssueDate: Boolean((editing as any).requiresIssueDate),
+        requiresDocumentNumber: Boolean((editing as any).requiresDocumentNumber),
+        requiresReview: Boolean(editing.requiresReview),
+        autoApprove: Boolean((editing as any).autoApprove),
+        autoApproveAfterDays: Number((editing as any).autoApproveAfterDays || 0),
+        requiresSignature: Boolean(editing.requiresSignature),
+        multipleAllowed: Boolean(editing.multipleAllowed),
+        requiresBackSide: Boolean((editing as any).requiresBackSide),
+        allowedMimeTypes: Array.isArray((editing as any).allowedMimeTypes)
+          ? (editing as any).allowedMimeTypes.join(",")
+          : String((editing as any).allowedMimeTypes || "application/pdf,image/jpeg,image/png"),
+        maxFileSizeBytes: Number(editing.maxFileSizeBytes || 10485760),
+        active: Boolean(editing.active),
       });
-    else setForm({ ...defaultForm, ownerType });
+    } else setForm({ ...defaultForm, ownerType });
     setError(null);
   }, [isFormOpen, editing, ownerType]);
 

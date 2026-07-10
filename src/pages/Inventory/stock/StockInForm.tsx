@@ -154,16 +154,16 @@ export const StockInForm: React.FC<StockInFormProps> = ({
 
   return (
     <ModalPortal onClose={onClose} size="2xl">
-      <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
-        <h3 className="text-2xl font-bold">Entrée de stock</h3>
-        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+      <div className="sticky top-0 bg-white ring-1 ring-gray-100 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
+        <h3 className="text-lg sm:text-xl sm:text-2xl font-bold">Entrée de stock</h3>
+        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-2xl">
           <X size={24} />
         </button>
       </div>
       <div className="overflow-y-auto max-h-[80vh]">
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
           <div>
-            <label className="block text-base font-medium text-gray-700 mb-2">
+            <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
               Article *
             </label>
             <div className="relative">
@@ -179,18 +179,18 @@ export const StockInForm: React.FC<StockInFormProps> = ({
                   setShowItemResults(true);
                 }}
                 placeholder="Rechercher un article..."
-                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg text-base"
+                className="w-full pl-12 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
               />
             </div>
             {showItemResults && items.length > 0 && (
               <div className="relative">
-                <div className="absolute z-20 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                <div className="absolute z-20 mt-1 w-full bg-white ring-1 rounded-2xl shadow-lg max-h-60 overflow-y-auto">
                   {items.map((item) => (
                     <button
                       key={item.itemCode}
                       type="button"
                       onClick={() => selectItem(item)}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b text-base"
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 ring-1 ring-gray-100 text-sm sm:text-base"
                     >
                       <p className="font-medium">{item.name}</p>
                       <p className="text-sm text-gray-500">{item.itemCode}</p>
@@ -200,7 +200,7 @@ export const StockInForm: React.FC<StockInFormProps> = ({
               </div>
             )}
             {selectedItem && (
-              <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
+              <div className="mt-3 p-3 bg-gray-50 rounded-2xl text-sm text-gray-600">
                 <p className="text-base font-medium text-gray-900">
                   {selectedItem.name}
                 </p>
@@ -217,7 +217,7 @@ export const StockInForm: React.FC<StockInFormProps> = ({
           </div>
 
           <div>
-            <label className="block text-base font-medium text-gray-700 mb-2">
+            <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
               Emplacement *
             </label>
             <select
@@ -226,7 +226,7 @@ export const StockInForm: React.FC<StockInFormProps> = ({
                 setFormData({ ...formData, locationCode: e.target.value })
               }
               required
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base bg-white"
+              className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base bg-white"
             >
               <option value="">Sélectionner</option>
               {locations.map((loc: any) => (
@@ -239,7 +239,7 @@ export const StockInForm: React.FC<StockInFormProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Quantité *
               </label>
               <input
@@ -253,11 +253,11 @@ export const StockInForm: React.FC<StockInFormProps> = ({
                   })
                 }
                 required
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
               />
             </div>
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Coût unitaire *
               </label>
               <input
@@ -271,14 +271,14 @@ export const StockInForm: React.FC<StockInFormProps> = ({
                   })
                 }
                 required
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
               />
             </div>
           </div>
 
           {selectedItem?.requiresLotNumber && (
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Numéro de lot *
               </label>
               <input
@@ -286,7 +286,7 @@ export const StockInForm: React.FC<StockInFormProps> = ({
                 onChange={(e) =>
                   setFormData({ ...formData, lotNumber: e.target.value })
                 }
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                 placeholder="LOT-2026-06"
               />
             </div>
@@ -294,7 +294,7 @@ export const StockInForm: React.FC<StockInFormProps> = ({
 
           {selectedItem?.requiresExpiryDate && (
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Date d'expiration *
               </label>
               <input
@@ -303,14 +303,14 @@ export const StockInForm: React.FC<StockInFormProps> = ({
                 onChange={(e) =>
                   setFormData({ ...formData, expiryDate: e.target.value })
                 }
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
               />
             </div>
           )}
 
           {selectedItem?.requiresSerialNumber && (
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Numéros de série *
               </label>
               <textarea
@@ -322,7 +322,7 @@ export const StockInForm: React.FC<StockInFormProps> = ({
                   })
                 }
                 rows={4}
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                 placeholder="Un numéro par ligne ou séparé par virgule"
               />
               <p className="text-sm text-gray-500 mt-1">
@@ -338,7 +338,7 @@ export const StockInForm: React.FC<StockInFormProps> = ({
                 setFormData({ ...formData, referenceType: e.target.value })
               }
               placeholder="Type de référence"
-              className="px-4 py-3 border border-gray-200 rounded-lg text-base"
+              className="px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
             />
             <input
               value={formData.referenceCode}
@@ -346,12 +346,12 @@ export const StockInForm: React.FC<StockInFormProps> = ({
                 setFormData({ ...formData, referenceCode: e.target.value })
               }
               placeholder="Code de référence"
-              className="px-4 py-3 border border-gray-200 rounded-lg text-base"
+              className="px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
             />
           </div>
 
           <div>
-            <label className="block text-base font-medium text-gray-700 mb-2">
+            <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
               Motif / détail
             </label>
             <textarea
@@ -360,22 +360,22 @@ export const StockInForm: React.FC<StockInFormProps> = ({
                 setFormData({ ...formData, reasonDetails: e.target.value })
               }
               rows={3}
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+              className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
               placeholder="Réception commande, retour, régularisation..."
             />
           </div>
 
           {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-base">
+            <div className="p-4 bg-red-50 ring-1 ring-1 ring-red-100 rounded-2xl text-red-700 text-sm sm:text-base">
               {error}
             </div>
           )}
 
-          <div className="flex gap-4 pt-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 pt-6">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-5 py-3 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 text-base"
+              className="flex-1 px-4 py-3 sm:px-5 ring-1 ring-gray-100 rounded-2xl text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
             >
               Annuler
             </button>
@@ -386,7 +386,7 @@ export const StockInForm: React.FC<StockInFormProps> = ({
                 !formData.itemCode ||
                 !formData.locationCode
               }
-              className="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 text-base font-medium"
+              className="flex-1 bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base font-medium w-full sm:w-auto justify-center"
             >
               {createMutation.isPending ? (
                 <Loader2 size={20} className="animate-spin" />

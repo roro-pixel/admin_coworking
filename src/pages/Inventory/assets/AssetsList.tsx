@@ -205,12 +205,12 @@ export const AssetsList: React.FC = () => {
   }
 
   return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-2xl font-semibold text-gray-900">Actifs</h2>
+    <div className="p-3 sm:p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
+        <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">Actifs</h2>
         <button
           onClick={() => handleOpenModal()}
-          className="bg-primary-600 text-white px-5 py-2.5 rounded-lg hover:bg-primary-700 flex items-center gap-2 text-base"
+          className="w-full sm:w-auto justify-center bg-primary-600 text-white px-4 py-3 rounded-2xl hover:bg-primary-700 flex items-center gap-2 text-sm sm:text-base"
         >
           <Plus size={20} />
           Nouvel actif
@@ -218,7 +218,7 @@ export const AssetsList: React.FC = () => {
       </div>
 
       {/* Filtres - AGRANDIS */}
-      <div className="flex flex-col md:flex-row gap-5 mb-8">
+      <div className="flex flex-col lg:flex-row gap-5 mb-8">
         <div className="flex-1 relative">
           <Search
             size={20}
@@ -229,13 +229,13 @@ export const AssetsList: React.FC = () => {
             placeholder="Rechercher un actif..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
+            className="w-full pl-11 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-5 py-3 border border-gray-200 rounded-lg bg-white text-base min-w-[180px]"
+          className="px-5 py-3 ring-1 ring-gray-100 rounded-2xl bg-white text-sm sm:text-base w-full lg:min-w-[180px]"
         >
           <option value="">Tous les statuts</option>
           {statusOptions.map((opt) => (
@@ -247,7 +247,7 @@ export const AssetsList: React.FC = () => {
         <select
           value={locationFilter}
           onChange={(e) => setLocationFilter(e.target.value)}
-          className="px-5 py-3 border border-gray-200 rounded-lg bg-white text-base min-w-[200px]"
+          className="px-5 py-3 ring-1 ring-gray-100 rounded-2xl bg-white text-sm sm:text-base w-full lg:min-w-[200px]"
         >
           <option value="">Tous les emplacements</option>
           {locations.map((loc: any) => (
@@ -259,34 +259,34 @@ export const AssetsList: React.FC = () => {
       </div>
 
       {/* Tableau - AGRANDI */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-3xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-base">
-            <thead className="bg-gray-50 border-b">
+          <table className="min-w-full text-sm sm:text-base">
+            <thead className="bg-gray-50/70">
               <tr>
-                <th className="px-5 py-4 text-left font-semibold">Code</th>
-                <th className="px-5 py-4 text-left font-semibold">Article</th>
-                <th className="px-5 py-4 text-left font-semibold">Série/Tag</th>
-                <th className="px-5 py-4 text-left font-semibold">
+                <th className="px-4 py-4 text-left font-semibold">Code</th>
+                <th className="px-4 py-4 text-left font-semibold">Article</th>
+                <th className="px-4 py-4 text-left font-semibold">Série/Tag</th>
+                <th className="px-4 py-4 text-left font-semibold">
                   Emplacement
                 </th>
-                <th className="px-5 py-4 text-left font-semibold">Statut</th>
-                <th className="px-5 py-4 text-left font-semibold">Condition</th>
-                <th className="px-5 py-4 text-center font-semibold">Actions</th>
+                <th className="px-4 py-4 text-left font-semibold">Statut</th>
+                <th className="px-4 py-4 text-left font-semibold">Condition</th>
+                <th className="px-4 py-4 text-center font-semibold">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="">
               {filteredAssets.map((asset: Asset) => (
-                <tr key={asset.assetCode} className="hover:bg-gray-50">
-                  <td className="px-5 py-4 font-mono text-sm">
+                <tr key={asset.assetCode} className="transition hover:bg-gray-50/70">
+                  <td className="px-4 py-4 font-mono text-sm">
                     {asset.assetCode}
                   </td>
-                  <td className="px-5 py-4 font-medium">{asset.itemName}</td>
-                  <td className="px-5 py-4">
+                  <td className="px-4 py-4 font-medium">{asset.itemName}</td>
+                  <td className="px-4 py-4">
                     {asset.serialNumber || asset.assetTag || "-"}
                   </td>
-                  <td className="px-5 py-4">{asset.locationName}</td>
-                  <td className="px-5 py-4">
+                  <td className="px-4 py-4">{asset.locationName}</td>
+                  <td className="px-4 py-4">
                     <span
                       className={`px-2.5 py-1 rounded-full text-xs ${statusOptions.find((s) => s.value === asset.status)?.color}`}
                     >
@@ -296,7 +296,7 @@ export const AssetsList: React.FC = () => {
                       }
                     </span>
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-4 py-4">
                     <span
                       className={`px-2.5 py-1 rounded-full text-xs ${conditionOptions.find((c) => c.value === asset.condition)?.color}`}
                     >
@@ -307,7 +307,7 @@ export const AssetsList: React.FC = () => {
                       }
                     </span>
                   </td>
-                  <td className="px-5 py-4 text-center">
+                  <td className="px-4 py-4 text-center">
                     <div className="flex justify-center gap-2">
                       <button
                         onClick={() => handleViewDetail(asset)}
@@ -340,28 +340,28 @@ export const AssetsList: React.FC = () => {
       </div>
 
       {filteredAssets.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-xl">
-          <p className="text-gray-500 text-base">Aucun actif trouvé</p>
+        <div className="text-center py-16 bg-white rounded-2xl">
+          <p className="text-gray-500 text-sm sm:text-base">Aucun actif trouvé</p>
         </div>
       )}
 
       {/* ========== MODAL CRÉATION/ÉDITION AVEC ModalPortal - AGRANDI ========== */}
       {isModalOpen && (
         <ModalPortal onClose={handleCloseModal} size="4xl">
-          <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-2xl font-bold">
+          <div className="sticky top-0 bg-white p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
+            <h3 className="text-xl sm:text-2xl font-bold">
               {editingAsset ? "Modifier" : "Nouvel"} actif
             </h3>
             <button
               onClick={handleCloseModal}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              className="p-2 hover:bg-gray-100 rounded-2xl"
             >
               <X size={24} />
             </button>
           </div>
-          <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          <form onSubmit={handleSubmit} className="p-5 sm:p-8 space-y-6">
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Article *
               </label>
               <div className="relative">
@@ -373,16 +373,16 @@ export const AssetsList: React.FC = () => {
                     setShowItemResults(true);
                   }}
                   placeholder="Rechercher un article..."
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                 />
                 {showItemResults && items.length > 0 && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  <div className="absolute z-10 mt-1 w-full bg-white border rounded-2xl shadow-lg max-h-60 overflow-y-auto">
                     {items.map((item: InventoryItem) => (
                       <button
                         key={item.itemCode}
                         type="button"
                         onClick={() => selectItem(item)}
-                        className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b text-base"
+                        className="w-full px-4 py-3 text-left hover:bg-gray-50 ring-0 text-sm sm:text-base"
                       >
                         <p className="font-medium">{item.name}</p>
                         <p className="text-sm text-gray-500">{item.itemCode}</p>
@@ -393,9 +393,9 @@ export const AssetsList: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:p-6">
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Numéro de série
                 </label>
                 <input
@@ -404,11 +404,11 @@ export const AssetsList: React.FC = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, serialNumber: e.target.value })
                   }
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                 />
               </div>
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Tag
                 </label>
                 <input
@@ -417,14 +417,14 @@ export const AssetsList: React.FC = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, assetTag: e.target.value })
                   }
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:p-6">
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Emplacement *
                 </label>
                 <select
@@ -433,7 +433,7 @@ export const AssetsList: React.FC = () => {
                     setFormData({ ...formData, locationCode: e.target.value })
                   }
                   required
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                 >
                   <option value="">Sélectionner</option>
                   {locations.map((loc: any) => (
@@ -444,7 +444,7 @@ export const AssetsList: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Statut
                 </label>
                 <select
@@ -452,7 +452,7 @@ export const AssetsList: React.FC = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, status: e.target.value as any })
                   }
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                 >
                   {statusOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -463,9 +463,9 @@ export const AssetsList: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:p-6">
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Condition
                 </label>
                 <select
@@ -476,7 +476,7 @@ export const AssetsList: React.FC = () => {
                       condition: e.target.value as any,
                     })
                   }
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                 >
                   {conditionOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -486,7 +486,7 @@ export const AssetsList: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Coût d'achat (FCFA)
                 </label>
                 <input
@@ -503,14 +503,14 @@ export const AssetsList: React.FC = () => {
                     });
                   }}
                   placeholder="0"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:p-6">
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Date d'achat
                 </label>
                 <input
@@ -519,11 +519,11 @@ export const AssetsList: React.FC = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, purchaseDate: e.target.value })
                   }
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                 />
               </div>
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Fin garantie
                 </label>
                 <input
@@ -535,13 +535,13 @@ export const AssetsList: React.FC = () => {
                       warrantyEndDate: e.target.value,
                     })
                   }
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Notes
               </label>
               <textarea
@@ -550,15 +550,15 @@ export const AssetsList: React.FC = () => {
                   setFormData({ ...formData, notes: e.target.value })
                 }
                 rows={3}
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
               />
             </div>
 
-            <div className="flex gap-4 pt-6">
+            <div className="flex flex-col gap-3 sm:flex-row pt-6">
               <button
                 type="button"
                 onClick={handleCloseModal}
-                className="flex-1 px-5 py-3 border rounded-lg text-gray-700 text-base"
+                className="flex-1 px-5 py-3 border rounded-2xl text-gray-700 text-sm sm:text-base"
               >
                 Annuler
               </button>
@@ -570,7 +570,7 @@ export const AssetsList: React.FC = () => {
                   createMutation.isPending ||
                   updateMutation.isPending
                 }
-                className="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 text-base"
+                className="flex-1 justify-center bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 text-sm sm:text-base"
               >
                 {editingAsset ? "Mettre à jour" : "Créer"}
               </button>

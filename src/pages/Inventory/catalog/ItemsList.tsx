@@ -226,12 +226,12 @@ export const ItemsList: React.FC = () => {
   }
 
   return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-2xl font-semibold text-gray-900">Articles</h2>
+    <div className="p-3 sm:p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
+        <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">Articles</h2>
         <button
           onClick={() => handleOpenModal()}
-          className="bg-primary-600 text-white px-5 py-2.5 rounded-lg hover:bg-primary-700 flex items-center gap-2 text-base"
+          className="w-full sm:w-auto justify-center bg-primary-600 text-white px-4 py-3 rounded-2xl hover:bg-primary-700 flex items-center gap-2 text-sm sm:text-base"
         >
           <Plus size={20} />
           Nouvel article
@@ -249,49 +249,49 @@ export const ItemsList: React.FC = () => {
           placeholder="Rechercher un article..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
+          className="w-full pl-11 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
         />
       </div>
 
       {/* Tableau - AGRANDI */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-3xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-base">
-            <thead className="bg-gray-50 border-b">
+          <table className="min-w-full text-sm sm:text-base">
+            <thead className="bg-gray-50/70">
               <tr>
-                <th className="px-5 py-4 text-left font-semibold">Code</th>
-                <th className="px-5 py-4 text-left font-semibold">Nom</th>
-                <th className="px-5 py-4 text-left font-semibold">Catégorie</th>
-                <th className="px-5 py-4 text-left font-semibold">Type</th>
-                <th className="px-5 py-4 text-left font-semibold">Unité</th>
-                <th className="px-5 py-4 text-left font-semibold">Prix</th>
-                <th className="px-5 py-4 text-left font-semibold">Statut</th>
-                <th className="px-5 py-4 text-right font-semibold">Actions</th>
+                <th className="px-4 py-4 text-left font-semibold">Code</th>
+                <th className="px-4 py-4 text-left font-semibold">Nom</th>
+                <th className="px-4 py-4 text-left font-semibold">Catégorie</th>
+                <th className="px-4 py-4 text-left font-semibold">Type</th>
+                <th className="px-4 py-4 text-left font-semibold">Unité</th>
+                <th className="px-4 py-4 text-left font-semibold">Prix</th>
+                <th className="px-4 py-4 text-left font-semibold">Statut</th>
+                <th className="px-4 py-4 text-right font-semibold">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="">
               {items.map((item) => (
-                <tr key={item.itemCode} className="hover:bg-gray-50">
-                  <td className="px-5 py-4 font-mono text-sm">
+                <tr key={item.itemCode} className="transition hover:bg-gray-50/70">
+                  <td className="px-4 py-4 font-mono text-sm">
                     {item.itemCode}
                   </td>
-                  <td className="px-5 py-4 font-medium">{item.name}</td>
-                  <td className="px-5 py-4">{item.categoryName || "-"}</td>
-                  <td className="px-5 py-4">
+                  <td className="px-4 py-4 font-medium">{item.name}</td>
+                  <td className="px-4 py-4">{item.categoryName || "-"}</td>
+                  <td className="px-4 py-4">
                     {itemTypes.find((t) => t.value === item.itemType)?.label}
                   </td>
-                  <td className="px-5 py-4">{item.unitName || "-"}</td>
-                  <td className="px-5 py-4">
+                  <td className="px-4 py-4">{item.unitName || "-"}</td>
+                  <td className="px-4 py-4">
                     {item.defaultCost.toLocaleString()} FCFA
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-4 py-4">
                     <span
                       className={`px-2.5 py-1 rounded-full text-xs ${item.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
                     >
                       {item.active ? "Actif" : "Inactif"}
                     </span>
                   </td>
-                  <td className="px-5 py-4 text-right">
+                  <td className="px-4 py-4 text-right">
                     <button
                       onClick={() => handleViewDetail(item)}
                       className="p-1.5 text-gray-600 hover:text-primary-600 mr-1"
@@ -329,30 +329,30 @@ export const ItemsList: React.FC = () => {
       </div>
 
       {items.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-xl">
+        <div className="text-center py-16 bg-white rounded-2xl">
           <Package size={64} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500 text-base">Aucun article trouvé</p>
+          <p className="text-gray-500 text-sm sm:text-base">Aucun article trouvé</p>
         </div>
       )}
 
       {/* ========== MODAL CRÉATION/ÉDITION - AGRANDIE ========== */}
       {isModalOpen && (
         <ModalPortal onClose={handleCloseModal} size="4xl">
-          <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-2xl font-bold">
+          <div className="sticky top-0 bg-white p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
+            <h3 className="text-xl sm:text-2xl font-bold">
               {editingItem ? "Modifier l'article" : "Nouvel article"}
             </h3>
             <button
               onClick={handleCloseModal}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              className="p-2 hover:bg-gray-100 rounded-2xl"
             >
               <X size={24} />
             </button>
           </div>
-          <form onSubmit={handleSubmit} className="p-8 space-y-6">
-            <div className="grid grid-cols-2 gap-6">
+          <form onSubmit={handleSubmit} className="p-5 sm:p-8 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:p-6">
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Nom *
                 </label>
                 <input
@@ -362,11 +362,11 @@ export const ItemsList: React.FC = () => {
                     setFormData({ ...formData, name: e.target.value })
                   }
                   required
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
                 />
               </div>
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Code affiché
                 </label>
                 <input
@@ -375,7 +375,7 @@ export const ItemsList: React.FC = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, displayCode: e.target.value })
                   }
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 bg-gray-50 text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 bg-gray-50 text-sm sm:text-base"
                   placeholder="Généré automatiquement"
                   disabled
                 />
@@ -383,7 +383,7 @@ export const ItemsList: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Description
               </label>
               <textarea
@@ -392,12 +392,12 @@ export const ItemsList: React.FC = () => {
                   setFormData({ ...formData, description: e.target.value })
                 }
                 rows={3}
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 text-base"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
               />
             </div>
 
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
+              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                 Spécification
               </label>
               <textarea
@@ -406,52 +406,52 @@ export const ItemsList: React.FC = () => {
                   setFormData({ ...formData, specification: e.target.value })
                 }
                 rows={3}
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 text-base"
+                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 sm:p-6">
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Code identification
                 </label>
                 <input
                   type="text"
                   value={formData.identificationCode}
                   disabled
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 bg-gray-50 text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 bg-gray-50 text-sm sm:text-base"
                   placeholder="Généré automatiquement"
                 />
               </div>
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Code court
                 </label>
                 <input
                   type="text"
                   value={formData.shortCode}
                   disabled
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 bg-gray-50 text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 bg-gray-50 text-sm sm:text-base"
                   placeholder="Généré automatiquement"
                 />
               </div>
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   SKU (PSKU)
                 </label>
                 <input
                   type="text"
                   value={formData.psku}
                   disabled
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 bg-gray-50 text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 bg-gray-50 text-sm sm:text-base"
                   placeholder="Généré automatiquement"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:p-6">
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Catégorie *
                 </label>
                 <select
@@ -460,7 +460,7 @@ export const ItemsList: React.FC = () => {
                     setFormData({ ...formData, categoryCode: e.target.value })
                   }
                   required
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
                 >
                   <option value="">Sélectionner</option>
                   {categories.map((cat: InventoryCategory) => (
@@ -474,7 +474,7 @@ export const ItemsList: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Unité *
                 </label>
                 <select
@@ -483,7 +483,7 @@ export const ItemsList: React.FC = () => {
                     setFormData({ ...formData, unitCode: e.target.value })
                   }
                   required
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
                 >
                   <option value="">Sélectionner</option>
                   {units.map((unit: InventoryUnit) => (
@@ -498,9 +498,9 @@ export const ItemsList: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:p-6">
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Type d'article *
                 </label>
                 <select
@@ -511,7 +511,7 @@ export const ItemsList: React.FC = () => {
                       itemType: e.target.value as any,
                     })
                   }
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
                 >
                   {itemTypes.map((type) => (
                     <option key={type.value} value={type.value}>
@@ -521,7 +521,7 @@ export const ItemsList: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Type de suivi
                 </label>
                 <select
@@ -532,7 +532,7 @@ export const ItemsList: React.FC = () => {
                       trackingType: e.target.value as any,
                     })
                   }
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
                 >
                   {trackingTypes.map((type) => (
                     <option key={type.value} value={type.value}>
@@ -543,9 +543,9 @@ export const ItemsList: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:p-6">
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Prix par défaut (FCFA)
                 </label>
                 <input
@@ -560,11 +560,11 @@ export const ItemsList: React.FC = () => {
                     });
                   }}
                   placeholder="0"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
                 />
               </div>
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
+                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
                   Prix de vente (FCFA)
                 </label>
                 <input
@@ -579,12 +579,12 @@ export const ItemsList: React.FC = () => {
                     });
                   }}
                   placeholder="0"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 text-base"
+                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <label className="flex items-center gap-3">
                 <input
                   type="checkbox"
@@ -594,7 +594,7 @@ export const ItemsList: React.FC = () => {
                   }
                   className="rounded w-5 h-5"
                 />
-                <span className="text-base">Taxable</span>
+                <span className="text-sm sm:text-base">Taxable</span>
               </label>
               <label className="flex items-center gap-3">
                 <input
@@ -608,7 +608,7 @@ export const ItemsList: React.FC = () => {
                   }
                   className="rounded w-5 h-5"
                 />
-                <span className="text-base">Autoriser stock négatif</span>
+                <span className="text-sm sm:text-base">Autoriser stock négatif</span>
               </label>
               <label className="flex items-center gap-3">
                 <input
@@ -622,7 +622,7 @@ export const ItemsList: React.FC = () => {
                   }
                   className="rounded w-5 h-5"
                 />
-                <span className="text-base">Requiert date d'expiration</span>
+                <span className="text-sm sm:text-base">Requiert date d'expiration</span>
               </label>
               <label className="flex items-center gap-3">
                 <input
@@ -636,7 +636,7 @@ export const ItemsList: React.FC = () => {
                   }
                   className="rounded w-5 h-5"
                 />
-                <span className="text-base">Requiert numéro de lot</span>
+                <span className="text-sm sm:text-base">Requiert numéro de lot</span>
               </label>
               <label className="flex items-center gap-3">
                 <input
@@ -650,22 +650,22 @@ export const ItemsList: React.FC = () => {
                   }
                   className="rounded w-5 h-5"
                 />
-                <span className="text-base">Requiert numéro de série</span>
+                <span className="text-sm sm:text-base">Requiert numéro de série</span>
               </label>
             </div>
 
-            <div className="flex gap-4 pt-6">
+            <div className="flex flex-col gap-3 sm:flex-row pt-6">
               <button
                 type="button"
                 onClick={handleCloseModal}
-                className="flex-1 px-5 py-3 border rounded-lg text-gray-700 hover:bg-gray-50 text-base"
+                className="flex-1 px-5 py-3 border rounded-2xl text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
               >
                 Annuler
               </button>
               <button
                 type="submit"
                 disabled={createMutation.isPending || updateMutation.isPending}
-                className="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 text-base"
+                className="flex-1 justify-center bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 text-sm sm:text-base"
               >
                 {editingItem ? "Mettre à jour" : "Créer"}
               </button>
@@ -677,48 +677,48 @@ export const ItemsList: React.FC = () => {
       {/* ========== MODAL DÉTAIL - AGRANDI ========== */}
       {isDetailOpen && selectedItem && (
         <ModalPortal onClose={() => setIsDetailOpen(false)} size="lg">
-          <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
+          <div className="sticky top-0 bg-white p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
             <div>
-              <h3 className="text-2xl font-bold">{selectedItem.name}</h3>
+              <h3 className="text-xl sm:text-2xl font-bold">{selectedItem.name}</h3>
               <p className="text-sm text-gray-500 font-mono mt-1">
                 {selectedItem.itemCode}
               </p>
             </div>
             <button
               onClick={() => setIsDetailOpen(false)}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              className="p-2 hover:bg-gray-100 rounded-2xl"
             >
               <X size={24} />
             </button>
           </div>
-          <div className="p-8 space-y-6">
+          <div className="p-5 sm:p-8 space-y-6">
             {/* Codes */}
             <div>
-              <h4 className="text-base font-semibold text-gray-700 mb-3">
+              <h4 className="text-sm sm:text-base font-semibold text-gray-700 mb-3">
                 Codes d'identification
               </h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-gray-50 rounded-2xl">
                   <p className="text-sm text-gray-500">Code affiché</p>
-                  <p className="font-mono text-base">
+                  <p className="font-mono text-sm sm:text-base">
                     {selectedItem.displayCode || "-"}
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-2xl">
                   <p className="text-sm text-gray-500">Code identification</p>
-                  <p className="font-mono text-base">
+                  <p className="font-mono text-sm sm:text-base">
                     {selectedItem.identificationCode || "-"}
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-2xl">
                   <p className="text-sm text-gray-500">Code court</p>
-                  <p className="font-mono text-base">
+                  <p className="font-mono text-sm sm:text-base">
                     {selectedItem.shortCode || "-"}
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-2xl">
                   <p className="text-sm text-gray-500">SKU (PSKU)</p>
-                  <p className="font-mono text-base">
+                  <p className="font-mono text-sm sm:text-base">
                     {selectedItem.psku || "-"}
                   </p>
                 </div>
@@ -727,34 +727,34 @@ export const ItemsList: React.FC = () => {
 
             {/* Classification */}
             <div>
-              <h4 className="text-base font-semibold text-gray-700 mb-3">
+              <h4 className="text-sm sm:text-base font-semibold text-gray-700 mb-3">
                 Classification
               </h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-gray-50 rounded-2xl">
                   <p className="text-sm text-gray-500">Catégorie</p>
-                  <p className="font-medium text-base">
+                  <p className="font-medium text-sm sm:text-base">
                     {selectedItem.categoryName || "-"}
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-2xl">
                   <p className="text-sm text-gray-500">Type</p>
-                  <p className="font-medium text-base">
+                  <p className="font-medium text-sm sm:text-base">
                     {
                       itemTypes.find((t) => t.value === selectedItem.itemType)
                         ?.label
                     }
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-2xl">
                   <p className="text-sm text-gray-500">Unité</p>
-                  <p className="font-medium text-base">
+                  <p className="font-medium text-sm sm:text-base">
                     {selectedItem.unitName || "-"}
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-2xl">
                   <p className="text-sm text-gray-500">Type de suivi</p>
-                  <p className="font-medium text-base">
+                  <p className="font-medium text-sm sm:text-base">
                     {
                       trackingTypes.find(
                         (t) => t.value === selectedItem.trackingType,
@@ -767,25 +767,25 @@ export const ItemsList: React.FC = () => {
 
             {/* Tarification */}
             <div>
-              <h4 className="text-base font-semibold text-gray-700 mb-3">
+              <h4 className="text-sm sm:text-base font-semibold text-gray-700 mb-3">
                 Tarification
               </h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-gray-50 rounded-2xl">
                   <p className="text-sm text-gray-500">Prix par défaut</p>
-                  <p className="font-bold text-base">
+                  <p className="font-bold text-sm sm:text-base">
                     {selectedItem.defaultCost.toLocaleString()} FCFA
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-2xl">
                   <p className="text-sm text-gray-500">Prix de vente</p>
-                  <p className="font-bold text-base">
+                  <p className="font-bold text-sm sm:text-base">
                     {(selectedItem.salePrice ?? 0).toLocaleString()} FCFA
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-2xl">
                   <p className="text-sm text-gray-500">Taxable</p>
-                  <p className="font-medium text-base flex items-center gap-2">
+                  <p className="font-medium text-sm sm:text-base flex items-center gap-2">
                     {selectedItem.taxable ? (
                       <>
                         <CheckCircle size={16} className="text-green-600" /> Oui
@@ -802,15 +802,15 @@ export const ItemsList: React.FC = () => {
 
             {/* Paramètres de stock */}
             <div>
-              <h4 className="text-base font-semibold text-gray-700 mb-3">
+              <h4 className="text-sm sm:text-base font-semibold text-gray-700 mb-3">
                 Paramètres de stock
               </h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-gray-50 rounded-2xl">
                   <p className="text-sm text-gray-500">
                     Stock négatif autorisé
                   </p>
-                  <p className="font-medium text-base flex items-center gap-2">
+                  <p className="font-medium text-sm sm:text-base flex items-center gap-2">
                     {selectedItem.allowNegativeStock ? (
                       <>
                         <CheckCircle size={16} className="text-amber-600" /> Oui
@@ -822,7 +822,7 @@ export const ItemsList: React.FC = () => {
                     )}
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-2xl">
                   <p className="text-sm text-gray-500">Statut</p>
                   <span
                     className={`px-2.5 py-1 rounded-full text-xs ${selectedItem.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
@@ -830,9 +830,9 @@ export const ItemsList: React.FC = () => {
                     {selectedItem.active ? "Actif" : "Inactif"}
                   </span>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-2xl">
                   <p className="text-sm text-gray-500">Requiert expiration</p>
-                  <p className="font-medium text-base flex items-center gap-2">
+                  <p className="font-medium text-sm sm:text-base flex items-center gap-2">
                     {selectedItem.requiresExpiryDate ? (
                       <>
                         <CheckCircle size={16} className="text-amber-600" /> Oui
@@ -844,9 +844,9 @@ export const ItemsList: React.FC = () => {
                     )}
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-2xl">
                   <p className="text-sm text-gray-500">Requiert n° lot</p>
-                  <p className="font-medium text-base flex items-center gap-2">
+                  <p className="font-medium text-sm sm:text-base flex items-center gap-2">
                     {selectedItem.requiresLotNumber ? (
                       <>
                         <CheckCircle size={16} className="text-amber-600" /> Oui
@@ -858,9 +858,9 @@ export const ItemsList: React.FC = () => {
                     )}
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg col-span-2">
+                <div className="p-4 bg-gray-50 rounded-2xl col-span-2">
                   <p className="text-sm text-gray-500">Requiert n° série</p>
-                  <p className="font-medium text-base flex items-center gap-2">
+                  <p className="font-medium text-sm sm:text-base flex items-center gap-2">
                     {selectedItem.requiresSerialNumber ? (
                       <>
                         <CheckCircle size={16} className="text-amber-600" /> Oui
@@ -878,22 +878,22 @@ export const ItemsList: React.FC = () => {
             {/* Description / Spécification */}
             {(selectedItem.description || selectedItem.specification) && (
               <div>
-                <h4 className="text-base font-semibold text-gray-700 mb-3">
+                <h4 className="text-sm sm:text-base font-semibold text-gray-700 mb-3">
                   Informations complémentaires
                 </h4>
                 <div className="space-y-3">
                   {selectedItem.description && (
-                    <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="p-4 bg-gray-50 rounded-2xl">
                       <p className="text-sm text-gray-500 mb-2">Description</p>
-                      <p className="text-base">{selectedItem.description}</p>
+                      <p className="text-sm sm:text-base">{selectedItem.description}</p>
                     </div>
                   )}
                   {selectedItem.specification && (
-                    <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="p-4 bg-gray-50 rounded-2xl">
                       <p className="text-sm text-gray-500 mb-2">
                         Spécification
                       </p>
-                      <p className="text-base">{selectedItem.specification}</p>
+                      <p className="text-sm sm:text-base">{selectedItem.specification}</p>
                     </div>
                   )}
                 </div>

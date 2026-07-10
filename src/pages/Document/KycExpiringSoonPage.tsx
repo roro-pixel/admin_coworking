@@ -1,15 +1,12 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Calendar, Eye, RefreshCw } from "lucide-react";
 import { kycService, kycStatusLabels } from "../../services/document.service";
-import { KycCaseDetailModal } from "../../components/kyc/KycCaseDetailModal";
-import type { KycCaseResponse } from "../../services/document.service";
 
 export const KycExpiringSoonPage: React.FC = () => {
+  const navigate = useNavigate();
   const [days, setDays] = useState(30);
-  const [selectedCase, setSelectedCase] = useState<KycCaseResponse | null>(
-    null,
-  );
 
   const { data, isLoading } = useQuery({
     queryKey: ["kyc-expiring-soon", days],
@@ -85,7 +82,7 @@ export const KycExpiringSoonPage: React.FC = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => setSelectedCase(kycCase)}
+                  onClick={() => navigate(`/documents/kyc/cases/${kycCase.code}`)}
                   className="px-4 py-2 border border-amber-200 text-amber-700 rounded-lg hover:bg-amber-50 flex items-center gap-2 text-sm"
                 >
                   <Eye size={14} /> Voir dossier
@@ -94,14 +91,6 @@ export const KycExpiringSoonPage: React.FC = () => {
             </div>
           ))}
         </div>
-      )}
-
-      {selectedCase && (
-        <KycCaseDetailModal
-          kycCase={selectedCase}
-          onClose={() => setSelectedCase(null)}
-          onRefresh={() => setSelectedCase(null)}
-        />
       )}
     </div>
   );

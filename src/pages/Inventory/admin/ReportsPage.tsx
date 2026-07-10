@@ -58,41 +58,41 @@ export const ReportsPage: React.FC = () => {
   };
 
   return (
-    <div className="p-4">
-      <h2 className="text-xl font-semibold text-gray-900 mb-8 text-2xl">
+    <div className="p-3 sm:p-4">
+      <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-8">
         Rapports
       </h2>
 
       {/* Rapport de mouvements - AGRANDI */}
-      <div className="bg-white rounded-xl p-8 shadow-sm mb-10 max-w-7xl mx-auto">
+      <div className="bg-white rounded-3xl p-5 sm:p-5 sm:p-8 shadow-sm ring-1 ring-gray-100 mb-10 max-w-7xl mx-auto">
         <h3 className="text-xl font-semibold text-gray-900 mb-6">
           Rapport de mouvements de stock
         </h3>
-        <div className="flex flex-col md:flex-row gap-6 mb-8">
+        <div className="flex flex-col lg:flex-row gap-5 sm:p-6 mb-8">
           <div className="flex-1">
-            <label className="block text-base font-medium text-gray-700 mb-2">
+            <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
               Du
             </label>
             <input
               type="date"
               value={fromDate}
               onChange={(e) => setFromDate(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+              className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
             />
           </div>
           <div className="flex-1">
-            <label className="block text-base font-medium text-gray-700 mb-2">
+            <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
               Au
             </label>
             <input
               type="date"
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+              className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
             />
           </div>
           <div className="flex-1">
-            <label className="block text-base font-medium text-gray-700 mb-2">
+            <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
               Article (optionnel)
             </label>
             <input
@@ -100,13 +100,13 @@ export const ReportsPage: React.FC = () => {
               value={itemFilter}
               onChange={(e) => setItemFilter(e.target.value)}
               placeholder="Code article"
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-base"
+              className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
             />
           </div>
-          <div className="flex gap-3 items-end">
+          <div className="flex flex-col gap-2 sm:flex-row sm:gap-3 items-end">
             <button
               onClick={() => refetch()}
-              className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2 text-base"
+              className="px-4 py-3 bg-primary-600 text-white rounded-2xl hover:bg-primary-700 flex items-center gap-2 text-sm sm:text-base"
             >
               <Search size={20} />
               Générer
@@ -114,7 +114,7 @@ export const ReportsPage: React.FC = () => {
             <button
               onClick={handleExportCSV}
               disabled={!fromDate || !toDate}
-              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-base"
+              className="px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm sm:text-base"
             >
               <FileSpreadsheet size={20} />
               CSV
@@ -122,7 +122,7 @@ export const ReportsPage: React.FC = () => {
             <button
               onClick={handleExportPDF}
               disabled={!fromDate || !toDate}
-              className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 text-base"
+              className="px-4 py-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 text-sm sm:text-base"
             >
               <FileText size={20} />
               PDF
@@ -132,8 +132,8 @@ export const ReportsPage: React.FC = () => {
 
         {movementsReport && (
           <div className="overflow-x-auto mt-6">
-            <table className="w-full text-base">
-              <thead className="bg-gray-50">
+            <table className="min-w-full text-sm sm:text-base">
+              <thead className="bg-gray-50/70">
                 <tr>
                   <th className="px-4 py-3 text-left">Date</th>
                   <th className="px-4 py-3 text-left">Type</th>
@@ -145,7 +145,7 @@ export const ReportsPage: React.FC = () => {
               </thead>
               <tbody>
                 {movementsReport?.data?.map((mov: any, idx: number) => (
-                  <tr key={idx} className="border-t">
+                  <tr key={idx} className="ring-0">
                     <td className="px-4 py-3">
                       {new Date(mov.performedAt).toLocaleDateString("fr-FR")}
                     </td>
@@ -165,40 +165,40 @@ export const ReportsPage: React.FC = () => {
       </div>
 
       {/* Rapport d'anomalies - AGRANDI */}
-      <div className="bg-white rounded-xl p-8 shadow-sm max-w-7xl mx-auto">
+      <div className="bg-white rounded-3xl p-5 sm:p-5 sm:p-8 shadow-sm ring-1 ring-gray-100 max-w-7xl mx-auto">
         <h3 className="text-xl font-semibold text-gray-900 mb-6">
           Rapport d'anomalies
         </h3>
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className="p-5 bg-red-50 rounded-lg">
-            <h4 className="font-medium text-red-800 mb-2 text-base">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:p-6">
+          <div className="p-5 bg-red-50 rounded-2xl">
+            <h4 className="font-medium text-red-800 mb-2 text-sm sm:text-base">
               Stocks négatifs
             </h4>
-            <p className="text-red-600 text-base">
+            <p className="text-red-600 text-sm sm:text-base">
               {anomaliesReport?.negativeStockItems?.length || 0} article(s)
             </p>
           </div>
-          <div className="p-5 bg-orange-50 rounded-lg">
-            <h4 className="font-medium text-orange-800 mb-2 text-base">
+          <div className="p-5 bg-orange-50 rounded-2xl">
+            <h4 className="font-medium text-orange-800 mb-2 text-sm sm:text-base">
               Lots expirés
             </h4>
-            <p className="text-orange-600 text-base">
+            <p className="text-orange-600 text-sm sm:text-base">
               {anomaliesReport?.expiredLots?.length || 0} lot(s)
             </p>
           </div>
-          <div className="p-5 bg-yellow-50 rounded-lg">
-            <h4 className="font-medium text-yellow-800 mb-2 text-base">
+          <div className="p-5 bg-yellow-50 rounded-2xl">
+            <h4 className="font-medium text-yellow-800 mb-2 text-sm sm:text-base">
               Actifs orphelins
             </h4>
-            <p className="text-yellow-600 text-base">
+            <p className="text-yellow-600 text-sm sm:text-base">
               {anomaliesReport?.orphanAssets?.length || 0} actif(s)
             </p>
           </div>
-          <div className="p-5 bg-purple-50 rounded-lg">
-            <h4 className="font-medium text-purple-800 mb-2 text-base">
+          <div className="p-5 bg-purple-50 rounded-2xl">
+            <h4 className="font-medium text-purple-800 mb-2 text-sm sm:text-base">
               Généré le
             </h4>
-            <p className="text-purple-600 text-base">
+            <p className="text-purple-600 text-sm sm:text-base">
               {anomaliesReport?.generatedAt
                 ? new Date(anomaliesReport.generatedAt).toLocaleString("fr-FR")
                 : "-"}

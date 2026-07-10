@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Search,
@@ -16,16 +17,13 @@ import {
   Loader2,
   CheckSquare,
 } from "lucide-react";
-import { kycService, documentService } from "../../services/document.service";
+import { kycService } from "../../services/document.service";
 import {
   kycRiskLevelLabels,
   kycRiskLevelColors,
 } from "../../services/document.service";
-import { DocumentReviewModal } from "../../components/kyc/DocumentReviewModal";
-import { KycCaseDetailModal } from "../../components/kyc/KycCaseDetailModal";
 import { useAuth } from "../../contexts/AuthContext";
 import { CreateKycCaseModal } from "./CreateKycCaseModal";
-import type { KycCaseResponse } from "../../services/document.service";
 
 const statusConfig: Record<
   string,
@@ -101,14 +99,12 @@ const statusConfig: Record<
 export const DocumentReviewQueue: React.FC = () => {
   const { admin } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [ownerTypeFilter, setOwnerTypeFilter] = useState("all");
   const [riskLevelFilter, setRiskLevelFilter] = useState("all");
   const [showMyQueue, setShowMyQueue] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<any>(null);
-  const [selectedKycCase, setSelectedKycCase] =
-    useState<KycCaseResponse | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Bulk review
@@ -145,33 +141,10 @@ export const DocumentReviewQueue: React.FC = () => {
   const kycCases = kycData?.content || [];
 
   // Mutations
-  const approveDocumentMutation = useMutation({
-    mutationFn: ({ code, comment }: { code: string; comment?: string }) =>
-      documentService.approveDocument(code, adminId, comment),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["kycCases"] });
-      queryClient.invalidateQueries({ queryKey: ["kyc-dashboard"] });
-      setSelectedDocument(null);
-    },
-    onError: (e: any) =>
-      alert(e?.response?.data?.message || "Erreur lors de l'approbation."),
-  });
-
-  const rejectDocumentMutation = useMutation({
-    mutationFn: ({ code, comment }: { code: string; comment: string }) =>
-      documentService.rejectDocument(code, adminId, comment, "OTHER"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["kycCases"] });
-      queryClient.invalidateQueries({ queryKey: ["kyc-dashboard"] });
-      setSelectedDocument(null);
-    },
-    onError: (e: any) =>
-      alert(e?.response?.data?.message || "Erreur lors du rejet."),
-  });
 
   const bulkApproveMutation = useMutation({
     mutationFn: () =>
-      documentService.bulkApproveDocuments(selectedCases, adminId),
+      Promise.all(selectedCases.map((code) => kycService.approveKycCase(code, adminId, "Approuvé en masse"))).then((results) => ({ succeeded: results.length, failed: 0 })),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["kycCases"] });
       queryClient.invalidateQueries({ queryKey: ["kyc-dashboard"] });
@@ -515,13 +488,29 @@ export const DocumentReviewQueue: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-start gap-2">
                         {kycCase.ownerType === "BUSINESS" ? (
-                          <Building2 size={16} className="text-gray-400" />
+                          <Building2
+                            size={16}
+                            className="mt-0.5 shrink-0 text-gray-400"
+                          />
                         ) : (
-                          <Users size={16} className="text-gray-400" />
+                          <Users
+                            size={16}
+                            className="mt-0.5 shrink-0 text-gray-400"
+                          />
                         )}
-                        <span className="text-sm">{kycCase.ownerType}</span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-gray-900">
+                            {kycCase.ownerName || "Propriétaire non renseigné"}
+                          </p>
+                          <p className="mt-0.5 text-xs text-gray-500">
+                            {kycCase.ownerType}
+                            {kycCase.ownerCode
+                              ? ` · ${kycCase.ownerCode}`
+                              : ""}
+                          </p>
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -578,7 +567,7 @@ export const DocumentReviewQueue: React.FC = () => {
                     <td className="px-4 py-3 text-center">
                       <div className="flex justify-center gap-1">
                         <button
-                          onClick={() => setSelectedKycCase(kycCase)}
+                          onClick={() => navigate(`/documents/kyc/cases/${kycCase.code}`)}
                           className="p-1 text-gray-600 hover:text-primary-600"
                           title="Voir détail"
                         >
@@ -612,46 +601,7 @@ export const DocumentReviewQueue: React.FC = () => {
         )}
       </div>
 
-      {/* Modals */}
-      {selectedDocument && (
-        <DocumentReviewModal
-          document={selectedDocument}
-          onClose={() => setSelectedDocument(null)}
-          onApprove={(comment) => {
-            if (selectedDocument) {
-              approveDocumentMutation.mutate({
-                code: selectedDocument.code,
-                comment,
-              });
-            }
-          }}
-          onReject={(comment, _reasonCode) => {
-            if (selectedDocument) {
-              rejectDocumentMutation.mutate({
-                code: selectedDocument.code,
-                comment,
-              });
-            }
-          }}
-          isProcessing={
-            approveDocumentMutation.isPending ||
-            rejectDocumentMutation.isPending
-          }
-        />
-      )}
-
-      {selectedKycCase && (
-        <KycCaseDetailModal
-          kycCase={selectedKycCase}
-          onClose={() => setSelectedKycCase(null)}
-          onRefresh={() => {
-            queryClient.invalidateQueries({ queryKey: ["kycCases"] });
-            queryClient.invalidateQueries({ queryKey: ["kyc-dashboard"] });
-            setSelectedKycCase(null);
-          }}
-        />
-      )}
-
+     
       {showCreateModal && (
         <CreateKycCaseModal
           isOpen={showCreateModal}
