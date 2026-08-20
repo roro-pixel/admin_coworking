@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "../../components/layout/AdminLayout";
 import {
@@ -27,12 +27,17 @@ import {
   Mail,
   User,
   Trash2,
+  ShieldCheck,
+  FilePlus2,
+  Ban,
+  Package,
+  Search,
 } from "lucide-react";
 import { billingService } from "../../services/billing.service";
+import type { BillingCatalogLookupItem } from "../../services/billing.service";
 import { paymentService } from "../../services/payment.service";
 import type { CashSession } from "../../services/payment.service";
 import { ModalPortal } from "../../components/ui/ModalPortal";
-import { CreateCreditNoteModal } from "./CreateCreditNoteModal";
 import { useAuth } from "../../contexts/AuthContext";
 
 // ─── Labels & config ──────────────────────────────────────────────────────────
@@ -43,6 +48,7 @@ const documentTypeLabels: Record<string, string> = {
   INVOICE: "Facture",
   CREDIT_NOTE: "Avoir",
   DEBIT_NOTE: "Note de débit",
+  CORRECTIVE_INVOICE: "Rectificative",
 };
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -76,22 +82,105 @@ const statusConfig: Record<string, { label: string; color: string }> = {
     color: "bg-violet-100 text-violet-700",
   },
   DEPOSIT_PAID: { label: "Acompte reçu", color: "bg-green-100 text-green-600" },
+  VALIDATED: { label: "Validé SEFC", color: "bg-emerald-100 text-emerald-700" },
 };
+
+// Statuts a partir desquels un document peut encore etre annule (DELETE) -
+// exclut les etats deja terminaux.
+const cancellableStatuses = new Set([
+  "DRAFT",
+  "ISSUED",
+  "SENT",
+  "VIEWED",
+  "ACCEPTED",
+  "NEGOTIATION",
+  "VALIDATED",
+  "PARTIALLY_PAID",
+  "PAID",
+  "OVERDUE",
+]);
 
 // ─── Composant principal ───────────────────────────────────────────────────────
 
 export const BillingDocumentDetailPage: React.FC = () => {
   const { documentNumber } = useParams<{ documentNumber: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { admin } = useAuth();
   const queryClient = useQueryClient();
 
   // États des modals
-  const [isCreditNoteOpen, setIsCreditNoteOpen] = useState(false);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [isSignatureOpen, setIsSignatureOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Panneaux inline (avoir / réapplication / rectificative) - voir barre
+  // d'actions. Un seul panneau ouvert a la fois.
+  const [activePanel, setActivePanel] = useState<
+    "creditNote" | "applyTo" | "corrective" | null
+  >(null);
+  const [creditNoteForm, setCreditNoteForm] = useState({
+    amount: "",
+    reason: "",
+    validateImmediately: false,
+    applyImmediately: false,
+  });
+  const [applyToTarget, setApplyToTarget] = useState("");
+  const [correctiveForm, setCorrectiveForm] = useState({
+    title: "",
+    description: "",
+    lines: [
+      {
+        description: "",
+        quantity: 1,
+        unitPrice: 0,
+        taxable: true,
+        vatRate: "",
+        catalogSourceType: "",
+        catalogSourceCode: "",
+      },
+    ],
+  });
+
+  // Recherche catalogue pour préremplir une ligne de rectificative - même
+  // mécanisme qu'en création/édition (billing-enhancements.md §3.2)
+  const [correctiveCatalogPickerIdx, setCorrectiveCatalogPickerIdx] = useState<
+    number | null
+  >(null);
+  const [correctiveCatalogQuery, setCorrectiveCatalogQuery] = useState("");
+  const { data: correctiveCatalogResults } = useQuery({
+    queryKey: ["billing-catalog-lookup-corrective", correctiveCatalogQuery],
+    queryFn: () =>
+      billingService.catalogLookup({ q: correctiveCatalogQuery, size: 8 }),
+    enabled:
+      correctiveCatalogPickerIdx !== null &&
+      correctiveCatalogQuery.trim().length > 1,
+  });
+  const correctiveCatalogItems: BillingCatalogLookupItem[] =
+    correctiveCatalogResults?.content ?? [];
+
+  const applyCorrectiveCatalogItem = (
+    idx: number,
+    item: BillingCatalogLookupItem,
+  ) => {
+    setCorrectiveForm((f) => ({
+      ...f,
+      lines: f.lines.map((l, i) =>
+        i === idx
+          ? {
+              ...l,
+              description: item.name,
+              unitPrice: item.unitPrice,
+              catalogSourceType: item.sourceType,
+              catalogSourceCode: item.sourceCode,
+            }
+          : l,
+      ),
+    }));
+    setCorrectiveCatalogPickerIdx(null);
+    setCorrectiveCatalogQuery("");
+  };
   const [selectedOptionLines, setSelectedOptionLines] = useState<Set<number>>(
     new Set(),
   );
@@ -137,6 +226,19 @@ export const BillingDocumentDetailPage: React.FC = () => {
     queryFn: () => billingService.getDocument(documentNumber!),
     enabled: !!documentNumber,
   });
+
+  // Lien profond depuis l'onglet Outils : /billing/documents/{n}?panel=corrective
+  React.useEffect(() => {
+    const panel = searchParams.get("panel");
+    if (
+      panel === "creditNote" ||
+      panel === "applyTo" ||
+      panel === "corrective"
+    ) {
+      setActivePanel(panel);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // ── Données complémentaires ────────────────────────────────────────────────
   const { data: openSessionsData } = useQuery({
@@ -215,6 +317,127 @@ export const BillingDocumentDetailPage: React.FC = () => {
   const markDepositPaidMutation = makeM(() =>
     billingService.markDepositPaid(documentNumber!),
   );
+
+  // ── SEFC / immutabilité ─────────────────────────────────────────────────────
+
+  /** Validation fiscale - irréversible, cf. modale de confirmation dédiée. */
+  const validateMutation = makeM(
+    () => billingService.validateDocument(documentNumber!),
+    "Erreur lors de la validation fiscale.",
+  );
+
+  /**
+   * Annulation - le backend gère seul la logique selon `locked` (annulation
+   * directe ou avoir automatique). Le frontend n'a plus besoin de vérifier
+   * `locked` avant d'appeler.
+   */
+  const cancelMutation = useMutation({
+    mutationFn: (reason: string) =>
+      billingService.cancelDocument(documentNumber!, reason),
+    onSuccess: (updated) => {
+      invalidateAll();
+      if (updated.status === "PAID" && updated.locked) {
+        setActionError(null);
+        alert(
+          "La facture a été annulée via avoir. Elle reste validée (SEFC) et passe au statut Payé.",
+        );
+      }
+    },
+    onError: (e: any) =>
+      setActionError(
+        e?.response?.data?.message ?? "Erreur lors de l’annulation.",
+      ),
+  });
+
+  const createCreditNoteMutation = useMutation({
+    mutationFn: () =>
+      billingService.createCreditNote(documentNumber!, {
+        amount: creditNoteForm.amount
+          ? parseFloat(creditNoteForm.amount)
+          : null,
+        reason: creditNoteForm.reason,
+        createdBy: admin?.email || String(admin?.id) || "admin",
+        validateImmediately: creditNoteForm.validateImmediately,
+        applyImmediately: creditNoteForm.applyImmediately,
+      }),
+    onSuccess: (creditNote) => {
+      invalidateAll();
+      setActivePanel(null);
+      setCreditNoteForm({
+        amount: "",
+        reason: "",
+        validateImmediately: false,
+        applyImmediately: false,
+      });
+      navigate(`/billing/documents/${creditNote.documentNumber}`);
+    },
+    onError: (e: any) =>
+      setActionError(
+        e?.response?.data?.message ?? "Erreur lors de la création de l’avoir.",
+      ),
+  });
+
+  const applyCreditNoteToMutation = useMutation({
+    mutationFn: () =>
+      billingService.applyCreditNoteTo(documentNumber!, applyToTarget.trim()),
+    onSuccess: () => {
+      invalidateAll();
+      setActivePanel(null);
+      setApplyToTarget("");
+    },
+    onError: (e: any) =>
+      setActionError(
+        e?.response?.data?.message ??
+          "Erreur lors de la ré-application de l’avoir.",
+      ),
+  });
+
+  const createCorrectiveMutation = useMutation({
+    mutationFn: () =>
+      billingService.createCorrectiveInvoice(documentNumber!, {
+        currency: document!.currency,
+        title: correctiveForm.title || `Facture rectificative ${documentNumber}`,
+        description: correctiveForm.description || undefined,
+        issueDate: new Date().toISOString().split("T")[0],
+        lines: correctiveForm.lines
+          .filter((l) => l.description.trim() && l.unitPrice >= 0)
+          .map((l) => ({
+            lineType: "SERVICE" as const,
+            description: l.description,
+            quantity: l.quantity,
+            unitPrice: l.unitPrice,
+            taxable: l.taxable,
+            vatRate: l.vatRate ? parseFloat(l.vatRate) : undefined,
+            catalogSourceType: l.catalogSourceType || undefined,
+            catalogSourceCode: l.catalogSourceCode || undefined,
+          })),
+      }),
+    onSuccess: (corrective) => {
+      invalidateAll();
+      setActivePanel(null);
+      setCorrectiveForm({
+        title: "",
+        description: "",
+        lines: [
+          {
+            description: "",
+            quantity: 1,
+            unitPrice: 0,
+            taxable: true,
+            vatRate: "",
+            catalogSourceType: "",
+            catalogSourceCode: "",
+          },
+        ],
+      });
+      navigate(`/billing/documents/${corrective.documentNumber}`);
+    },
+    onError: (e: any) =>
+      setActionError(
+        e?.response?.data?.message ??
+          "Erreur lors de la création de la rectificative.",
+      ),
+  });
 
   const selectOptionsMutation = useMutation({
     mutationFn: () =>
@@ -384,7 +607,7 @@ export const BillingDocumentDetailPage: React.FC = () => {
       }
     });
     const contentElement = window.document
-      .querySelector(".max-w-6xl.mx-auto.py-8")
+      .querySelector(".w-full.mx-auto.py-8")
       ?.cloneNode(true) as HTMLElement;
     if (contentElement) {
       contentElement.querySelectorAll("button").forEach((btn) => btn.remove());
@@ -398,7 +621,7 @@ export const BillingDocumentDetailPage: React.FC = () => {
           ${stylesHTML}
           <style>
             body { background: white !important; margin: 0; padding: 20px; }
-            .max-w-6xl { max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+            .w-full { max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
             .shadow-sm, .shadow { box-shadow: none !important; }
             button { display: none !important; }
           </style>
@@ -443,22 +666,22 @@ export const BillingDocumentDetailPage: React.FC = () => {
 
   // Formatage des dates
   const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return "—";
+    if (!dateString) return "-";
     try {
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) return "—";
+      if (isNaN(date.getTime())) return "-";
       return date.toLocaleDateString("fr-FR", {
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
       });
     } catch {
-      return "—";
+      return "-";
     }
   };
 
   const formatDateTime = (dateString: string | undefined) => {
-    if (!dateString) return "—";
+    if (!dateString) return "-";
     const parts = dateString.split("T");
     if (parts.length === 2) {
       const date = parts[0].split("-").reverse().join("/");
@@ -504,6 +727,16 @@ export const BillingDocumentDetailPage: React.FC = () => {
   const isQuote = t === "QUOTE";
   const isInvoice = t === "INVOICE";
   const isCreditNote = t === "CREDIT_NOTE";
+  const locked = !!document.locked;
+  const canValidate =
+    !locked &&
+    ["INVOICE", "CREDIT_NOTE", "DEBIT_NOTE", "PROFORMA_INVOICE"].includes(t) &&
+    ["DRAFT", "ISSUED"].includes(s);
+  // Prérequis backend pour la ré-application d'un avoir sur une autre
+  // facture : avoir VALIDATED (locked=true) et pas encore ISSUED (deja appliqué)
+  const canApplyToAnother = isCreditNote && locked && s !== "ISSUED";
+  const canCancel = cancellableStatuses.has(s);
+  const displayNumber = document.fiscalNumber ?? document.documentNumber;
   const optionalLines = document.lines?.filter((l) => l.optional) ?? [];
   const hasOptionalLines = optionalLines.length > 0;
   const canSelectOptions =
@@ -517,7 +750,7 @@ export const BillingDocumentDetailPage: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="max-w-6xl mx-auto py-8">
+      <div className="w-full mx-auto py-8">
         {/* Header avec retour */}
         <div className="mb-6">
           <button
@@ -540,19 +773,24 @@ export const BillingDocumentDetailPage: React.FC = () => {
         )}
 
         {/* En-tête du document */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-          <div className="p-6 border-b bg-gray-50">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+          <div className="p-6 border-b bg-gray-50 rounded-t-xl">
             <div className="flex justify-between items-start flex-wrap gap-4">
               <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-2xl font-bold text-gray-900">
-                    {document.documentNumber}
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
+                  <h1 className="text-2xl font-bold text-gray-900 font-mono">
+                    {displayNumber}
                   </h1>
                   <span
                     className={`px-3 py-1 rounded-full text-sm font-medium ${cfg.color}`}
                   >
                     {cfg.label}
                   </span>
+                  {locked && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <ShieldCheck size={14} /> Verrouillé (SEFC)
+                    </span>
+                  )}
                 </div>
                 <p className="text-gray-500">
                   {documentTypeLabels[t] ?? t}
@@ -562,6 +800,30 @@ export const BillingDocumentDetailPage: React.FC = () => {
                     </span>
                   )}
                 </p>
+                {document.fiscalNumber &&
+                  document.fiscalNumber !== document.documentNumber && (
+                    <p className="text-xs text-gray-400 font-mono mt-1">
+                      N° système : {document.documentNumber}
+                    </p>
+                  )}
+                {document.originalDocumentNumber && (
+                  <button
+                    onClick={() =>
+                      navigate(
+                        `/billing/documents/${document.originalDocumentNumber}`,
+                      )
+                    }
+                    className="mt-2 inline-flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 underline"
+                  >
+                    <FileText size={13} />
+                    Correction de {document.originalDocumentNumber}
+                  </button>
+                )}
+                {document.creditNoteReason && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Motif : {document.creditNoteReason}
+                  </p>
+                )}
               </div>
               <div className="flex gap-2 flex-wrap">
                 <button
@@ -769,12 +1031,48 @@ export const BillingDocumentDetailPage: React.FC = () => {
                 </>
               )}
 
-            {isInvoice && ["PAID", "PARTIALLY_PAID"].includes(s) && (
+            {isInvoice && locked && (
               <button
-                onClick={() => setIsCreditNoteOpen(true)}
+                onClick={() => {
+                  setActivePanel(activePanel === "creditNote" ? null : "creditNote");
+                  setCreditNoteForm({
+                    amount: "",
+                    reason: "",
+                    validateImmediately: false,
+                    applyImmediately: false,
+                  });
+                }}
                 className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-sm flex items-center gap-1"
               >
                 <FileText size={14} /> Créer un avoir
+              </button>
+            )}
+
+            {isInvoice && locked && (
+              <button
+                onClick={() => {
+                  setActivePanel(
+                    activePanel === "corrective" ? null : "corrective",
+                  );
+                  setCorrectiveForm({
+                    title: "",
+                    description: "",
+                    lines: [
+                      {
+                        description: "",
+                        quantity: 1,
+                        unitPrice: 0,
+                        taxable: true,
+                        vatRate: "",
+                        catalogSourceType: "",
+                        catalogSourceCode: "",
+                      },
+                    ],
+                  });
+                }}
+                className="px-3 py-1.5 bg-violet-600 text-white rounded-lg text-sm flex items-center gap-1"
+              >
+                <FilePlus2 size={14} /> Créer une rectificative
               </button>
             )}
 
@@ -789,7 +1087,446 @@ export const BillingDocumentDetailPage: React.FC = () => {
                 <CheckCircle size={14} /> Appliquer l'avoir
               </button>
             )}
+
+            {canApplyToAnother && (
+              <button
+                onClick={() => {
+                  setActivePanel(activePanel === "applyTo" ? null : "applyTo");
+                  setApplyToTarget("");
+                }}
+                className="px-3 py-1.5 bg-teal-600 text-white rounded-lg text-sm flex items-center gap-1"
+              >
+                <ArrowRight size={14} /> Réappliquer à une autre facture
+              </button>
+            )}
+
+            {canValidate && (
+              <button
+                onClick={() => {
+                  const confirmed = confirm(
+                    `⚠️ Valider ce document SEFC ?\n\nCette action est définitive. Une fois validé :\n• Le numéro fiscal sera assigné et ne pourra plus changer\n• Le document sera verrouillé et ne pourra plus être modifié\n• Un avoir (avoir annulateur) devra être créé pour toute correction\n\nNuméro actuel : ${document.documentNumber}\nType : ${documentTypeLabels[t] ?? t}`,
+                  );
+                  if (confirmed) validateMutation.mutate();
+                }}
+                disabled={anyPending}
+                className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm flex items-center gap-1 disabled:opacity-50"
+              >
+                {validateMutation.isPending ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <ShieldCheck size={14} />
+                )}
+                Valider (SEFC)
+              </button>
+            )}
+
+            {canCancel && (
+              <button
+                onClick={() => {
+                  const reason = window.prompt(
+                    "Motif de l’annulation (obligatoire) :",
+                  );
+                  if (reason && reason.trim())
+                    cancelMutation.mutate(reason.trim());
+                }}
+                disabled={cancelMutation.isPending}
+                className="px-3 py-1.5 border border-red-200 text-red-600 rounded-lg text-sm flex items-center gap-1 hover:bg-red-50 disabled:opacity-50"
+              >
+                {cancelMutation.isPending ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Ban size={14} />
+                )}
+                Annuler
+              </button>
+            )}
           </div>
+
+          {/* ── Panneaux inline (avoir / réapplication / rectificative) ── */}
+          {activePanel === "creditNote" && (
+            <div className="px-6 py-5 border-b bg-orange-50/50 space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold text-gray-900">Créer un avoir</h3>
+                <button
+                  onClick={() => setActivePanel(null)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XCircle size={18} />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Montant{" "}
+                    <span className="text-gray-400 font-normal">
+                      (vide = solde dû, {document.balanceDue.toLocaleString("fr-FR")}{" "}
+                      {document.currency})
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    value={creditNoteForm.amount}
+                    onChange={(e) =>
+                      setCreditNoteForm({
+                        ...creditNoteForm,
+                        amount: e.target.value,
+                      })
+                    }
+                    placeholder={String(document.balanceDue)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Motif *
+                  </label>
+                  <input
+                    value={creditNoteForm.reason}
+                    onChange={(e) =>
+                      setCreditNoteForm({
+                        ...creditNoteForm,
+                        reason: e.target.value,
+                      })
+                    }
+                    placeholder="Ex: Erreur sur la ligne TVA"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-5">
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={creditNoteForm.validateImmediately}
+                    onChange={(e) =>
+                      setCreditNoteForm({
+                        ...creditNoteForm,
+                        validateImmediately: e.target.checked,
+                      })
+                    }
+                    className="rounded"
+                  />
+                  Sceller l'avoir immédiatement (SEFC)
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={creditNoteForm.applyImmediately}
+                    onChange={(e) =>
+                      setCreditNoteForm({
+                        ...creditNoteForm,
+                        applyImmediately: e.target.checked,
+                      })
+                    }
+                    className="rounded"
+                  />
+                  Appliquer sur cette facture immédiatement
+                </label>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setActivePanel(null)}
+                  className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-white"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={() => createCreditNoteMutation.mutate()}
+                  disabled={
+                    !creditNoteForm.reason.trim() ||
+                    createCreditNoteMutation.isPending
+                  }
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {createCreditNoteMutation.isPending ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    "Créer l'avoir"
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activePanel === "applyTo" && (
+            <div className="px-6 py-5 border-b bg-teal-50/50 space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold text-gray-900">
+                  Réappliquer l'avoir à une autre facture
+                </h3>
+                <button
+                  onClick={() => setActivePanel(null)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XCircle size={18} />
+                </button>
+              </div>
+              <p className="text-sm text-gray-500">
+                La facture cible doit appartenir au même client. L'avoir passera
+                au statut Émis une fois appliqué.
+              </p>
+              <div className="flex gap-3">
+                <input
+                  value={applyToTarget}
+                  onChange={(e) => setApplyToTarget(e.target.value)}
+                  placeholder="N° de la facture cible (INV-... ou PRF-...)"
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono"
+                />
+                <button
+                  onClick={() => applyCreditNoteToMutation.mutate()}
+                  disabled={
+                    !applyToTarget.trim() || applyCreditNoteToMutation.isPending
+                  }
+                  className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm hover:bg-teal-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {applyCreditNoteToMutation.isPending ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    "Appliquer"
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activePanel === "corrective" && (
+            <div className="px-6 py-5 border-b bg-violet-50/50 space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold text-gray-900">
+                  Créer une facture rectificative
+                </h3>
+                <button
+                  onClick={() => setActivePanel(null)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XCircle size={18} />
+                </button>
+              </div>
+              <p className="text-sm text-gray-500">
+                Corrige une erreur de contenu sans modifier la facture
+                d'origine ({document.documentNumber}, conservée à titre
+                d'historique). Statut initial : Brouillon - à valider ensuite.
+              </p>
+              <input
+                value={correctiveForm.title}
+                onChange={(e) =>
+                  setCorrectiveForm({ ...correctiveForm, title: e.target.value })
+                }
+                placeholder={`Titre (défaut : Facture rectificative ${documentNumber})`}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              />
+              <textarea
+                value={correctiveForm.description}
+                onChange={(e) =>
+                  setCorrectiveForm({
+                    ...correctiveForm,
+                    description: e.target.value,
+                  })
+                }
+                rows={2}
+                placeholder="Description / motif de la correction"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              />
+
+              <div className="space-y-2">
+                {correctiveForm.lines.map((line, idx) => (
+                  <div
+                    key={idx}
+                    className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center bg-white rounded-lg p-3 border border-gray-100"
+                  >
+                    <div className="md:col-span-5 relative">
+                      <div className="relative">
+                        <input
+                          value={line.description}
+                          onChange={(e) => {
+                            const lines = [...correctiveForm.lines];
+                            lines[idx] = {
+                              ...lines[idx],
+                              description: e.target.value,
+                            };
+                            setCorrectiveForm({ ...correctiveForm, lines });
+                          }}
+                          placeholder="Description de la ligne corrigée"
+                          className="w-full pl-3 pr-8 py-2 border border-gray-200 rounded-lg text-sm"
+                        />
+                        <button
+                          type="button"
+                          title="Rechercher dans le catalogue"
+                          onClick={() => {
+                            setCorrectiveCatalogPickerIdx(
+                              correctiveCatalogPickerIdx === idx ? null : idx,
+                            );
+                            setCorrectiveCatalogQuery("");
+                          }}
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-primary-600 rounded"
+                        >
+                          <Package size={14} />
+                        </button>
+                      </div>
+                      {correctiveCatalogPickerIdx === idx && (
+                        <div className="absolute z-20 mt-1 w-80 bg-white border border-gray-200 rounded-xl shadow-lg">
+                          <div className="p-2 border-b border-gray-100 relative">
+                            <Search
+                              size={13}
+                              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                            />
+                            <input
+                              autoFocus
+                              type="text"
+                              value={correctiveCatalogQuery}
+                              onChange={(e) =>
+                                setCorrectiveCatalogQuery(e.target.value)
+                              }
+                              placeholder="Rechercher un article, un service..."
+                              className="w-full pl-7 pr-2 py-1.5 text-sm border-0 focus:outline-none"
+                            />
+                          </div>
+                          <div className="max-h-56 overflow-y-auto">
+                            {correctiveCatalogQuery.trim().length <= 1 ? (
+                              <p className="p-3 text-xs text-gray-400">
+                                Tapez au moins 2 caractères pour rechercher.
+                              </p>
+                            ) : correctiveCatalogItems.length === 0 ? (
+                              <p className="p-3 text-xs text-gray-400">
+                                Aucun résultat.
+                              </p>
+                            ) : (
+                              correctiveCatalogItems.map((item) => (
+                                <button
+                                  key={`${item.sourceType}-${item.sourceCode}`}
+                                  type="button"
+                                  onClick={() =>
+                                    applyCorrectiveCatalogItem(idx, item)
+                                  }
+                                  className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-50 last:border-0"
+                                >
+                                  <p className="text-sm font-medium text-gray-900">
+                                    {item.name}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {item.unitPrice.toLocaleString("fr-FR")}{" "}
+                                    {item.currency}
+                                    {item.unit ? ` / ${item.unit}` : ""} ·{" "}
+                                    {item.sourceType}
+                                  </p>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setCorrectiveCatalogPickerIdx(null)}
+                            className="w-full text-center py-1.5 text-xs text-gray-400 hover:text-gray-600 border-t border-gray-100"
+                          >
+                            Fermer
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      type="number"
+                      min={0}
+                      value={line.quantity}
+                      onChange={(e) => {
+                        const lines = [...correctiveForm.lines];
+                        lines[idx] = {
+                          ...lines[idx],
+                          quantity: Number(e.target.value) || 0,
+                        };
+                        setCorrectiveForm({ ...correctiveForm, lines });
+                      }}
+                      placeholder="Qté"
+                      className="md:col-span-2 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      value={line.unitPrice}
+                      onChange={(e) => {
+                        const lines = [...correctiveForm.lines];
+                        lines[idx] = {
+                          ...lines[idx],
+                          unitPrice: Number(e.target.value) || 0,
+                        };
+                        setCorrectiveForm({ ...correctiveForm, lines });
+                      }}
+                      placeholder="Prix unitaire"
+                      className="md:col-span-2 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={line.vatRate}
+                      onChange={(e) => {
+                        const lines = [...correctiveForm.lines];
+                        lines[idx] = { ...lines[idx], vatRate: e.target.value };
+                        setCorrectiveForm({ ...correctiveForm, lines });
+                      }}
+                      placeholder="TVA % (auto si vide)"
+                      className="md:col-span-2 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    />
+                    <button
+                      onClick={() =>
+                        setCorrectiveForm({
+                          ...correctiveForm,
+                          lines: correctiveForm.lines.filter((_, i) => i !== idx),
+                        })
+                      }
+                      disabled={correctiveForm.lines.length === 1}
+                      className="md:col-span-1 p-2 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-30 flex justify-center"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={() =>
+                    setCorrectiveForm({
+                      ...correctiveForm,
+                      lines: [
+                        ...correctiveForm.lines,
+                        {
+                          description: "",
+                          quantity: 1,
+                          unitPrice: 0,
+                          taxable: true,
+                          vatRate: "",
+                          catalogSourceType: "",
+                          catalogSourceCode: "",
+                        },
+                      ],
+                    })
+                  }
+                  className="text-sm text-violet-600 hover:text-violet-700"
+                >
+                  + Ajouter une ligne
+                </button>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setActivePanel(null)}
+                  className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-white"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={() => createCorrectiveMutation.mutate()}
+                  disabled={
+                    !correctiveForm.lines.some((l) => l.description.trim()) ||
+                    createCorrectiveMutation.isPending
+                  }
+                  className="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm hover:bg-violet-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {createCorrectiveMutation.isPending ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    "Créer la rectificative"
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Grille d'informations */}
@@ -972,7 +1709,7 @@ export const BillingDocumentDetailPage: React.FC = () => {
                     if (selectedOptionLines.size === 0) {
                       if (
                         !confirm(
-                          "Aucune option sélectionnée — toutes les options seront supprimées. Continuer ?",
+                          "Aucune option sélectionnée - toutes les options seront supprimées. Continuer ?",
                         )
                       )
                         return;
@@ -1067,8 +1804,16 @@ export const BillingDocumentDetailPage: React.FC = () => {
                           className={`hover:bg-gray-50 ${line.optional ? "bg-amber-50/30" : ""}`}
                         >
                           <td className="px-6 py-4">
-                            <p className="font-medium text-sm">
+                            <p className="font-medium text-sm flex items-center gap-1.5">
                               {line.description}
+                              {line.sourceCode && (
+                                <span
+                                  title={`Depuis le catalogue (${line.sourceCode})`}
+                                  className="inline-flex items-center justify-center w-4 h-4 bg-primary-50 text-primary-600 rounded-full"
+                                >
+                                  <Package size={10} />
+                                </span>
+                              )}
                             </p>
                             {line.optional && (
                               <span className="text-xs text-amber-600">
@@ -1145,6 +1890,50 @@ export const BillingDocumentDetailPage: React.FC = () => {
 
           {/* Colonne droite - Totaux et paiement */}
           <div className="space-y-6">
+            {/* Informations fiscales SEFC */}
+            {locked && (
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-emerald-100">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <ShieldCheck size={18} className="text-emerald-600" />
+                  Informations fiscales
+                </h2>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Numéro fiscal</span>
+                    <span className="font-mono">{document.fiscalNumber ?? "-"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Date fiscale</span>
+                    <span>{formatDate(document.fiscalDate ?? undefined)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Validé le</span>
+                    <span>{formatDateTime(document.validatedAt ?? undefined)}</span>
+                  </div>
+                  <div className="border-t pt-2 mt-2 flex justify-between">
+                    <span className="text-gray-500">Émetteur</span>
+                    <span>{document.sellerName ?? "-"}</span>
+                  </div>
+                  {document.sellerNiu && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">NIU émetteur</span>
+                      <span className="font-mono">{document.sellerNiu}</span>
+                    </div>
+                  )}
+                  <div className="border-t pt-2 mt-2 flex justify-between">
+                    <span className="text-gray-500">Catégorie client</span>
+                    <span>{document.customerCategory ?? "-"}</span>
+                  </div>
+                  {document.customerNiu && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">NIU client</span>
+                      <span className="font-mono">{document.customerNiu}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Totaux */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -1880,16 +2669,6 @@ export const BillingDocumentDetailPage: React.FC = () => {
         </ModalPortal>
       )}
 
-      {/* Modal création avoir */}
-      <CreateCreditNoteModal
-        isOpen={isCreditNoteOpen}
-        onClose={() => setIsCreditNoteOpen(false)}
-        invoiceNumber={documentNumber!}
-        onSuccess={() => {
-          invalidateAll();
-          setIsCreditNoteOpen(false);
-        }}
-      />
     </AdminLayout>
   );
 };

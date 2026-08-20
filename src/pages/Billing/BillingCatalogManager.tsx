@@ -384,7 +384,7 @@ export const BillingCatalogManager: React.FC = () => {
                       </p>
                     )}
                   </td>
-                  <td className="px-5 py-4 text-sm">{item.category ?? "—"}</td>
+                  <td className="px-5 py-4 text-sm">{item.category ?? "-"}</td>
                   <td className="px-5 py-4 text-sm text-right">
                     {item.unitPrice.toLocaleString("fr-FR")} {item.currency}
                     {item.unit ? ` / ${item.unit}` : ""}

@@ -7,7 +7,9 @@ export type BillingDocumentType =
   | "PROFORMA_INVOICE"
   | "INVOICE"
   | "CREDIT_NOTE"
-  | "DEBIT_NOTE";
+  | "DEBIT_NOTE"
+  // SEFC — facture rectificative (corrige une facture VALIDATED sans la modifier)
+  | "CORRECTIVE_INVOICE";
 
 export type BillingDocumentStatus =
   | "DRAFT"
@@ -28,7 +30,9 @@ export type BillingDocumentStatus =
   | "VIEWED"
   | "NEGOTIATION"
   | "DEPOSIT_REQUESTED"
-  | "DEPOSIT_PAID";
+  | "DEPOSIT_PAID"
+  // SEFC — document scellé fiscalement (locked = true)
+  | "VALIDATED";
 
 export type BillingLineType =
   | "SERVICE"
@@ -105,6 +109,8 @@ export interface BillingLine {
   // Sprint 2 — ligne optionnelle : calculée mais exclue du total
   optional?: boolean;
   taxable: boolean;
+  // SEFC — TTC (prix saisi taxe incluse) vs HT (par défaut)
+  taxIncluded?: boolean;
   vatRate?: number;
   additionalCentRate?: number;
   sourceType?: string;
@@ -196,9 +202,8 @@ export interface BillingDocument {
   issuedAt?: string;
   sentAt?: string;
   paidAt?: string;
-  cancelledAt?: string;
-  createdAt: string;
-  updatedAt: string;
+  // NOTE: BillingDocumentResponse (backend) n'expose ni cancelledAt, ni
+  // createdAt, ni updatedAt — ne pas s'y fier, ils ne sont jamais renvoyés.
 
   lines: BillingLine[];
   discounts: BillingDiscount[];
@@ -225,27 +230,66 @@ export interface BillingDocument {
   customerRegistered?: boolean;
   internalNotes?: string;
   recoverables?: BillingRecoverable[] | null;
+
+  // ── SEFC (validation fiscale) ──────────────────────────────────────────────
+  /** true = document validé fiscalement, immuable (PUT refusé en 400) */
+  locked?: boolean;
+  /** Numéro fiscal définitif, assigné uniquement à la validation SEFC */
+  fiscalNumber?: string | null;
+  /** Date fiscale officielle (YYYY-MM-DD), figée à la validation */
+  fiscalDate?: string | null;
+  /** Horodatage ISO 8601 de la validation SEFC */
+  validatedAt?: string | null;
+  sellerName?: string | null;
+  sellerNiu?: string | null;
+  sellerPhone?: string | null;
+  sellerEmail?: string | null;
+  customerNiu?: string | null;
+  /** Type String côté backend — valeurs usuelles ENTREPRISE/PARTICULIER mais non enum-contraint */
+  customerCategory?: string | null;
+
+  // ── SEFC Phase 2 — chaînage et signature ────────────────────────────────────
+  previousHash?: string | null;
+  currentHash?: string | null;
+  fiscalSignature?: string | null;
+  /** Horodatage de signature — distinct de signature.signedAt (signature électronique devis) */
+  signedAt?: string | null;
+
+  // ── Immutabilité / documents de correction ─────────────────────────────────
+  /** Numéro du document corrigé, présent sur un avoir ou une rectificative */
+  originalDocumentNumber?: string | null;
+  /** Type du document corrigé — String côté backend, pas l'enum BillingDocumentType */
+  originalDocumentType?: string | null;
+  /** Motif de l'avoir / de la rectificative */
+  creditNoteReason?: string | null;
 }
 
 export interface BillingRecoverable {
   recoverableNumber: string;
+  documentNumber?: string;
   itemDescription: string;
   quantity?: number;
   unit?: string;
+  /** INVENTORY_ITEM | ASSET | MANUAL */
   sourceType?: string;
   sourceCode?: string;
   notes?: string;
   status: "PENDING" | "RECOVERED" | "PARTIALLY_RECOVERED" | "WRITTEN_OFF";
+  recoveredAt?: string | null;
+  recoveredBy?: string | null;
+  createdAt?: string;
 }
 
 export interface BillingCatalogLookupItem {
   sourceType: string;
   sourceCode: string;
   name: string;
+  description?: string;
+  category?: string | null;
   unit?: string;
   unitPrice: number;
   currency: string;
-  taxRuleCode?: string;
+  taxRuleCode?: string | null;
   resourceMeta?: Record<string, unknown>;
 }
 
@@ -260,6 +304,7 @@ export interface ServiceCatalogItem {
   taxRuleCode?: string;
   displayOrder?: number;
   active?: boolean;
+  createdAt?: string;
 }
 
 export interface BillingScheduleInstallment {
@@ -314,6 +359,11 @@ export interface UpdateBillingLinePayload {
   optional?: boolean;
   externalReference?: string;
   notes?: string;
+  // Trace catalogue — le backend resout description/unit/unitPrice/taxable/
+  // vatRate a partir de ces 2 champs, aussi bien en creation qu'en edition
+  // (billing-enhancements.md §3.2 : "creation ou edition")
+  catalogSourceType?: string;
+  catalogSourceCode?: string;
 }
 
 export interface UpdateBillingDocumentPayload {
@@ -718,9 +768,16 @@ export const billingService = {
   createCreditNote: async (
     invoiceNumber: string,
     data: {
-      amount: number;
+      /** null/absent = balanceDue de la facture */
+      amount?: number | null;
       reason: string;
-      createdBy: string;
+      createdBy?: string;
+      /** Sceller l'avoir immédiatement (défaut false) */
+      validateImmediately?: boolean;
+      /** Appliquer l'avoir sur la facture source immédiatement (défaut false) */
+      applyImmediately?: boolean;
+      /** null = ligne auto générée par le backend */
+      lines?: BillingLine[] | null;
     },
   ): Promise<BillingDocument> => {
     const response = await apiClient.post(
@@ -734,6 +791,70 @@ export const billingService = {
     await apiClient.patch(
       `/sni/api/v1/billing/credit-notes/${creditNoteNumber}/apply`,
     );
+  },
+
+  /**
+   * Ré-applique un avoir non entièrement consommé sur une AUTRE facture du
+   * même client. Prérequis backend : avoir VALIDATED (locked=true), pas
+   * encore ISSUED (= déjà appliqué), même client que la facture cible.
+   */
+  applyCreditNoteTo: async (
+    creditNoteNumber: string,
+    targetInvoiceNumber: string,
+  ): Promise<BillingDocument> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/billing/credit-notes/${creditNoteNumber}/apply-to/${targetInvoiceNumber}`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Valide fiscalement le document (SEFC) — assigne le fiscalNumber
+   * définitif, verrouille le document (locked=true). IRRÉVERSIBLE.
+   * Uniquement pour INVOICE, CREDIT_NOTE, DEBIT_NOTE, PROFORMA_INVOICE
+   * en statut DRAFT ou ISSUED.
+   */
+  validateDocument: async (
+    documentNumber: string,
+  ): Promise<BillingDocument> => {
+    const response = await apiClient.patch(
+      `/sni/api/v1/billing/documents/${documentNumber}/validate`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Crée une facture rectificative (documentType: CORRECTIVE_INVOICE,
+   * statut DRAFT) qui corrige une facture déjà validée SANS la modifier.
+   * Doit ensuite être validée manuellement via validateDocument().
+   */
+  createCorrectiveInvoice: async (
+    originalInvoiceNumber: string,
+    data: Omit<CreateBillingDocumentPayload, "documentType">,
+  ): Promise<BillingDocument> => {
+    const response = await apiClient.post(
+      `/sni/api/v1/billing/invoices/${originalInvoiceNumber}/corrective`,
+      data,
+    );
+    return response.data;
+  },
+
+  /**
+   * Annule un document. Comportement géré côté backend selon `locked` :
+   * non verrouillé → annulation directe (status → CANCELLED) ;
+   * verrouillé → génère un avoir pour le balanceDue, le valide et
+   * l'applique automatiquement (la facture reste VALIDATED, passe à PAID).
+   * Inutile de vérifier `locked` côté frontend avant d'appeler.
+   */
+  cancelDocument: async (
+    documentNumber: string,
+    reason: string,
+  ): Promise<BillingDocument> => {
+    const response = await apiClient.delete(
+      `/sni/api/v1/billing/documents/${documentNumber}`,
+      { params: { reason } },
+    );
+    return response.data;
   },
 
   // ── Relevé client ────────────────────────────────────────────────────────────
@@ -846,7 +967,21 @@ export const billingService = {
     const response = await apiClient.get("/sni/api/v1/billing/catalog/lookup", {
       params,
     });
-    return normalizePaginated<BillingCatalogLookupItem>(response.data);
+    const normalized = normalizePaginated<BillingCatalogLookupItem>(
+      response.data,
+    );
+    // Le backend renvoie {content, totalElements, page, size} SANS
+    // totalPages (confirmé billing-enhancements.md §3.1) — normalizePaginated
+    // renvoie alors la donnée brute telle quelle, laissant totalPages
+    // undefined et cassant silencieusement la pagination du panneau de
+    // recherche catalogue. On le recalcule nous-mêmes ici.
+    const size = params?.size ?? 20;
+    return {
+      ...normalized,
+      totalPages:
+        response.data?.totalPages ??
+        Math.max(1, Math.ceil(normalized.totalElements / size)),
+    };
   },
 
   getCatalogItems: async (params?: {
@@ -863,7 +998,17 @@ export const billingService = {
     const response = await apiClient.get("/sni/api/v1/billing/catalog", {
       params,
     });
-    return normalizePaginated<ServiceCatalogItem>(response.data);
+    const normalized = normalizePaginated<ServiceCatalogItem>(response.data);
+    // Meme precaution que catalogLookup : la doc ne montre pas le JSON de
+    // reponse exact pour cet endpoint. Si totalPages est absent, on le
+    // recalcule plutot que de laisser la pagination se bloquer a "1/1".
+    const size = params?.size ?? 20;
+    return {
+      ...normalized,
+      totalPages:
+        response.data?.totalPages ??
+        Math.max(1, Math.ceil(normalized.totalElements / size)),
+    };
   },
 
   createCatalogItem: async (

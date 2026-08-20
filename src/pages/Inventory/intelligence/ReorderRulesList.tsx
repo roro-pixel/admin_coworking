@@ -11,12 +11,14 @@ import {
 } from "lucide-react";
 import { ModalPortal } from "../../../components/ui/ModalPortal";
 import { inventoryService } from "../../../services/inventory.service";
+import { useAuth } from "../../../contexts/AuthContext";
 import type {
   ReorderRule,
   InventoryItem,
 } from "../../../services/inventory.service";
 
 export const ReorderRulesList: React.FC = () => {
+  const { admin } = useAuth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -88,7 +90,7 @@ export const ReorderRulesList: React.FC = () => {
       inventoryService.createPurchaseRequestFromReorderSuggestions({
         locationCode: suggestion.locationCode,
         supplierCode: suggestion.bestSupplierCode || undefined,
-        requestedBy: "admin",
+        requestedBy: admin?.email || "admin",
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase-requests"] });
@@ -207,7 +209,7 @@ export const ReorderRulesList: React.FC = () => {
           <div className="space-y-4">
             {suggestions.map((suggestion: any) => (
               <div
-                key={suggestion.suggestionCode}
+                key={`${suggestion.itemCode}-${suggestion.locationCode}`}
                 className="bg-yellow-50 ring-1 border-yellow-200 rounded-2xl p-4 sm:p-5"
               >
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
@@ -230,9 +232,9 @@ export const ReorderRulesList: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3 text-sm text-gray-600">
                       <p>
                         Stock actuel : {suggestion.currentQuantity} / seuil{" "}
-                        {suggestion.minimumQuantity}
+                        {suggestion.minQuantity}
                       </p>
-                      <p>Qté suggérée : {suggestion.suggestedOrderQuantity}</p>
+                      <p>Qté suggérée : {suggestion.reorderQuantity}</p>
                       <p>En commande : {suggestion.quantityOnOrder ?? 0}</p>
                       <p>
                         Jours restants :{" "}

@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   ShoppingCart,
   DollarSign,
-  Boxes,
 } from "lucide-react";
 import { inventoryService } from "../../../services/inventory.service";
 
@@ -58,10 +57,16 @@ export const InventoryDashboard: React.FC = () => {
       color: "bg-orange-100 text-orange-600",
     },
     {
-      title: "Actifs disponibles",
-      value: metrics?.availableAssets || "-",
-      icon: Boxes,
-      color: "bg-purple-100 text-purple-600",
+      title: "Alertes expiration proche",
+      value: metrics?.expirySoonAlerts || 0,
+      icon: AlertTriangle,
+      color: "bg-orange-100 text-orange-600",
+    },
+    {
+      title: "Stocks négatifs",
+      value: metrics?.negativeStockAlerts || 0,
+      icon: TrendingDown,
+      color: "bg-red-100 text-red-600",
     },
   ];
 

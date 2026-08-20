@@ -15,6 +15,8 @@ import {
   Filter,
   Calendar,
   AlertCircle,
+  Copy,
+  Check,
 } from "lucide-react";
 import { billingService } from "../../services/billing.service";
 import type { BillingDocument } from "../../services/billing.service";
@@ -26,6 +28,7 @@ const documentTypeLabels: Record<string, string> = {
   INVOICE: "Facture",
   CREDIT_NOTE: "Avoir",
   DEBIT_NOTE: "Note de débit",
+  CORRECTIVE_INVOICE: "Rectificative",
 };
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -56,6 +59,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
     color: "bg-violet-100 text-violet-700",
   },
   DEPOSIT_PAID: { label: "Acompte reçu", color: "bg-green-100 text-green-600" },
+  VALIDATED: { label: "Validé SEFC", color: "bg-emerald-100 text-emerald-700" },
 };
 
 const PAGE_SIZE = 20;
@@ -63,6 +67,18 @@ const PAGE_SIZE = 20;
 export const BillingDocumentsList: React.FC = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [copiedNumber, setCopiedNumber] = useState<string | null>(null);
+
+  const copyDocumentNumber = (e: React.MouseEvent, documentNumber: string) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(documentNumber).then(() => {
+      setCopiedNumber(documentNumber);
+      setTimeout(
+        () => setCopiedNumber((c) => (c === documentNumber ? null : c)),
+        1500,
+      );
+    });
+  };
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -403,14 +419,27 @@ export const BillingDocumentsList: React.FC = () => {
                     onClick={() => handleViewDetail(doc.documentNumber)}
                   >
                     <td className="px-5 py-4 text-sm font-mono">
-                      {doc.documentNumber}
+                      <span className="group/copy inline-flex items-center gap-1.5">
+                        {doc.documentNumber}
+                        <button
+                          onClick={(e) => copyDocumentNumber(e, doc.documentNumber)}
+                          title="Copier le numéro"
+                          className="opacity-0 group-hover/copy:opacity-100 transition-opacity p-0.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700"
+                        >
+                          {copiedNumber === doc.documentNumber ? (
+                            <Check size={13} className="text-green-600" />
+                          ) : (
+                            <Copy size={13} />
+                          )}
+                        </button>
+                      </span>
                     </td>
                     <td className="px-5 py-4 text-sm">
                       {documentTypeLabels[doc.documentType] ?? doc.documentType}
                     </td>
                     <td className="px-5 py-4">
                       <p className="text-sm font-medium truncate max-w-[140px]">
-                        {doc.customerName ?? doc.customerCode ?? "—"}
+                        {doc.customerName ?? doc.customerCode ?? "-"}
                       </p>
                       {doc.customerEmail && (
                         <p className="text-xs text-gray-500 truncate max-w-[140px]">
@@ -442,7 +471,7 @@ export const BillingDocumentsList: React.FC = () => {
                     <td className="px-5 py-4 text-sm text-gray-600">
                       {doc.dueDate
                         ? new Date(doc.dueDate).toLocaleDateString("fr-FR")
-                        : "—"}
+                        : "-"}
                       {isOverdue && (
                         <AlertCircle
                           size={10}
@@ -549,7 +578,7 @@ export const BillingDocumentsList: React.FC = () => {
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4 px-2">
           <p className="text-sm text-gray-500">
-            {totalElements} document{totalElements > 1 ? "s" : ""} — Page{" "}
+            {totalElements} document{totalElements > 1 ? "s" : ""} - Page{" "}
             {page + 1} / {totalPages}
           </p>
           <div className="flex gap-2">

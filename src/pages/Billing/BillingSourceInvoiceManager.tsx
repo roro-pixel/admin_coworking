@@ -1,9 +1,16 @@
 import React, { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { FilePlus2, Loader2, Plus, Trash2, ArrowRight } from "lucide-react";
+import { FilePlus2, Loader2, Plus, Trash2, ArrowRight, Search } from "lucide-react";
 import { billingService } from "../../services/billing.service";
-import type { BillingLineType } from "../../services/billing.service";
+import type {
+  BillingLineType,
+  BillingCatalogLookupItem,
+} from "../../services/billing.service";
+import { CustomerAutocomplete } from "../../components/customers/CustomerAutocomplete";
+import { MemberAutocomplete } from "../../components/members/MemberAutocomplete";
+import type { CustomerSummaryResponse } from "../../services/customer.service";
+import type { MemberSummaryResponse } from "../../services/member.service";
 
 const inputCls =
   "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500";
@@ -68,6 +75,76 @@ export const BillingSourceInvoiceManager: React.FC = () => {
   });
 
   const [extraLines, setExtraLines] = useState<ExtraLineForm[]>([]);
+
+  // Recherche client (mode EXTERNAL)
+  const [selectedCustomer, setSelectedCustomer] =
+    useState<CustomerSummaryResponse | null>(null);
+  const [selectedMember, setSelectedMember] =
+    useState<MemberSummaryResponse | null>(null);
+
+  // Recherche ressource (mode EXTERNAL) - reutilise la recherche unifiee du
+  // catalogue filtree sur la source RESOURCE (billing-enhancements.md §3.1)
+  const [resourceQuery, setResourceQuery] = useState("");
+  const [showResourceResults, setShowResourceResults] = useState(false);
+  const { data: resourceResults } = useQuery({
+    queryKey: ["billing-resource-lookup", resourceQuery],
+    queryFn: () =>
+      billingService.catalogLookup({
+        q: resourceQuery,
+        source: "RESOURCE",
+        size: 10,
+      }),
+    enabled: resourceQuery.trim().length > 1,
+  });
+  const resources: BillingCatalogLookupItem[] = resourceResults?.content ?? [];
+
+  const bookingUnitValues = new Set([
+    "HOUR",
+    "HALF_DAY",
+    "DAY",
+    "WEEK",
+    "MONTH",
+  ]);
+
+  const selectResource = (item: BillingCatalogLookupItem) => {
+    setReservationForm((f) => ({
+      ...f,
+      resourceName: item.name,
+      resourceDescription: item.description || "",
+      unitPrice: item.unitPrice,
+      bookingUnit: bookingUnitValues.has(item.unit || "")
+        ? (item.unit as any)
+        : f.bookingUnit,
+    }));
+    setResourceQuery(item.name);
+    setShowResourceResults(false);
+  };
+
+  const handleCustomerTypeChange = (type: string) => {
+    setReservationForm({ ...reservationForm, customerType: type, customerCode: "" });
+    setSelectedCustomer(null);
+    setSelectedMember(null);
+  };
+
+  const handleCustomerSelect = (customer: CustomerSummaryResponse | null) => {
+    setSelectedCustomer(customer);
+    setSelectedMember(null);
+    setReservationForm((f) => ({
+      ...f,
+      customerType: "CUSTOMER",
+      customerCode: customer?.customerId || "",
+    }));
+  };
+
+  const handleMemberSelect = (member: MemberSummaryResponse | null) => {
+    setSelectedMember(member);
+    setSelectedCustomer(null);
+    setReservationForm((f) => ({
+      ...f,
+      customerType: "MEMBER",
+      customerCode: member?.memberId || "",
+    }));
+  };
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["billing-documents"] });
@@ -249,7 +326,7 @@ export const BillingSourceInvoiceManager: React.FC = () => {
       )}
 
       {activeTab === "billables" && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-5 max-w-4xl">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Titre</label>
@@ -339,7 +416,7 @@ export const BillingSourceInvoiceManager: React.FC = () => {
       )}
 
       {activeTab === "reservation" && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6 max-w-5xl">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Mode</label>
@@ -420,47 +497,86 @@ export const BillingSourceInvoiceManager: React.FC = () => {
                 <select
                   className={inputCls}
                   value={reservationForm.customerType}
-                  onChange={(e) =>
-                    setReservationForm({
-                      ...reservationForm,
-                      customerType: e.target.value,
-                    })
-                  }
+                  onChange={(e) => handleCustomerTypeChange(e.target.value)}
                 >
                   <option value="MEMBER">Membre</option>
                   <option value="CUSTOMER">Client</option>
                   <option value="BUSINESS_ENTITY">Entité</option>
                 </select>
               </div>
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium mb-1">
-                  Code client *
+                  Client *
                 </label>
-                <input
-                  className={inputCls}
-                  value={reservationForm.customerCode}
-                  onChange={(e) =>
-                    setReservationForm({
-                      ...reservationForm,
-                      customerCode: e.target.value,
-                    })
-                  }
-                />
+                {reservationForm.customerType === "MEMBER" ? (
+                  <MemberAutocomplete
+                    selectedMember={selectedMember}
+                    onSelect={handleMemberSelect}
+                    placeholder="Rechercher un membre..."
+                  />
+                ) : (
+                  <CustomerAutocomplete
+                    selectedCustomer={selectedCustomer}
+                    typeFilter={
+                      reservationForm.customerType === "BUSINESS_ENTITY"
+                        ? "COMPANY"
+                        : undefined
+                    }
+                    onSelect={handleCustomerSelect}
+                    placeholder={
+                      reservationForm.customerType === "BUSINESS_ENTITY"
+                        ? "Rechercher une entreprise..."
+                        : "Rechercher un client..."
+                    }
+                  />
+                )}
               </div>
-              <div>
+              <div className="md:col-span-3 relative">
                 <label className="block text-sm font-medium mb-1">
                   Ressource *
                 </label>
-                <input
-                  className={inputCls}
-                  value={reservationForm.resourceName}
-                  onChange={(e) =>
-                    setReservationForm({
-                      ...reservationForm,
-                      resourceName: e.target.value,
-                    })
-                  }
-                />
+                <div className="relative">
+                  <Search
+                    size={16}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
+                  <input
+                    className={`${inputCls} pl-9`}
+                    placeholder="Rechercher une ressource (salle, bureau...)"
+                    value={resourceQuery || reservationForm.resourceName}
+                    onChange={(e) => {
+                      setResourceQuery(e.target.value);
+                      setReservationForm({
+                        ...reservationForm,
+                        resourceName: e.target.value,
+                      });
+                      setShowResourceResults(true);
+                    }}
+                    onFocus={() => setShowResourceResults(true)}
+                  />
+                </div>
+                {showResourceResults && resources.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {resources.map((item) => (
+                      <button
+                        key={item.sourceCode}
+                        type="button"
+                        onClick={() => selectResource(item)}
+                        className="w-full px-4 py-2.5 text-left hover:bg-gray-50 text-sm"
+                      >
+                        <p className="font-medium">{item.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {item.unitPrice.toLocaleString("fr-FR")} {item.currency}
+                          {item.unit ? ` / ${item.unit}` : ""}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 mt-1">
+                  Sélectionner une ressource préremplit le prix et l'unité
+                  ci-dessous - modifiables ensuite.
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">

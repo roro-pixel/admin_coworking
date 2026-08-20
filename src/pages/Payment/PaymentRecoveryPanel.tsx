@@ -65,12 +65,16 @@ export const PaymentRecoveryPanel: React.FC = () => {
     payableDocuments.forEach((doc) => {
       const type = doc.customerType || "CUSTOMER";
       const code = doc.customerCode || "";
-      const key = `${type}::${code}`;
+      const docCurrency = doc.currency || currency;
+      // La devise fait partie de la clé : un client avec des documents
+      // ouverts dans plusieurs devises doit apparaître en groupes séparés,
+      // sinon les montants seraient additionnés à tort entre devises.
+      const key = `${type}::${code}::${docCurrency}`;
       map.set(key, [...(map.get(key) || []), doc]);
     });
 
     return Array.from(map.entries()).map(([key, docs]) => {
-      const [type, code] = key.split("::");
+      const [type, code, docCurrency] = key.split("::");
       const first = docs[0];
       const total = docs.reduce((sum, doc) => sum + (doc.balanceDue || 0), 0);
 
@@ -79,7 +83,7 @@ export const PaymentRecoveryPanel: React.FC = () => {
         customerType: type,
         customerCode: code,
         customerName: first?.customerName || code || "Client non identifié",
-        currency: first?.currency || currency,
+        currency: docCurrency,
         documents: docs,
         total,
       };
@@ -226,6 +230,9 @@ export const PaymentRecoveryPanel: React.FC = () => {
                         </span>
                         <span className="font-mono text-xs text-gray-400">
                           {group.customerCode || "—"}
+                        </span>
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+                          {group.currency}
                         </span>
                       </div>
                       <h4 className="mt-2 truncate text-base font-semibold text-gray-900">
@@ -374,12 +381,35 @@ export const PaymentRecoveryPanel: React.FC = () => {
               />
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-3">
+              {recovery.paymentIntent && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate("/payments", {
+                      state: {
+                        intentNumber: recovery.paymentIntent!.intentNumber,
+                      },
+                    })
+                  }
+                  className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                >
+                  <RefreshCw size={16} />
+                  Ouvrir l’intention existante
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => createMutation.mutate()}
                 disabled={
-                  createMutation.isPending || recovery.totalPayableAmount <= 0
+                  createMutation.isPending ||
+                  recovery.totalPayableAmount <= 0 ||
+                  !!recovery.paymentIntent
+                }
+                title={
+                  recovery.paymentIntent
+                    ? "Une intention de recouvrement existe déjà pour ce client — ouvrez-la plutôt que d’en créer une nouvelle."
+                    : undefined
                 }
                 className="inline-flex items-center gap-2 rounded-2xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:opacity-50"
               >

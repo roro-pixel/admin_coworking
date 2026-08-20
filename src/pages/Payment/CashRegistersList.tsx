@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
-  Edit,
   Search,
   Power,
   X,
@@ -20,9 +19,6 @@ export const CashRegistersList: React.FC = () => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingRegister, setEditingRegister] = useState<CashRegister | null>(
-    null,
-  );
   const [formData, setFormData] = useState({
     name: "",
     locationCode: "",
@@ -30,6 +26,7 @@ export const CashRegistersList: React.FC = () => {
     deviceCode: "",
     cashControlEnabled: true,
     maxCashAmount: 500000,
+    managerEmail: "",
   });
 
   const { data: registersData, isLoading } = useQuery({
@@ -43,22 +40,15 @@ export const CashRegistersList: React.FC = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: () => paymentService.createCashRegister(formData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cash-registers"] });
-      handleCloseModal();
-    },
-  });
-
-  const updateMutation = useMutation({
     mutationFn: () =>
-      paymentService.updateCashRegister(editingRegister!.registerCode, {
+      paymentService.createCashRegister({
         name: formData.name,
         locationCode: formData.locationCode,
-        businessEntityCode: formData.businessEntityCode || undefined,
+        businessEntityCode: formData.businessEntityCode,
         deviceCode: formData.deviceCode || undefined,
         cashControlEnabled: formData.cashControlEnabled,
         maxCashAmount: formData.maxCashAmount,
+        managerEmail: formData.managerEmail || undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cash-registers"] });
@@ -88,43 +78,26 @@ export const CashRegistersList: React.FC = () => {
       r.registerCode.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const handleOpenModal = (register?: CashRegister) => {
-    if (register) {
-      setEditingRegister(register);
-      setFormData({
-        name: register.name,
-        locationCode: register.locationCode,
-        businessEntityCode: register.businessEntityCode || "",
-        deviceCode: register.deviceCode || "",
-        cashControlEnabled: register.cashControlEnabled,
-        maxCashAmount: register.maxCashAmount || 500000,
-      });
-    } else {
-      setEditingRegister(null);
-      setFormData({
-        name: "",
-        locationCode: "",
-        businessEntityCode: "",
-        deviceCode: "",
-        cashControlEnabled: true,
-        maxCashAmount: 500000,
-      });
-    }
+  const handleOpenModal = () => {
+    setFormData({
+      name: "",
+      locationCode: "",
+      businessEntityCode: "",
+      deviceCode: "",
+      cashControlEnabled: true,
+      maxCashAmount: 500000,
+      managerEmail: "",
+    });
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setEditingRegister(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingRegister) {
-      updateMutation.mutate();
-    } else {
-      createMutation.mutate();
-    }
+    createMutation.mutate();
   };
 
   const handleToggleActive = (register: CashRegister) => {
@@ -135,7 +108,7 @@ export const CashRegistersList: React.FC = () => {
     }
   };
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
+  const isPending = createMutation.isPending;
 
   if (isLoading) {
     return <div className="text-center py-8">Chargement...</div>;
@@ -227,9 +200,6 @@ export const CashRegistersList: React.FC = () => {
               <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Actif
               </th>
-              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Actions
-              </th>
             </tr>
           </thead>
           <tbody>
@@ -264,14 +234,6 @@ export const CashRegistersList: React.FC = () => {
                     <Power size={16} />
                   </button>
                 </td>
-                <td className="px-6 py-4 text-right">
-                  <button
-                    onClick={() => handleOpenModal(register)}
-                    className="p-1 text-blue-600 hover:text-blue-800"
-                  >
-                    <Edit size={16} />
-                  </button>
-                </td>
               </tr>
             ))}
           </tbody>
@@ -288,9 +250,7 @@ export const CashRegistersList: React.FC = () => {
       {isModalOpen && (
         <ModalPortal onClose={handleCloseModal}>
           <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-xl font-bold">
-              {editingRegister ? "Modifier" : "Nouvelle"} caisse
-            </h3>
+            <h3 className="text-xl font-bold">Nouvelle caisse</h3>
             <button
               onClick={handleCloseModal}
               className="p-1 hover:bg-gray-100 rounded-lg"
@@ -366,6 +326,26 @@ export const CashRegistersList: React.FC = () => {
                 renseigné
               </p>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email du manager
+              </label>
+              <input
+                type="email"
+                value={formData.managerEmail}
+                onChange={(e) =>
+                  setFormData({ ...formData, managerEmail: e.target.value })
+                }
+                placeholder="manager.reception@elleaose.com"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Destinataire des alertes de dépassement de plafond. Si vide,
+                l’adresse superviseur générique est utilisée. Ne se règle
+                qu’à la création — aucun endpoint de modification n’existe
+                actuellement.
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <label className="flex items-center gap-2">
                 <input
@@ -418,8 +398,6 @@ export const CashRegistersList: React.FC = () => {
               >
                 {isPending ? (
                   <Loader2 size={16} className="animate-spin" />
-                ) : editingRegister ? (
-                  "Mettre à jour"
                 ) : (
                   "Créer"
                 )}

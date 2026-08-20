@@ -1,6 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import {
   Search,
   Eye,
@@ -16,6 +21,9 @@ import {
   Download,
   Loader2,
   CheckSquare,
+  ChevronLeft,
+  ChevronRight,
+  X,
 } from "lucide-react";
 import { kycService } from "../../services/document.service";
 import {
@@ -96,6 +104,18 @@ const statusConfig: Record<
   },
 };
 
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+
+/** Évite un appel réseau à chaque frappe dans le champ de recherche. */
+function useDebouncedValue<T>(value: T, delay = 350): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
+
 export const DocumentReviewQueue: React.FC = () => {
   const { admin } = useAuth();
   const queryClient = useQueryClient();
@@ -107,11 +127,29 @@ export const DocumentReviewQueue: React.FC = () => {
   const [showMyQueue, setShowMyQueue] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
+  // Pagination (page est en base 0, comme Spring Data)
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
+
   // Bulk review
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedCases, setSelectedCases] = useState<string[]>([]);
 
   const adminId = Number(admin?.id) || 1;
+  const debouncedSearch = useDebouncedValue(search, 350);
+
+  // Toute modification de filtre doit ramener à la première page,
+  // sinon on peut se retrouver sur une page 5 qui n'existe plus.
+  useEffect(() => {
+    setPage(0);
+  }, [
+    debouncedSearch,
+    statusFilter,
+    ownerTypeFilter,
+    riskLevelFilter,
+    showMyQueue,
+    pageSize,
+  ]);
 
   // Dashboard KPI
   const { data: dashboard, isLoading: dashboardLoading } = useQuery({
@@ -119,32 +157,69 @@ export const DocumentReviewQueue: React.FC = () => {
     queryFn: () => kycService.getKycDashboard(),
   });
 
-  // Liste principale (ou file reviewer)
-  const { data: kycData, isLoading: kycLoading } = useQuery({
+  // Liste principale : recherche, filtres ET pagination sont délégués au backend.
+  const {
+    data: kycData,
+    isLoading: kycLoading,
+    isFetching,
+  } = useQuery({
     queryKey: [
       "kycCases",
-      statusFilter,
-      ownerTypeFilter,
-      riskLevelFilter,
-      showMyQueue,
+      {
+        status: statusFilter,
+        ownerType: ownerTypeFilter,
+        riskLevel: riskLevelFilter,
+        myQueue: showMyQueue,
+        search: debouncedSearch,
+        page,
+        pageSize,
+      },
     ],
     queryFn: () =>
-      showMyQueue
-        ? kycService.getMyQueue(adminId)
-        : kycService.getAllKycCases({
-            status: statusFilter !== "all" ? statusFilter : undefined,
-            ownerType: ownerTypeFilter !== "all" ? ownerTypeFilter : undefined,
-            riskLevel: riskLevelFilter !== "all" ? riskLevelFilter : undefined,
-          }),
+      kycService.getAllKycCases({
+        status: statusFilter !== "all" ? statusFilter : undefined,
+        ownerType: ownerTypeFilter !== "all" ? ownerTypeFilter : undefined,
+        riskLevel: riskLevelFilter !== "all" ? riskLevelFilter : undefined,
+        // « Mes dossiers » passe par assignedTo pour bénéficier de la même
+        // recherche + pagination que la liste globale.
+        assignedTo: showMyQueue ? adminId : undefined,
+        searchText: debouncedSearch.trim() || undefined,
+        page,
+        size: pageSize,
+        sort: "submittedAt,desc",
+      }),
+    // Garde la page précédente affichée pendant le chargement de la suivante
+    placeholderData: keepPreviousData,
   });
 
-  const kycCases = kycData?.content || [];
+  const kycCases = kycData?.content ?? [];
+  const totalElements = kycData?.totalElements ?? kycCases.length;
+  const totalPages = Math.max(kycData?.totalPages ?? 1, 1);
+  const rangeStart = totalElements === 0 ? 0 : page * pageSize + 1;
+  const rangeEnd = Math.min(totalElements, page * pageSize + kycCases.length);
+
+  const hasActiveFilters =
+    debouncedSearch.trim() !== "" ||
+    statusFilter !== "all" ||
+    ownerTypeFilter !== "all" ||
+    riskLevelFilter !== "all";
+
+  const resetFilters = () => {
+    setSearch("");
+    setStatusFilter("all");
+    setOwnerTypeFilter("all");
+    setRiskLevelFilter("all");
+  };
 
   // Mutations
 
   const bulkApproveMutation = useMutation({
     mutationFn: () =>
-      Promise.all(selectedCases.map((code) => kycService.approveKycCase(code, adminId, "Approuvé en masse"))).then((results) => ({ succeeded: results.length, failed: 0 })),
+      Promise.all(
+        selectedCases.map((code) =>
+          kycService.approveKycCase(code, adminId, "Approuvé en masse"),
+        ),
+      ).then((results) => ({ succeeded: results.length, failed: 0 })),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["kycCases"] });
       queryClient.invalidateQueries({ queryKey: ["kyc-dashboard"] });
@@ -176,22 +251,25 @@ export const DocumentReviewQueue: React.FC = () => {
     );
   };
 
-  const filteredCases = kycCases.filter((kycCase) => {
-    if (search && !kycCase.code.toLowerCase().includes(search.toLowerCase()))
-      return false;
-    if (ownerTypeFilter !== "all" && kycCase.ownerType !== ownerTypeFilter)
-      return false;
-    return true;
-  });
+  const allOnPageSelected =
+    kycCases.length > 0 &&
+    kycCases.every((kycCase) => selectedCases.includes(kycCase.code));
 
-  // Extraire les données du dashboard avec la nouvelle structure
+  const toggleSelectAllOnPage = () => {
+    const codesOnPage = kycCases.map((kycCase) => kycCase.code);
+    setSelectedCases((prev) =>
+      allOnPageSelected
+        ? prev.filter((code) => !codesOnPage.includes(code))
+        : Array.from(new Set([...prev, ...codesOnPage])),
+    );
+  };
+
+  // Extraire les données du dashboard
   const totalCases = dashboard?.summary?.totalCases ?? 0;
   const pendingCount =
-    dashboard?.summary?.PENDING_REVIEW ??
-    dashboard?.summary?.PENDING_REVIEW ??
-    0;
+    dashboard?.summary?.PENDING_REVIEW ?? dashboard?.summary?.SUBMITTED ?? 0;
   const reviewCount =
-    dashboard?.summary?.IN_REVIEW ?? dashboard?.summary?.IN_REVIEW ?? 0;
+    dashboard?.summary?.IN_REVIEW ?? dashboard?.summary?.UNDER_REVIEW ?? 0;
   const approvedCount = dashboard?.summary?.APPROVED ?? 0;
   const overdueSla = dashboard?.sla?.casesExceeding48h ?? 0;
 
@@ -368,61 +446,92 @@ export const DocumentReviewQueue: React.FC = () => {
             />
             <input
               type="text"
-              placeholder="Rechercher un dossier..."
+              placeholder="Rechercher par nom, code dossier ou code client..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full pl-10 pr-10 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                title="Effacer la recherche"
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
-          {!showMyQueue && (
-            <>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-200 rounded-xl bg-white"
-              >
-                <option value="all">Tous les statuts</option>
-                <option value="PENDING_REVIEW">En attente</option>
-                <option value="IN_REVIEW">En revue</option>
-                <option value="APPROVED">Approuvé</option>
-                <option value="REJECTED">Rejeté</option>
-                <option value="EXPIRED">Expiré</option>
-              </select>
-              <select
-                value={ownerTypeFilter}
-                onChange={(e) => setOwnerTypeFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-200 rounded-xl bg-white"
-              >
-                <option value="all">Tous les types</option>
-                <option value="MEMBER">Membres</option>
-                <option value="CUSTOMER">Customers</option>
-                <option value="BUSINESS">Business</option>
-              </select>
-              <select
-                value={riskLevelFilter}
-                onChange={(e) => setRiskLevelFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-200 rounded-xl bg-white"
-              >
-                <option value="all">Tous les risques</option>
-                <option value="LOW">Faible</option>
-                <option value="MEDIUM">Moyen</option>
-                <option value="HIGH">Élevé</option>
-                <option value="CRITICAL">Critique</option>
-              </select>
-            </>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-200 rounded-xl bg-white"
+          >
+            <option value="all">Tous les statuts</option>
+            <option value="PENDING_REVIEW">En attente</option>
+            <option value="IN_REVIEW">En revue</option>
+            <option value="APPROVED">Approuvé</option>
+            <option value="REJECTED">Rejeté</option>
+            <option value="EXPIRED">Expiré</option>
+          </select>
+          <select
+            value={ownerTypeFilter}
+            onChange={(e) => setOwnerTypeFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-200 rounded-xl bg-white"
+          >
+            <option value="all">Tous les types</option>
+            <option value="MEMBER">Membres</option>
+            <option value="CUSTOMER">Customers</option>
+            <option value="BUSINESS">Business</option>
+          </select>
+          <select
+            value={riskLevelFilter}
+            onChange={(e) => setRiskLevelFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-200 rounded-xl bg-white"
+          >
+            <option value="all">Tous les risques</option>
+            <option value="LOW">Faible</option>
+            <option value="MEDIUM">Moyen</option>
+            <option value="HIGH">Élevé</option>
+            <option value="CRITICAL">Critique</option>
+          </select>
+        </div>
+
+        <div className="mt-3 flex items-center gap-3 text-sm text-gray-500">
+          <span>
+            {totalElements} dossier{totalElements > 1 ? "s" : ""}
+            {hasActiveFilters ? " correspondant aux filtres" : ""}
+          </span>
+          {hasActiveFilters && (
+            <button
+              onClick={resetFilters}
+              className="text-primary-600 hover:underline"
+            >
+              Réinitialiser
+            </button>
+          )}
+          {isFetching && (
+            <Loader2 size={14} className="animate-spin text-gray-400" />
           )}
         </div>
       </div>
 
       {/* Tableau */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div
+          className={`overflow-x-auto transition-opacity ${isFetching ? "opacity-60" : "opacity-100"}`}
+        >
           <table className="w-full">
             <thead className="bg-gray-50/70">
               <tr>
                 {bulkMode && (
                   <th className="px-4 py-3 text-center text-sm font-semibold w-10">
-                    #
+                    <input
+                      type="checkbox"
+                      checked={allOnPageSelected}
+                      onChange={toggleSelectAllOnPage}
+                      className="rounded"
+                      title="Tout sélectionner sur cette page"
+                    />
                   </th>
                 )}
                 <th className="px-4 py-3 text-left text-sm font-semibold">
@@ -455,7 +564,7 @@ export const DocumentReviewQueue: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredCases.map((kycCase) => {
+              {kycCases.map((kycCase) => {
                 const statusKey = kycCase.status as keyof typeof statusConfig;
                 const StatusIcon = statusConfig[statusKey]?.icon || Clock;
                 const statusClass =
@@ -506,9 +615,7 @@ export const DocumentReviewQueue: React.FC = () => {
                           </p>
                           <p className="mt-0.5 text-xs text-gray-500">
                             {kycCase.ownerType}
-                            {kycCase.ownerCode
-                              ? ` · ${kycCase.ownerCode}`
-                              : ""}
+                            {kycCase.ownerCode ? ` · ${kycCase.ownerCode}` : ""}
                           </p>
                         </div>
                       </div>
@@ -553,9 +660,7 @@ export const DocumentReviewQueue: React.FC = () => {
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
-                      {kycCase.assignedTo
-                        ? `Agent #${kycCase.assignedTo}`
-                        : "—"}
+                      {kycCase.assignedTo ? `Agent #${kycCase.assignedTo}` : "—"}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
                       {kycCase.submittedAt
@@ -567,7 +672,9 @@ export const DocumentReviewQueue: React.FC = () => {
                     <td className="px-4 py-3 text-center">
                       <div className="flex justify-center gap-1">
                         <button
-                          onClick={() => navigate(`/documents/kyc/cases/${kycCase.code}`)}
+                          onClick={() =>
+                            navigate(`/documents/kyc/cases/${kycCase.code}`)
+                          }
                           className="p-1 text-gray-600 hover:text-primary-600"
                           title="Voir détail"
                         >
@@ -589,19 +696,97 @@ export const DocumentReviewQueue: React.FC = () => {
           </table>
         </div>
 
-        {filteredCases.length === 0 && (
+        {kycCases.length === 0 && (
           <div className="text-center py-12">
             <FileText size={48} className="mx-auto text-gray-300 mb-4" />
             <p className="text-gray-500">
-              {showMyQueue
-                ? "Aucun dossier dans votre file"
-                : "Aucun dossier KYC trouvé"}
+              {hasActiveFilters
+                ? "Aucun dossier ne correspond à cette recherche."
+                : showMyQueue
+                  ? "Aucun dossier ne vous est assigné."
+                  : "Aucun dossier KYC pour le moment."}
             </p>
+            {hasActiveFilters && (
+              <button
+                onClick={resetFilters}
+                className="mt-3 text-sm text-primary-600 hover:underline"
+              >
+                Réinitialiser les filtres
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalElements > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-100 px-4 py-3">
+            <div className="flex items-center gap-3 text-sm text-gray-600">
+              <span>
+                {rangeStart}–{rangeEnd} sur {totalElements}
+              </span>
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="border border-gray-200 rounded-lg px-2 py-1 text-sm bg-white"
+                title="Dossiers par page"
+              >
+                {PAGE_SIZE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option} / page
+                  </option>
+                ))}
+              </select>
+              {bulkMode && selectedCases.length > 0 && (
+                <span className="text-primary-600">
+                  {selectedCases.length} sélectionné(s) au total
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0 || isFetching}
+                className="p-2 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
+                title="Page précédente"
+              >
+                <ChevronLeft size={16} />
+              </button>
+
+              {buildPageWindow(page, totalPages).map((item, index) =>
+                item === "…" ? (
+                  <span key={`gap-${index}`} className="px-2 text-gray-400">
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => setPage(item as number)}
+                    disabled={isFetching}
+                    className={`min-w-9 px-3 py-1.5 rounded-lg text-sm ${
+                      item === page
+                        ? "bg-primary-600 text-white"
+                        : "border border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+                    {(item as number) + 1}
+                  </button>
+                ),
+              )}
+
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1 || isFetching}
+                className="p-2 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
+                title="Page suivante"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
         )}
       </div>
 
-     
       {showCreateModal && (
         <CreateKycCaseModal
           isOpen={showCreateModal}
@@ -611,3 +796,34 @@ export const DocumentReviewQueue: React.FC = () => {
     </div>
   );
 };
+
+/** Fenêtre glissante de numéros de page : 1 … 4 5 6 … 20 */
+function buildPageWindow(
+  current: number,
+  totalPages: number,
+): Array<number | "…"> {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i);
+  }
+
+  const pages = new Set<number>([
+    0,
+    totalPages - 1,
+    current,
+    current - 1,
+    current + 1,
+  ]);
+
+  const sorted = Array.from(pages)
+    .filter((p) => p >= 0 && p < totalPages)
+    .sort((a, b) => a - b);
+
+  const result: Array<number | "…"> = [];
+  let previous: number | null = null;
+  for (const p of sorted) {
+    if (previous !== null && p - previous > 1) result.push("…");
+    result.push(p);
+    previous = p;
+  }
+  return result;
+}

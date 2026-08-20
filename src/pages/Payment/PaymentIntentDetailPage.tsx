@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Loader2,
@@ -145,6 +145,31 @@ export const PaymentIntentDetailPage: React.FC = () => {
       paymentService.getCashSessions({ status: "OPEN", size: 100 }),
   });
   const openSessions: CashSession[] = openSessionsData?.content || [];
+
+  // Historique des remboursements par transaction — nécessaire pour
+  // plafonner un nouveau remboursement au solde restant (comportement
+  // cumulé : plusieurs remboursements partiels possibles, plafonnés au
+  // montant d'origine — voir payment-billing-wallet-phases-2-5).
+  const succeededTransactions = (transactions as PaymentTransaction[]).filter(
+    (t) => t.status === "SUCCEEDED",
+  );
+  const refundsQueries = useQueries({
+    queries: succeededTransactions.map((txn) => ({
+      queryKey: ["transaction-refunds", txn.transactionNumber],
+      queryFn: () => paymentService.getTransactionRefunds(txn.transactionNumber),
+      enabled: !!txn.transactionNumber,
+    })),
+  });
+  const refundedAmountByTxn: Record<string, number> = {};
+  succeededTransactions.forEach((txn, idx) => {
+    const refunds = refundsQueries[idx]?.data ?? [];
+    refundedAmountByTxn[txn.transactionNumber] = refunds.reduce(
+      (sum, r) => sum + (r.amount || 0),
+      0,
+    );
+  });
+  const remainingRefundable = (txn: PaymentTransaction) =>
+    Math.max(0, txn.amount - (refundedAmountByTxn[txn.transactionNumber] ?? 0));
 
   // ========== INVALIDATION ==========
   const invalidateAll = () => {
@@ -459,7 +484,10 @@ export const PaymentIntentDetailPage: React.FC = () => {
               <div className="space-y-3">
                 {(transactions as PaymentTransaction[]).map((txn) => {
                   const txStatus = transactionStatusConfig[txn.status];
-                  const canRefund = txn.status === "SUCCEEDED";
+                  const remaining = remainingRefundable(txn);
+                  const alreadyRefunded =
+                    refundedAmountByTxn[txn.transactionNumber] ?? 0;
+                  const canRefund = txn.status === "SUCCEEDED" && remaining > 0;
                   const canReverse = txn.status === "SUCCEEDED";
                   const isRefunding = refundingTxn === txn.transactionNumber;
                   const isReversing = reversingTxn === txn.transactionNumber;
@@ -506,6 +534,14 @@ export const PaymentIntentDetailPage: React.FC = () => {
                         </p>
                       )}
 
+                      {alreadyRefunded > 0 && (
+                        <p className="text-xs text-orange-600 mb-2">
+                          Déjà remboursé : {alreadyRefunded.toLocaleString("fr-FR")}{" "}
+                          {intent.currency} — reste remboursable :{" "}
+                          {remaining.toLocaleString("fr-FR")} {intent.currency}
+                        </p>
+                      )}
+
                       {/* Bouton reçu */}
                       {txn.status === "SUCCEEDED" && (
                         <div className="flex gap-2 pt-2 border-t mb-2">
@@ -530,7 +566,7 @@ export const PaymentIntentDetailPage: React.FC = () => {
                                 onClick={() => {
                                   setRefundingTxn(txn.transactionNumber);
                                   setRefundForm({
-                                    amount: txn.amount,
+                                    amount: remaining,
                                     reason: "",
                                   });
                                 }}
@@ -565,16 +601,17 @@ export const PaymentIntentDetailPage: React.FC = () => {
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <label className="block text-xs text-gray-500 mb-1">
-                                Montant (FCFA)
+                                Montant (FCFA) — max {remaining.toLocaleString("fr-FR")}
                               </label>
                               <input
                                 type="number"
+                                max={remaining}
                                 value={refundForm.amount || ""}
                                 onChange={(e) => {
                                   const num = parseFloat(e.target.value) || 0;
                                   setRefundForm({
                                     ...refundForm,
-                                    amount: num > txn.amount ? txn.amount : num,
+                                    amount: num > remaining ? remaining : num,
                                   });
                                 }}
                                 className="w-full px-2 py-1.5 border rounded-lg text-sm"

@@ -149,7 +149,7 @@ export const BillingAgingReport: React.FC = () => {
                     <td className="px-5 py-4 text-sm">
                       {doc.dueDate
                         ? new Date(doc.dueDate).toLocaleDateString("fr-FR")
-                        : "—"}
+                        : "-"}
                     </td>
                     <td className="px-5 py-4 text-right text-sm font-semibold text-red-600">
                       {formatAmount(doc.balanceDue)}

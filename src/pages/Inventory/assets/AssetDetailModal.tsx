@@ -69,7 +69,10 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
     description: "",
     scheduledDate: "",
   });
-  const [reserveReason, setReserveReason] = useState("");
+  const [pendingAction, setPendingAction] = useState<
+    "reserve" | "damaged" | "retire" | "lost" | null
+  >(null);
+  const [actionReason, setActionReason] = useState("");
   const [lastAssignment, setLastAssignment] = useState<any>(null);
 
   const { data: locations = [] } = useQuery({
@@ -125,8 +128,8 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
     mutationFn: () =>
       inventoryService.createAssetMaintenance(asset.assetCode, {
         maintenanceType: maintenanceData.maintenanceType,
-        notes: maintenanceData.description,
-        scheduledAt: maintenanceData.scheduledDate,
+        description: maintenanceData.description,
+        scheduledDate: maintenanceData.scheduledDate || undefined,
         requestedBy: admin?.email || String(admin?.id || "1"),
       }),
     onSuccess: () => {
@@ -144,35 +147,58 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
     mutationFn: () =>
       inventoryService.reserveAsset(asset.assetCode, {
         reservedFor: assignData.assigneeCode,
-        reason: reserveReason,
+        reason: actionReason,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
-      setReserveReason("");
+      setPendingAction(null);
+      setActionReason("");
     },
   });
 
   const markDamagedMutation = useMutation({
     mutationFn: () =>
       inventoryService.markAssetDamaged(asset.assetCode, {
-        reason: reserveReason,
+        reason: actionReason,
         reportedBy: admin?.email || String(admin?.id || "1"),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
-      setReserveReason("");
+      setPendingAction(null);
+      setActionReason("");
     },
   });
 
   const retireMutation = useMutation({
     mutationFn: () =>
       inventoryService.retireAsset(asset.assetCode, {
-        reason: reserveReason,
+        reason: actionReason,
         reportedBy: admin?.email || String(admin?.id || "1"),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
-      setReserveReason("");
+      setPendingAction(null);
+      setActionReason("");
+    },
+  });
+
+  const markLostMutation = useMutation({
+    mutationFn: () =>
+      inventoryService.markAssetLost(asset.assetCode, {
+        reason: actionReason,
+        reportedBy: admin?.email || String(admin?.id || "1"),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      setPendingAction(null);
+      setActionReason("");
+    },
+  });
+
+  const cancelReservationMutation = useMutation({
+    mutationFn: () => inventoryService.cancelAssetReservation(asset.assetCode),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
     },
   });
 
@@ -201,6 +227,8 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
   const canMarkDamaged =
     asset.status !== "DAMAGED" && asset.status !== "RETIRED";
   const canRetire = asset.status !== "RETIRED";
+  const canMarkLost = asset.status !== "LOST" && asset.status !== "RETIRED";
+  const canCancelReservation = asset.status === "RESERVED";
 
   if (!isOpen) return null;
 
@@ -328,7 +356,10 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
               )}
               {canReserve && (
                 <button
-                  onClick={() => reserveMutation.mutate()}
+                  onClick={() => {
+                    setPendingAction("reserve");
+                    setActionReason("");
+                  }}
                   className="px-4 py-3 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 text-sm sm:text-base"
                 >
                   Réserver
@@ -336,7 +367,10 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
               )}
               {canMarkDamaged && (
                 <button
-                  onClick={() => markDamagedMutation.mutate()}
+                  onClick={() => {
+                    setPendingAction("damaged");
+                    setActionReason("");
+                  }}
                   className="px-4 py-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 text-sm sm:text-base"
                 >
                   Marquer endommagé
@@ -344,13 +378,101 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
               )}
               {canRetire && (
                 <button
-                  onClick={() => retireMutation.mutate()}
+                  onClick={() => {
+                    setPendingAction("retire");
+                    setActionReason("");
+                  }}
                   className="px-4 py-3 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 text-sm sm:text-base"
                 >
                   Retirer
                 </button>
               )}
+              {canMarkLost && (
+                <button
+                  onClick={() => {
+                    setPendingAction("lost");
+                    setActionReason("");
+                  }}
+                  className="px-4 py-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 text-sm sm:text-base"
+                >
+                  Marquer perdu
+                </button>
+              )}
+              {canCancelReservation && (
+                <button
+                  onClick={() => cancelReservationMutation.mutate()}
+                  disabled={cancelReservationMutation.isPending}
+                  className="px-4 py-3 bg-yellow-600 text-white rounded-2xl hover:bg-yellow-700 disabled:opacity-50 text-sm sm:text-base"
+                >
+                  {cancelReservationMutation.isPending ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    "Annuler la réservation"
+                  )}
+                </button>
+              )}
             </div>
+
+            {/* Formulaire de motif partage — reserver / endommager / retirer */}
+            {pendingAction && (
+              <div className="p-5 sm:p-6 bg-gray-50 rounded-2xl space-y-4">
+                <h4 className="font-semibold text-lg">
+                  {pendingAction === "reserve" && "Réserver l'actif"}
+                  {pendingAction === "damaged" && "Marquer l'actif endommagé"}
+                  {pendingAction === "retire" && "Retirer l'actif"}
+                  {pendingAction === "lost" && "Marquer l'actif perdu"}
+                </h4>
+                <textarea
+                  placeholder="Motif *"
+                  value={actionReason}
+                  onChange={(e) => setActionReason(e.target.value)}
+                  rows={3}
+                  required
+                  className="w-full px-4 py-3 border rounded-2xl text-sm sm:text-base"
+                />
+                <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+                  <button
+                    onClick={() => {
+                      setPendingAction(null);
+                      setActionReason("");
+                    }}
+                    className="flex-1 px-5 py-3 border rounded-2xl text-gray-700 text-sm sm:text-base"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (pendingAction === "reserve") reserveMutation.mutate();
+                      if (pendingAction === "damaged")
+                        markDamagedMutation.mutate();
+                      if (pendingAction === "retire") retireMutation.mutate();
+                      if (pendingAction === "lost") markLostMutation.mutate();
+                    }}
+                    disabled={
+                      !actionReason.trim() ||
+                      reserveMutation.isPending ||
+                      markDamagedMutation.isPending ||
+                      retireMutation.isPending ||
+                      markLostMutation.isPending
+                    }
+                    className={`flex-1 justify-center text-white py-3 rounded-2xl disabled:opacity-50 text-sm sm:text-base ${
+                      pendingAction === "damaged" || pendingAction === "lost"
+                        ? "bg-red-600 hover:bg-red-700"
+                        : "bg-primary-600 hover:bg-primary-700"
+                    }`}
+                  >
+                    {reserveMutation.isPending ||
+                    markDamagedMutation.isPending ||
+                    retireMutation.isPending ||
+                    markLostMutation.isPending ? (
+                      <Loader2 size={20} className="animate-spin mx-auto" />
+                    ) : (
+                      "Confirmer"
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Formulaire d'attribution - AGRANDI */}
             {showAssignForm && (

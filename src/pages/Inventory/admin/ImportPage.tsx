@@ -17,6 +17,105 @@ const importTypes = [
   { value: "SUPPLIERS", label: "Fournisseurs" },
 ];
 
+// La doc backend precise qu'aucun endpoint de template n'est expose par le
+// controleur d'import ("garder les templates CSV cote frontend si
+// necessaire") — on genere donc les templates directement dans le
+// navigateur, a partir des champs documentes pour chaque creation.
+const templateHeaders: Record<string, string[]> = {
+  ITEMS: [
+    "itemCode",
+    "name",
+    "description",
+    "categoryCode",
+    "unitCode",
+    "itemType",
+    "trackingType",
+    "defaultCost",
+    "salePrice",
+    "taxable",
+    "allowNegativeStock",
+    "requiresExpiryDate",
+    "requiresLotNumber",
+    "requiresSerialNumber",
+    "active",
+  ],
+  ASSETS: [
+    "assetCode",
+    "itemCode",
+    "serialNumber",
+    "assetTag",
+    "status",
+    "condition",
+    "locationCode",
+    "purchaseDate",
+    "purchaseCost",
+    "warrantyEndDate",
+    "usefulLifeMonths",
+    "residualValue",
+    "notes",
+  ],
+  INITIAL_STOCK: [
+    "itemCode",
+    "locationCode",
+    "quantity",
+    "unitCost",
+    "lotNumber",
+    "expiryDate",
+  ],
+  SUPPLIERS: ["code", "name", "email", "phone", "taxId", "address", "status"],
+};
+
+const templateSampleRow: Record<string, string[]> = {
+  ITEMS: [
+    "ART-001",
+    "Chaise de bureau",
+    "Chaise ergonomique reglable",
+    "MOBILIER",
+    "PIECE",
+    "ASSET",
+    "SERIAL",
+    "45000",
+    "65000",
+    "true",
+    "false",
+    "false",
+    "false",
+    "true",
+    "true",
+  ],
+  ASSETS: [
+    "AST-001",
+    "ART-001",
+    "SN-20260410-001",
+    "TAG-001",
+    "AVAILABLE",
+    "NEW",
+    "ENTREPOT-A",
+    "2026-04-10",
+    "45000",
+    "2028-04-10",
+    "60",
+    "5000",
+    "",
+  ],
+  INITIAL_STOCK: ["ART-001", "ENTREPOT-A", "100", "12000", "", ""],
+  SUPPLIERS: [
+    "FOURNISSEUR-001",
+    "Bureau Plus SARL",
+    "contact@bureauplus.cm",
+    "+237691000000",
+    "M12345678A",
+    "Rue de la Joie, Douala",
+    "ACTIVE",
+  ],
+};
+
+const buildTemplateCsv = (type: string): string => {
+  const headers = templateHeaders[type] || [];
+  const sample = templateSampleRow[type] || [];
+  return [headers.join(","), sample.join(",")].join("\n");
+};
+
 export const ImportPage: React.FC = () => {
   const [importType, setImportType] = useState("ITEMS");
   const [file, setFile] = useState<File | null>(null);
@@ -39,21 +138,15 @@ export const ImportPage: React.FC = () => {
     },
   });
 
-  const downloadTemplate = async () => {
-    try {
-      const blob = await inventoryService.downloadTemplate(importType);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `template_${importType.toLowerCase()}.csv`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.message ||
-          "Erreur lors du téléchargement du template.",
-      );
-    }
+  const downloadTemplate = () => {
+    const csv = buildTemplateCsv(importType);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `template_${importType.toLowerCase()}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

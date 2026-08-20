@@ -49,15 +49,19 @@ export const BillingCatalogLookupPanel: React.FC = () => {
             setPage(0);
           }}
         />
-        <input
+        <select
           className={inputCls}
-          placeholder="Source"
           value={source}
           onChange={(e) => {
             setSource(e.target.value);
             setPage(0);
           }}
-        />
+        >
+          <option value="">Toutes sources</option>
+          <option value="SERVICE_CATALOG">Catalogue de services</option>
+          <option value="INVENTORY_ITEM">Article inventaire</option>
+          <option value="RESOURCE">Ressource</option>
+        </select>
         <input
           className={inputCls}
           placeholder="Catégorie"
@@ -102,27 +106,24 @@ export const BillingCatalogLookupPanel: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {items.map((item: any, index) => (
-                <tr
-                  key={item.itemCode || item.code || index}
-                  className="hover:bg-gray-50"
-                >
+              {items.map((item) => (
+                <tr key={item.sourceCode} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm font-mono">
-                    {item.itemCode || item.code || "—"}
+                    {item.sourceCode}
                   </td>
                   <td className="px-4 py-3 text-sm font-medium">
-                    {item.name || item.label || "—"}
+                    {item.name}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">
-                    {item.source || item.sourceType || "—"}
+                    {item.sourceType}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">
-                    {item.category || "—"}
+                    {item.category || "-"}
                   </td>
                   <td className="px-4 py-3 text-sm text-right">
                     {typeof item.unitPrice === "number"
                       ? item.unitPrice.toLocaleString("fr-FR")
-                      : "—"}{" "}
+                      : "-"}{" "}
                     {item.currency || ""}
                   </td>
                 </tr>

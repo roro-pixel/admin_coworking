@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Loader2,
@@ -16,6 +16,8 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  Search,
+  Package,
 } from "lucide-react";
 import { AdminLayout } from "../../components/layout/AdminLayout";
 import { billingService } from "../../services/billing.service";
@@ -26,6 +28,7 @@ import type {
   BillingLine,
   BillingAdvance,
   BillingEarlyPaymentDiscount,
+  BillingCatalogLookupItem,
 } from "../../services/billing.service";
 import { CustomerAutocomplete } from "../../components/customers/CustomerAutocomplete";
 import { MemberAutocomplete } from "../../components/members/MemberAutocomplete";
@@ -57,6 +60,7 @@ const buildDefaultLine = (
   unitPrice: 0,
   discountRate: 0,
   taxable: true,
+  taxIncluded: false,
   optional: false,
   externalReference: "",
   notes: "",
@@ -115,6 +119,38 @@ export const CreateQuoteModal: React.FC = () => {
   // ── Lignes ───────────────────────────────────────────────────────────────
   const [lines, setLines] = useState([buildDefaultLine(1)]);
   const [expandedLines, setExpandedLines] = useState<Set<number>>(new Set());
+
+  // Recherche catalogue pour préremplir une ligne - voir billing-enhancements.md §3
+  const [catalogPickerIndex, setCatalogPickerIndex] = useState<number | null>(
+    null,
+  );
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const { data: catalogResults } = useQuery({
+    queryKey: ["billing-catalog-lookup-line", catalogQuery],
+    queryFn: () => billingService.catalogLookup({ q: catalogQuery, size: 8 }),
+    enabled: catalogPickerIndex !== null && catalogQuery.trim().length > 1,
+  });
+  const catalogItems: BillingCatalogLookupItem[] =
+    catalogResults?.content ?? [];
+
+  const applyCatalogItem = (idx: number, item: BillingCatalogLookupItem) => {
+    setLines((current) =>
+      current.map((l, i) =>
+        i === idx
+          ? {
+              ...l,
+              description: item.name,
+              unitPrice: item.unitPrice,
+              unit: item.unit || l.unit,
+              catalogSourceType: item.sourceType,
+              catalogSourceCode: item.sourceCode,
+            }
+          : l,
+      ),
+    );
+    setCatalogPickerIndex(null);
+    setCatalogQuery("");
+  };
 
   // ── Remises globales + clauses ───────────────────────────────────────────
   const [discounts, setDiscounts] = useState<BillingDiscount[]>([]);
@@ -233,9 +269,12 @@ export const CreateQuoteModal: React.FC = () => {
           unitPrice: l.unitPrice!,
           discountRate: l.discountRate ?? 0,
           taxable: l.taxable!,
+          taxIncluded: l.taxIncluded,
           optional: l.optional,
           externalReference: l.externalReference || undefined,
           notes: l.notes || undefined,
+          catalogSourceType: l.catalogSourceType || undefined,
+          catalogSourceCode: l.catalogSourceCode || undefined,
         }));
 
       const payload: any = {
@@ -387,7 +426,7 @@ export const CreateQuoteModal: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-4xl space-y-6">
+      <div className="space-y-6">
         {/* ── Onglet Client & Général ── */}
         {activeTab === "client" && (
           <>
@@ -526,7 +565,7 @@ export const CreateQuoteModal: React.FC = () => {
                         })
                       }
                       className={inputCls}
-                      placeholder="ex: Devis location espaces — Juin 2026"
+                      placeholder="ex: Devis location espaces - Juin 2026"
                     />
                   </Field>
                 </div>
@@ -709,15 +748,23 @@ export const CreateQuoteModal: React.FC = () => {
                 return (
                   <div
                     key={idx}
-                    className={`border rounded-xl overflow-hidden ${line.optional ? "border-amber-200" : "border-gray-200"}`}
+                    className={`border rounded-xl ${line.optional ? "border-amber-200" : "border-gray-200"}`}
                   >
                     <div
-                      className={`grid grid-cols-12 gap-3 items-start p-3 ${line.optional ? "bg-amber-50" : "bg-gray-50"}`}
+                      className={`grid grid-cols-12 gap-3 items-start p-3 rounded-t-xl ${expanded ? "" : "rounded-b-xl"} ${line.optional ? "bg-amber-50" : "bg-gray-50"}`}
                     >
-                      <div className="col-span-1 flex items-center justify-center pt-2">
+                      <div className="col-span-1 flex flex-col items-center justify-center pt-2 gap-1">
                         <span className="text-xs text-gray-400 font-mono">
                           #{line.lineOrder}
                         </span>
+                        {line.catalogSourceCode && (
+                          <span
+                            title={`Depuis le catalogue (${line.catalogSourceCode})`}
+                            className="inline-flex items-center justify-center w-5 h-5 bg-primary-50 text-primary-600 rounded-full"
+                          >
+                            <Package size={11} />
+                          </span>
+                        )}
                       </div>
                       <div className="col-span-2">
                         <label className="block text-xs text-gray-500 mb-1">
@@ -737,19 +784,91 @@ export const CreateQuoteModal: React.FC = () => {
                           ))}
                         </select>
                       </div>
-                      <div className="col-span-3">
+                      <div className="col-span-3 relative">
                         <label className="block text-xs text-gray-500 mb-1">
                           Description *
                         </label>
-                        <input
-                          type="text"
-                          value={line.description ?? ""}
-                          onChange={(e) =>
-                            updateLine(idx, "description", e.target.value)
-                          }
-                          placeholder="Description"
-                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white"
-                        />
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={line.description ?? ""}
+                            onChange={(e) =>
+                              updateLine(idx, "description", e.target.value)
+                            }
+                            placeholder="Description"
+                            className="w-full pl-2 pr-8 py-1.5 border border-gray-200 rounded-lg text-sm bg-white"
+                          />
+                          <button
+                            type="button"
+                            title="Rechercher dans le catalogue"
+                            onClick={() => {
+                              setCatalogPickerIndex(
+                                catalogPickerIndex === idx ? null : idx,
+                              );
+                              setCatalogQuery("");
+                            }}
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-primary-600 rounded"
+                          >
+                            <Package size={14} />
+                          </button>
+                        </div>
+                        {catalogPickerIndex === idx && (
+                          <div className="absolute z-30 mt-1 w-80 bg-white border border-gray-200 rounded-xl shadow-lg">
+                            <div className="p-2 border-b border-gray-100 relative">
+                              <Search
+                                size={13}
+                                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                              />
+                              <input
+                                autoFocus
+                                type="text"
+                                value={catalogQuery}
+                                onChange={(e) =>
+                                  setCatalogQuery(e.target.value)
+                                }
+                                placeholder="Rechercher un article, un service..."
+                                className="w-full pl-7 pr-2 py-1.5 text-sm border-0 focus:outline-none"
+                              />
+                            </div>
+                            <div className="max-h-56 overflow-y-auto">
+                              {catalogQuery.trim().length <= 1 ? (
+                                <p className="p-3 text-xs text-gray-400">
+                                  Tapez au moins 2 caractères pour rechercher.
+                                </p>
+                              ) : catalogItems.length === 0 ? (
+                                <p className="p-3 text-xs text-gray-400">
+                                  Aucun résultat.
+                                </p>
+                              ) : (
+                                catalogItems.map((item) => (
+                                  <button
+                                    key={`${item.sourceType}-${item.sourceCode}`}
+                                    type="button"
+                                    onClick={() => applyCatalogItem(idx, item)}
+                                    className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-50 last:border-0"
+                                  >
+                                    <p className="text-sm font-medium text-gray-900">
+                                      {item.name}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                      {item.unitPrice.toLocaleString("fr-FR")}{" "}
+                                      {item.currency}
+                                      {item.unit ? ` / ${item.unit}` : ""} ·{" "}
+                                      {item.sourceType}
+                                    </p>
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setCatalogPickerIndex(null)}
+                              className="w-full text-center py-1.5 text-xs text-gray-400 hover:text-gray-600 border-t border-gray-100"
+                            >
+                              Fermer
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <div className="col-span-1">
                         <label className="block text-xs text-gray-500 mb-1">
@@ -861,7 +980,7 @@ export const CreateQuoteModal: React.FC = () => {
                     </div>
 
                     {expanded && (
-                      <div className="grid grid-cols-3 gap-3 p-3 border-t border-gray-100 bg-white">
+                      <div className="grid grid-cols-3 gap-3 p-3 border-t border-gray-100 bg-white rounded-b-xl">
                         <Field label="Remise ligne (%)">
                           <input
                             type="number"
@@ -878,6 +997,24 @@ export const CreateQuoteModal: React.FC = () => {
                             }
                             className={inputCls}
                           />
+                        </Field>
+                        <Field
+                          label="Prix saisi TTC"
+                          hint="Si coché, le prix unitaire est taxe incluse"
+                        >
+                          <label className="flex items-center gap-2 cursor-pointer h-full pt-2">
+                            <input
+                              type="checkbox"
+                              checked={line.taxIncluded ?? false}
+                              onChange={(e) =>
+                                updateLine(idx, "taxIncluded", e.target.checked)
+                              }
+                              className="rounded"
+                            />
+                            <span className="text-sm">
+                              {line.taxIncluded ? "TTC" : "HT"}
+                            </span>
+                          </label>
                         </Field>
                         <Field
                           label="Référence externe"
@@ -912,7 +1049,7 @@ export const CreateQuoteModal: React.FC = () => {
                         </Field>
                         {line.optional && (
                           <div className="col-span-3 p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
-                            Ligne optionnelle — exclue du total principal,
+                            Ligne optionnelle - exclue du total principal,
                             affichée comme option sur le devis
                           </div>
                         )}
@@ -1236,7 +1373,7 @@ export const CreateQuoteModal: React.FC = () => {
                     type="text"
                     value={excludedLinesInput}
                     onChange={(e) => setExcludedLinesInput(e.target.value)}
-                    placeholder="ex: 3,5 — lignes optionnelles recommandées"
+                    placeholder="ex: 3,5 - lignes optionnelles recommandées"
                     className={inputCls}
                   />
                   {lines.some((l) => l.optional) && (
@@ -1246,7 +1383,7 @@ export const CreateQuoteModal: React.FC = () => {
                         .filter((l) => l.optional)
                         .map((l) => `#${l.lineOrder}`)
                         .join(", ")}
-                      ) — pensez à les exclure.
+                      ) - pensez à les exclure.
                     </p>
                   )}
                 </Field>
@@ -1289,7 +1426,7 @@ export const CreateQuoteModal: React.FC = () => {
                           })
                         }
                         className={inputCls}
-                        placeholder="Acompte 30% — Devis DEV-2026-0042"
+                        placeholder="Acompte 30% - Devis DEV-2026-0042"
                       />
                     </Field>
                   </div>
@@ -1311,7 +1448,7 @@ export const CreateQuoteModal: React.FC = () => {
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
                   <strong>Note :</strong> L'acompte est calculé côté backend. La
                   conversion en facture ne reporte pas l'acompte automatiquement
-                  — précisez-le dans les instructions de paiement.
+                  - précisez-le dans les instructions de paiement.
                 </div>
               </div>
             )}
@@ -1405,7 +1542,7 @@ export const CreateQuoteModal: React.FC = () => {
         )}
 
         {/* Bouton sticky */}
-        <div className="sticky bottom-0 bg-white border-t py-4 flex justify-end gap-3">
+        <div className="sticky bottom-0 z-10 bg-white border-t py-4 flex justify-end gap-3">
           <button
             onClick={() => navigate("/billing")}
             disabled={createMutation.isPending}
@@ -1443,7 +1580,7 @@ const Field: React.FC<{
     <label className="block text-sm font-medium text-gray-700 mb-1">
       {label}
       {hint && (
-        <span className="ml-1 text-xs text-gray-400 font-normal">— {hint}</span>
+        <span className="ml-1 text-xs text-gray-400 font-normal">- {hint}</span>
       )}
     </label>
     {children}
@@ -1457,8 +1594,8 @@ const FormSection: React.FC<{
   action?: React.ReactNode;
   children: React.ReactNode;
 }> = ({ title, icon, iconBg, action, children }) => (
-  <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-    <div className="border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+  <section className="bg-white rounded-2xl shadow-sm border border-gray-100">
+    <div className="border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
       <div className="flex items-center gap-3">
         <div
           className={`w-8 h-8 ${iconBg} rounded-full flex items-center justify-center flex-shrink-0`}
@@ -1469,6 +1606,6 @@ const FormSection: React.FC<{
       </div>
       {action}
     </div>
-    <div className="p-6 space-y-4">{children}</div>
+    <div className="p-6 space-y-4 rounded-b-2xl">{children}</div>
   </section>
 );

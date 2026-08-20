@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Loader2,
@@ -11,9 +11,13 @@ import {
   ListChecks,
   CreditCard,
   Tag,
+  Banknote,
+  Calendar,
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  Search,
+  Package,
 } from "lucide-react";
 import { AdminLayout } from "../../components/layout/AdminLayout";
 import { billingService } from "../../services/billing.service";
@@ -22,6 +26,9 @@ import type {
   BillingDiscount,
   BillingClause,
   BillingLine,
+  BillingAdvance,
+  BillingEarlyPaymentDiscount,
+  BillingCatalogLookupItem,
 } from "../../services/billing.service";
 import { CustomerAutocomplete } from "../../components/customers/CustomerAutocomplete";
 import { MemberAutocomplete } from "../../components/members/MemberAutocomplete";
@@ -51,6 +58,7 @@ const buildDefaultLine = (
   unitPrice: 0,
   discountRate: 0,
   taxable: true,
+  taxIncluded: false,
   optional: false,
   externalReference: "",
   notes: "",
@@ -58,12 +66,13 @@ const buildDefaultLine = (
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = "client" | "lines" | "discounts" | "payment";
+type Tab = "client" | "lines" | "discounts" | "advance" | "payment";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "client", label: "Client & Général", icon: User },
   { id: "lines", label: "Lignes", icon: ListChecks },
   { id: "discounts", label: "Remises & Taxes", icon: Tag },
+  { id: "advance", label: "Acompte", icon: Banknote },
   { id: "payment", label: "Paiement", icon: CreditCard },
 ];
 
@@ -102,15 +111,73 @@ export const CreateInvoiceModal: React.FC = () => {
     projectCode: "",
     salespersonCode: "",
     language: "fr",
+    terms: "",
   });
 
   // ── Lignes ────────────────────────────────────────────────────────────────
   const [lines, setLines] = useState([buildDefaultLine(1)]);
   const [expandedLines, setExpandedLines] = useState<Set<number>>(new Set());
 
+  // Recherche catalogue pour préremplir une ligne - voir billing-enhancements.md §3
+  const [catalogPickerIndex, setCatalogPickerIndex] = useState<number | null>(
+    null,
+  );
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const { data: catalogResults } = useQuery({
+    queryKey: ["billing-catalog-lookup-line", catalogQuery],
+    queryFn: () => billingService.catalogLookup({ q: catalogQuery, size: 8 }),
+    enabled: catalogPickerIndex !== null && catalogQuery.trim().length > 1,
+  });
+  const catalogItems: BillingCatalogLookupItem[] =
+    catalogResults?.content ?? [];
+
+  const applyCatalogItem = (idx: number, item: BillingCatalogLookupItem) => {
+    setLines((current) =>
+      current.map((l, i) =>
+        i === idx
+          ? {
+              ...l,
+              description: item.name,
+              unitPrice: item.unitPrice,
+              unit: item.unit || l.unit,
+              catalogSourceType: item.sourceType,
+              catalogSourceCode: item.sourceCode,
+            }
+          : l,
+      ),
+    );
+    setCatalogPickerIndex(null);
+    setCatalogQuery("");
+  };
+
   // ── Remises & Clauses ─────────────────────────────────────────────────────
   const [discounts, setDiscounts] = useState<BillingDiscount[]>([]);
   const [clauses, setClauses] = useState<BillingClause[]>([]);
+
+  // ── Escompte (Sprint 2) ──────────────────────────────────────────────────
+  const [earlyPaymentEnabled, setEarlyPaymentEnabled] = useState(false);
+  const [earlyPayment, setEarlyPayment] = useState<
+    Omit<BillingEarlyPaymentDiscount, "computedAmount">
+  >({
+    discountRate: 2,
+    ifPaidBefore: "",
+    label: "",
+  });
+
+  // ── Acompte (Sprint 1) ───────────────────────────────────────────────────
+  const [advanceEnabled, setAdvanceEnabled] = useState(false);
+  const [advance, setAdvance] = useState<
+    Omit<BillingAdvance, "computedAmount" | "status" | "paidAt">
+  >({
+    advanceType: "PERCENTAGE",
+    advanceValue: 30,
+    excludedLineOrders: [],
+    paymentReference: "",
+    referenceLabel: "",
+    dueDate: "",
+    notes: "",
+  });
+  const [excludedLinesInput, setExcludedLinesInput] = useState("");
 
   // ── Paiement ──────────────────────────────────────────────────────────────
   const [paymentData, setPaymentData] = useState({
@@ -203,14 +270,20 @@ export const CreateInvoiceModal: React.FC = () => {
           unitPrice: l.unitPrice!,
           discountRate: l.discountRate ?? 0,
           taxable: l.taxable!,
+          taxIncluded: l.taxIncluded,
           optional: l.optional,
           externalReference: l.externalReference || undefined,
           notes: l.notes || undefined,
+          // Trace vers le catalogue - permet au backend de résoudre/valider
+          // description, unit, unitPrice, taxable et vatRate (billing-enhancements.md §3.2)
+          catalogSourceType: l.catalogSourceType || undefined,
+          catalogSourceCode: l.catalogSourceCode || undefined,
         }));
 
       const payload: any = {
         title: generalData.title || "Facture manuelle",
         description: generalData.description || undefined,
+        terms: generalData.terms || undefined,
         currency: generalData.currency,
         issueDate: generalData.issueDate,
         dueDate: generalData.dueDate || undefined,
@@ -238,6 +311,36 @@ export const CreateInvoiceModal: React.FC = () => {
         payload.customerName = externalInfo.name;
         payload.customerEmail = externalInfo.email;
         if (externalInfo.phone) payload.customerPhone = externalInfo.phone;
+      }
+
+      // Acompte (Sprint 1)
+      if (advanceEnabled && advance.advanceValue > 0) {
+        const excl = excludedLinesInput
+          .split(",")
+          .map((s) => parseInt(s.trim()))
+          .filter((n) => !isNaN(n));
+        payload.advance = {
+          advanceType: advance.advanceType,
+          advanceValue: advance.advanceValue,
+          excludedLineOrders: excl.length > 0 ? excl : undefined,
+          paymentReference: advance.paymentReference || undefined,
+          referenceLabel: advance.referenceLabel || undefined,
+          dueDate: advance.dueDate || undefined,
+          notes: advance.notes || undefined,
+        };
+      }
+
+      // Escompte (Sprint 2)
+      if (
+        earlyPaymentEnabled &&
+        earlyPayment.discountRate > 0 &&
+        earlyPayment.ifPaidBefore
+      ) {
+        payload.earlyPaymentDiscount = {
+          discountRate: earlyPayment.discountRate,
+          ifPaidBefore: earlyPayment.ifPaidBefore,
+          label: earlyPayment.label || undefined,
+        };
       }
 
       return billingService.createManualInvoice(payload);
@@ -324,7 +427,7 @@ export const CreateInvoiceModal: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-4xl space-y-6">
+      <div className="space-y-6">
         {/* ── Onglet Client & Général ── */}
         {activeTab === "client" && (
           <>
@@ -603,6 +706,25 @@ export const CreateInvoiceModal: React.FC = () => {
                     placeholder="USR-RYAN"
                   />
                 </Field>
+                <div className="col-span-2">
+                  <Field
+                    label="Conditions générales"
+                    hint="Texte libre affiché sur la facture"
+                  >
+                    <textarea
+                      value={generalData.terms}
+                      rows={3}
+                      onChange={(e) =>
+                        setGeneralData({
+                          ...generalData,
+                          terms: e.target.value,
+                        })
+                      }
+                      className={`${inputCls} resize-none`}
+                      placeholder="Paiement à 30 jours net..."
+                    />
+                  </Field>
+                </div>
               </div>
             </FormSection>
           </>
@@ -629,16 +751,23 @@ export const CreateInvoiceModal: React.FC = () => {
                 const expanded = expandedLines.has(idx);
                 const subtotal = (line.quantity ?? 1) * (line.unitPrice ?? 0);
                 return (
-                  <div
-                    key={idx}
-                    className="border border-gray-200 rounded-xl overflow-hidden"
-                  >
+                  <div key={idx} className="border border-gray-200 rounded-xl">
                     {/* Ligne principale */}
-                    <div className="grid grid-cols-12 gap-3 items-start p-3 bg-gray-50">
-                      <div className="col-span-1 flex items-center justify-center pt-2">
+                    <div
+                      className={`grid grid-cols-12 gap-3 items-start p-3 bg-gray-50 rounded-t-xl ${expanded ? "" : "rounded-b-xl"}`}
+                    >
+                      <div className="col-span-1 flex flex-col items-center justify-center pt-2 gap-1">
                         <span className="text-xs text-gray-400 font-mono">
                           #{line.lineOrder}
                         </span>
+                        {line.catalogSourceCode && (
+                          <span
+                            title={`Depuis le catalogue (${line.catalogSourceCode})`}
+                            className="inline-flex items-center justify-center w-5 h-5 bg-primary-50 text-primary-600 rounded-full"
+                          >
+                            <Package size={11} />
+                          </span>
+                        )}
                       </div>
                       <div className="col-span-2">
                         <label className="block text-xs text-gray-500 mb-1">
@@ -658,19 +787,91 @@ export const CreateInvoiceModal: React.FC = () => {
                           ))}
                         </select>
                       </div>
-                      <div className="col-span-3">
+                      <div className="col-span-3 relative">
                         <label className="block text-xs text-gray-500 mb-1">
                           Description *
                         </label>
-                        <input
-                          type="text"
-                          value={line.description ?? ""}
-                          onChange={(e) =>
-                            updateLine(idx, "description", e.target.value)
-                          }
-                          placeholder="Description"
-                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white"
-                        />
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={line.description ?? ""}
+                            onChange={(e) =>
+                              updateLine(idx, "description", e.target.value)
+                            }
+                            placeholder="Description"
+                            className="w-full pl-2 pr-8 py-1.5 border border-gray-200 rounded-lg text-sm bg-white"
+                          />
+                          <button
+                            type="button"
+                            title="Rechercher dans le catalogue"
+                            onClick={() => {
+                              setCatalogPickerIndex(
+                                catalogPickerIndex === idx ? null : idx,
+                              );
+                              setCatalogQuery("");
+                            }}
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-primary-600 rounded"
+                          >
+                            <Package size={14} />
+                          </button>
+                        </div>
+                        {catalogPickerIndex === idx && (
+                          <div className="absolute z-30 mt-1 w-80 bg-white border border-gray-200 rounded-xl shadow-lg">
+                            <div className="p-2 border-b border-gray-100 relative">
+                              <Search
+                                size={13}
+                                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                              />
+                              <input
+                                autoFocus
+                                type="text"
+                                value={catalogQuery}
+                                onChange={(e) =>
+                                  setCatalogQuery(e.target.value)
+                                }
+                                placeholder="Rechercher un article, un service..."
+                                className="w-full pl-7 pr-2 py-1.5 text-sm border-0 focus:outline-none"
+                              />
+                            </div>
+                            <div className="max-h-56 overflow-y-auto">
+                              {catalogQuery.trim().length <= 1 ? (
+                                <p className="p-3 text-xs text-gray-400">
+                                  Tapez au moins 2 caractères pour rechercher.
+                                </p>
+                              ) : catalogItems.length === 0 ? (
+                                <p className="p-3 text-xs text-gray-400">
+                                  Aucun résultat.
+                                </p>
+                              ) : (
+                                catalogItems.map((item) => (
+                                  <button
+                                    key={`${item.sourceType}-${item.sourceCode}`}
+                                    type="button"
+                                    onClick={() => applyCatalogItem(idx, item)}
+                                    className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-50 last:border-0"
+                                  >
+                                    <p className="text-sm font-medium text-gray-900">
+                                      {item.name}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                      {item.unitPrice.toLocaleString("fr-FR")}{" "}
+                                      {item.currency}
+                                      {item.unit ? ` / ${item.unit}` : ""} ·{" "}
+                                      {item.sourceType}
+                                    </p>
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setCatalogPickerIndex(null)}
+                              className="w-full text-center py-1.5 text-xs text-gray-400 hover:text-gray-600 border-t border-gray-100"
+                            >
+                              Fermer
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <div className="col-span-1">
                         <label className="block text-xs text-gray-500 mb-1">
@@ -780,7 +981,7 @@ export const CreateInvoiceModal: React.FC = () => {
 
                     {/* Champs secondaires (accordéon) */}
                     {expanded && (
-                      <div className="grid grid-cols-3 gap-3 p-3 border-t border-gray-100 bg-white">
+                      <div className="grid grid-cols-3 gap-3 p-3 border-t border-gray-100 bg-white rounded-b-xl">
                         <Field label="Remise ligne (%)">
                           <input
                             type="number"
@@ -797,6 +998,24 @@ export const CreateInvoiceModal: React.FC = () => {
                             }
                             className={inputCls}
                           />
+                        </Field>
+                        <Field
+                          label="Prix saisi TTC"
+                          hint="Si coché, le prix unitaire ci-dessus est taxe incluse"
+                        >
+                          <label className="flex items-center gap-2 cursor-pointer h-full pt-2">
+                            <input
+                              type="checkbox"
+                              checked={line.taxIncluded ?? false}
+                              onChange={(e) =>
+                                updateLine(idx, "taxIncluded", e.target.checked)
+                              }
+                              className="rounded"
+                            />
+                            <span className="text-sm">
+                              {line.taxIncluded ? "TTC" : "HT"}
+                            </span>
+                          </label>
                         </Field>
                         <Field
                           label="Référence externe"
@@ -833,7 +1052,7 @@ export const CreateInvoiceModal: React.FC = () => {
                         {line.optional && (
                           <div className="col-span-3">
                             <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-lg">
-                              <Tag size={11} /> Ligne optionnelle — exclue du
+                              <Tag size={11} /> Ligne optionnelle - exclue du
                               total, affichée séparément sur le devis
                             </span>
                           </div>
@@ -938,6 +1157,76 @@ export const CreateInvoiceModal: React.FC = () => {
               )}
             </FormSection>
 
+            {/* Escompte (Sprint 2) */}
+            <FormSection
+              title="Escompte pour paiement anticipé"
+              icon={<Calendar size={16} className="text-teal-600" />}
+              iconBg="bg-teal-100"
+            >
+              <label className="flex items-center gap-2 cursor-pointer mb-3">
+                <input
+                  type="checkbox"
+                  checked={earlyPaymentEnabled}
+                  onChange={(e) => setEarlyPaymentEnabled(e.target.checked)}
+                  className="rounded"
+                />
+                <span className="text-sm font-medium">
+                  Activer un escompte pour paiement anticipé
+                </span>
+              </label>
+              {earlyPaymentEnabled && (
+                <div className="grid grid-cols-3 gap-4 p-4 bg-teal-50 rounded-xl">
+                  <Field label="Taux d'escompte (%)">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      value={earlyPayment.discountRate}
+                      onChange={(e) =>
+                        setEarlyPayment({
+                          ...earlyPayment,
+                          discountRate: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Si payé avant le *">
+                    <input
+                      type="date"
+                      value={earlyPayment.ifPaidBefore}
+                      min={generalData.issueDate}
+                      onChange={(e) =>
+                        setEarlyPayment({
+                          ...earlyPayment,
+                          ifPaidBefore: e.target.value,
+                        })
+                      }
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field
+                    label="Libellé personnalisé"
+                    hint="Généré automatiquement si absent"
+                  >
+                    <input
+                      type="text"
+                      value={earlyPayment.label ?? ""}
+                      onChange={(e) =>
+                        setEarlyPayment({
+                          ...earlyPayment,
+                          label: e.target.value,
+                        })
+                      }
+                      className={inputCls}
+                      placeholder="Escompte 2% si règlement avant..."
+                    />
+                  </Field>
+                </div>
+              )}
+            </FormSection>
+
             {/* Clauses */}
             <FormSection
               title="Clauses"
@@ -1009,6 +1298,161 @@ export const CreateInvoiceModal: React.FC = () => {
               )}
             </FormSection>
           </>
+        )}
+
+        {/* ── Onglet Acompte (Sprint 1) ── */}
+        {activeTab === "advance" && (
+          <FormSection
+            title="Acompte"
+            icon={<Banknote size={16} className="text-green-600" />}
+            iconBg="bg-green-100"
+          >
+            <label className="flex items-center gap-2 cursor-pointer mb-4">
+              <input
+                type="checkbox"
+                checked={advanceEnabled}
+                onChange={(e) => setAdvanceEnabled(e.target.checked)}
+                className="rounded"
+              />
+              <span className="text-sm font-medium">
+                Demander un acompte à la commande
+              </span>
+            </label>
+
+            {advanceEnabled && (
+              <div className="space-y-4 p-4 bg-green-50 rounded-xl">
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Type d'acompte *">
+                    <select
+                      value={advance.advanceType}
+                      onChange={(e) =>
+                        setAdvance({
+                          ...advance,
+                          advanceType: e.target.value as
+                            | "PERCENTAGE"
+                            | "FIXED_AMOUNT",
+                        })
+                      }
+                      className={inputCls}
+                    >
+                      <option value="PERCENTAGE">Pourcentage (%)</option>
+                      <option value="FIXED_AMOUNT">Montant fixe (FCFA)</option>
+                    </select>
+                  </Field>
+                  <Field
+                    label={
+                      advance.advanceType === "PERCENTAGE"
+                        ? "Valeur (%) *"
+                        : "Montant (FCFA) *"
+                    }
+                  >
+                    <input
+                      type="number"
+                      min="0"
+                      max={
+                        advance.advanceType === "PERCENTAGE" ? 100 : undefined
+                      }
+                      step={advance.advanceType === "PERCENTAGE" ? 1 : 1000}
+                      value={advance.advanceValue}
+                      onChange={(e) =>
+                        setAdvance({
+                          ...advance,
+                          advanceValue: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className={inputCls}
+                    />
+                  </Field>
+                </div>
+
+                <Field
+                  label="Lignes exclues du calcul"
+                  hint="Numéros de lignes séparés par virgule, ex: 3,5"
+                >
+                  <input
+                    type="text"
+                    value={excludedLinesInput}
+                    onChange={(e) => setExcludedLinesInput(e.target.value)}
+                    placeholder="ex: 3,5 - lignes optionnelles recommandées"
+                    className={inputCls}
+                  />
+                  {lines.some((l) => l.optional) && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      ⚠ Vous avez des lignes optionnelles (
+                      {lines
+                        .filter((l) => l.optional)
+                        .map((l) => `#${l.lineOrder}`)
+                        .join(", ")}
+                      ) - pensez à les exclure.
+                    </p>
+                  )}
+                </Field>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Référence de paiement acompte">
+                    <input
+                      type="text"
+                      value={advance.paymentReference ?? ""}
+                      onChange={(e) =>
+                        setAdvance({
+                          ...advance,
+                          paymentReference: e.target.value,
+                        })
+                      }
+                      className={inputCls}
+                      placeholder="AV-2026-0042"
+                    />
+                  </Field>
+                  <Field label="Date d'échéance acompte">
+                    <input
+                      type="date"
+                      value={advance.dueDate ?? ""}
+                      min={generalData.issueDate}
+                      onChange={(e) =>
+                        setAdvance({ ...advance, dueDate: e.target.value })
+                      }
+                      className={inputCls}
+                    />
+                  </Field>
+                  <div className="col-span-2">
+                    <Field label="Libellé acompte" hint="Affiché sur le PDF">
+                      <input
+                        type="text"
+                        value={advance.referenceLabel ?? ""}
+                        onChange={(e) =>
+                          setAdvance({
+                            ...advance,
+                            referenceLabel: e.target.value,
+                          })
+                        }
+                        className={inputCls}
+                        placeholder="Acompte 30% - Facture FAC-2026-0042"
+                      />
+                    </Field>
+                  </div>
+                  <div className="col-span-2">
+                    <Field label="Note interne">
+                      <input
+                        type="text"
+                        value={advance.notes ?? ""}
+                        onChange={(e) =>
+                          setAdvance({ ...advance, notes: e.target.value })
+                        }
+                        className={inputCls}
+                      />
+                    </Field>
+                  </div>
+                </div>
+
+                {/* Note d'info */}
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+                  <strong>Note :</strong> L'acompte est calculé côté backend
+                  et n'est pas modifiable après création (document en DRAFT
+                  uniquement).
+                </div>
+              </div>
+            )}
+          </FormSection>
         )}
 
         {/* ── Onglet Paiement ── */}
@@ -1098,7 +1542,7 @@ export const CreateInvoiceModal: React.FC = () => {
         )}
 
         {/* Bouton bas de page */}
-        <div className="sticky bottom-0 bg-white border-t py-4 flex justify-end gap-3">
+        <div className="sticky bottom-0 z-10 bg-white border-t py-4 flex justify-end gap-3">
           <button
             onClick={() => navigate("/billing")}
             disabled={createMutation.isPending}
@@ -1139,7 +1583,7 @@ const Field: React.FC<{
     <label className="block text-sm font-medium text-gray-700 mb-1">
       {label}
       {hint && (
-        <span className="ml-1 text-xs text-gray-400 font-normal">— {hint}</span>
+        <span className="ml-1 text-xs text-gray-400 font-normal">- {hint}</span>
       )}
     </label>
     {children}
@@ -1153,8 +1597,8 @@ const FormSection: React.FC<{
   action?: React.ReactNode;
   children: React.ReactNode;
 }> = ({ title, icon, iconBg, action, children }) => (
-  <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-    <div className="border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+  <section className="bg-white rounded-2xl shadow-sm border border-gray-100">
+    <div className="border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
       <div className="flex items-center gap-3">
         <div
           className={`w-8 h-8 ${iconBg} rounded-full flex items-center justify-center flex-shrink-0`}
@@ -1165,6 +1609,6 @@ const FormSection: React.FC<{
       </div>
       {action}
     </div>
-    <div className="p-6 space-y-4">{children}</div>
+    <div className="p-6 space-y-4 rounded-b-2xl">{children}</div>
   </section>
 );

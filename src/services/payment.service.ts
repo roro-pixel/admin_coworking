@@ -798,15 +798,19 @@ export const paymentService = {
     return response.data;
   },
 
+  // ATTENTION: la doc precise explicitement qu'aucun endpoint de mise a jour
+  // de caisse n'existe actuellement ("managerEmail se renseigne uniquement a
+  // la creation. Si le besoin de modification apparait cote UI, il faudra
+  // demander l'ajout d'un endpoint PATCH/PUT dedie."). Cet appel retournera
+  // 404 tant que le backend n'expose pas cette route.
   updateCashRegister: async (
-    registerCode: string,
-    data: UpdateCashRegisterPayload,
+    _registerCode: string,
+    _data: UpdateCashRegisterPayload,
   ): Promise<CashRegister> => {
-    const response = await apiClient.put(
-      `/sni/api/v1/cash-registers/${registerCode}`,
-      data,
+    throw new Error(
+      "updateCashRegister: aucun endpoint backend pour modifier une caisse. " +
+        "A demander au backend (voir payment-billing-wallet-phases-2-5-frontend-api.md §1.1).",
     );
-    return response.data;
   },
 
   activateCashRegister: async (registerCode: string): Promise<void> => {
@@ -839,6 +843,10 @@ export const paymentService = {
     return normalizePaginated<CashSession>(response.data);
   },
 
+  // NON DOCUMENTE : la doc ne liste qu'un endpoint de resume
+  // (GET .../summary, voir getCashSessionSummary ci-dessous), pas de detail
+  // brut separe. A confirmer aupres du backend ; en cas de 404, utiliser
+  // getCashSessionSummary a la place.
   getCashSession: async (sessionNumber: string): Promise<CashSession> => {
     const response = await apiClient.get(
       `/sni/api/v1/cash-registers/sessions/${sessionNumber}`,

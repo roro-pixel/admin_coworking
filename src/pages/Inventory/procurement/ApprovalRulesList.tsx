@@ -27,27 +27,20 @@ export const ApprovalRulesList: React.FC = () => {
     queryFn: () => inventoryService.getApprovalRules(),
   });
 
-  const createMutation = useMutation({
-    mutationFn: () => inventoryService.createApprovalRule([formData]),
+  // ATTENTION : la doc ne documente qu'un seul endpoint pour ce module —
+  // POST /inventory/procurement/approval-rules qui REMPLACE l'integralite
+  // de la configuration avec le tableau envoye. Il n'y a ni PUT ni DELETE
+  // par id documente. On reconstruit donc systematiquement la liste
+  // complete des regles avant chaque sauvegarde, pour ne jamais ecraser
+  // les autres niveaux configures.
+  const saveMutation = useMutation({
+    mutationFn: (nextRules: any[]) =>
+      inventoryService.createApprovalRule(
+        nextRules.map(({ id, ...rest }) => rest),
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["approval-rules"] });
       handleCloseModal();
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: () =>
-      inventoryService.updateApprovalRule(editingRule.id, formData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["approval-rules"] });
-      handleCloseModal();
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => inventoryService.deleteApprovalRule(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["approval-rules"] });
     },
   });
 
@@ -82,15 +75,18 @@ export const ApprovalRulesList: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingRule) {
-      updateMutation.mutate();
+      const next = rules.map((r: any) =>
+        r.id === editingRule.id ? { ...r, ...formData } : r,
+      );
+      saveMutation.mutate(next);
     } else {
-      createMutation.mutate();
+      saveMutation.mutate([...rules, formData]);
     }
   };
 
   const handleDelete = (id: number) => {
     if (confirm("Êtes-vous sûr de vouloir supprimer cette règle ?")) {
-      deleteMutation.mutate(id);
+      saveMutation.mutate(rules.filter((r: any) => r.id !== id));
     }
   };
 
@@ -299,9 +295,7 @@ export const ApprovalRulesList: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={
-                    createMutation.isPending || updateMutation.isPending
-                  }
+                  disabled={saveMutation.isPending}
                   className="flex-1 bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 text-sm sm:text-base font-medium w-full sm:w-auto justify-center"
                 >
                   {editingRule ? "Mettre à jour" : "Créer"}

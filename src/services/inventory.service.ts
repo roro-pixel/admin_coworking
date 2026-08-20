@@ -484,12 +484,15 @@ export interface InventoryImportResult {
 }
 
 export interface InventoryDashboardMetrics {
-  totalItems?: number;
-  totalStockValue?: number;
-  lowStockCount?: number;
   openAlerts?: number;
-  assetCount?: number;
-  pendingPurchaseRequests?: number;
+  lowStockAlerts?: number;
+  outOfStockAlerts?: number;
+  negativeStockAlerts?: number;
+  expirySoonAlerts?: number;
+  expiringLots30Days?: number;
+  outOfStockLevels?: number;
+  openPurchaseOrders?: number;
+  totalStockValue?: number;
   [key: string]: any;
 }
 
@@ -1002,33 +1005,32 @@ export const inventoryService = {
         `/sni/api/v1/inventory/procurement/purchase-requests/${requestCode}/submit`,
       )
     ).data,
+  // approvedBy et supplierCode sont des QUERY PARAMS cote backend (pas un body) — doc section 11
   approvePurchaseRequest: async (
     requestCode: string,
     approvedByOrData:
       | string
-      | { approvedBy?: string; note?: string; supplierCode?: string },
+      | { approvedBy?: string; supplierCode?: string },
     supplierCode?: string,
   ): Promise<PurchaseRequest> => {
-    const data =
+    const approvedBy =
       typeof approvedByOrData === "string"
-        ? { approvedBy: approvedByOrData }
-        : approvedByOrData;
+        ? approvedByOrData
+        : approvedByOrData.approvedBy;
+    const finalSupplierCode =
+      supplierCode ??
+      (typeof approvedByOrData === "object"
+        ? approvedByOrData.supplierCode
+        : undefined);
     return (
       await apiClient.patch(
         `/sni/api/v1/inventory/procurement/purchase-requests/${requestCode}/approve`,
-        data,
-        {
-          params: {
-            supplierCode:
-              supplierCode ??
-              (typeof approvedByOrData === "object"
-                ? approvedByOrData.supplierCode
-                : undefined),
-          },
-        },
+        null,
+        { params: { approvedBy, supplierCode: finalSupplierCode } },
       )
     ).data;
   },
+  // Le champ acteur du rejet s'appelle "approvedBy" cote backend (meme en cas de rejet) — doc section 11
   rejectPurchaseRequest: async (
     requestCode: string,
     rejectedByOrReason: string,
@@ -1038,20 +1040,24 @@ export const inventoryService = {
       await apiClient.patch(
         `/sni/api/v1/inventory/procurement/purchase-requests/${requestCode}/reject`,
         {
-          rejectedBy: reasonMaybe ? rejectedByOrReason : undefined,
+          approvedBy: reasonMaybe ? rejectedByOrReason : undefined,
           rejectionReason: reasonMaybe ?? rejectedByOrReason,
         },
       )
     ).data,
+  // Le backend attend un body JSON {supplierCode, expectedDeliveryDate, orderedBy} — doc section 12
   createPurchaseOrderFromRequest: async (
     requestCode: string,
-    supplierCode?: string,
+    data: {
+      supplierCode?: string;
+      expectedDeliveryDate?: string;
+      orderedBy?: string;
+    },
   ): Promise<PurchaseOrder> =>
     (
       await apiClient.post(
         `/sni/api/v1/inventory/procurement/purchase-requests/${requestCode}/purchase-order`,
-        null,
-        { params: { supplierCode } },
+        data,
       )
     ).data,
   createPurchaseRequestFromReorderSuggestions: async (
@@ -1114,6 +1120,8 @@ export const inventoryService = {
         orderedBy ? { orderedBy } : undefined,
       )
     ).data,
+  // NON DOCUMENTE dans inventory-frontend-api.md (seuls approve/mark-ordered y
+  // figurent). A confirmer aupres du backend avant de s'y fier en prod.
   cancelPurchaseOrder: async (
     orderCode: string,
     reason?: string,
@@ -1155,6 +1163,9 @@ export const inventoryService = {
       (await apiClient.get("/sni/api/v1/inventory/procurement/approval-rules"))
         .data,
     ),
+  // La doc decrit un unique POST recevant un tableau complet de regles
+  // (remplacement bulk). createApprovalRule/updateApprovalRule/deleteApprovalRule
+  // par id ci-dessous sont NON DOCUMENTES — a confirmer aupres du backend.
   createApprovalRule: async (data: any): Promise<any> =>
     (
       await apiClient.post(
@@ -1213,8 +1224,8 @@ export const inventoryService = {
     },
   ): Promise<AssetAssignment> =>
     (
-      await apiClient.post(
-        `/sni/api/v1/inventory/assets/${assetCode}/assignments`,
+      await apiClient.patch(
+        `/sni/api/v1/inventory/assets/${assetCode}/assign`,
         data,
       )
     ).data,
@@ -1248,7 +1259,7 @@ export const inventoryService = {
   markAssetLost: async (assetCode: string, data: any): Promise<Asset> =>
     (
       await apiClient.patch(
-        `/sni/api/v1/inventory/assets/${assetCode}/lost`,
+        `/sni/api/v1/inventory/assets/${assetCode}/mark-lost`,
         data,
       )
     ).data,
@@ -1259,10 +1270,17 @@ export const inventoryService = {
         data,
       )
     ).data,
+  // Manquait entierement — ajoute (doc section 15 "Annuler une reservation")
+  cancelAssetReservation: async (assetCode: string): Promise<Asset> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/assets/${assetCode}/cancel-reservation`,
+      )
+    ).data,
   markAssetDamaged: async (assetCode: string, data: any): Promise<Asset> =>
     (
       await apiClient.patch(
-        `/sni/api/v1/inventory/assets/${assetCode}/damaged`,
+        `/sni/api/v1/inventory/assets/${assetCode}/mark-damaged`,
         data,
       )
     ).data,
@@ -1281,6 +1299,7 @@ export const inventoryService = {
         )
       ).data,
     ),
+  // Ressource top-level (pas imbriquee sous /assets/{code}) — doc section 16
   createAssetMaintenance: async (
     assetCodeOrData: string | Partial<AssetMaintenance>,
     data?: Partial<AssetMaintenance>,
@@ -1290,25 +1309,43 @@ export const inventoryService = {
         ? assetCodeOrData
         : assetCodeOrData.assetCode;
     const payload =
-      typeof assetCodeOrData === "string" ? data : assetCodeOrData;
+      typeof assetCodeOrData === "string"
+        ? { ...data, assetCode }
+        : assetCodeOrData;
     if (!assetCode) throw new Error("assetCode is required");
     return (
       await apiClient.post(
-        `/sni/api/v1/inventory/assets/${assetCode}/maintenances`,
+        "/sni/api/v1/inventory/asset-maintenances",
         payload,
       )
     ).data;
   },
   getAssetMaintenances: async (
     assetCode: string,
+    params?: { status?: string; page?: number; size?: number },
   ): Promise<AssetMaintenance[]> =>
     toList<AssetMaintenance>(
       (
-        await apiClient.get(
-          `/sni/api/v1/inventory/assets/${assetCode}/maintenances`,
-        )
+        await apiClient.get("/sni/api/v1/inventory/asset-maintenances", {
+          params: { ...params, assetCode },
+        })
       ).data,
     ),
+  completeAssetMaintenance: async (
+    maintenanceCode: string,
+    data: {
+      completedBy: string;
+      resolutionNotes?: string;
+      maintenanceCost?: number;
+      newCondition?: string;
+    },
+  ): Promise<AssetMaintenance> =>
+    (
+      await apiClient.patch(
+        `/sni/api/v1/inventory/asset-maintenances/${maintenanceCode}/complete`,
+        data,
+      )
+    ).data,
 
   // ---------- Counts ----------
   getInventoryCounts: async (
@@ -1416,6 +1453,9 @@ export const inventoryService = {
       (await apiClient.get("/sni/api/v1/inventory/reorder-rules", { params }))
         .data,
     ),
+  // La doc decrit uniquement un POST en "creer ou modifier" (upsert). Les
+  // routes PUT/DELETE par ruleCode ci-dessous sont NON DOCUMENTEES — a
+  // confirmer aupres du backend avant de s'y fier en prod.
   createReorderRule: async (data: Partial<ReorderRule>): Promise<ReorderRule> =>
     (await apiClient.post("/sni/api/v1/inventory/reorder-rules", data)).data,
   updateReorderRule: async (
@@ -1521,6 +1561,14 @@ export const inventoryService = {
     dryRun = false,
   ): Promise<InventoryImportResult> =>
     inventoryService.importInventory("SUPPLIERS", file, dryRun),
-  downloadTemplate: async (type: string): Promise<Blob> =>
-    blob(`/sni/api/v1/inventory/import/template/${type}`),
+  // ATTENTION: la doc precise explicitement qu'aucun endpoint de template n'est
+  // expose par le controleur actuel ("garder les templates CSV cote frontend
+  // si necessaire"). Cet appel retournera 404. Generer/stocker les templates
+  // CSV statiquement cote front plutot que d'appeler le backend.
+  downloadTemplate: async (_type: string): Promise<Blob> => {
+    throw new Error(
+      "downloadTemplate: aucun endpoint backend pour les templates d'import. " +
+        "Fournir les templates CSV statiquement cote frontend.",
+    );
+  },
 };

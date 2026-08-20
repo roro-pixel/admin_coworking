@@ -107,7 +107,6 @@ export const PaymentIntentsList: React.FC = () => {
   const [debtPayMethod, setDebtPayMethod] = useState<"CASH" | "WALLET">("CASH");
   const [debtCashSession, setDebtCashSession] = useState("");
   const [debtWalletNumber, setDebtWalletNumber] = useState("");
-  const [debtPayAmount, setDebtPayAmount] = useState<number>(0);
   const [debtPayResult, setDebtPayResult] = useState<any>(null);
   const [debtPayError, setDebtPayError] = useState<string | null>(null);
 
@@ -300,6 +299,12 @@ export const PaymentIntentsList: React.FC = () => {
   };
 
   // ========== HELPERS DETTES CLIENT ==========
+  // Un paiement multi-documents ne peut porter que sur une seule devise —
+  // on la derive de la premiere ligne selectionnee.
+  const selectedCurrency =
+    (payableDocuments || []).find((doc: any) =>
+      selectedDocuments.includes(doc.documentNumber),
+    )?.currency || "XAF";
   const selectedTotal = (payableDocuments || [])
     .filter((doc: any) => selectedDocuments.includes(doc.documentNumber))
     .reduce(
@@ -307,20 +312,41 @@ export const PaymentIntentsList: React.FC = () => {
       0,
     );
 
-  const toggleDocument = (docNumber: string) => {
-    setSelectedDocuments((prev) =>
-      prev.includes(docNumber)
-        ? prev.filter((d) => d !== docNumber)
-        : [...prev, docNumber],
-    );
+  const toggleDocument = (docNumber: string, docCurrency?: string) => {
+    setSelectedDocuments((prev) => {
+      if (prev.includes(docNumber)) {
+        return prev.filter((d) => d !== docNumber);
+      }
+      // Empeche de melanger des documents de devises differentes dans le
+      // meme paiement (createPaymentIntentFromBillings cree une intention
+      // unique, donc une seule devise).
+      if (
+        prev.length > 0 &&
+        docCurrency &&
+        docCurrency !== selectedCurrency
+      ) {
+        setDebtError(
+          `Sélection limitée à une devise à la fois (${selectedCurrency}). Désélectionnez d’abord les documents en ${selectedCurrency} pour choisir des documents en ${docCurrency}.`,
+        );
+        return prev;
+      }
+      setDebtError(null);
+      return [...prev, docNumber];
+    });
   };
 
   const selectAll = () => {
-    const allDocs = (payableDocuments || []).map((d: any) => d.documentNumber);
-    if (selectedDocuments.length === allDocs.length) {
+    // "Tout selectionner" ne prend que les documents de la premiere devise
+    // rencontree, pour la meme raison de coherence de devise.
+    const docs = payableDocuments || [];
+    const firstCurrency = docs[0]?.currency;
+    const sameCurrencyDocs = docs
+      .filter((d: any) => !firstCurrency || d.currency === firstCurrency)
+      .map((d: any) => d.documentNumber);
+    if (selectedDocuments.length === sameCurrencyDocs.length) {
       setSelectedDocuments([]);
     } else {
-      setSelectedDocuments(allDocs);
+      setSelectedDocuments(sameCurrencyDocs);
     }
   };
 
@@ -377,7 +403,6 @@ export const PaymentIntentsList: React.FC = () => {
               setSelectedDocuments([]);
               setDebtPayResult(null);
               setDebtPayError(null);
-              setDebtPayAmount(0);
             }}
             className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 flex items-center gap-2 text-sm"
           >
@@ -777,8 +802,12 @@ export const PaymentIntentsList: React.FC = () => {
                   <p className="text-xs text-blue-600">
                     Total à payer :{" "}
                     <span className="font-bold">
-                      {selectedTotal.toLocaleString("fr-FR")} FCFA
+                      {selectedTotal.toLocaleString("fr-FR")} {selectedCurrency}
                     </span>
+                  </p>
+                  <p className="text-xs text-blue-400 mt-0.5">
+                    Le règlement couvre l’intégralité du montant sélectionné
+                    (paiement partiel indisponible en multi-documents).
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -827,17 +856,6 @@ export const PaymentIntentsList: React.FC = () => {
                       className="w-full px-2 py-1 border border-gray-200 rounded text-xs"
                     />
                   )}
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={debtPayAmount === 0 ? "" : debtPayAmount}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, "");
-                      setDebtPayAmount(val === "" ? 0 : parseInt(val));
-                    }}
-                    placeholder="Montant (vide = total)"
-                    className="w-full px-2 py-1 border border-gray-200 rounded text-xs"
-                  />
                   <button
                     onClick={() => paySelectedDocumentsMutation.mutate()}
                     disabled={
@@ -887,15 +905,34 @@ export const PaymentIntentsList: React.FC = () => {
                   const isSelected = selectedDocuments.includes(
                     doc.documentNumber,
                   );
+                  const isDisabledCurrency =
+                    selectedDocuments.length > 0 &&
+                    !isSelected &&
+                    doc.currency &&
+                    doc.currency !== selectedCurrency;
                   return (
                     <div
                       key={doc.documentNumber}
-                      onClick={() => toggleDocument(doc.documentNumber)}
-                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                      onClick={() =>
+                        !isDisabledCurrency &&
+                        toggleDocument(doc.documentNumber, doc.currency)
+                      }
+                      className={`p-3 rounded-lg border transition-colors ${
+                        isDisabledCurrency
+                          ? "cursor-not-allowed opacity-40 border-gray-200 bg-gray-50"
+                          : "cursor-pointer"
+                      } ${
                         isSelected
                           ? "border-blue-500 bg-blue-50"
-                          : "border-gray-200 bg-gray-50 hover:bg-gray-100"
+                          : !isDisabledCurrency
+                            ? "border-gray-200 bg-gray-50 hover:bg-gray-100"
+                            : ""
                       }`}
+                      title={
+                        isDisabledCurrency
+                          ? `Devise différente (${doc.currency}) — désélectionnez d’abord les documents en ${selectedCurrency}`
+                          : undefined
+                      }
                     >
                       <div className="flex items-start gap-3">
                         <div className="mt-0.5">

@@ -23,6 +23,8 @@ export const CreateCreditNoteModal: React.FC<CreateCreditNoteModalProps> = ({
 
   const [amount, setAmount] = useState(0);
   const [reason, setReason] = useState("");
+  const [validateImmediately, setValidateImmediately] = useState(false);
+  const [applyImmediately, setApplyImmediately] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // CORRECTION : reset à chaque ouverture
@@ -30,6 +32,8 @@ export const CreateCreditNoteModal: React.FC<CreateCreditNoteModalProps> = ({
     if (isOpen) {
       setAmount(0);
       setReason("");
+      setValidateImmediately(false);
+      setApplyImmediately(false);
       setErrorMessage(null);
     }
   }, [isOpen]);
@@ -37,10 +41,11 @@ export const CreateCreditNoteModal: React.FC<CreateCreditNoteModalProps> = ({
   const createMutation = useMutation({
     mutationFn: () =>
       billingService.createCreditNote(invoiceNumber, {
-        amount,
+        amount: amount > 0 ? amount : null,
         reason,
-
         createdBy: admin?.email || String(admin?.id) || "admin",
+        validateImmediately,
+        applyImmediately,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["billing-documents"] });
@@ -58,10 +63,6 @@ export const CreateCreditNoteModal: React.FC<CreateCreditNoteModalProps> = ({
   });
 
   const handleSubmit = () => {
-    if (amount <= 0) {
-      setErrorMessage("Le montant doit être supérieur à 0.");
-      return;
-    }
     if (!reason.trim()) {
       setErrorMessage("Le motif est obligatoire.");
       return;
@@ -96,7 +97,10 @@ export const CreateCreditNoteModal: React.FC<CreateCreditNoteModalProps> = ({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Montant (FCFA) *
+            Montant (FCFA){" "}
+            <span className="text-gray-400 font-normal">
+              (vide = solde dû de la facture)
+            </span>
           </label>
           <input
             type="text"
@@ -125,6 +129,27 @@ export const CreateCreditNoteModal: React.FC<CreateCreditNoteModalProps> = ({
           />
         </div>
 
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={validateImmediately}
+              onChange={(e) => setValidateImmediately(e.target.checked)}
+              className="rounded"
+            />
+            Sceller l'avoir immédiatement (SEFC)
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={applyImmediately}
+              onChange={(e) => setApplyImmediately(e.target.checked)}
+              className="rounded"
+            />
+            Appliquer sur cette facture immédiatement
+          </label>
+        </div>
+
         <div className="flex gap-3 pt-2">
           <button
             onClick={onClose}
@@ -135,7 +160,7 @@ export const CreateCreditNoteModal: React.FC<CreateCreditNoteModalProps> = ({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={createMutation.isPending || amount <= 0 || !reason.trim()}
+            disabled={createMutation.isPending || !reason.trim()}
             className="flex-1 bg-orange-600 text-white py-2 rounded-lg hover:bg-orange-700 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {createMutation.isPending ? (

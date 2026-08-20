@@ -103,7 +103,7 @@ export const LotsList: React.FC = () => {
                     {lot.lotNumber}
                   </td>
                   <td className="px-5 py-4 font-medium flex justify-between gap-4 md:table-cell text-sm">{lot.itemName}</td>
-                  <td className="px-5 py-4 flex justify-between gap-4 md:table-cell text-sm">{lot.locationName}</td>
+                  <td className="px-5 py-4 flex justify-between gap-4 md:table-cell text-sm">{lot.locationName || lot.locationCode}</td>
                   <td className="px-5 py-4 text-right font-medium flex justify-between gap-4 md:table-cell text-sm">
                     {lot.quantityAvailable}
                   </td>

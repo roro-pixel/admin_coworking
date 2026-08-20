@@ -14,12 +14,21 @@ import { ModalPortal } from "../../../components/ui/ModalPortal";
 import { inventoryService } from "../../../services/inventory.service";
 import { useAuth } from "../../../contexts/AuthContext";
 
+// Valeurs alignees sur l'enum backend InventoryAlertType (doc section 18) —
+// les anciennes cles LOT_EXPIRED / ASSET_WARRANTY_EXPIRING /
+// ASSET_MAINTENANCE_DUE ne correspondent a aucune valeur reelle et
+// empechaient le filtre + le style de fonctionner pour ces alertes.
 const alertTypeConfig: Record<
   string,
   { label: string; color: string; icon: any }
 > = {
   LOW_STOCK: {
     label: "Stock bas",
+    color: "bg-yellow-100 text-yellow-700",
+    icon: TrendingDown,
+  },
+  RECURRING_LOW_STOCK: {
+    label: "Stock bas récurrent",
     color: "bg-yellow-100 text-yellow-700",
     icon: TrendingDown,
   },
@@ -33,25 +42,50 @@ const alertTypeConfig: Record<
     color: "bg-red-100 text-red-700",
     icon: AlertTriangle,
   },
+  OVERSTOCK: {
+    label: "Surstock",
+    color: "bg-blue-100 text-blue-700",
+    icon: TrendingDown,
+  },
+  SLOW_MOVING: {
+    label: "Stock dormant",
+    color: "bg-gray-100 text-gray-700",
+    icon: TrendingDown,
+  },
   EXPIRY_SOON: {
     label: "Expiration proche",
     color: "bg-orange-100 text-orange-700",
     icon: Calendar,
   },
-  LOT_EXPIRED: {
-    label: "Lot expiré",
+  EXPIRY_IMMINENT: {
+    label: "Expiration imminente",
     color: "bg-red-100 text-red-700",
-    icon: AlertTriangle,
+    icon: Calendar,
   },
-  ASSET_WARRANTY_EXPIRING: {
+  WARRANTY_SOON: {
     label: "Garantie expire",
     color: "bg-orange-100 text-orange-700",
     icon: Calendar,
   },
-  ASSET_MAINTENANCE_DUE: {
+  MAINTENANCE_DUE: {
     label: "Maintenance due",
     color: "bg-blue-100 text-blue-700",
     icon: Wrench,
+  },
+  ASSET_RETURN_DUE_SOON: {
+    label: "Retour d’actif proche (J-1)",
+    color: "bg-blue-100 text-blue-700",
+    icon: Calendar,
+  },
+  ASSET_RETURN_OVERDUE: {
+    label: "Retour d’actif en retard",
+    color: "bg-red-100 text-red-700",
+    icon: AlertTriangle,
+  },
+  SUSPICIOUS_ADJUSTMENT: {
+    label: "Ajustement suspect",
+    color: "bg-red-100 text-red-700",
+    icon: AlertTriangle,
   },
 };
 
@@ -208,11 +242,18 @@ export const AlertsCenter: React.FC = () => {
         >
           <option value="">Tous les types</option>
           <option value="LOW_STOCK">Stock bas</option>
+          <option value="RECURRING_LOW_STOCK">Stock bas récurrent</option>
           <option value="OUT_OF_STOCK">Rupture</option>
+          <option value="NEGATIVE_STOCK">Stock négatif</option>
+          <option value="OVERSTOCK">Surstock</option>
+          <option value="SLOW_MOVING">Stock dormant</option>
           <option value="EXPIRY_SOON">Expiration proche</option>
-          <option value="LOT_EXPIRED">Lot expiré</option>
-          <option value="ASSET_WARRANTY_EXPIRING">Garantie expire</option>
-          <option value="ASSET_MAINTENANCE_DUE">Maintenance due</option>
+          <option value="EXPIRY_IMMINENT">Expiration imminente</option>
+          <option value="WARRANTY_SOON">Garantie expire</option>
+          <option value="MAINTENANCE_DUE">Maintenance due</option>
+          <option value="ASSET_RETURN_DUE_SOON">Retour proche (J-1)</option>
+          <option value="ASSET_RETURN_OVERDUE">Retour en retard</option>
+          <option value="SUSPICIOUS_ADJUSTMENT">Ajustement suspect</option>
         </select>
       </div>
 

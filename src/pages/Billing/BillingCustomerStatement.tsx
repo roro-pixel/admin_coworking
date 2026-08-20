@@ -144,9 +144,9 @@ export const BillingCustomerStatement: React.FC = () => {
 
   // Formatage des dates
   const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return "—";
+    if (!dateString) return "-";
     const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "—";
+    if (isNaN(date.getTime())) return "-";
     return date.toLocaleDateString("fr-FR");
   };
 
@@ -302,7 +302,7 @@ export const BillingCustomerStatement: React.FC = () => {
 
           {totalElements > 0 && (
             <p className="text-sm text-gray-500 mb-3">
-              {totalElements} document{totalElements > 1 ? "s" : ""} —{" "}
+              {totalElements} document{totalElements > 1 ? "s" : ""} -{" "}
               {selectedLabel}
             </p>
           )}
@@ -353,7 +353,7 @@ export const BillingCustomerStatement: React.FC = () => {
                           doc.documentType}
                       </td>
                       <td className="px-6 py-4 text-sm">
-                        {doc.issueDate ? formatDate(doc.issueDate) : "—"}
+                        {doc.issueDate ? formatDate(doc.issueDate) : "-"}
                       </td>
                       <td className="px-6 py-4 text-right font-semibold text-sm">
                         {doc.totalAmount.toLocaleString("fr-FR")} FCFA
@@ -375,7 +375,7 @@ export const BillingCustomerStatement: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
-                        {doc.dueDate ? formatDate(doc.dueDate) : "—"}
+                        {doc.dueDate ? formatDate(doc.dueDate) : "-"}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <div
@@ -416,7 +416,7 @@ export const BillingCustomerStatement: React.FC = () => {
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4 px-2">
               <p className="text-sm text-gray-500">
-                {totalElements} document{totalElements > 1 ? "s" : ""} — Page{" "}
+                {totalElements} document{totalElements > 1 ? "s" : ""} - Page{" "}
                 {page + 1} / {totalPages}
               </p>
               <div className="flex gap-2">
@@ -442,7 +442,7 @@ export const BillingCustomerStatement: React.FC = () => {
         </>
       )}
 
-      {/* État initial — rien sélectionné */}
+      {/* État initial - rien sélectionné */}
       {!hasSelection && !isLoading && (
         <div className="text-center py-16 bg-white rounded-xl border border-gray-100">
           <User size={48} className="mx-auto text-gray-200 mb-4" />
