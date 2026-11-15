@@ -17,6 +17,16 @@ import { AdminContracts } from "./pages/Contracts";
 import { InventoryMaster } from "./pages/Inventory/InventoryMaster";
 import { SubscriptionMaster } from "./pages/Subscription/SubscriptionMaster";
 import { CreateEntitlementDefinition } from "./pages/Subscription/entitlements/CreateEntitlementDefinition";
+import { CreateSubscription } from "./pages/Subscription/subscriptions/CreateSubscription";
+import { CreateUsageRecord } from "./pages/Subscription/usage/CreateUsageRecord";
+import { PlanDetailPage } from "./pages/Subscription/plans/PlanDetailPage";
+import { PlanVersionFormPage } from "./pages/Subscription/plans/PlanVersionFormPage";
+import { PlanVersionDetailPage } from "./pages/Subscription/plans/PlanVersionDetailPage";
+import { CreatePass } from "./pages/Subscription/passes/CreatePass";
+import { PassDetailPage } from "./pages/Subscription/passes/PassDetailPage";
+import { PassPlanDetailPage } from "./pages/Subscription/pass-plans/PassPlanDetailPage";
+import { PromotionFormPage } from "./pages/Subscription/promotions/PromotionFormPage";
+import { PromotionDetailPage } from "./pages/Subscription/promotions/PromotionDetailPage";
 import { EntitlementDefinitionDetail } from "./pages/Subscription/entitlements/EntitlementDefinitionDetail";
 import { PaymentMaster } from "./pages/Payment/PaymentMaster";
 import { WalletMaster } from "./pages/Wallet/WalletMaster";
@@ -29,16 +39,31 @@ import { TicketDetailPage } from "./pages/Support/TicketDetailPage";
 import { SettingsMaster } from "./pages/Settings/SettingsMaster";
 import { CreateQuoteModal } from "./pages/Billing/CreateQuoteModal";
 import { CreateInvoiceModal } from "./pages/Billing/CreateInvoiceModal";
-import { ContractCreatePage } from "./components/contracts/ContractCreatePage";
-import { ContractDetailPage } from "./components/contracts/ContractDetailPage";
+import { ContractCreatePage } from "./pages/contracts/ContractCreatePage";
+import { ContractDetailPage } from "./pages/contracts/ContractDetailPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { BillingDocumentDetailPage } from "./pages/Billing/BillingDocumentDetailPage";
 import { AdminUserDetailsPage } from "./pages/Settings/AdminUserDetailsPage";
-import { ContractPreviewPage } from "./components/contracts/ContractPreviewPage";
+import { ContractPreviewPage } from "./pages/contracts/ContractPreviewPage";
+import { ContractTemplatesDraftingPage } from "./pages/contracts/ContractTemplatesDraftingPage";
+import { PublicContractSignaturePage } from "./pages/contracts/PublicContractSignaturePage";
 import { BookingCreatePage } from "./components/bookings/BookingCreatePage";
 import { BookingDetailPage } from "./components/bookings/BookingDetailPage";
 import { PublicQuoteSignaturePage } from "./pages/Billing/PublicQuoteSignaturePage";
 import { SubscriptionDetailPage } from "./pages/Subscription/subscriptions/SubscriptionDetailPage";
+import { TerminationDetailPage } from "./pages/Subscription/lifecycle/TerminationDetailPage";
+import { QuoteCreatePage } from "./pages/Subscription/lifecycle/QuoteCreatePage";
+import { QuoteDetailPage } from "./pages/Subscription/lifecycle/QuoteDetailPage";
+import { DerivationDetailPage } from "./pages/Subscription/lifecycle/DerivationDetailPage";
+import { ServicesMaster } from "./pages/Services/ServicesMaster";
+import { DomiciliationContractCreatePage } from "./pages/Services/DomiciliationContractCreatePage";
+import { DomiciliationContractDetailPage } from "./pages/Services/DomiciliationContractDetailPage";
+import { CompaniesPage } from "./pages/companies/CompaniesPage";
+import { CompanyCreatePage } from "./pages/companies/CompanyCreatePage";
+import { CompanyDetailPage } from "./pages/companies/CompanyDetailPage";
+import { MarketplacePage } from "./pages/marketplace/MarketplacePage";
+import { MarketplaceOrderDetailPage } from "./pages/marketplace/MarketplaceOrderDetailPage";
+import { SectionHub } from "./pages/SectionHub";
 
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -60,6 +85,10 @@ function App() {
             <Route
               path="/public/quotes/sign/:token"
               element={<PublicQuoteSignaturePage />}
+            />
+            <Route
+              path="/contracts/sign/:signatureToken"
+              element={<PublicContractSignaturePage />}
             />
             <Route
               path="/"
@@ -174,6 +203,14 @@ function App() {
               }
             />
             <Route
+              path="/contracts/templates-drafting"
+              element={
+                <ProtectedRoute>
+                  <ContractTemplatesDraftingPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/contracts/:contractCode"
               element={
                 <ProtectedRoute>
@@ -210,6 +247,222 @@ function App() {
               element={
                 <ProtectedRoute>
                   <EntitlementDefinitionDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/subscriptions/create"
+              element={
+                <ProtectedRoute>
+                  <CreateSubscription />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/usage/create"
+              element={
+                <ProtectedRoute>
+                  <CreateUsageRecord />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/plans/:planCode"
+              element={
+                <ProtectedRoute>
+                  <PlanDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/plans/:planCode/versions/new"
+              element={
+                <ProtectedRoute>
+                  <PlanVersionFormPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/plans/:planCode/versions/:versionId"
+              element={
+                <ProtectedRoute>
+                  <PlanVersionDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/passes/create"
+              element={
+                <ProtectedRoute>
+                  <CreatePass />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/passes/:passNumber"
+              element={
+                <ProtectedRoute>
+                  <PassDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/pass-plans/:planCode"
+              element={
+                <ProtectedRoute>
+                  <PassPlanDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/promotions/create"
+              element={
+                <ProtectedRoute>
+                  <PromotionFormPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/promotions/:code"
+              element={
+                <ProtectedRoute>
+                  <PromotionDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/promotions/:code/edit"
+              element={
+                <ProtectedRoute>
+                  <PromotionFormPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/plans"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionMaster />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/entitlements"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionMaster />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/subscriptions"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionMaster />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/passes"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionMaster />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/pass-plans"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionMaster />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/usage"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionMaster />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/billable"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionMaster />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/promotions"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionMaster />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/terminations"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionMaster />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/quotes"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionMaster />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/derivations"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionMaster />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/policy"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionMaster />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/terminations/:code"
+              element={
+                <ProtectedRoute>
+                  <TerminationDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/quotes/new"
+              element={
+                <ProtectedRoute>
+                  <QuoteCreatePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/quotes/:number"
+              element={
+                <ProtectedRoute>
+                  <QuoteDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions/derivations/:code"
+              element={
+                <ProtectedRoute>
+                  <DerivationDetailPage />
                 </ProtectedRoute>
               }
             />
@@ -325,6 +578,78 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/section/:groupId"
+              element={
+                <ProtectedRoute>
+                  <SectionHub />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/marketplace"
+              element={
+                <ProtectedRoute>
+                  <MarketplacePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/marketplace/orders/:orderNumber"
+              element={
+                <ProtectedRoute>
+                  <MarketplaceOrderDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/companies"
+              element={
+                <ProtectedRoute>
+                  <CompaniesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/companies/create"
+              element={
+                <ProtectedRoute>
+                  <CompanyCreatePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/companies/:customerId"
+              element={
+                <ProtectedRoute>
+                  <CompanyDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/services/contracts/new"
+              element={
+                <ProtectedRoute>
+                  <DomiciliationContractCreatePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/services/contracts/:contractNumber"
+              element={
+                <ProtectedRoute>
+                  <DomiciliationContractDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/services/*"
+              element={
+                <ProtectedRoute>
+                  <ServicesMaster />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route
               path="/settings/*"
@@ -364,5 +689,3 @@ function App() {
 }
 
 export default App;
-
-

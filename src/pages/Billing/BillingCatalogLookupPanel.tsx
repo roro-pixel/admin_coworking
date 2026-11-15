@@ -1,163 +1,106 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { billingService } from "../../services/billing.service";
 import type { BillingCatalogLookupItem } from "../../services/billing.service";
+import { DataCard, EmptyState, ErrorBlock, HeadRow, ListHeader, Pagination, SearchField, Tag } from "../../components/subscription/kit";
+import { FIELD_SOFT, ROW_HOVER, formatMoney } from "../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../components/ui/Skeleton";
+import { currencyLabel } from "../../components/payment/paymentUtils";
+import { SOURCE_TYPE_LABEL } from "../../components/billing/billingLabels";
 
-const inputCls =
-  "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500";
+const COLS = "lg:grid-cols-[9rem_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)_10rem]";
 
 export const BillingCatalogLookupPanel: React.FC = () => {
   const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
   const [source, setSource] = useState("");
   const [category, setCategory] = useState("");
   const [page, setPage] = useState(0);
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["billing-catalog-lookup", q, source, category, page],
-    queryFn: () =>
-      billingService.catalogLookup({
-        q: q || undefined,
-        source: source || undefined,
-        category: category || undefined,
-        page,
-        size: 20,
-      }),
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedQ(q);
+      setPage(0);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["billing-catalog-lookup", debouncedQ, source, category, page],
+    queryFn: () => billingService.catalogLookup({ q: debouncedQ || undefined, source: source || undefined, category: category || undefined, page, size: 20 }),
   });
 
   const items: BillingCatalogLookupItem[] = data?.content ?? [];
   const totalPages = data?.totalPages ?? 1;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900">
-          Recherche catalogue facturable
-        </h2>
-        <p className="text-sm text-gray-500 mt-1">
-          Recherche les éléments réutilisables pour les lignes de devis/facture.
-        </p>
-      </div>
+    <div className="space-y-5">
+      <ListHeader title="Recherche catalogue facturable" subtitle="Éléments réutilisables pour les lignes de devis et de factures." />
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-        <input
-          className={inputCls}
-          placeholder="Recherche"
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
-            setPage(0);
-          }}
-        />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        <SearchField value={q} onChange={setQ} placeholder="Rechercher un élément" />
         <select
-          className={inputCls}
+          className={`${FIELD_SOFT} bg-white shadow-sm`}
           value={source}
+          aria-label="Source"
           onChange={(e) => {
             setSource(e.target.value);
             setPage(0);
           }}
         >
-          <option value="">Toutes sources</option>
-          <option value="SERVICE_CATALOG">Catalogue de services</option>
-          <option value="INVENTORY_ITEM">Article inventaire</option>
-          <option value="RESOURCE">Ressource</option>
+          <option value="">Toutes les sources</option>
+          <option value="SERVICE_CATALOG">{SOURCE_TYPE_LABEL.SERVICE_CATALOG}</option>
+          <option value="INVENTORY_ITEM">{SOURCE_TYPE_LABEL.INVENTORY_ITEM}</option>
+          <option value="RESOURCE">{SOURCE_TYPE_LABEL.RESOURCE}</option>
         </select>
         <input
-          className={inputCls}
+          className={`${FIELD_SOFT} bg-white shadow-sm`}
           placeholder="Catégorie"
+          aria-label="Catégorie"
           value={category}
           onChange={(e) => {
             setCategory(e.target.value);
             setPage(0);
           }}
         />
-        <button
-          onClick={() => refetch()}
-          className="bg-primary-600 text-white rounded-lg px-4 py-2 inline-flex items-center justify-center gap-2 hover:bg-primary-700"
-        >
-          <Search size={16} /> Rechercher
-        </button>
       </div>
 
       {isLoading ? (
-        <div className="py-12 flex justify-center">
-          <Loader2 className="animate-spin text-primary-600" />
-        </div>
+        <ListSkeleton rows={8} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger le catalogue." onRetry={() => refetch()} />
+      ) : items.length === 0 ? (
+        <EmptyState icon={Search} title="Aucun élément trouvé" hint="Modifiez la recherche ou les filtres." />
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50/80">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold">
-                  Code
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">
-                  Nom
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">
-                  Source
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">
-                  Catégorie
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-semibold">
-                  Prix
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {items.map((item) => (
-                <tr key={item.sourceCode} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-mono">
-                    {item.sourceCode}
-                  </td>
-                  <td className="px-4 py-3 text-sm font-medium">
-                    {item.name}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {item.sourceType}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {item.category || "-"}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right">
-                    {typeof item.unitPrice === "number"
-                      ? item.unitPrice.toLocaleString("fr-FR")
-                      : "-"}{" "}
-                    {item.currency || ""}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {items.length === 0 && (
-            <div className="text-center py-10 text-gray-500 text-sm">
-              Aucun élément trouvé.
-            </div>
-          )}
-        </div>
-      )}
-
-      {totalPages > 1 && (
-        <div className="flex justify-end gap-2">
-          <button
-            disabled={page <= 0}
-            onClick={() => setPage((p) => p - 1)}
-            className="px-3 py-2 border rounded-lg disabled:opacity-40"
-          >
-            Précédent
-          </button>
-          <span className="px-3 py-2 text-sm text-gray-500">
-            Page {page + 1} / {totalPages}
-          </span>
-          <button
-            disabled={page >= totalPages - 1}
-            onClick={() => setPage((p) => p + 1)}
-            className="px-3 py-2 border rounded-lg disabled:opacity-40"
-          >
-            Suivant
-          </button>
-        </div>
+        <>
+          <HeadRow cols={COLS}>
+            <span>Code</span>
+            <span>Nom</span>
+            <span>Source</span>
+            <span>Catégorie</span>
+            <span className="text-right">Prix</span>
+          </HeadRow>
+          <DataCard>
+            {items.map((item) => (
+              <div key={`${item.sourceType}-${item.sourceCode}`} className={`grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 rounded-2xl p-4 transition max-lg:mb-2 max-lg:bg-gray-50 ${COLS} ${ROW_HOVER}`}>
+                <p className="truncate font-mono text-xs font-semibold text-[color:var(--logo-pink-dark)]">{item.sourceCode}</p>
+                <p className="text-sm font-bold tabular-nums text-gray-950 lg:order-last lg:text-right">
+                  {typeof item.unitPrice === "number" ? formatMoney(item.unitPrice, currencyLabel(item.currency)) : ""}
+                </p>
+                <div className="col-span-2 min-w-0 lg:col-span-1">
+                  <p className="truncate font-semibold text-gray-950">{item.name}</p>
+                  {item.description && <p className="truncate text-xs text-gray-400">{item.description}</p>}
+                </div>
+                <div>
+                  <Tag>{SOURCE_TYPE_LABEL[item.sourceType] ?? item.sourceType}</Tag>
+                </div>
+                <p className="text-sm text-gray-500 max-lg:hidden">{item.category ?? ""}</p>
+              </div>
+            ))}
+          </DataCard>
+          <Pagination page={page} totalPages={totalPages} total={data?.totalElements ?? items.length} noun="élément" onChange={setPage} />
+        </>
       )}
     </div>
   );

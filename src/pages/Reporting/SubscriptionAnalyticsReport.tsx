@@ -1,148 +1,115 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Download, RefreshCw } from "lucide-react";
 import { reportingService } from "../../services/reporting.service";
+import { ChartCard, KpiRow } from "../../components/operations/OpsCharts";
+import { RankBars, TrendChart, ValueDonut } from "../../components/reporting/ReportCharts";
+import { ExportButton, RefreshButton, ReportBody, ReportHead, ReportTable, SelectField, Sub } from "../../components/reporting/reportKit";
+import { DANGER, fmtInt, fmtPct, money, monthLabel, useExport } from "../../components/reporting/reportUtils";
+import { CHART_COLORS } from "../../components/operations/opsChartData";
+import { StatusChip } from "../../components/subscription/kit";
+import { formatDate } from "../../components/subscription/kitUtils";
+import { compactAmount } from "../../components/payment/paymentUtils";
 
-const formatFCFA = (amount?: number | null) =>
-  `${(amount ?? 0).toLocaleString("fr-FR")} XAF`;
-const formatDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString("fr-FR") : "—";
-// const getCurrentMonthRange = () => {
-//   const now = new Date();
-//   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-//   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-//   const format = (d: Date) => d.toISOString().split("T")[0];
-//   return { from: format(firstDay), to: format(lastDay) };
-// };
-const Loading = ({ title }: { title: string }) => (
-  <div className="py-16 text-center">
-    <RefreshCw className="mx-auto mb-3 animate-spin text-primary-500" />
-    <p className="text-gray-500">{title}</p>
-  </div>
-);
-const ButtonClass =
-  "inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-100 disabled:opacity-50";
+const MONTHS = [6, 12, 24].map((m) => ({ value: m, label: `${m} derniers mois` }));
+const RENEWAL = [15, 30, 60].map((d) => ({ value: d, label: `Renouvellements sous ${d} jours` }));
 
 export const SubscriptionAnalyticsReport: React.FC = () => {
   const [months, setMonths] = useState(12);
   const [renewalDays, setRenewalDays] = useState(30);
-  const { data, isLoading, isFetching, refetch } = useQuery({
+  const exporter = useExport();
+
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ["subscription-analytics", months, renewalDays],
-    queryFn: () =>
-      reportingService.getSubscriptionAnalytics({ months, renewalDays }),
+    queryFn: () => reportingService.getSubscriptionAnalytics({ months, renewalDays }),
   });
-  const download = async () => {
-    const blob = await reportingService.exportSubscriptionAnalyticsPdf({
-      months,
-      renewalDays,
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "rapport-abonnements.pdf";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-  if (isLoading) return <Loading title="Chargement analytics abonnements..." />;
-  const churn = data?.churnTrend?.[data.churnTrend.length - 1]?.churnRate ?? 0;
+
+  const mrr = data?.mrrTrend ?? [];
+  const churnTrend = data?.churnTrend ?? [];
+  const plans = data?.activeByPlan ?? [];
+  const revenue = data?.revenueByPlan ?? [];
+  const renewals = data?.upcomingRenewals ?? [];
+  const churn = churnTrend[churnTrend.length - 1]?.churnRate ?? 0;
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between">
-        <div>
-          <h2 className="text-xl font-bold">Analytics abonnements</h2>
-          <p className="text-sm text-gray-500">
-            MRR, churn et renouvellements.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <select
-            value={months}
-            onChange={(e) => setMonths(Number(e.target.value))}
-            className="rounded-xl bg-white px-3 py-2 ring-1 ring-gray-100"
-          >
-            <option value={6}>6 mois</option>
-            <option value={12}>12 mois</option>
-            <option value={24}>24 mois</option>
-          </select>
-          <select
-            value={renewalDays}
-            onChange={(e) => setRenewalDays(Number(e.target.value))}
-            className="rounded-xl bg-white px-3 py-2 ring-1 ring-gray-100"
-          >
-            <option value={15}>15 jours</option>
-            <option value={30}>30 jours</option>
-            <option value={60}>60 jours</option>
-          </select>
-          <button className={ButtonClass} onClick={download}>
-            <Download size={15} />
-            PDF
-          </button>
-          <button
-            className="rounded-xl bg-white p-2 ring-1 ring-gray-100"
-            onClick={() => refetch()}
-          >
-            <RefreshCw size={16} className={isFetching ? "animate-spin" : ""} />
-          </button>
-        </div>
-      </div>
-      {data && (
-        <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <K label="MRR" v={formatFCFA(data.currentMrr)} />
-            <K label="Actifs" v={data.totalActive} />
-            <K label="Churn" v={`${churn.toFixed(1)}%`} />
-          </div>
-          <List
-            title="MRR trend"
-            rows={data.mrrTrend.map((i) => [
-              formatDate(i.month),
-              `${formatFCFA(i.mrr)} · ${i.activeCount}`,
-            ])}
-          />
-          <List
-            title="Actifs par plan"
-            rows={data.activeByPlan.map((i) => [
-              i.planName,
-              `${i.subscriptionCount} · ${formatFCFA(i.totalAmount)}`,
-            ])}
-          />
-          <List
-            title="Renouvellements"
-            rows={data.upcomingRenewals.map((i) => [
-              i.subscriptionNumber,
-              `${i.planName} · ${i.daysUntilRenewal} j · ${formatFCFA(i.totalAmount)}`,
-            ])}
-          />
-        </>
-      )}
+      <ReportHead title="Analytique des abonnements" subtitle="Revenu récurrent, résiliations et prochains renouvellements">
+        <SelectField label="Historique" value={months} options={MONTHS} onChange={setMonths} />
+        <SelectField label="Fenêtre de renouvellement" value={renewalDays} options={RENEWAL} onChange={setRenewalDays} />
+        <ExportButton label="PDF" busy={exporter.busy === "pdf"} onClick={() => exporter.run("pdf", () => reportingService.exportSubscriptionAnalyticsPdf({ months, renewalDays }), "rapport-abonnements.pdf")} />
+        <RefreshButton fetching={isFetching} onClick={() => refetch()} />
+      </ReportHead>
+
+      <ReportBody loading={isLoading} error={isError} hasData={!!data} onRetry={() => refetch()}>
+        {data && (
+          <>
+            <KpiRow
+              items={[
+                { label: "Revenu mensuel récurrent", value: money(data.currentMrr), tone: "pink" },
+                { label: "Abonnements actifs", value: fmtInt(data.totalActive) },
+                { label: "Taux de résiliation", value: fmtPct(churn), hint: "dernier mois" },
+                { label: "À renouveler", value: fmtInt(renewals.length), hint: `sous ${renewalDays} jours` },
+              ]}
+            />
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <ChartCard title="Revenu mensuel récurrent">
+                <TrendChart height={220} name="Revenu récurrent" format={money} labels={mrr.map((m) => monthLabel(m.month))} values={mrr.map((m) => m.mrr)} />
+              </ChartCard>
+              <ChartCard title="Taux de résiliation" subtitle="Part des abonnements résiliés chaque mois">
+                <TrendChart
+                  mode="line"
+                  height={220}
+                  name="Résiliation"
+                  color={DANGER}
+                  format={(n) => fmtPct(n)}
+                  labels={churnTrend.map((c) => monthLabel(c.month))}
+                  values={churnTrend.map((c) => c.churnRate)}
+                />
+              </ChartCard>
+            </div>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <ChartCard title="Abonnements actifs par plan">
+                <RankBars
+                  format={fmtInt}
+                  items={plans.map((p) => ({ key: p.planName, label: p.planName, sub: money(p.totalAmount), value: p.subscriptionCount }))}
+                />
+              </ChartCard>
+              <ChartCard title="Revenu par plan">
+                <ValueDonut
+                  centerLabel="par mois"
+                  format={money}
+                  centerFormat={compactAmount}
+                  data={revenue.map((r, i) => ({ key: r.planName, label: r.planName, value: r.totalRevenue, color: CHART_COLORS[i % CHART_COLORS.length] }))}
+                />
+              </ChartCard>
+            </div>
+            <ChartCard title="Prochains renouvellements" subtitle={`Échéances dans les ${renewalDays} prochains jours`}>
+              <ReportTable
+                empty="Aucun renouvellement prévu sur cette fenêtre."
+                cols={[
+                  { key: "n", label: "Abonnement", width: "minmax(0,1.5fr)" },
+                  { key: "who", label: "Abonné" },
+                  { key: "end", label: "Échéance" },
+                  { key: "a", label: "Montant", align: "right" },
+                ]}
+                rows={renewals.map((r) => ({
+                  id: r.subscriptionNumber,
+                  cells: {
+                    n: (<><span className="block truncate font-semibold text-gray-950">{r.planName}</span><Sub>{r.subscriptionNumber}</Sub></>),
+                    who: r.subscriberCode,
+                    end: (
+                      <span className="inline-flex items-center gap-2">
+                        {formatDate(r.currentPeriodEnd)}
+                        <StatusChip tone={r.daysUntilRenewal <= 7 ? "warn" : "neutral"}>dans {fmtInt(r.daysUntilRenewal)} j</StatusChip>
+                      </span>
+                    ),
+                    a: <b className="text-gray-950">{money(r.totalAmount)}</b>,
+                  },
+                }))}
+              />
+            </ChartCard>
+          </>
+        )}
+      </ReportBody>
     </div>
   );
 };
-const K = ({ label, v }: { label: string; v: string | number }) => (
-  <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
-    <p className="text-sm text-gray-500">{label}</p>
-    <p className="mt-3 text-2xl font-bold">{v}</p>
-  </div>
-);
-const List = ({
-  title,
-  rows,
-}: {
-  title: string;
-  rows: Array<[string, string]>;
-}) => (
-  <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
-    <h3 className="mb-4 font-bold">{title}</h3>
-    <div className="space-y-2">
-      {rows.map(([a, b]) => (
-        <div
-          key={a}
-          className="flex justify-between rounded-xl bg-gray-50 p-3 text-sm"
-        >
-          <span>{a}</span>
-          <b>{b}</b>
-        </div>
-      ))}
-    </div>
-  </section>
-);

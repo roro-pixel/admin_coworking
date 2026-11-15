@@ -1,230 +1,118 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw, TrendingUp } from "lucide-react";
-import {
-  reportingService,
-  paymentMethodLabels,
-} from "../../services/reporting.service";
+import { paymentMethodLabels, reportingService } from "../../services/reporting.service";
+import { ChartCard, KpiRow } from "../../components/operations/OpsCharts";
+import { SeriesColumns, ValueDonut } from "../../components/reporting/ReportCharts";
+import { Disclosure, PeriodBar, RefreshButton, ReportBody, ReportHead, ReportTable } from "../../components/reporting/reportKit";
+import { METHOD_COLORS, fmtInt, fmtPct, longDay, money, monthRange, shortDay } from "../../components/reporting/reportUtils";
+import { StatusChip } from "../../components/subscription/kit";
+import { compactAmount } from "../../components/payment/paymentUtils";
 
-const getCurrentMonthRange = () => {
-  const now = new Date();
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const format = (d: Date) => d.toISOString().split("T")[0];
-  return { fromDate: format(firstDay), toDate: format(lastDay) };
-};
-
-const methodColors: Record<string, string> = {
-  CASH: "bg-green-100 text-green-700",
-  WALLET: "bg-blue-100 text-blue-700",
-  MOBILE_MONEY: "bg-purple-100 text-purple-700",
-  BANK_TRANSFER: "bg-amber-100 text-amber-700",
-  CARD: "bg-cyan-100 text-cyan-700",
-  CHEQUE: "bg-gray-100 text-gray-700",
-};
+const DAILY: { key: "cash" | "wallet" | "mobileMoney" | "bankTransfer" | "card" | "cheque"; method: string }[] = [
+  { key: "cash", method: "CASH" },
+  { key: "wallet", method: "WALLET" },
+  { key: "mobileMoney", method: "MOBILE_MONEY" },
+  { key: "bankTransfer", method: "BANK_TRANSFER" },
+  { key: "card", method: "CARD" },
+  { key: "cheque", method: "CHEQUE" },
+];
 
 export const PaymentsReport: React.FC = () => {
-  const [dateRange, setDateRange] = useState(getCurrentMonthRange());
+  const [range, setRange] = useState(monthRange());
 
-  const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["payments-report", dateRange.fromDate, dateRange.toDate],
-    queryFn: () =>
-      reportingService.getPaymentsReport({
-        fromDate: dateRange.fromDate,
-        toDate: dateRange.toDate,
-      }),
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
+    queryKey: ["payments-report", range.from, range.to],
+    queryFn: () => reportingService.getPaymentsReport({ fromDate: range.from, toDate: range.to }),
   });
 
-  const formatFCFA = (amount: number | undefined | null) =>
-    `${(amount ?? 0).toLocaleString("fr-FR")} FCFA`;
-
-  if (isLoading) {
-    return (
-      <div className="text-center py-12">
-        <RefreshCw className="animate-spin mx-auto mb-4" size={32} />
-        <p className="text-gray-500">Chargement du rapport...</p>
-      </div>
-    );
-  }
+  const byMethod = data?.byMethod ?? [];
+  const daily = data?.dailySeries ?? [];
+  const series = DAILY.map((d) => ({
+    key: d.key,
+    name: paymentMethodLabels[d.method],
+    color: METHOD_COLORS[d.method],
+    values: daily.map((day) => day[d.key] ?? 0),
+  })).filter((s) => s.values.some((v) => v > 0));
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">
-          Répartition des paiements
-        </h2>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={dateRange.fromDate}
-              onChange={(e) =>
-                setDateRange((prev) => ({ ...prev, fromDate: e.target.value }))
-              }
-              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm"
+    <div className="space-y-6">
+      <ReportHead title="Répartition des paiements" subtitle="Encaissements par moyen de paiement et par jour">
+        <PeriodBar value={range} onChange={setRange} />
+        <RefreshButton fetching={isFetching} onClick={() => refetch()} />
+      </ReportHead>
+
+      <ReportBody loading={isLoading} error={isError} hasData={!!data} onRetry={() => refetch()} kpis={3}>
+        {data && (
+          <>
+            <KpiRow
+              columns={3}
+              items={[
+                { label: "Total encaissé", value: money(data.totalReceived), tone: "pink" },
+                { label: "Transactions", value: fmtInt(data.totalTransactions) },
+                { label: "Montant moyen", value: money(data.totalTransactions > 0 ? data.totalReceived / data.totalTransactions : 0) },
+              ]}
             />
-            <span className="text-gray-400">→</span>
-            <input
-              type="date"
-              value={dateRange.toDate}
-              onChange={(e) =>
-                setDateRange((prev) => ({ ...prev, toDate: e.target.value }))
-              }
-              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm"
-            />
-          </div>
-          {isFetching && (
-            <RefreshCw size={14} className="animate-spin text-gray-400" />
-          )}
-        </div>
-      </div>
-
-      {data && (
-        <div className="space-y-6">
-          {/* Résumé */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white rounded-xl p-5 shadow-sm">
-              <p className="text-sm text-gray-500">Total encaissé</p>
-              <p className="text-2xl font-bold text-green-700">
-                {formatFCFA(data.totalReceived)}
-              </p>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <ChartCard title="Par moyen de paiement">
+                <ValueDonut
+                  centerLabel="encaissés"
+                  format={money}
+                  centerFormat={compactAmount}
+                  data={byMethod.map((m) => ({
+                    key: m.method,
+                    label: paymentMethodLabels[m.method] ?? m.method,
+                    value: m.amount ?? 0,
+                    color: METHOD_COLORS[m.method] ?? "#B9B4B0",
+                  }))}
+                />
+              </ChartCard>
+              <ChartCard title="Détail par moyen" subtitle="Nombre de transactions, montant et part">
+                <ReportTable
+                  cols={[
+                    { key: "m", label: "Moyen", width: "minmax(0,1.4fr)" },
+                    { key: "c", label: "Transactions", align: "right" },
+                    { key: "a", label: "Montant", align: "right", width: "minmax(0,1.3fr)" },
+                    { key: "p", label: "Part", align: "right", width: "4rem" },
+                  ]}
+                  rows={byMethod.map((m) => ({
+                    id: m.method,
+                    cells: {
+                      m: <StatusChip tone="neutral">{paymentMethodLabels[m.method] ?? m.method}</StatusChip>,
+                      c: fmtInt(m.count),
+                      a: <b className="text-gray-950">{money(m.amount)}</b>,
+                      p: fmtPct(m.percentage, 0),
+                    },
+                  }))}
+                />
+              </ChartCard>
             </div>
-            <div className="bg-white rounded-xl p-5 shadow-sm">
-              <p className="text-sm text-gray-500">Nombre de transactions</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {data.totalTransactions}
-              </p>
-            </div>
-          </div>
-
-          {/* Par méthode */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Par méthode de paiement
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full border-separate border-spacing-y-2">
-                <thead className="bg-transparent">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-sm font-semibold">
-                      Méthode
-                    </th>
-                    <th className="px-4 py-2 text-right text-sm font-semibold">
-                      Transactions
-                    </th>
-                    <th className="px-4 py-2 text-right text-sm font-semibold">
-                      Montant
-                    </th>
-                    <th className="px-4 py-2 text-right text-sm font-semibold">
-                      %
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.byMethod.map((item) => (
-                    <tr key={item.method} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs ${methodColors[item.method] || "bg-gray-100 text-gray-700"}`}
-                        >
-                          {paymentMethodLabels[item.method] || item.method}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right">
-                        {item.count}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right font-medium">
-                        {formatFCFA(item.amount)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right">
-                        {(item.percentage ?? 0).toFixed(1)}%
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Série journalière */}
-          {data.dailySeries.length > 0 && (
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Série journalière
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full border-separate border-spacing-y-2">
-                  <thead className="bg-transparent">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-sm font-semibold">
-                        Date
-                      </th>
-                      <th className="px-4 py-2 text-right text-sm font-semibold">
-                        Espèces
-                      </th>
-                      <th className="px-4 py-2 text-right text-sm font-semibold">
-                        Wallet
-                      </th>
-                      <th className="px-4 py-2 text-right text-sm font-semibold">
-                        Mobile Money
-                      </th>
-                      <th className="px-4 py-2 text-right text-sm font-semibold">
-                        Virement
-                      </th>
-                      <th className="px-4 py-2 text-right text-sm font-semibold">
-                        Carte
-                      </th>
-                      <th className="px-4 py-2 text-right text-sm font-semibold">
-                        Total
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.dailySeries.map((day) => (
-                      <tr key={day.date} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm">
-                          {new Date(day.date).toLocaleDateString("fr-FR")}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right">
-                          {day.cash > 0 ? formatFCFA(day.cash) : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right">
-                          {day.wallet > 0 ? formatFCFA(day.wallet) : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right">
-                          {day.mobileMoney > 0
-                            ? formatFCFA(day.mobileMoney)
-                            : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right">
-                          {day.bankTransfer > 0
-                            ? formatFCFA(day.bankTransfer)
-                            : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right">
-                          {day.card > 0 ? formatFCFA(day.card) : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right font-bold">
-                          {formatFCFA(day.total)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {!data && !isLoading && (
-        <div className="text-center py-12 bg-white rounded-xl">
-          <TrendingUp size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500">
-            Aucune donnée disponible pour cette période
-          </p>
-        </div>
-      )}
+            <ChartCard title="Encaissements par jour" subtitle="Empilés par moyen de paiement">
+              <SeriesColumns stacked format={money} labels={daily.map((d) => shortDay(d.date))} series={series} />
+              {daily.length > 0 && (
+                <div className="mt-6">
+                  <Disclosure label="Détail jour par jour">
+                    <ReportTable
+                      cols={[
+                        { key: "d", label: "Date" },
+                        ...series.map((s) => ({ key: s.key, label: s.name, align: "right" as const })),
+                        { key: "t", label: "Total", align: "right" as const },
+                      ]}
+                      rows={daily.map((d) => ({
+                        id: d.date,
+                        cells: {
+                          d: longDay(d.date),
+                          ...Object.fromEntries(series.map((s) => [s.key, fmtInt(d[s.key as (typeof DAILY)[number]["key"]])])),
+                          t: <b className="text-gray-950">{fmtInt(d.total)}</b>,
+                        },
+                      }))}
+                    />
+                  </Disclosure>
+                </div>
+              )}
+            </ChartCard>
+          </>
+        )}
+      </ReportBody>
     </div>
   );
 };

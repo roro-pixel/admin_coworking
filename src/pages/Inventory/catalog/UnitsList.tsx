@@ -1,300 +1,132 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, Search, X } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Pencil, Plus, Ruler, Trash2 } from "lucide-react";
 import { inventoryService } from "../../../services/inventory.service";
 import type { InventoryUnit } from "../../../services/inventory.service";
+import { ActionButton, DataCard, EmptyState, ErrorBlock, Field, HeadRow, IconButton, ListHeader, PanelForm, Pagination, SearchField } from "../../../components/subscription/kit";
+import { FIELD, ROW_HOVER, apiMessage } from "../../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../../components/ui/Skeleton";
+import { toast } from "../../../components/ui/toastStore";
+import { Cell, UNIT_TYPES, UNIT_TYPE_LABEL, label, unitCode, usePaged } from "../../../components/inventory/invKit";
 
-const unitTypes = [
-  { value: "COUNT", label: "Comptage" },
-  { value: "WEIGHT", label: "Poids" },
-  { value: "VOLUME", label: "Volume" },
-  { value: "LENGTH", label: "Longueur" },
-];
+const COLS = "lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_6rem_auto]";
+const EMPTY = { unitCode: "", name: "", unitType: "COUNT", symbol: "" };
 
 export const UnitsList: React.FC = () => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingUnit, setEditingUnit] = useState<InventoryUnit | null>(null);
-  const [formData, setFormData] = useState({
-    unitCode: "",
-    name: "",
-    unitType: "COUNT" as InventoryUnit["unitType"],
-    symbol: "",
-  });
+  const [editing, setEditing] = useState<{ code: string | null; form: typeof EMPTY } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const { data: units = [], isLoading } = useQuery({
-    queryKey: ["inventory-units"],
-    queryFn: () => inventoryService.getUnits(),
-  });
+  const { data: units = [], isLoading, isError, refetch } = useQuery({ queryKey: ["inventory-units"], queryFn: () => inventoryService.getUnits() });
+  const q = search.trim().toLowerCase();
+  const filtered = units.filter((u) => !q || u.name.toLowerCase().includes(q) || unitCode(u).toLowerCase().includes(q) || (u.symbol ?? "").toLowerCase().includes(q));
+  const paged = usePaged(filtered, 15);
 
-  const createMutation = useMutation({
-    mutationFn: (data: any) => inventoryService.createUnit(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventory-units"] });
-      handleCloseModal();
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["inventory-units"] });
+  const save = useMutation({
+    mutationFn: async () => {
+      const f = editing!.form;
+      const body = { unitCode: f.unitCode.trim(), name: f.name.trim(), unitType: f.unitType, symbol: f.symbol.trim() };
+      if (editing!.code === null) await inventoryService.createUnit(body);
+      else await inventoryService.updateUnit(editing!.code, body);
     },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ code, data }: { code: string; data: any }) =>
-      inventoryService.updateUnit(code, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventory-units"] });
-      handleCloseModal();
+    onSuccess: async () => {
+      toast.success(editing?.code === null ? "Unité créée" : "Unité modifiée");
+      await invalidate();
+      setEditing(null);
+      setError(null);
     },
+    onError: (e) => setError(apiMessage(e, "Enregistrement impossible")),
   });
+  // PUT et DELETE sur /inventory/units/{code} ne sont pas documentés côté backend : à confirmer
+  const remove = useMutation({ mutationFn: (code: string) => inventoryService.deleteUnit(code), onSuccess: invalidate });
 
-  const deleteMutation = useMutation({
-    mutationFn: (code: string) => inventoryService.deleteUnit(code),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventory-units"] });
-    },
-  });
-
-  const filteredUnits = units.filter(
-    (unit) =>
-      unit.name.toLowerCase().includes(search.toLowerCase()) ||
-      (unit.code || unit.unitCode || "")
-        .toLowerCase()
-        .includes(search.toLowerCase()),
-  );
-
-  const handleOpenModal = (unit?: InventoryUnit) => {
-    if (unit) {
-      setEditingUnit(unit);
-      setFormData({
-        unitCode: unit.unitCode || unit.code || "",
-        name: unit.name,
-        unitType: unit.unitType,
-        symbol: unit.symbol || "",
-      });
-    } else {
-      setEditingUnit(null);
-      setFormData({ unitCode: "", name: "", unitType: "COUNT", symbol: "" });
-    }
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingUnit(null);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingUnit) {
-      updateMutation.mutate({
-        code: editingUnit.unitCode || editingUnit.code || "",
-        data: formData,
-      });
-    } else {
-      createMutation.mutate(formData);
-    }
-  };
-
-  const handleDelete = (code: string) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer cette unité ?")) {
-      deleteMutation.mutate(code);
-    }
-  };
-
-  if (isLoading) {
-    return <div className="text-center py-8">Chargement...</div>;
-  }
+  const f = editing?.form;
+  const set = (p: Partial<typeof EMPTY>) => setEditing((s) => (s ? { ...s, form: { ...s.form, ...p } } : s));
 
   return (
-    <div className="p-3 sm:p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
-        <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">
-          Unités de mesure
-        </h2>
-        <button
-          onClick={() => handleOpenModal()}
-          className="w-full sm:w-auto justify-center bg-primary-600 text-white px-4 py-3 rounded-2xl hover:bg-primary-700 flex items-center gap-2 text-sm sm:text-base"
+    <div className="space-y-5">
+      <ListHeader title="Unités de mesure" subtitle={isLoading ? undefined : `${filtered.length} unité${filtered.length > 1 ? "s" : ""}`} action={<ActionButton icon={Plus} onClick={() => { setError(null); setEditing({ code: null, form: { ...EMPTY } }); }}>Nouvelle unité</ActionButton>} />
+
+      {editing && f && (
+        <PanelForm
+          title={editing.code === null ? "Nouvelle unité" : `Modifier ${editing.code}`}
+          onCancel={() => setEditing(null)}
+          pending={save.isPending}
+          submitLabel={editing.code === null ? "Créer" : "Enregistrer"}
+          submitDisabled={!f.unitCode.trim() || !f.name.trim() || !f.symbol.trim()}
+          error={error}
+          onSubmit={(e) => { e.preventDefault(); save.mutate(); }}
         >
-          <Plus size={20} />
-          Nouvelle unité
-        </button>
-      </div>
-
-      {/* Recherche - AGRANDIE */}
-      <div className="relative mb-8">
-        <Search
-          size={20}
-          className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
-        />
-        <input
-          type="text"
-          placeholder="Rechercher une unité..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-11 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
-        />
-      </div>
-
-      {/* Tableau - AGRANDI */}
-      <div className="bg-white rounded-3xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-        <table className="min-w-full text-sm sm:text-base">
-          <thead className="bg-gray-50/70">
-            <tr>
-              <th className="px-4 py-4 text-left font-semibold">Code</th>
-              <th className="px-4 py-4 text-left font-semibold">Nom</th>
-              <th className="px-4 py-4 text-left font-semibold">Type</th>
-              <th className="px-4 py-4 text-left font-semibold">Symbole</th>
-              <th className="px-4 py-4 text-right font-semibold">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="">
-            {filteredUnits.map((unit) => (
-              <tr key={unit.unitCode || unit.code} className="transition hover:bg-gray-50/70">
-                <td className="px-4 py-4 font-mono text-sm">
-                  {unit.unitCode || unit.code}
-                </td>
-                <td className="px-4 py-4 font-medium">{unit.name}</td>
-                <td className="px-4 py-4">
-                  {unitTypes.find((t) => t.value === unit.unitType)?.label}
-                </td>
-                <td className="px-4 py-4">{unit.symbol}</td>
-                <td className="px-4 py-4 text-right">
-                  <button
-                    onClick={() => handleOpenModal(unit)}
-                    className="p-1.5 text-blue-600 hover:text-blue-800 mr-2"
-                  >
-                    <Edit size={18} />
-                  </button>
-                  <button
-                    onClick={() =>
-                      handleDelete(unit.unitCode || unit.code || "")
-                    }
-                    className="p-1.5 text-red-600 hover:text-red-800"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {filteredUnits.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-2xl">
-          <p className="text-gray-500 text-sm sm:text-base">Aucune unité trouvée</p>
-        </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Code" required hint={editing.code === null ? undefined : "Le code ne peut pas être modifié."}>
+              <input value={f.unitCode} onChange={(e) => set({ unitCode: e.target.value })} disabled={editing.code !== null} placeholder="Ex : PIECE" className={`${FIELD} disabled:opacity-60`} autoFocus={editing.code === null} />
+            </Field>
+            <Field label="Nom" required>
+              <input value={f.name} onChange={(e) => set({ name: e.target.value })} placeholder="Ex : Pièce" className={FIELD} />
+            </Field>
+            <Field label="Type" required>
+              <select value={f.unitType} onChange={(e) => set({ unitType: e.target.value })} className={FIELD}>
+                {UNIT_TYPES.map((t) => <option key={t} value={t}>{UNIT_TYPE_LABEL[t]}</option>)}
+              </select>
+            </Field>
+            <Field label="Symbole" required>
+              <input value={f.symbol} onChange={(e) => set({ symbol: e.target.value })} placeholder="Ex : pcs" className={FIELD} />
+            </Field>
+          </div>
+        </PanelForm>
       )}
 
-      {/* Modal - AGRANDI */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={handleCloseModal}
-          />
-          <div className="relative bg-white rounded-2xl w-full max-w-lg mx-3">
-            <div className="sticky top-0 bg-white p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-xl sm:text-2xl font-bold">
-                {editingUnit ? "Modifier l'unité" : "Nouvelle unité"}
-              </h3>
-              <button
-                onClick={handleCloseModal}
-                className="p-2 hover:bg-gray-100 rounded-2xl"
-              >
-                <X size={24} />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-5 sm:p-8 space-y-6">
-              <div>
-                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                  Code *
-                </label>
-                <input
-                  type="text"
-                  value={formData.unitCode}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      unitCode: e.target.value.toUpperCase(),
-                    })
-                  }
-                  disabled={!!editingUnit}
-                  required
-                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 disabled:bg-gray-100 text-sm sm:text-base"
-                  placeholder="ex: PIECE"
-                />
+      <SearchField value={search} onChange={setSearch} placeholder="Nom, code ou symbole de l'unité" />
+
+      {isLoading ? (
+        <ListSkeleton rows={5} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les unités." onRetry={() => refetch()} />
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={Ruler} title="Aucune unité" hint={q ? "Aucun résultat pour cette recherche." : "Ajoutez par exemple « Pièce », « Boîte » ou « Kilogramme »."} />
+      ) : (
+        <>
+          <HeadRow cols={COLS}>
+            <span>Unité</span>
+            <span>Type</span>
+            <span>Symbole</span>
+            <span className="text-right">Actions</span>
+          </HeadRow>
+          <DataCard>
+            {paged.slice.map((u: InventoryUnit) => (
+              <div key={unitCode(u)} className={`grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl p-4 max-lg:mb-2 max-lg:bg-gray-50 ${COLS} ${ROW_HOVER}`}>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-gray-900">{u.name}</p>
+                  <p className="font-mono text-xs text-gray-400">{unitCode(u)}</p>
+                </div>
+                <Cell title="Type" className="max-lg:order-3"><span className="text-sm text-gray-600">{label(UNIT_TYPE_LABEL, u.unitType)}</span></Cell>
+                <div className="max-lg:order-2 max-lg:justify-self-end"><span className="rounded-full bg-gray-100 px-3 py-1 font-mono text-xs font-semibold text-gray-700">{u.symbol || "n/a"}</span></div>
+                <div className="flex items-center gap-1 max-lg:order-4 max-lg:col-span-2 lg:justify-end">
+                  <IconButton icon={Pencil} label="Modifier" onClick={() => { setError(null); setEditing({ code: unitCode(u), form: { unitCode: unitCode(u), name: u.name, unitType: u.unitType, symbol: u.symbol ?? "" } }); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+                  <IconButton
+                    icon={Trash2}
+                    label="Supprimer"
+                    tone="danger"
+                    onClick={() =>
+                      toast.confirm({
+                        message: `Supprimer l'unité « ${u.name} » ?`,
+                        detail: "La suppression échoue si des articles l'utilisent.",
+                        confirmLabel: "Supprimer",
+                        pendingLabel: "Suppression",
+                        successMessage: "Unité supprimée",
+                        errorMessage: "Suppression impossible : l'unité est probablement utilisée",
+                        onConfirm: () => remove.mutateAsync(unitCode(u)),
+                      })
+                    }
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                  Nom *
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  required
-                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
-                  placeholder="ex: Pièce"
-                />
-              </div>
-              <div>
-                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                  Type *
-                </label>
-                <select
-                  value={formData.unitType}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      unitType: e.target.value as any,
-                    })
-                  }
-                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
-                >
-                  {unitTypes.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                  Symbole *
-                </label>
-                <input
-                  type="text"
-                  value={formData.symbol}
-                  onChange={(e) =>
-                    setFormData({ ...formData, symbol: e.target.value })
-                  }
-                  required
-                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
-                  placeholder="ex: pcs"
-                />
-              </div>
-              <div className="flex flex-col gap-3 sm:flex-row pt-6">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="flex-1 px-5 py-3 border rounded-2xl text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={
-                    createMutation.isPending || updateMutation.isPending
-                  }
-                  className="flex-1 justify-center bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 text-sm sm:text-base"
-                >
-                  {editingUnit ? "Mettre à jour" : "Créer"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            ))}
+          </DataCard>
+          <Pagination page={paged.page} totalPages={paged.totalPages} total={paged.total} noun="unité" onChange={paged.setPage} />
+        </>
       )}
     </div>
   );

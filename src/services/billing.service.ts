@@ -26,7 +26,7 @@ export type BillingDocumentStatus =
   | "VOIDED"
   | "REFUNDED"
   | "WRITTEN_OFF"
-  // Sprint 3 — nouveaux statuts devis
+  // Statuts du cycle devis
   | "VIEWED"
   | "NEGOTIATION"
   | "DEPOSIT_REQUESTED"
@@ -46,9 +46,35 @@ export type BillingLineType =
   | "FEE"
   | "OTHER";
 
-// ─── Sous-interfaces sprint 1-2-3 ─────────────────────────────────────────────
+// ─── Sous-interfaces ─────────────────────────────────────────────────────────
 
-/** Sprint 1 — Acompte attaché à la création d'un document */
+export type CompanyLinkSource = "AT_ISSUE" | "ATTACHED";
+
+/** Relie d'anciennes factures : par numéros, ou par membre et période. */
+export interface CompanyLinkRequest {
+  companyCustomerCode: string;
+  documentNumbers?: string[];
+  memberId?: string;
+  from?: string;
+  to?: string;
+}
+
+export interface CompanyLinkPreviewLine {
+  documentNumber: string;
+  eligible: boolean;
+  /** Pourquoi la facture ne serait pas reliée. */
+  reason?: string | null;
+  [key: string]: unknown;
+}
+
+export interface CompanyLinkResult {
+  linked?: number;
+  skipped?: number;
+  lines?: CompanyLinkPreviewLine[];
+  [key: string]: unknown;
+}
+
+/** Acompte attaché à un document */
 export interface BillingAdvance {
   advanceType: "PERCENTAGE" | "FIXED_AMOUNT";
   advanceValue: number;
@@ -61,11 +87,12 @@ export interface BillingAdvance {
   notes?: string;
   // Champs retournés en lecture
   computedAmount?: number;
-  status?: "PENDING" | "PAID" | "CANCELLED";
+  /** PARTIALLY_PAID : le payé ne couvre pas encore l'acompte. */
+  status?: "PENDING" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
   paidAt?: string | null;
 }
 
-/** Sprint 2 — Escompte pour paiement anticipé */
+/** Escompte pour paiement anticipé */
 export interface BillingEarlyPaymentDiscount {
   discountRate: number;
   ifPaidBefore: string;
@@ -74,7 +101,7 @@ export interface BillingEarlyPaymentDiscount {
   computedAmount?: number;
 }
 
-/** Sprint 3 — Signature électronique */
+/** Signature électronique */
 export interface BillingSignature {
   signerName?: string;
   signerEmail?: string;
@@ -92,21 +119,20 @@ export interface ConfirmPublicQuoteSignaturePayload {
 // ─── Ligne de document ────────────────────────────────────────────────────────
 
 export interface BillingLine {
-  // Sprint 1 — ordre de ligne (requis pour advance.excludedLineOrders)
+  // Ordre de ligne (requis pour advance.excludedLineOrders)
   lineOrder?: number;
   lineType: BillingLineType;
   itemCode?: string;
   description: string;
   detailedDescription?: string;
   quantity: number;
-  // Sprint 1 — unité de mesure (ex: jour, heure, m², forfait)
+  // Unité de mesure (jour, heure, m², forfait)
   unit?: string;
   unitPrice: number;
   discountRate?: number;
-  // Sprint 1 — champs enrichis
   externalReference?: string;
   notes?: string;
-  // Sprint 2 — ligne optionnelle : calculée mais exclue du total
+  // Ligne optionnelle : calculée mais exclue du total
   optional?: boolean;
   taxable: boolean;
   // SEFC — TTC (prix saisi taxe incluse) vs HT (par défaut)
@@ -166,7 +192,6 @@ export interface BillingDocument {
   customerPhone?: string;
   billingAddressJson?: string;
 
-  // Sprint 2 — champs formulaire enrichis
   customerReference?: string;
   poNumber?: string;
   projectCode?: string;
@@ -176,7 +201,7 @@ export interface BillingDocument {
   exchangeRate?: number | null;
   terms?: string;
 
-  // Sprint 1 — référence et coordonnées de paiement
+  // Référence et coordonnées de paiement
   paymentReference?: string;
   paymentInstructions?: string;
   bankDetailsJson?: string;
@@ -193,7 +218,7 @@ export interface BillingDocument {
   totalAmount: number;
   paidAmount: number;
   balanceDue: number;
-  // Sprint 2 — total des lignes optionnelles
+  // Total des lignes optionnelles
   optionsTotal?: number;
 
   // Dates
@@ -202,8 +227,6 @@ export interface BillingDocument {
   issuedAt?: string;
   sentAt?: string;
   paidAt?: string;
-  // NOTE: BillingDocumentResponse (backend) n'expose ni cancelledAt, ni
-  // createdAt, ni updatedAt — ne pas s'y fier, ils ne sont jamais renvoyés.
 
   lines: BillingLine[];
   discounts: BillingDiscount[];
@@ -212,7 +235,7 @@ export interface BillingDocument {
 
   sourceType?: string;
   sourceCode?: string;
-  // Champs enrichis source résolue
+  // Source résolue
   resolvedSourceType?: string;
   resolvedSourceCode?: string;
   resolvedSourceLabel?: string;
@@ -220,16 +243,23 @@ export interface BillingDocument {
 
   metadataJson?: string;
 
-  // Sprint 1 — acompte
+  // Acompte
   advance?: BillingAdvance | null;
-  // Sprint 2 — escompte
+  // Escompte
   earlyPaymentDiscount?: BillingEarlyPaymentDiscount | null;
-  // Sprint 3 — signature
+  // Signature
   signature?: BillingSignature | null;
 
   customerRegistered?: boolean;
   internalNotes?: string;
   recoverables?: BillingRecoverable[] | null;
+
+  // ── Facture émise pour le compte d'une organisation ────────────────────────
+  /** Code client de l'organisation (CUS-COM-...), vide si le membre est seul. */
+  companyCustomerCode?: string | null;
+  companyName?: string | null;
+  /** AT_ISSUE : émise ainsi (imprimée) ; ATTACHED : ancienne facture reliée. */
+  companyLinkSource?: CompanyLinkSource | null;
 
   // ── SEFC (validation fiscale) ──────────────────────────────────────────────
   /** true = document validé fiscalement, immuable (PUT refusé en 400) */
@@ -293,6 +323,35 @@ export interface BillingCatalogLookupItem {
   resourceMeta?: Record<string, unknown>;
 }
 
+export type BillingDiscountPolicy = "NONE" | "WARN" | "BLOCK";
+export type BillingItemMode = "UNIT" | "HOURLY" | "DAILY" | "MONTHLY" | "FIXED";
+/** D'où provient le plancher réellement appliqué (effectiveFloorPrice) */
+export type BillingFloorPriceOrigin =
+  | "EXPLICIT"
+  | "DERIVED_FROM_MARGIN"
+  | "COST_PRICE"
+  | "NONE";
+
+/** Champs du catalogue pouvant être vidés via clearFields (updateCatalogItem). */
+export type ClearableCatalogField =
+  | "costPrice"
+  | "floorPrice"
+  | "minMarginRate"
+  | "maxDiscountRate"
+  | "detailedDescription"
+  | "includedItems"
+  | "imageUrl"
+  | "billingMode"
+  | "defaultQuantity"
+  | "minQuantity"
+  | "maxQuantity"
+  | "taxableByDefault"
+  | "subcategory"
+  | "tags"
+  | "externalReference"
+  | "validFrom"
+  | "validUntil";
+
 export interface ServiceCatalogItem {
   itemCode: string;
   name: string;
@@ -305,6 +364,40 @@ export interface ServiceCatalogItem {
   displayOrder?: number;
   active?: boolean;
   createdAt?: string;
+
+  // ── Économie ──────────────────────────────────────────────────────────────
+  costPrice?: number;
+  /** Plancher saisi explicitement (peut être vide, voir effectiveFloorPrice). */
+  minMarginRate?: number;
+  maxDiscountRate?: number;
+  discountPolicy?: BillingDiscountPolicy;
+
+  // ── Contenu ───────────────────────────────────────────────────────────────
+  detailedDescription?: string;
+  includedItems?: string[];
+  imageUrl?: string;
+
+  // ── Saisie ────────────────────────────────────────────────────────────────
+  billingMode?: BillingItemMode;
+  defaultQuantity?: number;
+  minQuantity?: number;
+  maxQuantity?: number;
+  taxableByDefault?: boolean;
+
+  // ── Classement ────────────────────────────────────────────────────────────
+  subcategory?: string;
+  tags?: string[];
+  externalReference?: string;
+  validFrom?: string;
+  validUntil?: string;
+
+  // ── Lecture seule — calculés par le backend ─────────────────────────────────
+  /** Plancher réellement appliqué : à afficher à la place de floorPrice. */
+  effectiveFloorPrice?: number;
+  /** Origine de effectiveFloorPrice. */
+  floorPriceOrigin?: BillingFloorPriceOrigin;
+  /** L'article est valide aujourd'hui. */
+  currentlyValid?: boolean;
 }
 
 export interface BillingScheduleInstallment {
@@ -346,6 +439,93 @@ export interface BillingAgingReport {
   }>;
 }
 
+// ─── Simulation (aperçu sans écriture) ─────────────────────────────────────────
+
+export type BillingViolationType =
+  | "FLOOR_PRICE"
+  | "MAX_DISCOUNT_RATE"
+  | "LINE_MIN_NET_RATE"
+  | "LINE_MIN_NET_AMOUNT"
+  | "DOCUMENT_DISCOUNT_RATE"
+  | "DOCUMENT_DISCOUNT_AMOUNT";
+
+export type BillingViolationSeverity = "WARN" | "BLOCK";
+
+export interface BillingDiscountViolation {
+  type: BillingViolationType;
+  severity: BillingViolationSeverity;
+  itemCode?: string;
+  lineDescription?: string;
+  observed: string;
+  limit: string;
+  /** Rédigé par le backend pour être affiché tel quel. */
+  message: string;
+}
+
+export interface SimulatedBillingLine {
+  itemCode?: string;
+  description: string;
+  category?: string;
+  unit?: string;
+  quantity: string;
+  unitPrice: string;
+  subtotalAmount: string;
+  discountRate: string | null;
+  discountAmount: string;
+  /** Taux de remise réel, recalculé depuis les montants. */
+  effectiveRate: string;
+  netAmount: string;
+  taxAmount: string;
+  totalAmount: string;
+  taxable: boolean;
+  optional: boolean;
+}
+
+export interface SimulateBillingDocumentResponse {
+  subtotalAmount: string;
+  lineDiscountAmount: string;
+  documentDiscountAmount: string;
+  discountAmount: string;
+  taxableAmount: string;
+  vatAmount: string;
+  additionalCentAmount: string;
+  taxAmount: string;
+  totalAmount: string;
+  /** true si une violation BLOCK existe : issue() refusera. */
+  blocked: boolean;
+  violations: BillingDiscountViolation[];
+  lines: SimulatedBillingLine[];
+}
+
+// ─── Versionnage des documents ──────────────────────────────────────────────────
+
+export type BillingDocumentEditType = "FULL_EDIT" | string;
+
+export interface BillingDocumentVersion {
+  versionNumber: number;
+  editType: BillingDocumentEditType;
+  changedBy: string;
+  changedAt: string;
+  /** Null tant que la version n'a pas été transmise au client. */
+  sentToCustomerAt: string | null;
+  /** Champs modifiés depuis la version précédente. */
+  changeSummary: string;
+  /** Présent uniquement sur le détail d'une version. */
+  snapshot?: BillingDocument | null;
+}
+
+export interface BillingDocumentVersionFieldChange {
+  field: string;
+  before: string | null;
+  after: string | null;
+}
+
+export interface BillingDocumentVersionDiff {
+  fromVersion: number;
+  toVersion: number;
+  changes: BillingDocumentVersionFieldChange[];
+}
+
 export interface UpdateBillingLinePayload {
   action: "UPSERT" | "REMOVE";
   lineOrder: number;
@@ -359,9 +539,7 @@ export interface UpdateBillingLinePayload {
   optional?: boolean;
   externalReference?: string;
   notes?: string;
-  // Trace catalogue — le backend resout description/unit/unitPrice/taxable/
-  // vatRate a partir de ces 2 champs, aussi bien en creation qu'en edition
-  // (billing-enhancements.md §3.2 : "creation ou edition")
+  // Le backend résout description, unité, prix et taxe depuis la source catalogue.
   catalogSourceType?: string;
   catalogSourceCode?: string;
 }
@@ -422,6 +600,11 @@ export interface CreateInvoiceFromReservationPayload {
 
 export interface CreateBillingDocumentPayload {
   documentType?: BillingDocumentType;
+  /**
+   * Organisation qui paie : absent = selon le mode du rattachement,
+   * "NONE" = le membre seul, un code client = cette organisation.
+   */
+  companyCustomerCode?: string;
   // Client enregistré
   customerType?: string;
   customerCode?: string;
@@ -437,7 +620,6 @@ export interface CreateBillingDocumentPayload {
   currency: string;
   issueDate: string;
   dueDate?: string;
-  // Sprint 2 — champs enrichis
   customerReference?: string;
   poNumber?: string;
   projectCode?: string;
@@ -445,7 +627,7 @@ export interface CreateBillingDocumentPayload {
   deliveryAddressJson?: string;
   language?: string;
   exchangeRate?: number | null;
-  // Sprint 1 — paiement
+  // Paiement
   paymentReference?: string;
   paymentInstructions?: string;
   bankDetailsJson?: string;
@@ -462,27 +644,44 @@ export interface CreateBillingDocumentPayload {
   >[];
   discounts?: BillingDiscount[];
   clauses?: BillingClause[];
-  // Sprint 1 — acompte
+  // Acompte
   advance?: Omit<BillingAdvance, "computedAmount" | "status" | "paidAt">;
-  // Sprint 2 — escompte
+  // Escompte
   earlyPaymentDiscount?: Omit<BillingEarlyPaymentDiscount, "computedAmount">;
   metadataJson?: string;
 }
 
 // ─── Helper normalisation réponses paginées ───────────────────────────────────
 
-function normalizePaginated<T>(data: any): {
+function normalizePaginated<T>(
+  data: any,
+  fallbackSize = 20,
+): {
   content: T[];
   totalElements: number;
   totalPages: number;
 } {
-  if (data?.content !== undefined) return data;
-  if (Array.isArray(data?.data))
+  // Enveloppe Spring : { content, totalElements, size } ; totalPages peut manquer
+  if (data?.content !== undefined) {
+    const totalElements = data.totalElements ?? data.content.length;
+    const size = data.size || fallbackSize;
+    return {
+      ...data,
+      totalElements,
+      totalPages: data.totalPages ?? Math.max(1, Math.ceil(totalElements / size)),
+    };
+  }
+  // Enveloppe documentée : { data: [...], pageable: { totalElements, totalPages, size } }
+  if (Array.isArray(data?.data)) {
+    const pageable = data.pageable ?? {};
+    const totalElements = pageable.totalElements ?? data.totalElements ?? data.data.length;
+    const size = pageable.size || fallbackSize;
     return {
       content: data.data,
-      totalElements: data.totalElements ?? data.data.length,
-      totalPages: data.totalPages ?? 1,
+      totalElements,
+      totalPages: pageable.totalPages ?? data.totalPages ?? Math.max(1, Math.ceil(totalElements / size)),
     };
+  }
   if (Array.isArray(data))
     return { content: data, totalElements: data.length, totalPages: 1 };
   return { content: [], totalElements: 0, totalPages: 0 };
@@ -514,7 +713,7 @@ export const billingService = {
     const response = await apiClient.get("/sni/api/v1/billing/documents", {
       params,
     });
-    return normalizePaginated<BillingDocument>(response.data);
+    return normalizePaginated<BillingDocument>(response.data, params?.size);
   },
 
   getDocument: async (documentNumber: string): Promise<BillingDocument> => {
@@ -532,6 +731,17 @@ export const billingService = {
   ): Promise<BillingDocument> => {
     const response = await apiClient.post(
       "/sni/api/v1/billing/documents",
+      data,
+    );
+    return response.data;
+  },
+
+  /** Aperçu de calcul sans écriture : aucun document créé, aucun numéro consommé. */
+  simulateDocument: async (
+    data: CreateBillingDocumentPayload,
+  ): Promise<SimulateBillingDocumentResponse> => {
+    const response = await apiClient.post(
+      "/sni/api/v1/billing/documents/simulate",
       data,
     );
     return response.data;
@@ -557,7 +767,7 @@ export const billingService = {
     return response.data;
   },
 
-  /** Alias documenté côté backend */
+  /** Alias de createManualQuote */
   createManualQuotation: async (
     data: Omit<CreateBillingDocumentPayload, "documentType">,
   ): Promise<BillingDocument> => {
@@ -614,9 +824,52 @@ export const billingService = {
 
   // ── Workflow document général ────────────────────────────────────────────────
 
-  issueDocument: async (documentNumber: string): Promise<BillingDocument> => {
+  /** Émet le document. Un dépassement de remise bloquant renvoie 400, sauf motif de dérogation. */
+  issueDocument: async (
+    documentNumber: string,
+    discountOverrideReason?: string,
+  ): Promise<BillingDocument> => {
     const response = await apiClient.patch(
       `/sni/api/v1/billing/documents/${documentNumber}/issue`,
+      null,
+      discountOverrideReason
+        ? { params: { discountOverrideReason } }
+        : undefined,
+    );
+    return response.data;
+  },
+
+  // ── Versionnage ──────────────────────────────────────────────────────────────
+  // Un document validé (locked) n'est plus versionné.
+
+  getDocumentVersions: async (
+    documentNumber: string,
+  ): Promise<BillingDocumentVersion[]> => {
+    const response = await apiClient.get(
+      `/sni/api/v1/billing/documents/${documentNumber}/versions`,
+    );
+    return Array.isArray(response.data)
+      ? response.data
+      : (response.data?.content ?? []);
+  },
+
+  getDocumentVersion: async (
+    documentNumber: string,
+    versionNumber: number,
+  ): Promise<BillingDocumentVersion> => {
+    const response = await apiClient.get(
+      `/sni/api/v1/billing/documents/${documentNumber}/versions/${versionNumber}`,
+    );
+    return response.data;
+  },
+
+  getDocumentVersionsDiff: async (
+    documentNumber: string,
+    fromVersion: number,
+    toVersion: number,
+  ): Promise<BillingDocumentVersionDiff> => {
+    const response = await apiClient.get(
+      `/sni/api/v1/billing/documents/${documentNumber}/versions/${fromVersion}/diff/${toVersion}`,
     );
     return response.data;
   },
@@ -634,6 +887,7 @@ export const billingService = {
     );
   },
 
+  /** PDF d'administration : l'original suivi de son duplicata « DUPLICATA ». */
   getPdf: async (documentNumber: string): Promise<Blob> => {
     const response = await apiClient.get(
       `/sni/api/v1/billing/documents/${documentNumber}/pdf`,
@@ -671,7 +925,7 @@ export const billingService = {
     return response.data;
   },
 
-  /** Alias documenté côté backend */
+  /** Alias de acceptQuote */
   acceptQuotation: async (quoteNumber: string): Promise<BillingDocument> => {
     const response = await apiClient.patch(
       `/sni/api/v1/billing/quotations/${quoteNumber}/accept`,
@@ -679,7 +933,7 @@ export const billingService = {
     return response.data;
   },
 
-  /** Alias documenté côté backend */
+  /** Alias de rejectQuote */
   rejectQuotation: async (
     quoteNumber: string,
     reason?: string,
@@ -691,7 +945,7 @@ export const billingService = {
     return response.data;
   },
 
-  /** Alias documenté côté backend */
+  /** Alias de convertToInvoice */
   convertQuotationToInvoice: async (
     quoteNumber: string,
   ): Promise<BillingDocument> => {
@@ -701,7 +955,7 @@ export const billingService = {
     return response.data;
   },
 
-  /** Sprint 2 — Sélectionner les lignes optionnelles avant acceptation */
+  /** Sélectionner les lignes optionnelles avant acceptation */
   selectOptions: async (
     quoteNumber: string,
     selectedLineOrders: number[],
@@ -715,7 +969,7 @@ export const billingService = {
     return response.data;
   },
 
-  /** Sprint 3 — Marquer le devis comme vu (SENT → VIEWED) */
+  /** Marquer le devis comme vu (SENT → VIEWED) */
   markViewed: async (quoteNumber: string): Promise<BillingDocument> => {
     const response = await apiClient.patch(
       `/sni/api/v1/billing/quotes/${quoteNumber}/mark-viewed`,
@@ -723,7 +977,7 @@ export const billingService = {
     return response.data;
   },
 
-  /** Sprint 3 — Passer en négociation */
+  /** Passer en négociation */
   startNegotiation: async (quoteNumber: string): Promise<BillingDocument> => {
     const response = await apiClient.patch(
       `/sni/api/v1/billing/quotes/${quoteNumber}/start-negotiation`,
@@ -731,7 +985,7 @@ export const billingService = {
     return response.data;
   },
 
-  /** Sprint 3 — Demander un acompte (ACCEPTED → DEPOSIT_REQUESTED) */
+  /** Demander un acompte (ACCEPTED → DEPOSIT_REQUESTED) */
   requestDeposit: async (quoteNumber: string): Promise<BillingDocument> => {
     const response = await apiClient.patch(
       `/sni/api/v1/billing/quotes/${quoteNumber}/request-deposit`,
@@ -739,7 +993,7 @@ export const billingService = {
     return response.data;
   },
 
-  /** Sprint 3 — Marquer l'acompte comme reçu (DEPOSIT_REQUESTED → DEPOSIT_PAID) */
+  /** Marquer l'acompte comme reçu (DEPOSIT_REQUESTED → DEPOSIT_PAID) */
   markDepositPaid: async (quoteNumber: string): Promise<BillingDocument> => {
     const response = await apiClient.patch(
       `/sni/api/v1/billing/quotes/${quoteNumber}/mark-deposit-paid`,
@@ -747,7 +1001,7 @@ export const billingService = {
     return response.data;
   },
 
-  /** Sprint 3 — Demander une signature électronique */
+  /** Demander une signature électronique */
   requestSignature: async (
     quoteNumber: string,
     data?: {
@@ -793,11 +1047,7 @@ export const billingService = {
     );
   },
 
-  /**
-   * Ré-applique un avoir non entièrement consommé sur une AUTRE facture du
-   * même client. Prérequis backend : avoir VALIDATED (locked=true), pas
-   * encore ISSUED (= déjà appliqué), même client que la facture cible.
-   */
+  /** Applique un avoir non consommé sur une autre facture du même client. */
   applyCreditNoteTo: async (
     creditNoteNumber: string,
     targetInvoiceNumber: string,
@@ -808,10 +1058,22 @@ export const billingService = {
     return response.data;
   },
 
+  /** Reverse le solde d'un avoir au portefeuille du client quand il n'y a plus rien à imputer. */
+  refundCreditNoteToWallet: async (
+    creditNoteNumber: string,
+    reason: string,
+  ): Promise<BillingDocument> => {
+    const response = await apiClient.post(
+      `/sni/api/v1/billing/credit-notes/${creditNoteNumber}/refund-to-wallet`,
+      null,
+      { params: { reason } },
+    );
+    return response.data;
+  },
+
   /**
-   * Valide fiscalement le document (SEFC) — assigne le fiscalNumber
-   * définitif, verrouille le document (locked=true). IRRÉVERSIBLE.
-   * Uniquement pour INVOICE, CREDIT_NOTE, DEBIT_NOTE, PROFORMA_INVOICE
+   * Valide fiscalement le document (SEFC) : assigne le fiscalNumber et verrouille
+   * le document. IRRÉVERSIBLE. INVOICE, CREDIT_NOTE, DEBIT_NOTE, PROFORMA_INVOICE
    * en statut DRAFT ou ISSUED.
    */
   validateDocument: async (
@@ -823,11 +1085,7 @@ export const billingService = {
     return response.data;
   },
 
-  /**
-   * Crée une facture rectificative (documentType: CORRECTIVE_INVOICE,
-   * statut DRAFT) qui corrige une facture déjà validée SANS la modifier.
-   * Doit ensuite être validée manuellement via validateDocument().
-   */
+  /** Crée une facture rectificative (DRAFT) corrigeant une facture validée ; à valider ensuite via validateDocument(). */
   createCorrectiveInvoice: async (
     originalInvoiceNumber: string,
     data: Omit<CreateBillingDocumentPayload, "documentType">,
@@ -839,13 +1097,7 @@ export const billingService = {
     return response.data;
   },
 
-  /**
-   * Annule un document. Comportement géré côté backend selon `locked` :
-   * non verrouillé → annulation directe (status → CANCELLED) ;
-   * verrouillé → génère un avoir pour le balanceDue, le valide et
-   * l'applique automatiquement (la facture reste VALIDATED, passe à PAID).
-   * Inutile de vérifier `locked` côté frontend avant d'appeler.
-   */
+  /** Annule un document ; s'il est verrouillé, le backend génère et applique un avoir. */
   cancelDocument: async (
     documentNumber: string,
     reason: string,
@@ -876,6 +1128,36 @@ export const billingService = {
       { params },
     );
     return response.data;
+  },
+
+  // ── Factures reliées à une organisation (lien seulement) ────────────────────
+
+  /** N'écrit rien : ce qui serait relié, et pourquoi le reste ne le serait pas. */
+  previewCompanyLinks: async (
+    data: CompanyLinkRequest,
+  ): Promise<CompanyLinkResult> => {
+    const response = await apiClient.post(
+      "/sni/api/v1/billing/documents/company-links/preview",
+      data,
+    );
+    return response.data;
+  },
+
+  linkInvoicesToCompany: async (
+    data: CompanyLinkRequest,
+  ): Promise<CompanyLinkResult> => {
+    const response = await apiClient.post(
+      "/sni/api/v1/billing/documents/company-links",
+      data,
+    );
+    return response.data;
+  },
+
+  /** Seul un lien ATTACHED se retire : un lien AT_ISSUE est imprimé. */
+  unlinkInvoiceFromCompany: async (documentNumber: string): Promise<void> => {
+    await apiClient.delete(
+      `/sni/api/v1/billing/documents/${encodeURIComponent(documentNumber)}/company-link`,
+    );
   },
 
   // ── Paiement direct ──────────────────────────────────────────────────────────
@@ -970,11 +1252,7 @@ export const billingService = {
     const normalized = normalizePaginated<BillingCatalogLookupItem>(
       response.data,
     );
-    // Le backend renvoie {content, totalElements, page, size} SANS
-    // totalPages (confirmé billing-enhancements.md §3.1) — normalizePaginated
-    // renvoie alors la donnée brute telle quelle, laissant totalPages
-    // undefined et cassant silencieusement la pagination du panneau de
-    // recherche catalogue. On le recalcule nous-mêmes ici.
+    // Le backend ne renvoie pas totalPages : on le recalcule.
     const size = params?.size ?? 20;
     return {
       ...normalized,
@@ -999,9 +1277,7 @@ export const billingService = {
       params,
     });
     const normalized = normalizePaginated<ServiceCatalogItem>(response.data);
-    // Meme precaution que catalogLookup : la doc ne montre pas le JSON de
-    // reponse exact pour cet endpoint. Si totalPages est absent, on le
-    // recalcule plutot que de laisser la pagination se bloquer a "1/1".
+    // Le backend ne renvoie pas totalPages : on le recalcule.
     const size = params?.size ?? 20;
     return {
       ...normalized,
@@ -1018,13 +1294,17 @@ export const billingService = {
     return response.data;
   },
 
+  /** Seuls les champs présents sont modifiés ; pour en vider un, le lister dans clearFields. */
   updateCatalogItem: async (
     itemCode: string,
     data: Partial<ServiceCatalogItem>,
+    clearFields?: ClearableCatalogField[],
   ): Promise<ServiceCatalogItem> => {
     const response = await apiClient.put(
       `/sni/api/v1/billing/catalog/${itemCode}`,
-      data,
+      clearFields && clearFields.length > 0
+        ? { ...data, clearFields }
+        : data,
     );
     return response.data;
   },

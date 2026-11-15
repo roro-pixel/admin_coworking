@@ -4,21 +4,26 @@ import { AdminLayout } from "../../components/layout/AdminLayout";
 import {
   Package,
   Tags,
-  Users,
+  Repeat,
   Ticket,
   BarChart3,
-  Ticket as PassIcon,
   Activity,
-  CreditCard,
+  Receipt,
+  Percent,
 } from "lucide-react";
 import { PlansList } from "./plans/PlansList";
 import { EntitlementDefinitionsList } from "./entitlements/EntitlementDefinitionsList";
-import { SubscriptionsList } from "./subscriptions/SubscriptionsList";
-import { PromotionsList } from "./promotions/PromotionsList";
+import { SubscriptionsHub, HUB_PATHS } from "./subscriptions/SubscriptionsHub";
+import type { HubTab } from "./subscriptions/SubscriptionsHub";
+import { PromotionsHub } from "./promotions/PromotionsHub";
 import { SubscriptionMetrics } from "./metrics/SubscriptionMetrics";
 import { UsageRecordsList } from "./usage/UsageRecordsList";
 import { BillableItemsList } from "./billing/BillableItemsList";
 import { PassCommercialMaster } from "./PassCommercialMaster";
+import { brandVars } from "../../components/layout/adminTheme";
+import { Toaster } from "../../components/ui/Toaster";
+import { Tabs } from "../../components/subscription/kit";
+import type { TabItem } from "../../components/subscription/kit";
 
 type TabId =
   | "metrics"
@@ -30,23 +35,27 @@ type TabId =
   | "billable"
   | "promotions";
 
-const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
+const tabs: TabItem<TabId>[] = [
   { id: "metrics", label: "Métriques", icon: BarChart3 },
   { id: "plans", label: "Plans", icon: Package },
   { id: "entitlements", label: "Droits", icon: Tags },
-  { id: "subscriptions", label: "Souscriptions", icon: Users },
-  { id: "passCommercial", label: "Pass commercial", icon: PassIcon },
+  { id: "subscriptions", label: "Souscriptions", icon: Repeat },
+  { id: "passCommercial", label: "Pass commercial", icon: Ticket },
   { id: "usage", label: "Usage", icon: Activity },
-  { id: "billable", label: "Items facturables", icon: CreditCard },
-  { id: "promotions", label: "Promotions", icon: Ticket },
+  { id: "billable", label: "Items facturables", icon: Receipt },
+  { id: "promotions", label: "Promotions", icon: Percent },
 ];
+
+const getHubTab = (pathname: string): HubTab | null => {
+  const found = (Object.entries(HUB_PATHS) as [HubTab, string][]).find(([, path]) => pathname.startsWith(path));
+  return found ? found[0] : null;
+};
 
 const getTabFromPath = (pathname: string): TabId => {
   if (pathname.startsWith("/subscriptions/entitlements")) return "entitlements";
   if (pathname.startsWith("/subscriptions/plans")) return "plans";
-  if (pathname.startsWith("/subscriptions/subscriptions"))
-    return "subscriptions";
-  if (pathname.startsWith("/subscriptions/passes")) return "passCommercial";
+  if (getHubTab(pathname)) return "subscriptions";
+  if (pathname.startsWith("/subscriptions/passes") || pathname.startsWith("/subscriptions/pass-plans")) return "passCommercial";
   if (pathname.startsWith("/subscriptions/usage")) return "usage";
   if (pathname.startsWith("/subscriptions/billable")) return "billable";
   if (pathname.startsWith("/subscriptions/promotions")) return "promotions";
@@ -59,17 +68,17 @@ export const SubscriptionMaster: React.FC = () => {
   const initialTab = getTabFromPath(location.pathname);
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
 
-  // Lazy mounting : un composant n'est monté qu'à sa première visite,
-  // puis conservé avec display:none pour éviter les re-fetch.
-  const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(
-    new Set([initialTab]),
-  );
+  // Montage paresseux : un onglet n'est monté qu'à sa première visite,
+  // puis conservé masqué pour éviter de recharger ses données.
+  const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(new Set([initialTab]));
 
   useEffect(() => {
     const nextTab = getTabFromPath(location.pathname);
     setActiveTab(nextTab);
     setVisitedTabs((prev) => new Set([...prev, nextTab]));
   }, [location.pathname]);
+
+  const hubTab = getHubTab(location.pathname) ?? "list";
 
   const handleTabChange = (tabId: TabId) => {
     setActiveTab(tabId);
@@ -80,89 +89,38 @@ export const SubscriptionMaster: React.FC = () => {
     }
   };
 
+  const handleHubTabChange = (tab: HubTab) => navigate(HUB_PATHS[tab]);
+
+  const panel = (id: TabId, content: React.ReactNode) =>
+    visitedTabs.has(id) && <div className={activeTab !== id ? "hidden" : ""}>{content}</div>;
+
   return (
     <AdminLayout>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Abonnements</h1>
-        <p className="text-gray-600 mt-1">
-          Gérez les plans, souscriptions, passes et promotions
-        </p>
-      </div>
-
-      {/* Onglets — style nav arrondi comme ResourceMaster */}
-      <div className="mb-8 overflow-x-auto rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100">
-        <div className="flex min-w-max items-center gap-1.5">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.id;
-
-            return (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className={`group flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all whitespace-nowrap ${
-                  active
-                    ? "bg-primary-600 text-white shadow-lg shadow-primary-600/20"
-                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-                }`}
-              >
-                <Icon
-                  size={18}
-                  className={
-                    active
-                      ? "text-white"
-                      : "text-gray-500 group-hover:text-gray-800"
-                  }
-                />
-                {tab.label}
-              </button>
-            );
-          })}
+      <div style={brandVars}>
+        <div className="mb-5">
+          <h1 className="text-2xl font-bold tracking-tight text-gray-950 sm:text-3xl">
+            Abonnements
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Plans, souscriptions, passes, usages et promotions
+          </p>
         </div>
-      </div>
 
-      {/* Lazy rendering : monté à la première visite, caché ensuite */}
-      <div>
-        {visitedTabs.has("metrics") && (
-          <div className={activeTab !== "metrics" ? "hidden" : ""}>
-            <SubscriptionMetrics />
-          </div>
-        )}
-        {visitedTabs.has("plans") && (
-          <div className={activeTab !== "plans" ? "hidden" : ""}>
-            <PlansList />
-          </div>
-        )}
-        {visitedTabs.has("entitlements") && (
-          <div className={activeTab !== "entitlements" ? "hidden" : ""}>
-            <EntitlementDefinitionsList />
-          </div>
-        )}
-        {visitedTabs.has("subscriptions") && (
-          <div className={activeTab !== "subscriptions" ? "hidden" : ""}>
-            <SubscriptionsList />
-          </div>
-        )}
-        {visitedTabs.has("passCommercial") && (
-          <div className={activeTab !== "passCommercial" ? "hidden" : ""}>
-            <PassCommercialMaster />
-          </div>
-        )}
-        {visitedTabs.has("usage") && (
-          <div className={activeTab !== "usage" ? "hidden" : ""}>
-            <UsageRecordsList />
-          </div>
-        )}
-        {visitedTabs.has("billable") && (
-          <div className={activeTab !== "billable" ? "hidden" : ""}>
-            <BillableItemsList />
-          </div>
-        )}
-        {visitedTabs.has("promotions") && (
-          <div className={activeTab !== "promotions" ? "hidden" : ""}>
-            <PromotionsList />
-          </div>
-        )}
+        <div className="mb-6">
+          <Tabs items={tabs} active={activeTab} onChange={handleTabChange} />
+        </div>
+
+        {panel("metrics", <SubscriptionMetrics />)}
+        {panel("plans", <PlansList />)}
+        {panel("entitlements", <EntitlementDefinitionsList />)}
+        {panel("subscriptions", <SubscriptionsHub tab={hubTab} onTabChange={handleHubTabChange} />)}
+        {panel("passCommercial", <PassCommercialMaster />)}
+        {panel("usage", <UsageRecordsList />)}
+        {panel("billable", <BillableItemsList />)}
+        {panel("promotions", <PromotionsHub />)}
+
+        {/* Un seul Toaster pour tous les onglets du hub */}
+        <Toaster />
       </div>
     </AdminLayout>
   );

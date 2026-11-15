@@ -35,16 +35,16 @@ const notificationTone: Record<string, string> = {
   BOOKING_CANCELLATION: "text-rose-700 bg-rose-50 ring-rose-100",
   KYC_APPROVED: "text-emerald-700 bg-emerald-50 ring-emerald-100",
   KYC_REJECTED: "text-rose-700 bg-rose-50 ring-rose-100",
-  INVOICE_ISSUED: "text-slate-700 bg-slate-50 ring-slate-100",
+  INVOICE_ISSUED: "text-gray-700 bg-gray-50 ring-gray-100",
   PAYMENT_RECEIVED: "text-emerald-700 bg-emerald-50 ring-emerald-100",
   INVENTORY_ALERT: "text-amber-700 bg-amber-50 ring-amber-100",
   SUPPORT_CLIENT_REPLY: "text-sky-700 bg-sky-50 ring-sky-100",
   CASH_ANOMALY: "text-rose-700 bg-rose-50 ring-rose-100",
   BILLING_OVERDUE: "text-amber-700 bg-amber-50 ring-amber-100",
-  BILLING_DOCUMENT_ISSUED: "text-slate-700 bg-slate-50 ring-slate-100",
-  CONTRACT_SIGNING_REQUESTED: "text-violet-700 bg-violet-50 ring-violet-100",
+  BILLING_DOCUMENT_ISSUED: "text-gray-700 bg-gray-50 ring-gray-100",
+  CONTRACT_SIGNING_REQUESTED: "text-[color:var(--logo-pink-dark)] bg-[color:color-mix(in_srgb,var(--logo-pink)_16%,white)] ring-[color:color-mix(in_srgb,var(--logo-pink)_30%,white)]",
   CONTRACT_SIGNED_VIA_ESIGN: "text-emerald-700 bg-emerald-50 ring-emerald-100",
-  default: "text-slate-700 bg-slate-50 ring-slate-100",
+  default: "text-gray-700 bg-gray-50 ring-gray-100",
 };
 
 const typeLabels: Record<string, string> = {
@@ -126,6 +126,22 @@ export const NotificationDropdown: React.FC = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const closeTimer = useRef<number | undefined>(undefined);
+
+  const openOnHover = (e: React.PointerEvent) => {
+    if (e.pointerType !== "mouse") return;
+    window.clearTimeout(closeTimer.current);
+    setIsOpen(true);
+  };
+
+  const closeOnLeave = (e: React.PointerEvent) => {
+    if (e.pointerType !== "mouse") return;
+    window.clearTimeout(closeTimer.current);
+    closeTimer.current = window.setTimeout(() => setIsOpen(false), 200);
+  };
+
+  useEffect(() => () => window.clearTimeout(closeTimer.current), []);
+
   const handleNotificationClick = (notification: Notification) => {
     if (notification.status === "SENT" && !notification.readAt) {
       markAsReadMutation.mutate(notification.notificationNumber);
@@ -134,29 +150,34 @@ export const NotificationDropdown: React.FC = () => {
   };
 
   return (
-    <div ref={dropdownRef} className="relative">
+    <div
+      ref={dropdownRef}
+      className="relative"
+      onPointerEnter={openOnHover}
+      onPointerLeave={closeOnLeave}
+    >
       <button
         type="button"
         onClick={() => setIsOpen((open) => !open)}
-        className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+        className="relative inline-flex h-[2.2em] w-[2.2em] items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--logo-pink)]"
         aria-label="Notifications"
       >
-        <Bell size={20} />
+        <Bell className="h-[52%] w-[52%]" />
         {unreadCount > 0 && (
-          <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-white">
+          <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 z-50 mt-3 w-[390px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
-          <div className="flex items-start justify-between gap-4 px-4 py-4">
+        <div className="absolute right-0 z-50 mt-3 w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-3xl border border-gray-100 bg-white text-base shadow-xl">
+          <div className="flex items-start justify-between gap-4 px-5 py-4">
             <div>
-              <h3 className="text-sm font-semibold text-slate-950">
+              <h3 className="text-sm font-semibold text-gray-950">
                 Notifications
               </h3>
-              <p className="mt-0.5 text-xs text-slate-500">
+              <p className="mt-0.5 text-xs text-gray-500">
                 {unreadCount > 0
                   ? `${unreadCount} non lue${unreadCount > 1 ? "s" : ""}`
                   : "Aucune notification non lue"}
@@ -168,7 +189,7 @@ export const NotificationDropdown: React.FC = () => {
                 type="button"
                 onClick={() => markAllAsReadMutation.mutate()}
                 disabled={markAllAsReadMutation.isPending}
-                className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-[color:var(--logo-pink-dark)] transition hover:bg-[color:color-mix(in_srgb,var(--logo-pink)_16%,white)] disabled:opacity-50"
               >
                 <CheckCheck size={14} />
                 Tout lire
@@ -178,8 +199,8 @@ export const NotificationDropdown: React.FC = () => {
 
           <div className="max-h-[380px] overflow-y-auto px-2 pb-2">
             {notifications.length === 0 ? (
-              <div className="mx-2 mb-2 rounded-xl bg-slate-50 px-4 py-8 text-center text-slate-500">
-                <Bell size={34} className="mx-auto mb-2 text-slate-300" />
+              <div className="mx-2 mb-2 rounded-2xl bg-gray-50 px-4 py-8 text-center text-gray-500">
+                <Bell size={34} className="mx-auto mb-2 text-gray-300" />
                 <p className="text-sm">Aucune notification</p>
               </div>
             ) : (
@@ -197,33 +218,35 @@ export const NotificationDropdown: React.FC = () => {
                       key={notification.notificationNumber}
                       type="button"
                       onClick={() => handleNotificationClick(notification)}
-                      className="group w-full rounded-xl px-3 py-3 text-left transition hover:bg-slate-50"
+                      className={`group w-full rounded-2xl px-3 py-3 text-left transition hover:bg-gray-50 ${
+                        isRead ? "" : "bg-[color:color-mix(in_srgb,var(--logo-pink)_10%,white)]"
+                      }`}
                     >
                       <div className="flex gap-3">
                         <div
-                          className={`mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ${tone}`}
+                          className={`mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-1 ${tone}`}
                         >
                           <Icon size={16} />
                         </div>
 
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start gap-2">
-                            <p className="line-clamp-1 flex-1 text-sm font-semibold text-slate-900">
+                            <p className="line-clamp-1 flex-1 text-sm font-semibold text-gray-900">
                               {notification.subject ||
                                 typeLabels[notification.type] ||
                                 notification.type}
                             </p>
                             {!isRead && (
-                              <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary-600" />
+                              <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[color:var(--logo-pink)]" />
                             )}
                           </div>
-                          <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600">
+                          <p className="mt-1 line-clamp-2 text-sm leading-5 text-gray-600">
                             {notification.body}
                           </p>
-                          <div className="mt-2 flex items-center gap-2 text-xs text-slate-400">
+                          <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
                             <span>{formatDate(notification.createdAt)}</span>
                             {notification.channel && (
-                              <span className="rounded-full bg-slate-100 px-2 py-0.5 capitalize text-slate-500">
+                              <span className="rounded-full bg-gray-100 px-2 py-0.5 capitalize text-gray-500">
                                 {notification.channel}
                               </span>
                             )}
@@ -244,7 +267,7 @@ export const NotificationDropdown: React.FC = () => {
                 setIsOpen(false);
                 navigate("/notifications");
               }}
-              className="w-full rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+              className="w-full rounded-full bg-[color:var(--logo-pink)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[color:var(--logo-pink-dark)]"
             >
               Voir toutes les notifications
             </button>

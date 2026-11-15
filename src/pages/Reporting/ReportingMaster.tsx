@@ -1,5 +1,4 @@
-import React, { useMemo, useState } from "react";
-import { AdminLayout } from "../../components/layout/AdminLayout";
+import React, { useState } from "react";
 import {
   Activity,
   Archive,
@@ -12,11 +11,15 @@ import {
   LayoutDashboard,
   LineChart,
   Repeat,
-  Search,
   Trophy,
   UserRound,
   Wallet,
 } from "lucide-react";
+import { AdminLayout } from "../../components/layout/AdminLayout";
+import { brandVars } from "../../components/layout/adminTheme";
+import { PageHeader, Tabs } from "../../components/subscription/kit";
+import type { TabItem } from "../../components/subscription/kit";
+import { Toaster } from "../../components/ui/Toaster";
 import { FinanceDashboard } from "./FinanceDashboard";
 import { PaymentsReport } from "./PaymentsReport";
 import { AgingReport } from "./AgingReport";
@@ -54,395 +57,81 @@ type TabId =
   | "stock-valuation"
   | "subscription-analytics";
 
-type ReportCategory = "analytics" | "financial" | "business" | "all";
+type GroupId = "analytics" | "financial" | "business";
 
-interface Tab {
-  id: TabId;
-  label: string;
-  icon: React.ElementType;
-  description: string;
-  group: Exclude<ReportCategory, "all">;
+interface Report extends TabItem<TabId> {
+  group: GroupId;
+  view: React.ReactNode;
 }
 
-const categoryLabels: Record<ReportCategory, string> = {
-  all: "Tous les rapports",
-  analytics: "Analytics",
-  financial: "Financier",
-  business: "Métier",
-};
+const REPORTS: Report[] = [
+  { id: "live", label: "Temps réel", icon: Activity, group: "analytics", view: <LiveKpiDashboard /> },
+  { id: "comparison", label: "Comparaison", icon: GitCompare, group: "analytics", view: <ComparisonReport /> },
+  { id: "trends", label: "Tendances", icon: LineChart, group: "analytics", view: <TrendsChart /> },
+  { id: "top-resources", label: "Top ressources", icon: Building2, group: "analytics", view: <TopResourcesReport /> },
+  { id: "top-owners", label: "Top clients", icon: Trophy, group: "analytics", view: <TopOwnersReport /> },
+  { id: "dashboard", label: "Tableau de bord", icon: LayoutDashboard, group: "financial", view: <FinanceDashboard /> },
+  { id: "payments", label: "Paiements", icon: CreditCard, group: "financial", view: <PaymentsReport /> },
+  { id: "aging", label: "Vieillissement", icon: Clock, group: "financial", view: <AgingReport /> },
+  { id: "cash-registers", label: "Caisses", icon: Wallet, group: "financial", view: <CashRegistersReport /> },
+  { id: "cash-flow", label: "Trésorerie", icon: BarChart3, group: "financial", view: <CashFlowReport /> },
+  { id: "occupancy", label: "Occupation", icon: Building2, group: "financial", view: <OccupancyReport /> },
+  { id: "activity", label: "Activité", icon: FileText, group: "business", view: <ActivityReport /> },
+  { id: "member-profile", label: "Membre 360", icon: UserRound, group: "business", view: <MemberProfileReport /> },
+  { id: "debt-recovery", label: "Recouvrement", icon: Clock, group: "business", view: <DebtRecoveryReport /> },
+  { id: "resource-utilization", label: "Utilisation ressources", icon: Building2, group: "business", view: <ResourceUtilizationReport /> },
+  { id: "stock-valuation", label: "Stock", icon: Archive, group: "business", view: <StockValuationReport /> },
+  { id: "subscription-analytics", label: "Abonnements", icon: Repeat, group: "business", view: <SubscriptionAnalyticsReport /> },
+];
 
-const tabs: Tab[] = [
-  {
-    id: "live",
-    label: "Temps réel",
-    icon: Activity,
-    description: "KPIs opérationnels en direct",
-    group: "analytics",
-  },
-  {
-    id: "comparison",
-    label: "Comparaison",
-    icon: GitCompare,
-    description: "Comparer deux périodes",
-    group: "analytics",
-  },
-  {
-    id: "trends",
-    label: "Tendances",
-    icon: LineChart,
-    description: "Évolution réservations, revenus et occupation",
-    group: "analytics",
-  },
-  {
-    id: "top-resources",
-    label: "Top ressources",
-    icon: Building2,
-    description: "Ressources les plus utilisées",
-    group: "analytics",
-  },
-  {
-    id: "top-owners",
-    label: "Top clients",
-    icon: Trophy,
-    description: "Clients les plus actifs",
-    group: "analytics",
-  },
-  {
-    id: "dashboard",
-    label: "Tableau de bord",
-    icon: LayoutDashboard,
-    description: "Vue financière globale",
-    group: "financial",
-  },
-  {
-    id: "payments",
-    label: "Paiements",
-    icon: CreditCard,
-    description: "Répartition par méthode",
-    group: "financial",
-  },
-  {
-    id: "aging",
-    label: "Vieillissement",
-    icon: Clock,
-    description: "Créances par ancienneté",
-    group: "financial",
-  },
-  {
-    id: "cash-registers",
-    label: "Caisses",
-    icon: Wallet,
-    description: "Sessions et écarts de caisse",
-    group: "financial",
-  },
-  {
-    id: "cash-flow",
-    label: "Trésorerie",
-    icon: BarChart3,
-    description: "Flux entrants et sortants",
-    group: "financial",
-  },
-  {
-    id: "occupancy",
-    label: "Occupation",
-    icon: Building2,
-    description: "Taux d’utilisation des ressources",
-    group: "financial",
-  },
-  {
-    id: "activity",
-    label: "Activité",
-    icon: FileText,
-    description: "Rapport consolidé cross-module",
-    group: "business",
-  },
-  {
-    id: "member-profile",
-    label: "Membre 360",
-    icon: UserRound,
-    description: "Dossier complet d’un membre",
-    group: "business",
-  },
-  {
-    id: "debt-recovery",
-    label: "Recouvrement",
-    icon: Clock,
-    description: "Factures impayées et relance",
-    group: "business",
-  },
-  {
-    id: "resource-utilization",
-    label: "Utilisation ressources",
-    icon: Building2,
-    description: "Heatmap, occupation et revenu par heure",
-    group: "business",
-  },
-  {
-    id: "stock-valuation",
-    label: "Stock",
-    icon: Archive,
-    description: "Valorisation, stock faible et stock mort",
-    group: "business",
-  },
-  {
-    id: "subscription-analytics",
-    label: "Abonnements",
-    icon: Repeat,
-    description: "MRR, churn et renouvellements",
-    group: "business",
-  },
+const GROUPS: TabItem<GroupId>[] = [
+  { id: "analytics", label: "Analytics", icon: LineChart },
+  { id: "financial", label: "Financier", icon: CreditCard },
+  { id: "business", label: "Métier", icon: FileText },
 ];
 
 export const ReportingMaster: React.FC = () => {
+  const [group, setGroup] = useState<GroupId>("analytics");
   const [activeTab, setActiveTab] = useState<TabId>("live");
-  const [category, setCategory] = useState<ReportCategory>("all");
-  const [search, setSearch] = useState("");
+  // Un rapport visité reste monté (filtres conservés), les autres ne sont chargés qu'à la première visite.
   const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(new Set(["live"]));
 
-  const activeTabInfo = tabs.find((tab) => tab.id === activeTab);
-
-  const filteredTabs = useMemo(() => {
-    const value = search.trim().toLowerCase();
-
-    return tabs.filter((tab) => {
-      const matchesCategory = category === "all" || tab.group === category;
-      const matchesSearch =
-        !value ||
-        tab.label.toLowerCase().includes(value) ||
-        tab.description.toLowerCase().includes(value);
-
-      return matchesCategory && matchesSearch;
-    });
-  }, [category, search]);
-
-  const handleTabChange = (tabId: TabId) => {
-    setActiveTab(tabId);
-    setVisitedTabs((prev) => new Set([...prev, tabId]));
+  const openReport = (id: TabId) => {
+    setActiveTab(id);
+    setVisitedTabs((prev) => new Set([...prev, id]));
   };
+
+  const openGroup = (g: GroupId) => {
+    setGroup(g);
+    const current = REPORTS.find((r) => r.id === activeTab);
+    if (current?.group !== g) {
+      const first = REPORTS.find((r) => r.group === g);
+      if (first) openReport(first.id);
+    }
+  };
+
+  const inGroup: TabItem<TabId>[] = REPORTS.filter((r) => r.group === group).map(({ id, label, icon }) => ({ id, label, icon }));
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
-        <section className="rounded-[2rem] bg-white p-5 shadow-sm ring-1 ring-gray-100 md:p-6">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-primary-600">
-                Reporting
-              </p>
-              <h1 className="mt-2 text-2xl font-black tracking-tight text-gray-950 md:text-3xl">
-                Analytiques & rapports
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
-                Consultez les rapports financiers, opérationnels et métier depuis un
-                même espace.
-              </p>
+      <div style={brandVars}>
+        <Toaster />
+        <PageHeader title="Analytiques et rapports" subtitle="Les chiffres financiers, opérationnels et métier au même endroit" />
+        <div className="mb-4">
+          <Tabs items={GROUPS} active={group} onChange={openGroup} />
+        </div>
+        <div className="mb-6">
+          <Tabs variant="soft" items={inGroup} active={activeTab} onChange={openReport} />
+        </div>
+
+        {REPORTS.map((r) =>
+          visitedTabs.has(r.id) ? (
+            <div key={r.id} className={activeTab !== r.id ? "hidden" : ""}>
+              {r.view}
             </div>
-
-            <div className="grid gap-3 sm:grid-cols-[220px_1fr] xl:w-[560px]">
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-gray-400">
-                  Catégorie
-                </span>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as ReportCategory)}
-                  className="h-11 w-full rounded-2xl border border-gray-200 bg-white px-3 text-sm font-bold text-gray-700 outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-                >
-                  <option value="all">Tous les rapports</option>
-                  <option value="analytics">Analytics</option>
-                  <option value="financial">Financier</option>
-                  <option value="business">Métier</option>
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-gray-400">
-                  Recherche
-                </span>
-                <div className="relative">
-                  <Search
-                    size={17}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Rechercher un rapport..."
-                    className="h-11 w-full rounded-2xl border border-gray-200 bg-white pl-10 pr-3 text-sm font-semibold text-gray-700 outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-                  />
-                </div>
-              </label>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-[2rem] bg-white p-3 shadow-sm ring-1 ring-gray-100">
-          <div className="mb-3 flex items-center justify-between px-2 pt-2">
-            <div>
-              <p className="text-sm font-black text-gray-900">
-                {categoryLabels[category]}
-              </p>
-              <p className="text-xs font-semibold text-gray-400">
-                {filteredTabs.length} rapport{filteredTabs.length > 1 ? "s" : ""}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {filteredTabs.map((tab) => {
-              const Icon = tab.icon;
-              const active = tab.id === activeTab;
-
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => handleTabChange(tab.id)}
-                  className={`rounded-[1.35rem] p-4 text-left transition-all ${
-                    active
-                      ? "bg-primary-600 text-white shadow-lg shadow-primary-600/20"
-                      : "bg-gray-50 text-gray-700 hover:bg-white hover:shadow-sm hover:ring-1 hover:ring-gray-100"
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <span
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
-                        active
-                          ? "bg-white/15 text-white"
-                          : "bg-white text-primary-600 ring-1 ring-gray-100"
-                      }`}
-                    >
-                      <Icon size={19} />
-                    </span>
-
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-black">
-                        {tab.label}
-                      </span>
-                      <span
-                        className={`mt-1 block text-xs leading-5 ${
-                          active ? "text-white/80" : "text-gray-500"
-                        }`}
-                      >
-                        {tab.description}
-                      </span>
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {activeTabInfo && (
-          <section className="rounded-[2rem] bg-white p-5 shadow-sm ring-1 ring-gray-100 md:p-6">
-            <div className="mb-6 flex flex-col gap-3 border-b border-gray-100 pb-5 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-primary-600">
-                  {categoryLabels[activeTabInfo.group]}
-                </p>
-                <h2 className="mt-1 text-xl font-black text-gray-950">
-                  {activeTabInfo.label}
-                </h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  {activeTabInfo.description}
-                </p>
-              </div>
-            </div>
-
-            {visitedTabs.has("live") && (
-              <Panel active={activeTab === "live"}>
-                <LiveKpiDashboard />
-              </Panel>
-            )}
-            {visitedTabs.has("comparison") && (
-              <Panel active={activeTab === "comparison"}>
-                <ComparisonReport />
-              </Panel>
-            )}
-            {visitedTabs.has("trends") && (
-              <Panel active={activeTab === "trends"}>
-                <TrendsChart />
-              </Panel>
-            )}
-            {visitedTabs.has("top-resources") && (
-              <Panel active={activeTab === "top-resources"}>
-                <TopResourcesReport />
-              </Panel>
-            )}
-            {visitedTabs.has("top-owners") && (
-              <Panel active={activeTab === "top-owners"}>
-                <TopOwnersReport />
-              </Panel>
-            )}
-            {visitedTabs.has("dashboard") && (
-              <Panel active={activeTab === "dashboard"}>
-                <FinanceDashboard />
-              </Panel>
-            )}
-            {visitedTabs.has("payments") && (
-              <Panel active={activeTab === "payments"}>
-                <PaymentsReport />
-              </Panel>
-            )}
-            {visitedTabs.has("aging") && (
-              <Panel active={activeTab === "aging"}>
-                <AgingReport />
-              </Panel>
-            )}
-            {visitedTabs.has("cash-registers") && (
-              <Panel active={activeTab === "cash-registers"}>
-                <CashRegistersReport />
-              </Panel>
-            )}
-            {visitedTabs.has("cash-flow") && (
-              <Panel active={activeTab === "cash-flow"}>
-                <CashFlowReport />
-              </Panel>
-            )}
-            {visitedTabs.has("occupancy") && (
-              <Panel active={activeTab === "occupancy"}>
-                <OccupancyReport />
-              </Panel>
-            )}
-            {visitedTabs.has("activity") && (
-              <Panel active={activeTab === "activity"}>
-                <ActivityReport />
-              </Panel>
-            )}
-            {visitedTabs.has("member-profile") && (
-              <Panel active={activeTab === "member-profile"}>
-                <MemberProfileReport />
-              </Panel>
-            )}
-            {visitedTabs.has("debt-recovery") && (
-              <Panel active={activeTab === "debt-recovery"}>
-                <DebtRecoveryReport />
-              </Panel>
-            )}
-            {visitedTabs.has("resource-utilization") && (
-              <Panel active={activeTab === "resource-utilization"}>
-                <ResourceUtilizationReport />
-              </Panel>
-            )}
-            {visitedTabs.has("stock-valuation") && (
-              <Panel active={activeTab === "stock-valuation"}>
-                <StockValuationReport />
-              </Panel>
-            )}
-            {visitedTabs.has("subscription-analytics") && (
-              <Panel active={activeTab === "subscription-analytics"}>
-                <SubscriptionAnalyticsReport />
-              </Panel>
-            )}
-          </section>
+          ) : null,
         )}
       </div>
     </AdminLayout>
   );
 };
-
-const Panel: React.FC<{ active: boolean; children: React.ReactNode }> = ({
-  active,
-  children,
-}) => <div className={active ? "" : "hidden"}>{children}</div>;

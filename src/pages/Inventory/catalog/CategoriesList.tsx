@@ -1,270 +1,128 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, Search, X } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Boxes, Pencil, Plus, Trash2 } from "lucide-react";
 import { inventoryService } from "../../../services/inventory.service";
-import type { InventoryCategory } from "../../../services/inventory.service";
-import { ModalPortal } from "../../../components/ui/ModalPortal";
+import { ActionButton, DataCard, EmptyState, ErrorBlock, Field, HeadRow, IconButton, ListHeader, PanelForm, Pagination, SearchField, StatusChip } from "../../../components/subscription/kit";
+import { FIELD, ROW_HOVER, apiMessage } from "../../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../../components/ui/Skeleton";
+import { toast } from "../../../components/ui/toastStore";
+import { Cell, catCode, usePaged } from "../../../components/inventory/invKit";
+
+const COLS = "lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1.8fr)_6rem_auto]";
+const EMPTY = { categoryCode: "", name: "", description: "" };
 
 export const CategoriesList: React.FC = () => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCategory, setEditingCategory] =
-    useState<InventoryCategory | null>(null);
-  const [formData, setFormData] = useState({
-    categoryCode: "",
-    name: "",
-    description: "",
-  });
+  const [editing, setEditing] = useState<{ code: string | null; form: typeof EMPTY } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const { data: categories = [], isLoading } = useQuery({
-    queryKey: ["inventory-categories"],
-    queryFn: () => inventoryService.getCategories(),
-  });
+  const { data: categories = [], isLoading, isError, refetch } = useQuery({ queryKey: ["inventory-categories"], queryFn: () => inventoryService.getCategories() });
+  const q = search.trim().toLowerCase();
+  const filtered = categories.filter((c) => !q || c.name.toLowerCase().includes(q) || catCode(c).toLowerCase().includes(q));
+  const paged = usePaged(filtered, 15);
 
-  const createMutation = useMutation({
-    mutationFn: (data: any) => inventoryService.createCategory(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventory-categories"] });
-      handleCloseModal();
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["inventory-categories"] });
+  const save = useMutation({
+    mutationFn: async () => {
+      const f = editing!.form;
+      const body = { categoryCode: f.categoryCode.trim(), name: f.name.trim(), description: f.description.trim() || undefined };
+      if (editing!.code === null) await inventoryService.createCategory(body);
+      else await inventoryService.updateCategory(editing!.code, body);
     },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ code, data }: { code: string; data: any }) =>
-      inventoryService.updateCategory(code, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventory-categories"] });
-      handleCloseModal();
+    onSuccess: async () => {
+      toast.success(editing?.code === null ? "Catégorie créée" : "Catégorie modifiée");
+      await invalidate();
+      setEditing(null);
+      setError(null);
     },
+    onError: (e) => setError(apiMessage(e, "Enregistrement impossible")),
   });
+  // DELETE /inventory/categories/{code} n'est pas documenté côté backend : à confirmer
+  const remove = useMutation({ mutationFn: (code: string) => inventoryService.deleteCategory(code), onSuccess: invalidate });
 
-  const deleteMutation = useMutation({
-    mutationFn: (code: string) => inventoryService.deleteCategory(code),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventory-categories"] });
-    },
-  });
-
-  const filteredCategories = categories.filter(
-    (cat) =>
-      cat.name.toLowerCase().includes(search.toLowerCase()) ||
-      (cat.code || cat.categoryCode || "")
-        .toLowerCase()
-        .includes(search.toLowerCase()),
-  );
-
-  const handleOpenModal = (category?: InventoryCategory) => {
-    if (category) {
-      setEditingCategory(category);
-      setFormData({
-        categoryCode: category.categoryCode || category.code || "",
-        name: category.name,
-        description: category.description || "",
-      });
-    } else {
-      setEditingCategory(null);
-      setFormData({ categoryCode: "", name: "", description: "" });
-    }
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingCategory(null);
-    setFormData({ categoryCode: "", name: "", description: "" });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingCategory) {
-      updateMutation.mutate({
-        code: editingCategory.categoryCode || editingCategory.code || "",
-        data: formData,
-      });
-    } else {
-      createMutation.mutate(formData);
-    }
-  };
-
-  const handleDelete = (code: string) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer cette catégorie ?")) {
-      deleteMutation.mutate(code);
-    }
-  };
-
-  if (isLoading) {
-    return <div className="text-center py-8">Chargement...</div>;
-  }
+  const f = editing?.form;
+  const set = (p: Partial<typeof EMPTY>) => setEditing((s) => (s ? { ...s, form: { ...s.form, ...p } } : s));
 
   return (
-    <div className="p-3 sm:p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
-        <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">
-          Catégories d'articles
-        </h2>
-        <button
-          onClick={() => handleOpenModal()}
-          className="w-full sm:w-auto justify-center bg-primary-600 text-white px-4 py-3 rounded-2xl hover:bg-primary-700 flex items-center gap-2 text-sm sm:text-base"
+    <div className="space-y-5">
+      <ListHeader title="Catégories" subtitle={isLoading ? undefined : `${filtered.length} catégorie${filtered.length > 1 ? "s" : ""}`} action={<ActionButton icon={Plus} onClick={() => { setError(null); setEditing({ code: null, form: { ...EMPTY } }); }}>Nouvelle catégorie</ActionButton>} />
+
+      {editing && f && (
+        <PanelForm
+          title={editing.code === null ? "Nouvelle catégorie" : `Modifier ${editing.code}`}
+          onCancel={() => setEditing(null)}
+          pending={save.isPending}
+          submitLabel={editing.code === null ? "Créer" : "Enregistrer"}
+          submitDisabled={!f.categoryCode.trim() || !f.name.trim()}
+          error={error}
+          onSubmit={(e) => { e.preventDefault(); save.mutate(); }}
         >
-          <Plus size={20} />
-          Nouvelle catégorie
-        </button>
-      </div>
-
-      {/* Recherche - AGRANDIE */}
-      <div className="relative mb-8">
-        <Search
-          size={20}
-          className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
-        />
-        <input
-          type="text"
-          placeholder="Rechercher une catégorie..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-11 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
-        />
-      </div>
-
-      {/* Tableau - AGRANDI */}
-      <div className="bg-white rounded-3xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm sm:text-base">
-            <thead className="bg-gray-50/70">
-              <tr>
-                <th className="px-4 py-4 text-left font-semibold">Code</th>
-                <th className="px-4 py-4 text-left font-semibold">Nom</th>
-                <th className="px-4 py-4 text-left font-semibold">
-                  Description
-                </th>
-                <th className="px-4 py-4 text-left font-semibold">Articles</th>
-                <th className="px-4 py-4 text-right font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="">
-              {filteredCategories.map((cat) => (
-                <tr
-                  key={cat.categoryCode || cat.code}
-                  className="transition hover:bg-gray-50/70"
-                >
-                  <td className="px-4 py-4 font-mono text-sm">
-                    {cat.categoryCode || cat.code}
-                  </td>
-                  <td className="px-4 py-4 font-medium">{cat.name}</td>
-                  <td className="px-4 py-4 text-gray-500">
-                    {cat.description || "-"}
-                  </td>
-                  <td className="px-4 py-4">{cat.itemCount || 0}</td>
-                  <td className="px-4 py-4 text-right">
-                    <button
-                      onClick={() => handleOpenModal(cat)}
-                      className="p-1.5 text-blue-600 hover:text-blue-800 mr-2"
-                      title="Modifier"
-                    >
-                      <Edit size={18} />
-                    </button>
-                    <button
-                      onClick={() =>
-                        handleDelete(cat.categoryCode || cat.code || "")
-                      }
-                      className="p-1.5 text-red-600 hover:text-red-800"
-                      title="Supprimer"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {filteredCategories.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-2xl">
-          <p className="text-gray-500 text-sm sm:text-base">Aucune catégorie trouvée</p>
-        </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Code" required hint={editing.code === null ? undefined : "Le code ne peut pas être modifié."}>
+              <input value={f.categoryCode} onChange={(e) => set({ categoryCode: e.target.value })} disabled={editing.code !== null} placeholder="Ex : MOBILIER" className={`${FIELD} disabled:opacity-60`} autoFocus={editing.code === null} />
+            </Field>
+            <Field label="Nom" required>
+              <input value={f.name} onChange={(e) => set({ name: e.target.value })} placeholder="Ex : Mobilier" className={FIELD} autoFocus={editing.code !== null} />
+            </Field>
+          </div>
+          <Field label="Description">
+            <textarea value={f.description} onChange={(e) => set({ description: e.target.value })} rows={2} className={`${FIELD} resize-none`} />
+          </Field>
+        </PanelForm>
       )}
 
-      {/* ========== MODAL AVEC ModalPortal - AGRANDI ========== */}
-      {isModalOpen && (
-        <ModalPortal onClose={handleCloseModal} size="2xl">
-          <div className="sticky top-0 bg-white p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
-            <h3 className="text-xl sm:text-2xl font-bold">
-              {editingCategory ? "Modifier la catégorie" : "Nouvelle catégorie"}
-            </h3>
-            <button
-              onClick={handleCloseModal}
-              className="p-2 hover:bg-gray-100 rounded-2xl"
-            >
-              <X size={24} />
-            </button>
-          </div>
-          <form onSubmit={handleSubmit} className="p-5 sm:p-8 space-y-6">
-            <div>
-              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                Code *
-              </label>
-              <input
-                type="text"
-                value={formData.categoryCode}
-                onChange={(e) =>
-                  setFormData({ ...formData, categoryCode: e.target.value })
-                }
-                disabled={!!editingCategory}
-                required
-                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 disabled:bg-gray-100 text-sm sm:text-base"
-                placeholder="ex: MOBILIER"
-              />
-            </div>
-            <div>
-              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                Nom *
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                required
-                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
-                placeholder="ex: Mobilier"
-              />
-            </div>
-            <div>
-              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                Description
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                rows={4}
-                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
-                placeholder="Description optionnelle"
-              />
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row pt-6">
-              <button
-                type="button"
-                onClick={handleCloseModal}
-                className="flex-1 px-5 py-3 ring-1 ring-gray-100 rounded-2xl text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
-              >
-                Annuler
-              </button>
-              <button
-                type="submit"
-                disabled={createMutation.isPending || updateMutation.isPending}
-                className="flex-1 justify-center bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 text-sm sm:text-base"
-              >
-                {editingCategory ? "Mettre à jour" : "Créer"}
-              </button>
-            </div>
-          </form>
-        </ModalPortal>
+      <SearchField value={search} onChange={setSearch} placeholder="Nom ou code de la catégorie" />
+
+      {isLoading ? (
+        <ListSkeleton rows={5} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les catégories." onRetry={() => refetch()} />
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={Boxes} title="Aucune catégorie" hint={q ? "Aucun résultat pour cette recherche." : "Les catégories regroupent vos articles : fournitures, mobilier, informatique."} />
+      ) : (
+        <>
+          <HeadRow cols={COLS}>
+            <span>Catégorie</span>
+            <span>Description</span>
+            <span>Articles</span>
+            <span className="text-right">Actions</span>
+          </HeadRow>
+          <DataCard>
+            {paged.slice.map((c) => (
+              <div key={catCode(c)} className={`grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl p-4 max-lg:mb-2 max-lg:bg-gray-50 ${COLS} ${ROW_HOVER}`}>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-gray-900">{c.name}</p>
+                  <p className="font-mono text-xs text-gray-400">{catCode(c)}</p>
+                </div>
+                <Cell title="Description" className="max-lg:order-3 max-lg:col-span-2"><span className="line-clamp-1 text-sm text-gray-600">{c.description || "Sans description"}</span></Cell>
+                <div className="max-lg:order-2 max-lg:justify-self-end">
+                  {c.active === false ? <StatusChip tone="neutral">Inactive</StatusChip> : <span className="text-sm text-gray-600">{c.itemCount ?? 0} article{(c.itemCount ?? 0) > 1 ? "s" : ""}</span>}
+                </div>
+                <div className="flex items-center gap-1 max-lg:order-4 max-lg:col-span-2 lg:justify-end">
+                  <IconButton icon={Pencil} label="Modifier" onClick={() => { setError(null); setEditing({ code: catCode(c), form: { categoryCode: catCode(c), name: c.name, description: c.description ?? "" } }); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+                  <IconButton
+                    icon={Trash2}
+                    label="Supprimer"
+                    tone="danger"
+                    onClick={() =>
+                      toast.confirm({
+                        message: `Supprimer la catégorie « ${c.name} » ?`,
+                        detail: "La suppression échoue si des articles y sont rattachés.",
+                        confirmLabel: "Supprimer",
+                        pendingLabel: "Suppression",
+                        successMessage: "Catégorie supprimée",
+                        errorMessage: "Suppression impossible : la catégorie est probablement utilisée",
+                        onConfirm: () => remove.mutateAsync(catCode(c)),
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            ))}
+          </DataCard>
+          <Pagination page={paged.page} totalPages={paged.totalPages} total={paged.total} noun="catégorie" onChange={paged.setPage} />
+        </>
       )}
     </div>
   );

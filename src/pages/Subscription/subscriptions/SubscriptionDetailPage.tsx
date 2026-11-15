@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft,
   Clock,
   Play,
   Pause,
@@ -19,6 +18,13 @@ import {
   Activity,
   Users,
   Layers,
+  History,
+  Receipt,
+  Send,
+  UserRound,
+  Workflow,
+  LogIn,
+  Briefcase,
 } from "lucide-react";
 import { subscriptionService } from "../../../services/subscription.service";
 import type {
@@ -29,41 +35,65 @@ import type {
   TimelineEvent,
   SubscriptionNotification,
   OverageCharge,
+  OveragePolicy,
   Rollover,
   UsageRecord,
   BillableItem,
+  EntitlementBalance,
+  EntitlementGrant,
 } from "../../../services/subscription.service";
 import { AdminLayout } from "../../../components/layout/AdminLayout";
-import { AddSeatModal } from "./AddSeatModal";
-import { CreateAddonModal } from "./CreateAddonModal";
-import { CreateChangeModal } from "./CreateChangeModal";
-import { CreateTimelineEventModal } from "./CreateTimelineEventModal";
-import { CreateNotificationModal } from "./CreateNotificationModal";
-import { CreateUsageRecordModal } from "../usage/CreateUsageRecordModal";
+import { brandVars } from "../../../components/layout/adminTheme";
+import { DetailsSkeleton } from "../../../components/ui/Skeleton";
+import { Toaster } from "../../../components/ui/Toaster";
+import { toast } from "../../../components/ui/toastStore";
+import {
+  ActionButton,
+  Detail,
+  ErrorBlock,
+  IconButton,
+  ItemRow,
+  PageHeader,
+  Section,
+  StatusChip,
+  Tabs,
+  Tag,
+} from "../../../components/subscription/kit";
+import type { TabItem } from "../../../components/subscription/kit";
+import {
+  PINK_SOFT,
+  apiMessage,
+  formatDate,
+  formatDateTime,
+  formatMoney,
+} from "../../../components/subscription/kitUtils";
+import {
+  BILLABLE_STATUS,
+  BILLING_CYCLE_LABELS,
+  BILLING_SCHEDULE_STATUS,
+  CHANGE_STATUS,
+  NOTIFICATION_STATUS,
+  OVERAGE_MODE_LABELS,
+  SUBSCRIBER_TYPE_LABELS,
+  SUBSCRIPTION_STATUS,
+  USAGE_STATUS,
+  statusOf,
+} from "../../../components/subscription/labels";
+import { AddSeatPanel } from "./AddSeatPanel";
+import { AddonPanel } from "./AddonPanel";
+import { ChangePanel } from "./ChangePanel";
+import { TimelineEventPanel } from "./TimelineEventPanel";
+import { NotificationPanel } from "./NotificationPanel";
+import { OveragePolicyPanel } from "./OveragePolicyPanel";
+import { UsageRecordForm } from "../usage/UsageRecordForm";
+import { subscriptionLifecycleService } from "../../../services/subscriptionLifecycle.service";
+import { CommitmentPanel } from "../../../components/subscription/lifecycle/CommitmentPanel";
+import { FreezePanel } from "../../../components/subscription/lifecycle/FreezePanel";
+import { DebitMandatePanel } from "../../../components/subscription/lifecycle/DebitMandatePanel";
+import { TerminationPanel } from "../../../components/subscription/lifecycle/TerminationPanel";
+import { DerivationPanel } from "../../../components/subscription/lifecycle/DerivationPanel";
+import { SubscriptionServicesPanel } from "../../../components/services/SubscriptionServicesPanel";
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  DRAFT: { label: "Brouillon", color: "bg-gray-100 text-gray-700" },
-  PENDING_ACTIVATION: {
-    label: "En attente",
-    color: "bg-yellow-100 text-yellow-700",
-  },
-  ACTIVE: { label: "Actif", color: "bg-green-100 text-green-700" },
-  PAST_DUE: { label: "En retard", color: "bg-red-100 text-red-700" },
-  SUSPENDED: { label: "Suspendu", color: "bg-orange-100 text-orange-700" },
-  CANCELLED: { label: "Annulé", color: "bg-gray-100 text-gray-500" },
-  EXPIRED: { label: "Expiré", color: "bg-gray-100 text-gray-500" },
-};
-
-const billingCycleLabels: Record<string, string> = {
-  ONE_TIME: "Unique",
-  DAILY: "Journalier",
-  WEEKLY: "Hebdomadaire",
-  MONTHLY: "Mensuel",
-  QUARTERLY: "Trimestriel",
-  YEARLY: "Annuel",
-};
-
-// 12 onglets selon la doc
 type Tab =
   | "info"
   | "entitlements"
@@ -71,27 +101,54 @@ type Tab =
   | "billable"
   | "usage"
   | "addons"
+  | "services"
   | "seats"
   | "changes"
   | "timeline"
   | "notifications"
   | "overage"
-  | "rollover";
+  | "rollover"
+  | "lifecycle"
+  | "history";
 
-const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
+const TABS: TabItem<Tab>[] = [
   { id: "info", label: "Résumé", icon: Activity },
   { id: "entitlements", label: "Droits", icon: CheckCircle },
   { id: "billing", label: "Facturation", icon: CreditCard },
-  { id: "billable", label: "Items facturables", icon: CreditCard },
+  { id: "billable", label: "Items facturables", icon: Receipt },
   { id: "usage", label: "Usage", icon: Activity },
   { id: "addons", label: "Add-ons", icon: Layers },
+  { id: "services", label: "Services", icon: Briefcase },
   { id: "seats", label: "Sièges", icon: Users },
   { id: "changes", label: "Changements", icon: GitBranch },
   { id: "timeline", label: "Timeline", icon: Clock },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "overage", label: "Overage", icon: AlertCircle },
   { id: "rollover", label: "Rollover", icon: RotateCcw },
+  { id: "lifecycle", label: "Cycle de vie", icon: Workflow },
+  { id: "history", label: "Historique", icon: History },
 ];
+
+type Panel =
+  | "usage"
+  | "addon"
+  | "seat"
+  | "change"
+  | "timeline"
+  | "notification"
+  | "overage"
+  | null;
+
+const Empty: React.FC<{ text: string }> = ({ text }) => (
+  <p className="py-8 text-center text-sm text-gray-500">{text}</p>
+);
+
+const Mono: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <span className="font-mono text-xs font-semibold text-gray-700">{children}</span>
+);
+
+type RowMutation = { isPending: boolean; variables: string | undefined };
+const busy = (m: RowMutation, id: string) => m.isPending && m.variables === id;
 
 export const SubscriptionDetailPage: React.FC = () => {
   const { subscriptionNumber } = useParams();
@@ -99,17 +156,11 @@ export const SubscriptionDetailPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>("info");
   const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(new Set(["info"]));
-
-  // Modaux enfants
-  const [addSeatOpen, setAddSeatOpen] = useState(false);
-  const [addAddonOpen, setAddAddonOpen] = useState(false);
-  const [addChangeOpen, setAddChangeOpen] = useState(false);
-  const [addTimelineOpen, setAddTimelineOpen] = useState(false);
-  const [addNotifOpen, setAddNotifOpen] = useState(false);
-  const [addUsageOpen, setAddUsageOpen] = useState(false);
+  const [panel, setPanel] = useState<Panel>(null);
 
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab);
+    setPanel(null);
     setVisitedTabs((p) => new Set([...p, tab]));
   };
 
@@ -132,12 +183,28 @@ export const SubscriptionDetailPage: React.FC = () => {
     refetchSub();
   };
 
-  // ── Données par onglet (lazy) ─────────────────────────────────────────────
+  const ownerType = subscription?.subscriberType ?? "";
+  const ownerCode = subscription?.subscriberCode ?? "";
+
+  // ── Données par onglet (chargées à la première visite) ────────────────────
   const { data: entitlements } = useQuery({
     queryKey: ["subscription-entitlements", subNum],
     queryFn: () => subscriptionService.getSubscriptionEntitlements(subNum),
     enabled: !!subNum && visitedTabs.has("entitlements"),
   });
+
+  const { data: balances } = useQuery({
+    queryKey: ["subscription-balances", ownerType, ownerCode],
+    queryFn: () => subscriptionService.getEntitlementBalances({ ownerType, ownerCode }),
+    enabled: !!ownerCode && visitedTabs.has("entitlements"),
+  });
+
+  const { data: grantsData } = useQuery({
+    queryKey: ["subscription-grants", ownerType, ownerCode],
+    queryFn: () => subscriptionService.getEntitlementGrants({ ownerType, ownerCode, size: 50 }),
+    enabled: !!ownerCode && visitedTabs.has("entitlements"),
+  });
+  const grants: EntitlementGrant[] = grantsData?.content ?? [];
 
   const { data: billingScheduleRaw } = useQuery({
     queryKey: ["subscription-billing", subNum],
@@ -149,18 +216,11 @@ export const SubscriptionDetailPage: React.FC = () => {
     : (billingScheduleRaw?.items ?? billingScheduleRaw?.content ?? []);
 
   const { data: billableData } = useQuery({
-    queryKey: [
-      "billable-items",
-      "",
-      subscription?.subscriberType ?? "",
-      subscription?.subscriberCode ?? "",
-      "",
-      0,
-    ],
+    queryKey: ["billable-items", "", ownerType, ownerCode, "", 0],
     queryFn: () =>
       subscriptionService.getBillableItems({
-        subscriberType: subscription?.subscriberType ?? "",
-        subscriberCode: subscription?.subscriberCode ?? "",
+        subscriberType: ownerType,
+        subscriberCode: ownerCode,
         size: 50,
       }),
     enabled: !!subNum && visitedTabs.has("billable"),
@@ -168,207 +228,249 @@ export const SubscriptionDetailPage: React.FC = () => {
   const billableItems: BillableItem[] = billableData?.content ?? [];
 
   const { data: usageData } = useQuery({
-    queryKey: [
-      "usage-records",
-      subscription?.subscriberType ?? "",
-      subscription?.subscriberCode ?? "",
-      "",
-      "",
-      0,
-    ],
+    queryKey: ["usage-records", ownerType, ownerCode, "", "", 0],
     queryFn: () =>
-      subscriptionService.getUsageRecords({
-        ownerType: subscription?.subscriberType ?? "",
-        ownerCode: subscription?.subscriberCode ?? "",
-        size: 50,
-      }),
+      subscriptionService.getUsageRecords({ ownerType, ownerCode, size: 50 }),
     enabled: !!subNum && visitedTabs.has("usage"),
   });
   const usageRecords: UsageRecord[] = usageData?.content ?? [];
 
   const { data: addonsData } = useQuery({
     queryKey: ["subscription-addons", subNum],
-    queryFn: () =>
-      subscriptionService.getAddons({ subscriptionNumber: subNum, size: 50 }),
+    queryFn: () => subscriptionService.getAddons({ subscriptionNumber: subNum, size: 50 }),
     enabled: !!subNum && visitedTabs.has("addons"),
   });
   const addons: Addon[] = addonsData?.content ?? [];
 
   const { data: seatsData } = useQuery({
     queryKey: ["subscription-seats", subNum],
-    queryFn: () =>
-      subscriptionService.getSeats({ subscriptionNumber: subNum, size: 50 }),
+    queryFn: () => subscriptionService.getSeats({ subscriptionNumber: subNum, size: 50 }),
     enabled: !!subNum && visitedTabs.has("seats"),
   });
   const seats: Seat[] = seatsData?.content ?? [];
 
   const { data: changesData } = useQuery({
     queryKey: ["subscription-changes", subNum],
-    queryFn: () =>
-      subscriptionService.getChanges({ subscriptionNumber: subNum, size: 50 }),
+    queryFn: () => subscriptionService.getChanges({ subscriptionNumber: subNum, size: 50 }),
     enabled: !!subNum && visitedTabs.has("changes"),
   });
   const changes: SubscriptionChange[] = changesData?.content ?? [];
 
   const { data: timelineData } = useQuery({
     queryKey: ["subscription-timeline", subNum],
-    queryFn: () =>
-      subscriptionService.getTimeline({ subscriptionNumber: subNum, size: 50 }),
+    queryFn: () => subscriptionService.getTimeline({ subscriptionNumber: subNum, size: 50 }),
     enabled: !!subNum && visitedTabs.has("timeline"),
   });
   const timelineEvents: TimelineEvent[] = timelineData?.content ?? [];
 
   const { data: notifData } = useQuery({
     queryKey: ["subscription-notifications", subNum],
-    queryFn: () =>
-      subscriptionService.getNotifications({
-        subscriptionNumber: subNum,
-        size: 50,
-      }),
+    queryFn: () => subscriptionService.getNotifications({ subscriptionNumber: subNum, size: 50 }),
     enabled: !!subNum && visitedTabs.has("notifications"),
   });
   const notifications: SubscriptionNotification[] = notifData?.content ?? [];
 
   const { data: overageData } = useQuery({
     queryKey: ["subscription-overage-charges", subNum],
-    queryFn: () =>
-      subscriptionService.getOverageCharges({
-        subscriptionNumber: subNum,
-        size: 50,
-      }),
+    queryFn: () => subscriptionService.getOverageCharges({ subscriptionNumber: subNum, size: 50 }),
     enabled: !!subNum && visitedTabs.has("overage"),
   });
   const overageCharges: OverageCharge[] = overageData?.content ?? [];
 
+  const planVersionId = subscription?.planVersionId ?? "";
+  const { data: policiesData } = useQuery({
+    queryKey: ["overage-policies", planVersionId],
+    queryFn: () => subscriptionService.getOveragePolicies({ planVersionId, size: 50 }),
+    enabled: !!planVersionId && visitedTabs.has("overage"),
+  });
+  const policies: OveragePolicy[] = policiesData?.content ?? [];
+
   const { data: rolloverData } = useQuery({
     queryKey: ["subscription-rollovers", subNum],
-    queryFn: () =>
-      subscriptionService.getRollovers({
-        subscriptionNumber: subNum,
-        size: 50,
-      }),
+    queryFn: () => subscriptionService.getRollovers({ subscriptionNumber: subNum, size: 50 }),
     enabled: !!subNum && visitedTabs.has("rollover"),
   });
   const rollovers: Rollover[] = rolloverData?.content ?? [];
 
-  // ── Mutations lifecycle ────────────────────────────────────────────────────
+  const { data: historyRaw } = useQuery({
+    queryKey: ["subscription-history", subNum],
+    queryFn: () => subscriptionService.getSubscriptionHistory(subNum),
+    enabled: !!subNum && visitedTabs.has("history"),
+  });
+  const history: any[] = Array.isArray(historyRaw) ? historyRaw : [];
+
+  // ── Mutations du cycle de vie ─────────────────────────────────────────────
   const activateMutation = useMutation({
-    mutationFn: () =>
-      subscriptionService.activateSubscription(
-        subNum,
-        "Activé par admin",
-        "ADMIN",
-      ),
-    onSuccess: invalidateAndRefetch,
-    onError: (e: any) =>
-      alert(e?.response?.data?.message ?? "Erreur activation."),
-  });
-  const suspendMutation = useMutation({
-    mutationFn: () =>
-      subscriptionService.suspendSubscription(
-        subNum,
-        "Suspendu par admin",
-        "ADMIN",
-      ),
-    onSuccess: invalidateAndRefetch,
-    onError: (e: any) =>
-      alert(e?.response?.data?.message ?? "Erreur suspension."),
-  });
-  const cancelMutation = useMutation({
-    mutationFn: () =>
-      subscriptionService.cancelSubscription(
-        subNum,
-        "Annulé par admin",
-        "ADMIN",
-      ),
-    onSuccess: invalidateAndRefetch,
-    onError: (e: any) =>
-      alert(e?.response?.data?.message ?? "Erreur annulation."),
-  });
-  const renewMutation = useMutation({
-    mutationFn: () =>
-      subscriptionService.renewSubscription(subNum, "Renouvelé par admin"),
+    mutationFn: () => subscriptionService.activateSubscription(subNum, "Activé par admin", "ADMIN"),
     onSuccess: () => {
       invalidateAndRefetch();
-      queryClient.invalidateQueries({
-        queryKey: ["subscription-entitlements", subNum],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["subscription-billing", subNum],
-      });
+      toast.success("Souscription activée");
     },
-    onError: (e: any) =>
-      alert(e?.response?.data?.message ?? "Erreur renouvellement."),
+    onError: (e: unknown) => toast.error(apiMessage(e, "Erreur activation.")),
+  });
+  const suspendMutation = useMutation({
+    mutationFn: () => subscriptionService.suspendSubscription(subNum, "Suspendu par admin", "ADMIN"),
+    onSuccess: () => {
+      invalidateAndRefetch();
+      toast.success("Souscription suspendue");
+    },
+    onError: (e: unknown) => toast.error(apiMessage(e, "Erreur suspension.")),
+  });
+  // Annulation : toast de confirmation, l'erreur est gérée par le toast
+  const cancelMutation = useMutation({
+    mutationFn: () => subscriptionService.cancelSubscription(subNum, "Annulé par admin", "ADMIN"),
+    onSuccess: invalidateAndRefetch,
+  });
+  const renewMutation = useMutation({
+    mutationFn: () => subscriptionService.renewSubscription(subNum, "Renouvellement demandé par admin"),
+    onSuccess: () => {
+      invalidateAndRefetch();
+      queryClient.invalidateQueries({ queryKey: ["subscription-entitlements", subNum] });
+      queryClient.invalidateQueries({ queryKey: ["subscription-billing", subNum] });
+      toast.success("Facture de renouvellement émise, à régler");
+    },
+    onError: (e: unknown) => toast.error(apiMessage(e, "Erreur renouvellement.")),
   });
 
+  // Actions de suppression : toast de confirmation
   const removeSeatMutation = useMutation({
-    mutationFn: (memberCode: string) =>
-      subscriptionService.removeSeat(subNum, memberCode),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: ["subscription-seats", subNum],
-      }),
-    onError: (e: any) =>
-      alert(e?.response?.data?.message ?? "Erreur retrait siège."),
+    mutationFn: (memberCode: string) => subscriptionService.removeSeat(subNum, memberCode),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["subscription-seats", subNum] }),
   });
-
   const cancelAddonMutation = useMutation({
-    mutationFn: (addonId: string) =>
-      subscriptionService.cancelAddon(addonId, "Annulé par admin"),
+    mutationFn: (addonId: string) => subscriptionService.cancelAddon(addonId, "Annulé par admin"),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["subscription-addons", subNum] }),
+  });
+  const deleteEntitlementMutation = useMutation({
+    mutationFn: (entitlementCode: string) =>
+      subscriptionService.deleteSubscriptionEntitlement(subNum, entitlementCode),
     onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: ["subscription-addons", subNum],
-      }),
-    onError: (e: any) =>
-      alert(e?.response?.data?.message ?? "Erreur annulation add-on."),
+      queryClient.invalidateQueries({ queryKey: ["subscription-entitlements", subNum] }),
   });
 
   const approveChangeMutation = useMutation({
-    mutationFn: (changeNumber: string) =>
-      subscriptionService.approveChange(changeNumber, "ADMIN"),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: ["subscription-changes", subNum],
-      }),
-    onError: (e: any) =>
-      alert(e?.response?.data?.message ?? "Erreur approbation."),
-  });
-
-  const applyChangeMutation = useMutation({
-    mutationFn: (changeNumber: string) =>
-      subscriptionService.applyChange(changeNumber),
+    mutationFn: (changeNumber: string) => subscriptionService.approveChange(changeNumber, "ADMIN"),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["subscription-changes", subNum],
-      });
-      invalidateAndRefetch();
+      queryClient.invalidateQueries({ queryKey: ["subscription-changes", subNum] });
+      toast.success("Changement approuvé");
     },
-    onError: (e: any) =>
-      alert(e?.response?.data?.message ?? "Erreur application."),
+    onError: (e: unknown) => toast.error(apiMessage(e, "Erreur approbation.")),
   });
-
+  const applyChangeMutation = useMutation({
+    mutationFn: (changeNumber: string) => subscriptionService.applyChange(changeNumber),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subscription-changes", subNum] });
+      invalidateAndRefetch();
+      toast.success("Changement appliqué");
+    },
+    onError: (e: unknown) => toast.error(apiMessage(e, "Erreur application.")),
+  });
   const cancelNotifMutation = useMutation({
     mutationFn: (notificationNumber: string) =>
       subscriptionService.cancelNotification(notificationNumber),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: ["subscription-notifications", subNum],
-      }),
-    onError: (e: any) =>
-      alert(e?.response?.data?.message ?? "Erreur annulation notification."),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subscription-notifications", subNum] });
+      toast.success("Notification annulée");
+    },
+    onError: (e: unknown) => toast.error(apiMessage(e, "Erreur annulation notification.")),
   });
+
+  const exitGraceMutation = useMutation({
+    mutationFn: () => subscriptionLifecycleService.exitGracePeriod(subNum),
+    onSuccess: () => {
+      invalidateAndRefetch();
+      toast.success("Sortie de la période de tolérance");
+    },
+    onError: (e: unknown) => toast.error(apiMessage(e, "Sortie de tolérance impossible.")),
+  });
+
+  const askCancel = () =>
+    toast.confirm({
+      message: "Annuler cette souscription ?",
+      detail: subNum,
+      confirmLabel: "Annuler la souscription",
+      pendingLabel: "Annulation en cours",
+      successMessage: "Souscription annulée",
+      errorMessage: "L'annulation a échoué",
+      onConfirm: () => cancelMutation.mutateAsync(),
+    });
+
+  const askRemoveSeat = (memberCode: string) =>
+    toast.confirm({
+      message: "Retirer ce siège ?",
+      detail: memberCode,
+      confirmLabel: "Retirer",
+      pendingLabel: "Retrait en cours",
+      successMessage: "Siège retiré",
+      errorMessage: "Le retrait a échoué",
+      onConfirm: () => removeSeatMutation.mutateAsync(memberCode),
+    });
+
+  const askCancelAddon = (addonId: string) =>
+    toast.confirm({
+      message: "Annuler cet add-on ?",
+      detail: addonId,
+      confirmLabel: "Annuler l'add-on",
+      pendingLabel: "Annulation en cours",
+      successMessage: "Add-on annulé",
+      errorMessage: "L'annulation a échoué",
+      onConfirm: () => cancelAddonMutation.mutateAsync(addonId),
+    });
+
+  const askDeleteEntitlement = (ent: SubscriptionEntitlement) =>
+    toast.confirm({
+      message: "Retirer ce droit de la souscription ?",
+      detail: ent.entitlementName || ent.entitlementCode,
+      confirmLabel: "Retirer",
+      pendingLabel: "Retrait en cours",
+      successMessage: "Droit retiré",
+      errorMessage: "Le retrait a échoué",
+      onConfirm: () => deleteEntitlementMutation.mutateAsync(ent.entitlementCode),
+    });
+
+  // Actions d'administration globales (elles traitent toutes les souscriptions)
+  const askApplyRollovers = () =>
+    toast.confirm({
+      tone: "primary",
+      message: "Appliquer les reports dus ?",
+      detail: "Traite les reports échus de toutes les souscriptions",
+      confirmLabel: "Appliquer",
+      pendingLabel: "Application en cours",
+      successMessage: "Reports appliqués",
+      errorMessage: "L'application des reports a échoué",
+      onConfirm: async () => {
+        await subscriptionService.applyDueRollovers();
+        queryClient.invalidateQueries({ queryKey: ["subscription-rollovers", subNum] });
+      },
+    });
+
+  const askDispatchNotifications = () =>
+    toast.confirm({
+      tone: "primary",
+      message: "Envoyer les notifications dues ?",
+      detail: "Envoie jusqu'à 100 notifications échues, toutes souscriptions confondues",
+      confirmLabel: "Envoyer",
+      pendingLabel: "Envoi en cours",
+      successMessage: "Notifications envoyées",
+      errorMessage: "L'envoi a échoué",
+      onConfirm: async () => {
+        await subscriptionService.dispatchDueNotifications();
+        queryClient.invalidateQueries({ queryKey: ["subscription-notifications", subNum] });
+      },
+    });
 
   const anyPending =
     activateMutation.isPending ||
     suspendMutation.isPending ||
     cancelMutation.isPending ||
-    renewMutation.isPending;
+    renewMutation.isPending ||
+    exitGraceMutation.isPending;
 
   if (subscriptionLoading) {
     return (
       <AdminLayout>
-        <div className="flex h-64 items-center justify-center text-gray-500">
-          Chargement de la souscription...
+        <div style={brandVars} className="mx-auto w-full max-w-4xl">
+          <DetailsSkeleton />
         </div>
       </AdminLayout>
     );
@@ -377,887 +479,869 @@ export const SubscriptionDetailPage: React.FC = () => {
   if (subscriptionError || !subscription) {
     return (
       <AdminLayout>
-        <div className="rounded-2xl border border-red-100 bg-red-50 p-5 text-red-700">
-          Souscription introuvable.
+        <div style={brandVars} className="mx-auto w-full max-w-4xl">
+          <PageHeader
+            title="Souscription introuvable"
+            onBack={() => navigate("/subscriptions/subscriptions")}
+            backLabel="Souscriptions"
+          />
+          <ErrorBlock message="Cette souscription n'existe pas ou n'est plus accessible." />
         </div>
       </AdminLayout>
     );
   }
 
+  const st = statusOf(SUBSCRIPTION_STATUS, subscription.status);
+  const currency = subscription.currency ?? "XAF";
+  const subscriberTypeLabel =
+    SUBSCRIBER_TYPE_LABELS[subscription.subscriberType] ?? subscription.subscriberType;
+
+  const addButton = (label: string, target: Exclude<Panel, null>) => (
+    <ActionButton
+      icon={Plus}
+      className="!px-4 !py-2"
+      onClick={() => setPanel(panel === target ? null : target)}
+    >
+      {label}
+    </ActionButton>
+  );
+
+  const closePanel = () => setPanel(null);
+
+  const lifecycleActions = (
+    <>
+      {subscription.status === "PENDING_ACTIVATION" && (
+        <ActionButton
+          icon={Play}
+          pending={activateMutation.isPending}
+          disabled={anyPending}
+          onClick={() => activateMutation.mutate()}
+        >
+          Activer
+        </ActionButton>
+      )}
+      {subscription.status === "PAST_DUE" && (
+        <ActionButton
+          icon={Play}
+          pending={activateMutation.isPending}
+          disabled={anyPending}
+          onClick={() => activateMutation.mutate()}
+        >
+          Réactiver
+        </ActionButton>
+      )}
+      {subscription.status === "GRACE_PERIOD" && (
+        <ActionButton
+          variant="ghost"
+          icon={LogIn}
+          pending={exitGraceMutation.isPending}
+          disabled={anyPending}
+          onClick={() => exitGraceMutation.mutate()}
+        >
+          Sortir de la tolérance
+        </ActionButton>
+      )}
+      {subscription.status === "ACTIVE" && (
+        <>
+          <ActionButton
+            variant="ghost"
+            icon={Pause}
+            pending={suspendMutation.isPending}
+            disabled={anyPending}
+            onClick={() => suspendMutation.mutate()}
+          >
+            Suspendre
+          </ActionButton>
+          {!subscription.pendingRenewalInvoice && (
+            <ActionButton
+              variant="ghost"
+              icon={RefreshCw}
+              pending={renewMutation.isPending}
+              disabled={anyPending}
+              onClick={() => renewMutation.mutate()}
+            >
+              Renouveler
+            </ActionButton>
+          )}
+        </>
+      )}
+      {subscription.pendingRenewalInvoice && (
+        <ActionButton
+          icon={CreditCard}
+          disabled={anyPending}
+          onClick={() => navigate(`/billing/documents/${encodeURIComponent(subscription.pendingRenewalInvoice ?? "")}`)}
+        >
+          Régler la facture
+        </ActionButton>
+      )}
+      {["ACTIVE", "SUSPENDED", "PAST_DUE"].includes(subscription.status) && (
+        <ActionButton variant="danger" icon={XCircle} disabled={anyPending} onClick={askCancel}>
+          Annuler
+        </ActionButton>
+      )}
+    </>
+  );
+
   return (
     <AdminLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
-          <div className="flex items-start gap-4">
-            <button
-              onClick={() => navigate("/subscriptions")}
-              className="mt-1 rounded-xl border border-gray-100 p-2 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900"
-              aria-label="Retour"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                {subscription.planName}
-              </h1>
-              <p className="mt-1 text-sm text-gray-500 font-mono">{subNum}</p>
-            </div>
-          </div>
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${statusConfig[subscription.status]?.color ?? "bg-gray-100 text-gray-600"}`}
-          >
-            {statusConfig[subscription.status]?.label ?? subscription.status}
-          </span>
-        </div>
-
-        {/* Actions rapides */}
-        <div className="flex flex-wrap gap-2 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-          {subscription.status === "PENDING_ACTIVATION" && (
-            <button
-              onClick={() => activateMutation.mutate()}
-              disabled={anyPending}
-              className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm flex items-center gap-1 disabled:opacity-50"
-            >
-              <Play size={14} /> Activer
-            </button>
-          )}
-          {subscription.status === "PAST_DUE" && (
-            <button
-              onClick={() => activateMutation.mutate()}
-              disabled={anyPending}
-              className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm flex items-center gap-1 disabled:opacity-50"
-            >
-              <Play size={14} /> Réactiver
-            </button>
-          )}
-          {subscription.status === "ACTIVE" && (
-            <>
-              <button
-                onClick={() => suspendMutation.mutate()}
-                disabled={anyPending}
-                className="px-3 py-1 bg-orange-600 text-white rounded-lg text-sm flex items-center gap-1 disabled:opacity-50"
-              >
-                <Pause size={14} /> Suspendre
-              </button>
-              <button
-                onClick={() => renewMutation.mutate()}
-                disabled={anyPending}
-                className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm flex items-center gap-1 disabled:opacity-50"
-              >
-                <RefreshCw size={14} /> Renouveler
-              </button>
-            </>
-          )}
-          {["ACTIVE", "SUSPENDED", "PAST_DUE"].includes(
-            subscription.status,
-          ) && (
-            <button
-              onClick={() => {
-                if (confirm("Confirmer l'annulation ?"))
-                  cancelMutation.mutate();
-              }}
-              disabled={anyPending}
-              className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm flex items-center gap-1 disabled:opacity-50"
-            >
-              <XCircle size={14} /> Annuler
-            </button>
-          )}
-          {anyPending && (
-            <span className="text-xs text-gray-500 self-center animate-pulse">
-              Opération en cours...
+      <div style={brandVars} className="mx-auto w-full max-w-4xl">
+        <PageHeader
+          title={subscription.planName}
+          subtitle={
+            <span>
+              <span className="font-mono">{subNum}</span>
+              {subscription.subscriberName && <span> · {subscription.subscriberName}</span>}
             </span>
-          )}
+          }
+          badge={<StatusChip tone={st.tone}>{st.label}</StatusChip>}
+          actions={lifecycleActions}
+          onBack={() => navigate("/subscriptions/subscriptions")}
+          backLabel="Souscriptions"
+        />
+
+        <div className="mb-5">
+          <Tabs variant="soft" items={TABS} active={activeTab} onChange={handleTabChange} />
         </div>
 
-        {/* Onglets — scroll horizontal sur mobile */}
-        <div className="overflow-x-auto rounded-2xl bg-white px-2 shadow-sm ring-1 ring-gray-100">
-          <div className="flex space-x-1 min-w-max">
-            {TABS.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabChange(tab.id)}
-                  className={`py-3 px-3 text-xs font-medium rounded-xl transition-colors flex items-center gap-1 whitespace-nowrap ${
-                    activeTab === tab.id
-                      ? "bg-primary-50 text-primary-700"
-                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
-                  }`}
-                >
-                  <Icon size={13} />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        {/* ── Résumé ─────────────────────────────────────────────────────── */}
+        {activeTab === "info" && (
+          <div className="space-y-4">
+            <Section title="Souscripteur" icon={UserRound}>
+              <p className="text-base font-bold text-gray-950">
+                {subscription.subscriberName ?? subscription.subscriberCode}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Tag>{subscriberTypeLabel}</Tag>
+                <span className="font-mono text-xs text-gray-500">{subscription.subscriberCode}</span>
+              </div>
+            </Section>
 
-        <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-          {/* ── Résumé ──────────────────────────────────────────────────────── */}
-          {activeTab === "info" && (
-            <div className="space-y-4">
-              <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
-                <p className="text-xs text-blue-500 mb-1 font-medium">
-                  Souscripteur
-                </p>
-                <p className="font-semibold text-blue-900">
-                  {subscription?.subscriberName ??
-                    subscription?.subscriberCode ??
-                    ""}
-                </p>
-                <p className="text-xs text-blue-600 font-mono">
-                  {subscription?.subscriberType ?? ""} ·{" "}
-                  {subscription?.subscriberCode ?? ""}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Statut</p>
-                  <span
-                    className={`mt-1 inline-block px-2 py-0.5 rounded-full text-xs ${statusConfig[subscription.status]?.color ?? "bg-gray-100"}`}
-                  >
-                    {statusConfig[subscription.status]?.label ??
-                      subscription.status}
-                  </span>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Cycle</p>
-                  <p className="font-medium text-sm">
-                    {billingCycleLabels[subscription.billingCycle] ??
-                      subscription.billingCycle}
-                  </p>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Sous-total</p>
-                  <p className="font-medium">
-                    {(subscription.subtotalAmount ?? 0).toLocaleString("fr-FR")}{" "}
-                    {subscription.currency ?? "XAF"}
-                  </p>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Total TTC</p>
-                  <p className="font-bold text-green-700">
-                    {(subscription.totalAmount ?? 0).toLocaleString("fr-FR")}{" "}
-                    {subscription.currency ?? "XAF"}
-                  </p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Début</p>
-                  <p className="font-medium text-sm">
-                    {new Date(subscription.startDate).toLocaleDateString(
-                      "fr-FR",
+            <Section title="Détails" icon={CreditCard}>
+              <div className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2">
+                <Detail label="Statut">
+                  <StatusChip tone={st.tone}>{st.label}</StatusChip>
+                </Detail>
+                <Detail label="Cycle">
+                  {BILLING_CYCLE_LABELS[subscription.billingCycle] ?? subscription.billingCycle}
+                </Detail>
+                <Detail label="Sous-total">
+                  {formatMoney(subscription.subtotalAmount, currency)}
+                </Detail>
+                <Detail label="Total TTC">
+                  {subscription.totalAmount !== undefined && (
+                    <span className="text-base font-bold text-emerald-700">
+                      {formatMoney(subscription.totalAmount, currency)}
+                    </span>
+                  )}
+                </Detail>
+                <Detail label="Début">{formatDate(subscription.startDate)}</Detail>
+                <Detail label="Fin">{formatDate(subscription.endDate)}</Detail>
+                <Detail label="Prochaine facturation">
+                  {formatDate(subscription.nextBillingDate)}
+                </Detail>
+                <Detail label="Renouvellement">
+                  {subscription.autoRenew ? "Automatique" : "Manuel"}
+                </Detail>
+                {subscription.pendingRenewalInvoice && (
+                  <Detail label="Facture à régler" mono>
+                    {subscription.pendingRenewalInvoice}
+                    {subscription.pendingRenewalStart && subscription.pendingRenewalEnd && (
+                      <span className="block font-sans text-xs font-normal text-gray-400">
+                        Période prévue du {formatDate(subscription.pendingRenewalStart)} au {formatDate(subscription.pendingRenewalEnd)}
+                      </span>
                     )}
-                  </p>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Fin</p>
-                  <p className="font-medium text-sm">
-                    {subscription.endDate
-                      ? new Date(subscription.endDate).toLocaleDateString(
-                          "fr-FR",
-                        )
-                      : "—"}
-                  </p>
-                </div>
-                {subscription.nextBillingDate && (
-                  <div className="p-3 bg-amber-50 rounded-lg col-span-2">
-                    <p className="text-xs text-amber-600">
-                      Prochaine facturation
-                    </p>
-                    <p className="font-semibold text-amber-800">
-                      {new Date(
-                        subscription.nextBillingDate,
-                      ).toLocaleDateString("fr-FR")}
-                    </p>
-                  </div>
+                  </Detail>
                 )}
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Plan</p>
-                  <p className="font-medium text-sm">{subscription.planName}</p>
-                  <p className="text-xs text-gray-400 font-mono">
+                <Detail label="Plan">
+                  <span>{subscription.planName}</span>
+                  <span className="block font-mono text-xs font-normal text-gray-400">
                     {subscription.planCode}
-                  </p>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Renouvellement auto</p>
-                  <p className="font-medium text-sm">
-                    {subscription.autoRenew ? "✅ Oui" : "❌ Non"}
-                  </p>
-                </div>
-                {subscription.contractCode && (
-                  <div className="p-3 bg-gray-50 rounded-lg col-span-2">
-                    <p className="text-xs text-gray-500">Contrat lié</p>
-                    <p className="font-mono text-sm text-primary-600">
-                      {subscription.contractCode}
-                    </p>
-                  </div>
-                )}
+                    {subscription.planVersion !== undefined && ` · v${subscription.planVersion}`}
+                  </span>
+                </Detail>
+                <Detail label="Contrat lié" mono>
+                  {subscription.contractCode}
+                </Detail>
               </div>
-              {subscription.metadataJson && (
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-1">Métadonnées</p>
-                  <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto">
-                    {(() => {
-                      try {
-                        return JSON.stringify(
-                          JSON.parse(subscription.metadataJson!),
-                          null,
-                          2,
-                        );
-                      } catch {
-                        return subscription.metadataJson;
-                      }
-                    })()}
-                  </pre>
-                </div>
-              )}
-            </div>
-          )}
+            </Section>
 
-          {/* ── Droits ──────────────────────────────────────────────────────── */}
-          {activeTab === "entitlements" && (
-            <div className="space-y-3">
-              {(entitlements ?? []).map((ent: SubscriptionEntitlement, i) => (
-                <div key={i} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium">{ent.entitlementName}</p>
-                      <p className="text-sm text-gray-500 font-mono">
-                        {ent.entitlementCode}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium">
-                        {ent.unlimited
-                          ? "Illimité"
-                          : `${ent.remainingQuantity} / ${ent.quantity}`}
-                      </p>
-                      {!ent.unlimited && (
-                        <p className="text-xs text-gray-500">
-                          Utilisé : {ent.usedQuantity}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  {!ent.unlimited && ent.quantity > 0 && (
-                    <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary-500 rounded-full"
-                        style={{
-                          width: `${Math.min(100, (ent.usedQuantity / ent.quantity) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                  )}
-                  {(ent.validFrom || ent.validUntil) && (
-                    <p className="text-xs text-gray-400 mt-2">
-                      {ent.validFrom &&
-                        `Du ${new Date(ent.validFrom).toLocaleDateString("fr-FR")}`}
-                      {ent.validUntil &&
-                        ` au ${new Date(ent.validUntil).toLocaleDateString("fr-FR")}`}
-                    </p>
-                  )}
-                </div>
-              ))}
-              {(!entitlements || entitlements.length === 0) && (
-                <EmptyState text="Aucun droit associé" />
-              )}
-            </div>
-          )}
+            {subscription.metadataJson && (
+              <Section title="Métadonnées">
+                <pre className="overflow-x-auto rounded-xl bg-white p-3 text-xs text-gray-700 shadow-sm">
+                  {(() => {
+                    try {
+                      return JSON.stringify(JSON.parse(subscription.metadataJson), null, 2);
+                    } catch {
+                      return subscription.metadataJson;
+                    }
+                  })()}
+                </pre>
+              </Section>
+            )}
+          </div>
+        )}
 
-          {/* ── Facturation (billing schedule) ────────────────────────────── */}
-          {activeTab === "billing" && (
-            <div className="space-y-3">
-              {billingItems.map((item: any, i) => (
-                <div
-                  key={i}
-                  className="border rounded-lg p-4 flex justify-between items-start"
-                >
-                  <div>
-                    <p className="font-medium text-sm">
-                      Échéance :{" "}
-                      {item.dueDate
-                        ? new Date(item.dueDate).toLocaleDateString("fr-FR")
-                        : item.scheduledDate
-                          ? new Date(item.scheduledDate).toLocaleDateString(
-                              "fr-FR",
-                            )
-                          : "N/A"}
-                    </p>
-                    {item.description && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        {item.description}
+        {/* ── Droits ─────────────────────────────────────────────────────── */}
+        {activeTab === "entitlements" && (
+          <div className="space-y-4">
+            <Section title="Droits de la souscription" icon={CheckCircle}>
+              <div className="space-y-2">
+                {(entitlements ?? []).map((ent: SubscriptionEntitlement) => (
+                  <ItemRow key={ent.entitlementCode}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900">{ent.entitlementName}</p>
+                        <p className="font-mono text-xs text-gray-400">{ent.entitlementCode}</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-gray-900">
+                            {ent.unlimited ? "Illimité" : `${ent.remainingQuantity} / ${ent.quantity}`}
+                          </p>
+                          {!ent.unlimited && (
+                            <p className="text-xs text-gray-500">Utilisé : {ent.usedQuantity}</p>
+                          )}
+                        </div>
+                        <IconButton
+                          icon={Trash2}
+                          label="Retirer ce droit"
+                          tone="danger"
+                          pending={
+                            deleteEntitlementMutation.isPending &&
+                            deleteEntitlementMutation.variables === ent.entitlementCode
+                          }
+                          onClick={() => askDeleteEntitlement(ent)}
+                        />
+                      </div>
+                    </div>
+                    {!ent.unlimited && ent.quantity > 0 && (
+                      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100">
+                        <div
+                          className="h-full rounded-full bg-[color:var(--logo-pink)]"
+                          style={{
+                            width: `${Math.min(100, (ent.usedQuantity / ent.quantity) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                    )}
+                    {(ent.validFrom || ent.validUntil) && (
+                      <p className="mt-2 text-xs text-gray-400">
+                        {ent.validFrom && `Du ${formatDate(ent.validFrom)}`}
+                        {ent.validUntil && ` au ${formatDate(ent.validUntil)}`}
                       </p>
                     )}
-                    <p className="text-sm text-gray-600 mt-1">
-                      {(item.amount ?? item.totalAmount ?? 0).toLocaleString(
-                        "fr-FR",
-                      )}{" "}
-                      {item.currency ?? "FCFA"}
-                    </p>
-                  </div>
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-xs ${
-                      item.status === "PAID"
-                        ? "bg-green-100 text-green-700"
-                        : item.status === "PENDING"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-red-100 text-red-700"
-                    }`}
-                  >
-                    {item.status === "PAID"
-                      ? "Payé"
-                      : item.status === "PENDING"
-                        ? "En attente"
-                        : (item.status ?? "—")}
-                  </span>
+                  </ItemRow>
+                ))}
+                {(!entitlements || entitlements.length === 0) && <Empty text="Aucun droit associé" />}
+              </div>
+            </Section>
+
+            {(balances ?? []).length > 0 && (
+              <Section
+                title="Soldes du souscripteur"
+                description="Tous droits confondus, pas seulement cette souscription"
+              >
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {(balances ?? []).map((b: EntitlementBalance) => (
+                    <ItemRow key={b.entitlementCode}>
+                      <p className="font-mono text-xs font-semibold text-gray-700">{b.entitlementCode}</p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900">
+                        {b.unlimited ? "Illimité" : `${b.remainingQuantity} restant sur ${b.totalQuantity}`}
+                      </p>
+                      {!b.unlimited && (
+                        <p className="text-xs text-gray-500">Utilisé : {b.usedQuantity}</p>
+                      )}
+                    </ItemRow>
+                  ))}
                 </div>
-              ))}
-              {billingItems.length === 0 && (
-                <EmptyState text="Aucune échéance" />
-              )}
-            </div>
-          )}
+              </Section>
+            )}
 
-          {/* ── Items facturables ──────────────────────────────────────────── */}
-          {activeTab === "billable" && (
-            <div className="space-y-3">
-              {billableItems.map((item, i) => (
-                <div
-                  key={i}
-                  className="border rounded-lg p-4 flex justify-between items-start"
-                >
-                  <div>
-                    <p className="font-mono text-sm">{item.billableNumber}</p>
-                    <p className="text-xs text-gray-400">
-                      {item.sourceType} · {item.sourceId}
-                    </p>
-                    <p className="font-semibold mt-1">
-                      {item.amount.toLocaleString("fr-FR")} {item.currency}
-                    </p>
-                  </div>
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-xs ${
-                      item.status === "PENDING"
-                        ? "bg-yellow-100 text-yellow-700"
-                        : item.status === "INVOICED"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {item.status}
-                  </span>
+            {grants.length > 0 && (
+              <Section title="Octrois" description="Droits accordés au souscripteur">
+                <div className="space-y-2">
+                  {grants.map((g) => (
+                    <ItemRow key={g.grantNumber}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <Mono>{g.grantNumber}</Mono>
+                          <p className="mt-1 text-sm text-gray-800">{g.entitlementCode}</p>
+                          {(g.validFrom || g.validUntil) && (
+                            <p className="mt-1 text-xs text-gray-400">
+                              {g.validFrom && `Du ${formatDate(g.validFrom)}`}
+                              {g.validUntil && ` au ${formatDate(g.validUntil)}`}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-gray-900">
+                            {g.unlimited ? "Illimité" : g.quantity}
+                          </p>
+                          <Tag>{g.status}</Tag>
+                        </div>
+                      </div>
+                    </ItemRow>
+                  ))}
                 </div>
-              ))}
-              {billableItems.length === 0 && (
-                <EmptyState text="Aucun item facturable" />
-              )}
-            </div>
-          )}
+              </Section>
+            )}
+          </div>
+        )}
 
-          {/* ── Usage ─────────────────────────────────────────────────────── */}
-          {activeTab === "usage" && (
-            <div>
-              <div className="flex justify-end mb-4">
-                <button
-                  onClick={() => setAddUsageOpen(true)}
-                  className="bg-primary-600 text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 hover:bg-primary-700"
-                >
-                  <Plus size={14} /> Enregistrer un usage
-                </button>
-              </div>
-              <div className="space-y-2">
-                {usageRecords.map((r, i) => (
-                  <div
-                    key={i}
-                    className="border rounded-lg p-3 flex justify-between items-center"
-                  >
-                    <div>
-                      <p className="text-sm font-mono">{r.usageNumber}</p>
-                      <p className="text-xs text-gray-500">
-                        {r.entitlementCode}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        {new Date(r.occurredAt).toLocaleString("fr-FR")}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">
-                        {r.quantity} {r.unit}
-                      </p>
-                      {r.billable && (
-                        <p className="text-xs text-green-600">
-                          {r.billableAmount?.toLocaleString("fr-FR")}{" "}
-                          {r.currency}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {usageRecords.length === 0 && (
-                  <EmptyState text="Aucun usage enregistré" />
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ── Add-ons ───────────────────────────────────────────────────── */}
-          {activeTab === "addons" && (
-            <div>
-              <div className="flex justify-end mb-4">
-                <button
-                  onClick={() => setAddAddonOpen(true)}
-                  className="bg-primary-600 text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 hover:bg-primary-700"
-                >
-                  <Plus size={14} /> Ajouter un add-on
-                </button>
-              </div>
-              <div className="space-y-3">
-                {addons.map((addon, i) => (
-                  <div
-                    key={i}
-                    className="border rounded-lg p-4 flex justify-between items-start"
-                  >
-                    <div>
-                      <p className="text-sm font-mono">{addon.addonId}</p>
-                      <p className="text-xs text-gray-500">
-                        Version : {addon.planVersionId}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        Qté : {addon.quantity} · Début :{" "}
-                        {new Date(addon.startsAt).toLocaleDateString("fr-FR")}
-                        {addon.endsAt &&
-                          ` → ${new Date(addon.endsAt).toLocaleDateString("fr-FR")}`}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs ${
-                          addon.status === "ACTIVE"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {addon.status}
-                      </span>
-                      {addon.status === "ACTIVE" && (
-                        <button
-                          onClick={() => {
-                            if (confirm("Annuler cet add-on ?"))
-                              cancelAddonMutation.mutate(addon.addonId);
-                          }}
-                          disabled={cancelAddonMutation.isPending}
-                          className="p-1 text-red-600 hover:text-red-800 disabled:opacity-40"
-                          title="Annuler l'add-on"
-                        >
-                          <XCircle size={16} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {addons.length === 0 && (
-                  <EmptyState text="Aucun add-on actif" />
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ── Sièges ───────────────────────────────────────────────────── */}
-          {activeTab === "seats" && (
-            <div>
-              <div className="flex justify-end mb-4">
-                <button
-                  onClick={() => setAddSeatOpen(true)}
-                  className="bg-primary-600 text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 hover:bg-primary-700"
-                >
-                  <Plus size={14} /> Ajouter un siège
-                </button>
-              </div>
-              <div className="space-y-2">
-                {seats.map((seat, i) => (
-                  <div
-                    key={i}
-                    className="border rounded-lg p-3 flex justify-between items-center"
-                  >
-                    <div>
-                      <p className="font-mono text-sm">{seat.memberCode}</p>
-                      <p className="text-xs text-gray-500">{seat.role}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs ${
-                          seat.status === "ACTIVE"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {seat.status}
-                      </span>
-                      {seat.role !== "OWNER" && (
-                        <button
-                          onClick={() => {
-                            if (confirm(`Retirer ${seat.memberCode} ?`))
-                              removeSeatMutation.mutate(seat.memberCode);
-                          }}
-                          disabled={removeSeatMutation.isPending}
-                          className="p-1 text-red-600 hover:text-red-800 disabled:opacity-40"
-                          title="Retirer le siège"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {seats.length === 0 && (
-                  <EmptyState text="Aucun siège enregistré" />
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ── Changements ──────────────────────────────────────────────── */}
-          {activeTab === "changes" && (
-            <div>
-              <div className="flex justify-end mb-4">
-                <button
-                  onClick={() => setAddChangeOpen(true)}
-                  className="bg-primary-600 text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 hover:bg-primary-700"
-                >
-                  <Plus size={14} /> Demander un changement
-                </button>
-              </div>
-              <div className="space-y-3">
-                {changes.map((c, i) => (
-                  <div key={i} className="border rounded-lg p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="font-mono text-sm">{c.changeNumber}</p>
-                        <p className="text-xs text-gray-500">
-                          {c.changeType} · {c.effectivePolicy}
-                        </p>
-                        {c.reason && (
-                          <p className="text-xs text-gray-400 mt-1">
-                            {c.reason}
+        {/* ── Facturation ────────────────────────────────────────────────── */}
+        {activeTab === "billing" && (
+          <Section title="Échéancier" icon={CreditCard}>
+            <div className="space-y-2">
+              {billingItems.map((item: any, i) => {
+                const bs = statusOf(BILLING_SCHEDULE_STATUS, item.status);
+                const due = item.dueDate ?? item.scheduledDate;
+                const amount = item.amount ?? item.totalAmount;
+                return (
+                  <ItemRow key={i}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        {due && (
+                          <p className="text-sm font-semibold text-gray-900">
+                            Échéance : {formatDate(due)}
+                          </p>
+                        )}
+                        {item.description && (
+                          <p className="mt-1 text-xs text-gray-500">{item.description}</p>
+                        )}
+                        {typeof amount === "number" && (
+                          <p className="mt-1 text-sm text-gray-700">
+                            {formatMoney(amount, item.currency ?? "XAF")}
                           </p>
                         )}
                       </div>
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs ${
-                          c.status === "APPROVED"
-                            ? "bg-green-100 text-green-700"
-                            : c.status === "PENDING"
-                              ? "bg-yellow-100 text-yellow-700"
-                              : c.status === "APPLIED"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {c.status}
-                      </span>
-                    </div>
-                    <div className="flex gap-2 mt-2">
-                      {c.status === "PENDING" && (
-                        <button
-                          onClick={() =>
-                            approveChangeMutation.mutate(c.changeNumber)
-                          }
-                          disabled={approveChangeMutation.isPending}
-                          className="px-2 py-1 bg-green-600 text-white rounded text-xs disabled:opacity-50"
-                        >
-                          Approuver
-                        </button>
-                      )}
-                      {c.status === "APPROVED" && (
-                        <button
-                          onClick={() =>
-                            applyChangeMutation.mutate(c.changeNumber)
-                          }
-                          disabled={applyChangeMutation.isPending}
-                          className="px-2 py-1 bg-blue-600 text-white rounded text-xs disabled:opacity-50"
-                        >
-                          Appliquer
-                        </button>
+                      {item.status && (
+                        <StatusChip tone={item.status in BILLING_SCHEDULE_STATUS ? bs.tone : "danger"}>
+                          {bs.label}
+                        </StatusChip>
                       )}
                     </div>
-                  </div>
-                ))}
-                {changes.length === 0 && <EmptyState text="Aucun changement" />}
-              </div>
+                  </ItemRow>
+                );
+              })}
+              {billingItems.length === 0 && <Empty text="Aucune échéance" />}
             </div>
-          )}
+          </Section>
+        )}
 
-          {/* ── Timeline ─────────────────────────────────────────────────── */}
-          {activeTab === "timeline" && (
-            <div>
-              <div className="flex justify-end mb-4">
-                <button
-                  onClick={() => setAddTimelineOpen(true)}
-                  className="bg-primary-600 text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 hover:bg-primary-700"
-                >
-                  <Plus size={14} /> Ajouter un événement
-                </button>
-              </div>
-              <div className="space-y-2">
-                {timelineEvents.map((ev, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg"
-                  >
-                    <Clock
-                      size={16}
-                      className="text-gray-400 mt-0.5 flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between gap-2">
-                        <p className="text-sm font-medium">{ev.title}</p>
-                        <p className="text-xs text-gray-500 whitespace-nowrap">
-                          {new Date(ev.occurredAt).toLocaleString("fr-FR")}
+        {/* ── Items facturables ──────────────────────────────────────────── */}
+        {activeTab === "billable" && (
+          <Section title="Items facturables" icon={Receipt}>
+            <div className="space-y-2">
+              {billableItems.map((item) => {
+                const bs = statusOf(BILLABLE_STATUS, item.status);
+                return (
+                  <ItemRow key={item.billableNumber}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <Mono>{item.billableNumber}</Mono>
+                        <p className="mt-1 text-xs text-gray-400">
+                          {item.sourceType} · {item.sourceId}
+                        </p>
+                        <p className="mt-1 font-semibold text-gray-900">
+                          {formatMoney(item.amount, item.currency)}
                         </p>
                       </div>
-                      <p className="text-xs text-gray-400">{ev.eventType}</p>
-                      {ev.description && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          {ev.description}
-                        </p>
-                      )}
-                      {ev.sourceType && (
-                        <p className="text-xs text-gray-400 font-mono mt-0.5">
-                          {ev.sourceType}
-                          {ev.sourceId ? ` · ${ev.sourceId}` : ""}
-                        </p>
-                      )}
+                      <StatusChip tone={bs.tone}>{bs.label}</StatusChip>
                     </div>
-                  </div>
-                ))}
-                {timelineEvents.length === 0 && (
-                  <EmptyState text="Aucun événement sur la timeline" />
-                )}
-              </div>
+                  </ItemRow>
+                );
+              })}
+              {billableItems.length === 0 && <Empty text="Aucun item facturable" />}
             </div>
-          )}
+          </Section>
+        )}
 
-          {/* ── Notifications ─────────────────────────────────────────────── */}
-          {activeTab === "notifications" && (
-            <div>
-              <div className="flex justify-end mb-4">
-                <button
-                  onClick={() => setAddNotifOpen(true)}
-                  className="bg-primary-600 text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 hover:bg-primary-700"
-                >
-                  <Plus size={14} /> Planifier une notification
-                </button>
-              </div>
+        {/* ── Usage ──────────────────────────────────────────────────────── */}
+        {activeTab === "usage" && (
+          <>
+            {panel === "usage" && (
+              <UsageRecordForm
+                layout="panel"
+                defaultOwnerType={ownerType}
+                defaultOwnerCode={ownerCode}
+                onDone={closePanel}
+                onCancel={closePanel}
+              />
+            )}
+            <Section
+              title="Usage"
+              icon={Activity}
+              action={addButton("Enregistrer un usage", "usage")}
+            >
               <div className="space-y-2">
-                {notifications.map((n, i) => (
-                  <div
-                    key={i}
-                    className="border rounded-lg p-3 flex justify-between items-start"
-                  >
-                    <div>
-                      <p className="text-sm font-medium">
-                        {n.notificationType}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {n.channel} · {n.recipient}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        Planifié :{" "}
-                        {new Date(n.scheduledAt).toLocaleString("fr-FR")}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs ${
-                          n.status === "SENT"
-                            ? "bg-green-100 text-green-700"
-                            : n.status === "PENDING"
-                              ? "bg-yellow-100 text-yellow-700"
-                              : n.status === "CANCELLED"
-                                ? "bg-gray-100 text-gray-500"
-                                : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {n.status}
-                      </span>
-                      {n.status === "PENDING" && (
-                        <button
-                          onClick={() =>
-                            cancelNotifMutation.mutate(n.notificationNumber)
-                          }
-                          disabled={cancelNotifMutation.isPending}
-                          className="p-1 text-red-600 hover:text-red-800 disabled:opacity-40"
-                          title="Annuler la notification"
-                        >
-                          <XCircle size={14} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {notifications.length === 0 && (
-                  <EmptyState text="Aucune notification planifiée" />
-                )}
+                {usageRecords.map((r) => {
+                  const us = statusOf(USAGE_STATUS, r.status);
+                  return (
+                    <ItemRow key={r.usageNumber}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <Mono>{r.usageNumber}</Mono>
+                          <p className="mt-1 text-sm text-gray-800">{r.entitlementCode}</p>
+                          <p className="mt-0.5 text-xs text-gray-400">{formatDateTime(r.occurredAt)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-gray-900">
+                            {r.quantity} {r.unit}
+                          </p>
+                          {r.billable && (
+                            <p className="text-xs font-semibold text-emerald-600">
+                              {formatMoney(r.billableAmount, r.currency || "XAF")}
+                            </p>
+                          )}
+                          {r.status && (
+                            <div className="mt-1">
+                              <StatusChip tone={us.tone}>{us.label}</StatusChip>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </ItemRow>
+                  );
+                })}
+                {usageRecords.length === 0 && <Empty text="Aucun usage enregistré" />}
               </div>
-            </div>
-          )}
+            </Section>
+          </>
+        )}
 
-          {/* ── Overage ──────────────────────────────────────────────────── */}
-          {activeTab === "overage" && (
-            <div className="space-y-3">
+        {/* ── Add-ons ────────────────────────────────────────────────────── */}
+        {activeTab === "addons" && (
+          <>
+            {panel === "addon" && (
+              <AddonPanel subscriptionNumber={subNum} onDone={closePanel} onCancel={closePanel} />
+            )}
+            <Section title="Add-ons" icon={Layers} action={addButton("Ajouter un add-on", "addon")}>
+              <div className="space-y-2">
+                {addons.map((addon) => (
+                  <ItemRow key={addon.addonId}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <Mono>{addon.addonId}</Mono>
+                        <p className="mt-1 text-xs text-gray-500">Version : {addon.planVersionId}</p>
+                        <p className="mt-0.5 text-xs text-gray-400">
+                          Qté : {addon.quantity} · Début : {formatDate(addon.startsAt)}
+                          {addon.endsAt && ` → ${formatDate(addon.endsAt)}`}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <StatusChip tone={addon.status === "ACTIVE" ? "success" : "neutral"}>
+                          {addon.status === "ACTIVE" ? "Actif" : addon.status}
+                        </StatusChip>
+                        {addon.status === "ACTIVE" && (
+                          <IconButton
+                            icon={XCircle}
+                            label="Annuler l'add-on"
+                            tone="danger"
+                            pending={
+                              cancelAddonMutation.isPending &&
+                              cancelAddonMutation.variables === addon.addonId
+                            }
+                            onClick={() => askCancelAddon(addon.addonId)}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </ItemRow>
+                ))}
+                {addons.length === 0 && <Empty text="Aucun add-on actif" />}
+              </div>
+            </Section>
+          </>
+        )}
+
+        {/* ── Services ───────────────────────────────────────────────────── */}
+        {activeTab === "services" && <SubscriptionServicesPanel subscriptionNumber={subNum} />}
+
+        {/* ── Sièges ─────────────────────────────────────────────────────── */}
+        {activeTab === "seats" && (
+          <>
+            {panel === "seat" && (
+              <AddSeatPanel subscriptionNumber={subNum} onDone={closePanel} onCancel={closePanel} />
+            )}
+            <Section title="Sièges" icon={Users} action={addButton("Ajouter un siège", "seat")}>
+              <div className="space-y-2">
+                {seats.map((seat) => (
+                  <ItemRow key={seat.memberCode}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <Mono>{seat.memberCode}</Mono>
+                        <p className="mt-1">
+                          <Tag>{seat.role}</Tag>
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <StatusChip tone={seat.status === "ACTIVE" ? "success" : "neutral"}>
+                          {seat.status === "ACTIVE" ? "Actif" : seat.status}
+                        </StatusChip>
+                        {seat.role !== "OWNER" && (
+                          <IconButton
+                            icon={Trash2}
+                            label="Retirer le siège"
+                            tone="danger"
+                            pending={
+                              removeSeatMutation.isPending &&
+                              removeSeatMutation.variables === seat.memberCode
+                            }
+                            onClick={() => askRemoveSeat(seat.memberCode)}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </ItemRow>
+                ))}
+                {seats.length === 0 && <Empty text="Aucun siège enregistré" />}
+              </div>
+            </Section>
+          </>
+        )}
+
+        {/* ── Changements ────────────────────────────────────────────────── */}
+        {activeTab === "changes" && (
+          <>
+            {panel === "change" && (
+              <ChangePanel subscriptionNumber={subNum} onDone={closePanel} onCancel={closePanel} />
+            )}
+            <Section
+              title="Changements"
+              icon={GitBranch}
+              action={addButton("Demander un changement", "change")}
+            >
+              <div className="space-y-2">
+                {changes.map((c) => {
+                  const cs = statusOf(CHANGE_STATUS, c.status);
+                  return (
+                    <ItemRow key={c.changeNumber}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <Mono>{c.changeNumber}</Mono>
+                          <p className="mt-1 text-xs text-gray-500">
+                            {c.changeType} · {c.effectivePolicy}
+                          </p>
+                          {c.reason && <p className="mt-1 text-xs text-gray-400">{c.reason}</p>}
+                        </div>
+                        <StatusChip tone={cs.tone}>{cs.label}</StatusChip>
+                      </div>
+                      {(c.status === "PENDING" || c.status === "APPROVED") && (
+                        <div className="mt-3 flex gap-2">
+                          {c.status === "PENDING" && (
+                            <ActionButton
+                              className="!px-4 !py-1.5 !text-xs"
+                              pending={busy(approveChangeMutation, c.changeNumber)}
+                              onClick={() => approveChangeMutation.mutate(c.changeNumber)}
+                            >
+                              Approuver
+                            </ActionButton>
+                          )}
+                          {c.status === "APPROVED" && (
+                            <ActionButton
+                              className="!px-4 !py-1.5 !text-xs"
+                              pending={busy(applyChangeMutation, c.changeNumber)}
+                              onClick={() => applyChangeMutation.mutate(c.changeNumber)}
+                            >
+                              Appliquer
+                            </ActionButton>
+                          )}
+                        </div>
+                      )}
+                    </ItemRow>
+                  );
+                })}
+                {changes.length === 0 && <Empty text="Aucun changement" />}
+              </div>
+            </Section>
+          </>
+        )}
+
+        {/* ── Timeline ───────────────────────────────────────────────────── */}
+        {activeTab === "timeline" && (
+          <>
+            {panel === "timeline" && (
+              <TimelineEventPanel
+                subscriptionNumber={subNum}
+                ownerType={ownerType}
+                ownerCode={ownerCode}
+                onDone={closePanel}
+                onCancel={closePanel}
+              />
+            )}
+            <Section
+              title="Timeline"
+              icon={Clock}
+              action={addButton("Ajouter un événement", "timeline")}
+            >
+              <div className="space-y-2">
+                {timelineEvents.map((ev) => (
+                  <ItemRow key={ev.eventNumber}>
+                    <div className="flex items-start gap-3">
+                      <span
+                        className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[color:var(--logo-pink-dark)] ${PINK_SOFT}`}
+                      >
+                        <Clock size={15} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-3">
+                          <p className="text-sm font-semibold text-gray-900">{ev.title}</p>
+                          <p className="whitespace-nowrap text-xs text-gray-500">
+                            {formatDateTime(ev.occurredAt)}
+                          </p>
+                        </div>
+                        <p className="text-xs text-gray-400">{ev.eventType}</p>
+                        {ev.description && <p className="mt-1 text-xs text-gray-600">{ev.description}</p>}
+                        {ev.sourceType && (
+                          <p className="mt-1 font-mono text-xs text-gray-400">
+                            {ev.sourceType}
+                            {ev.sourceId ? ` · ${ev.sourceId}` : ""}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </ItemRow>
+                ))}
+                {timelineEvents.length === 0 && <Empty text="Aucun événement sur la timeline" />}
+              </div>
+            </Section>
+          </>
+        )}
+
+        {/* ── Notifications ──────────────────────────────────────────────── */}
+        {activeTab === "notifications" && (
+          <>
+            {panel === "notification" && (
+              <NotificationPanel
+                subscriptionNumber={subNum}
+                ownerType={ownerType}
+                ownerCode={ownerCode}
+                onDone={closePanel}
+                onCancel={closePanel}
+              />
+            )}
+            <Section
+              title="Notifications"
+              icon={Bell}
+              action={
+                <div className="flex flex-wrap justify-end gap-2">
+                  <ActionButton
+                    variant="ghost"
+                    icon={Send}
+                    className="!px-4 !py-2"
+                    onClick={askDispatchNotifications}
+                  >
+                    Envoyer les notifications dues
+                  </ActionButton>
+                  {addButton("Planifier une notification", "notification")}
+                </div>
+              }
+            >
+              <div className="space-y-2">
+                {notifications.map((n) => {
+                  const ns = statusOf(NOTIFICATION_STATUS, n.status);
+                  return (
+                    <ItemRow key={n.notificationNumber}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-gray-900">{n.notificationType}</p>
+                          <p className="mt-0.5 text-xs text-gray-500">
+                            {n.channel} · {n.recipient}
+                          </p>
+                          <p className="mt-0.5 text-xs text-gray-400">
+                            Planifiée : {formatDateTime(n.scheduledAt)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <StatusChip tone={ns.tone}>{ns.label}</StatusChip>
+                          {n.status === "PENDING" && (
+                            <IconButton
+                              icon={XCircle}
+                              label="Annuler la notification"
+                              tone="danger"
+                              pending={busy(cancelNotifMutation, n.notificationNumber)}
+                              onClick={() => cancelNotifMutation.mutate(n.notificationNumber)}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </ItemRow>
+                  );
+                })}
+                {notifications.length === 0 && <Empty text="Aucune notification planifiée" />}
+              </div>
+            </Section>
+          </>
+        )}
+
+        {/* ── Overage ────────────────────────────────────────────────────── */}
+        {activeTab === "overage" && (
+          <div className="space-y-4">
+            <Section title="Frais de dépassement" icon={AlertCircle}>
               {overageCharges.length > 0 && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-700 flex justify-between">
-                  <span>Total overage</span>
-                  <strong>
-                    {overageCharges
-                      .reduce((s, c) => s + c.totalAmount, 0)
-                      .toLocaleString("fr-FR")}{" "}
-                    {overageCharges[0]?.currency}
+                <div
+                  className={`mb-3 flex items-center justify-between rounded-2xl px-4 py-3 text-sm ${PINK_SOFT}`}
+                >
+                  <span className="font-semibold text-[color:var(--logo-pink-dark)]">Total overage</span>
+                  <strong className="text-gray-950">
+                    {formatMoney(
+                      overageCharges.reduce((s, c) => s + c.totalAmount, 0),
+                      overageCharges[0]?.currency,
+                    )}
                   </strong>
                 </div>
               )}
-              {overageCharges.map((charge, i) => (
-                <div key={i} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-mono text-sm">{charge.chargeNumber}</p>
-                      <p className="text-xs text-gray-500">
-                        {charge.entitlementCode}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        {charge.quantity} unités ×{" "}
-                        {charge.unitPrice.toLocaleString("fr-FR")}{" "}
-                        {charge.currency}
-                      </p>
+              <div className="space-y-2">
+                {overageCharges.map((charge) => (
+                  <ItemRow key={charge.chargeNumber}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <Mono>{charge.chargeNumber}</Mono>
+                        <p className="mt-1 text-sm text-gray-800">{charge.entitlementCode}</p>
+                        <p className="mt-0.5 text-xs text-gray-400">
+                          {charge.quantity} unités × {formatMoney(charge.unitPrice, charge.currency)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-gray-950">
+                          {formatMoney(charge.totalAmount, charge.currency)}
+                        </p>
+                        <p className="text-xs text-gray-400">{formatDate(charge.createdAt)}</p>
+                      </div>
                     </div>
-                    <p className="font-bold text-orange-700">
-                      {charge.totalAmount.toLocaleString("fr-FR")}{" "}
-                      {charge.currency}
-                    </p>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-2">
-                    {new Date(charge.createdAt).toLocaleDateString("fr-FR")}
-                  </p>
-                </div>
-              ))}
-              {overageCharges.length === 0 && (
-                <EmptyState text="Aucun overage enregistré" />
-              )}
-            </div>
-          )}
+                  </ItemRow>
+                ))}
+                {overageCharges.length === 0 && <Empty text="Aucun overage enregistré" />}
+              </div>
+            </Section>
 
-          {/* ── Rollover ─────────────────────────────────────────────────── */}
-          {activeTab === "rollover" && (
-            <div className="space-y-3">
-              {rollovers.map((r, i) => (
-                <div key={i} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-mono text-sm">{r.rolloverNumber}</p>
-                      <p className="text-xs text-gray-500">
-                        {r.entitlementCode}
-                      </p>
+            {planVersionId && (
+              <>
+                {panel === "overage" && (
+                  <OveragePolicyPanel
+                    planVersionId={planVersionId}
+                    onDone={closePanel}
+                    onCancel={closePanel}
+                  />
+                )}
+                <Section
+                  title="Règles de dépassement"
+                  description="Appliquées à la version du plan de cette souscription"
+                  action={addButton("Nouvelle règle", "overage")}
+                >
+                  <div className="space-y-2">
+                    {policies.map((p) => (
+                      <ItemRow key={p.id}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-gray-900">{p.entitlementCode}</p>
+                            <p className="mt-0.5 text-xs text-gray-500">
+                              {OVERAGE_MODE_LABELS[p.mode] ?? p.mode}
+                              {typeof p.unitPrice === "number" &&
+                                ` · ${formatMoney(p.unitPrice, p.currency || "XAF")} l'unité`}
+                              {typeof p.freeQuantity === "number" &&
+                                p.freeQuantity > 0 &&
+                                ` · ${p.freeQuantity} gratuites`}
+                            </p>
+                          </div>
+                          <StatusChip tone={p.active ? "success" : "neutral"}>
+                            {p.active ? "Active" : "Inactive"}
+                          </StatusChip>
+                        </div>
+                      </ItemRow>
+                    ))}
+                    {policies.length === 0 && <Empty text="Aucune règle de dépassement" />}
+                  </div>
+                </Section>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── Rollover ───────────────────────────────────────────────────── */}
+        {activeTab === "rollover" && (
+          <Section
+            title="Reports de crédits"
+            icon={RotateCcw}
+            action={
+              <ActionButton
+                variant="ghost"
+                icon={RotateCcw}
+                className="!px-4 !py-2"
+                onClick={askApplyRollovers}
+              >
+                Appliquer les reports dus
+              </ActionButton>
+            }
+          >
+            <div className="space-y-2">
+              {rollovers.map((r) => (
+                <ItemRow key={r.rolloverNumber}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Mono>{r.rolloverNumber}</Mono>
+                      <p className="mt-1 text-sm text-gray-800">{r.entitlementCode}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-blue-700">
+                      <p className="font-bold text-[color:var(--logo-pink-dark)]">
                         +{r.quantity} reportés
                       </p>
-                      <p className="text-xs text-gray-400">
-                        {new Date(r.rolledAt).toLocaleDateString("fr-FR")}
-                      </p>
+                      <p className="text-xs text-gray-400">{formatDate(r.rolledAt)}</p>
                     </div>
                   </div>
-                </div>
+                </ItemRow>
               ))}
-              {rollovers.length === 0 && (
-                <EmptyState text="Aucun report de crédits" />
-              )}
+              {rollovers.length === 0 && <Empty text="Aucun report de crédits" />}
             </div>
-          )}
-        </div>
+          </Section>
+        )}
 
-        {/* Modaux enfants */}
-        <AddSeatModal
-          isOpen={addSeatOpen}
-          onClose={() => setAddSeatOpen(false)}
-          subscriptionNumber={subNum}
-          onSuccess={() => {
-            queryClient.invalidateQueries({
-              queryKey: ["subscription-seats", subNum],
-            });
-            setAddSeatOpen(false);
-          }}
-        />
-        <CreateAddonModal
-          isOpen={addAddonOpen}
-          onClose={() => setAddAddonOpen(false)}
-          subscriptionNumber={subNum}
-          onSuccess={() => {
-            queryClient.invalidateQueries({
-              queryKey: ["subscription-addons", subNum],
-            });
-            setAddAddonOpen(false);
-          }}
-        />
-        <CreateChangeModal
-          isOpen={addChangeOpen}
-          onClose={() => setAddChangeOpen(false)}
-          subscriptionNumber={subNum}
-          onSuccess={() => {
-            queryClient.invalidateQueries({
-              queryKey: ["subscription-changes", subNum],
-            });
-            setAddChangeOpen(false);
-          }}
-        />
-        <CreateTimelineEventModal
-          isOpen={addTimelineOpen}
-          onClose={() => setAddTimelineOpen(false)}
-          subscriptionNumber={subNum}
-          ownerType={subscription?.subscriberType ?? ""}
-          ownerCode={subscription?.subscriberCode ?? ""}
-          onSuccess={() => {
-            queryClient.invalidateQueries({
-              queryKey: ["subscription-timeline", subNum],
-            });
-            setAddTimelineOpen(false);
-          }}
-        />
-        <CreateNotificationModal
-          isOpen={addNotifOpen}
-          onClose={() => setAddNotifOpen(false)}
-          subscriptionNumber={subNum}
-          ownerType={subscription?.subscriberType ?? ""}
-          ownerCode={subscription?.subscriberCode ?? ""}
-          onSuccess={() => {
-            queryClient.invalidateQueries({
-              queryKey: ["subscription-notifications", subNum],
-            });
-            setAddNotifOpen(false);
-          }}
-        />
-        <CreateUsageRecordModal
-          isOpen={addUsageOpen}
-          onClose={() => setAddUsageOpen(false)}
-          defaultOwnerType={subscription?.subscriberType ?? ""}
-          defaultOwnerCode={subscription?.subscriberCode ?? ""}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ["usage-records"] });
-            setAddUsageOpen(false);
-          }}
-        />
+        {/* ── Cycle de vie ───────────────────────────────────────────────── */}
+        {activeTab === "lifecycle" && (
+          <div className="space-y-4">
+            <CommitmentPanel subscriptionNumber={subNum} currency={currency} onChanged={invalidateAndRefetch} />
+            <FreezePanel subscriptionNumber={subNum} status={subscription.status} currency={currency} onChanged={invalidateAndRefetch} />
+            <DebitMandatePanel subscriptionNumber={subNum} currency={currency} onChanged={invalidateAndRefetch} />
+            <TerminationPanel subscriptionNumber={subNum} onChanged={invalidateAndRefetch} />
+            <DerivationPanel subscriptionNumber={subNum} currency={currency} onChanged={invalidateAndRefetch} />
+          </div>
+        )}
+
+        {/* ── Historique ─────────────────────────────────────────────────── */}
+        {activeTab === "history" && (
+          <Section title="Historique des statuts" icon={History}>
+            <div className="space-y-2">
+              {history.map((h: any, i) => {
+                const to = h.toStatus ?? h.status;
+                const from = h.fromStatus;
+                const when = h.changedAt ?? h.createdAt ?? h.occurredAt;
+                return (
+                  <ItemRow key={h.id ?? i}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        {to && (
+                          <p className="text-sm font-semibold text-gray-900">
+                            {from
+                              ? `${statusOf(SUBSCRIPTION_STATUS, from).label} → ${statusOf(SUBSCRIPTION_STATUS, to).label}`
+                              : statusOf(SUBSCRIPTION_STATUS, to).label}
+                          </p>
+                        )}
+                        {h.reason && <p className="mt-1 text-xs text-gray-500">{h.reason}</p>}
+                        {h.changedBy && <p className="mt-0.5 text-xs text-gray-400">Par {h.changedBy}</p>}
+                      </div>
+                      {when && (
+                        <p className="whitespace-nowrap text-xs text-gray-500">{formatDateTime(when)}</p>
+                      )}
+                    </div>
+                  </ItemRow>
+                );
+              })}
+              {history.length === 0 && <Empty text="Aucun changement de statut" />}
+            </div>
+          </Section>
+        )}
       </div>
+      <Toaster />
     </AdminLayout>
   );
 };
-
-// ── Helper ────────────────────────────────────────────────────────────────────
-const EmptyState: React.FC<{ text: string }> = ({ text }) => (
-  <div className="text-center py-8 text-gray-500">{text}</div>
-);

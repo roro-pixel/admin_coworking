@@ -1,22 +1,17 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  CheckCircle2,
-  Edit,
-  Loader2,
-  Mail,
-  Plus,
-  Send,
-  Trash2,
-  X,
-  XCircle,
-} from "lucide-react";
+import { CheckCircle2, Pencil, Plus, Send, Trash2, X, XCircle } from "lucide-react";
+import { brandVars } from "../../layout/adminTheme";
 import { ModalPortal } from "../../ui/ModalPortal";
 import { operationsService } from "../../../services/operations.service";
-import type {
-  ProposalLineResponse,
-  ProposalResponse,
-} from "../../../services/operations.service";
+import type { ProposalLineResponse, ProposalResponse } from "../../../services/operations.service";
+import { ActionButton, Detail, IconButton, ItemRow, Section, StatusChip } from "../../subscription/kit";
+import { apiMessage, formatDate, formatDateTime, formatMoney } from "../../subscription/kitUtils";
+import { statusOf } from "../../subscription/labels";
+import { ReasonPanel } from "../../bookings/ReasonPanel";
+import { DetailsSkeleton } from "../../ui/Skeleton";
+import { toast } from "../../ui/toastStore";
+import { PROPOSAL_SERVICE_TYPES, PROPOSAL_STATUS } from "../opsLabels";
 import { ProposalFormModal } from "./ProposalFormModal";
 import { ProposalLineFormModal } from "./ProposalLineFormModal";
 
@@ -25,288 +20,224 @@ interface Props {
   onClose: () => void;
   proposal: ProposalResponse | null;
 }
-const statusClass: Record<string, string> = {
-  DRAFT: "bg-gray-100 text-gray-700",
-  SENT: "bg-blue-50 text-blue-700",
-  VIEWED: "bg-purple-50 text-purple-700",
-  ACCEPTED: "bg-green-50 text-green-700",
-  REJECTED: "bg-red-50 text-red-700",
-  EXPIRED: "bg-orange-50 text-orange-700",
-  CONVERTED: "bg-gray-950 text-white",
-};
-const money = (v?: number, c = "XAF") =>
-  `${Number(v ?? 0).toLocaleString("fr-FR")} ${c}`;
-const fmt = (v?: string | null) =>
-  v ? new Date(v).toLocaleString("fr-FR") : "—";
 
-export const ProposalDetailModal: React.FC<Props> = ({
-  isOpen,
-  onClose,
-  proposal,
-}) => {
+const serviceLabel = (v?: string | null) => PROPOSAL_SERVICE_TYPES.find((s) => s.value === v)?.label ?? v ?? "";
+
+export const ProposalDetailModal: React.FC<Props> = ({ isOpen, onClose, proposal }) => {
   const queryClient = useQueryClient();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isLineOpen, setIsLineOpen] = useState(false);
-  const [editingLine, setEditingLine] = useState<ProposalLineResponse | null>(
-    null,
-  );
+  const [isRejectOpen, setIsRejectOpen] = useState(false);
+  const [editingLine, setEditingLine] = useState<ProposalLineResponse | null>(null);
+
   const { data: detail, isLoading } = useQuery({
     queryKey: ["crm-proposal", proposal?.id],
     queryFn: () => operationsService.getProposal(proposal!.id),
     enabled: isOpen && !!proposal?.id,
   });
   const current = detail || proposal;
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["crm-proposals"] });
     queryClient.invalidateQueries({ queryKey: ["crm-proposal", current?.id] });
   };
   const sendMutation = useMutation({
     mutationFn: () => operationsService.sendProposal(current!.id),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      toast.success("Proposition envoyée");
+    },
+    onError: (e) => toast.error(apiMessage(e, "Envoi impossible.")),
   });
   const acceptMutation = useMutation({
     mutationFn: () => operationsService.acceptProposal(current!.id),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      toast.success("Proposition acceptée");
+    },
+    onError: (e) => toast.error(apiMessage(e, "Acceptation impossible.")),
   });
   const rejectMutation = useMutation({
-    mutationFn: () => {
-      const reason = prompt("Motif du rejet ?");
-      if (!reason) return Promise.reject(new Error("Motif requis."));
-      return operationsService.rejectProposal(current!.id, reason);
+    mutationFn: (reason: string) => operationsService.rejectProposal(current!.id, reason),
+    onSuccess: () => {
+      invalidate();
+      setIsRejectOpen(false);
+      toast.success("Proposition rejetée");
     },
-    onSuccess: invalidate,
-    onError: (e: any) => {
-      if (e?.message !== "Motif requis.")
-        alert(e?.response?.data?.message || e?.message || "Erreur rejet.");
-    },
+    onError: (e) => toast.error(apiMessage(e, "Rejet impossible.")),
   });
   const deleteLineMutation = useMutation({
-    mutationFn: (lineId: number) =>
-      operationsService.deleteProposalLine(current!.id, lineId),
+    mutationFn: (lineId: number) => operationsService.deleteProposalLine(current!.id, lineId),
     onSuccess: invalidate,
   });
+
   if (!isOpen || !current) return null;
   const lines = current.lines || [];
+  const st = statusOf(PROPOSAL_STATUS, String(current.status));
+  const awaitingAnswer = ["SENT", "VIEWED"].includes(String(current.status));
+  const converted =
+    current.convertedInvoiceNumber ||
+    current.convertedContractCode ||
+    current.convertedSubscriptionNumber ||
+    current.convertedPassNumber;
+
+  const closeLinePanel = () => {
+    setIsLineOpen(false);
+    setEditingLine(null);
+  };
+
   return (
-    <ModalPortal onClose={onClose} size="5xl">
-      <div className="sticky top-0 z-10 flex items-start justify-between rounded-t-2xl border-b bg-white/95 px-6 py-4 backdrop-blur">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-xl font-bold text-gray-950">{current.title}</h3>
-            <span
-              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass[current.status] ?? "bg-gray-100"}`}
-            >
-              {current.status}
-            </span>
+    <ModalPortal onClose={onClose} size="4xl">
+      <div style={brandVars}>
+      <div className="p-5 sm:p-7">
+        <div className="flex items-start gap-4">
+          <div className="min-w-0 flex-1">
+            <h3 className="break-words text-xl font-bold tracking-tight text-gray-950">{current.title}</h3>
+            <p className="mt-0.5 font-mono text-xs font-semibold text-[color:var(--logo-pink-dark)]">{current.proposalNumber}</p>
           </div>
-          <p className="mt-1 font-mono text-xs text-gray-400">
-            {current.proposalNumber}
-          </p>
+          <IconButton icon={X} label="Fermer" tone="neutral" onClick={onClose} />
         </div>
-        <button onClick={onClose} className="rounded-xl p-2 hover:bg-gray-100">
-          <X size={20} />
-        </button>
-      </div>
-      {isLoading ? (
-        <div className="p-10 text-center">
-          <Loader2 className="mx-auto animate-spin" />
+        <div className="mt-4 flex flex-wrap gap-2">
+          <StatusChip tone={st.tone}>{st.label}</StatusChip>
         </div>
-      ) : (
-        <div className="space-y-5 p-6">
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setIsEditOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium"
-            >
-              <Edit size={16} /> Modifier
-            </button>
-            <button
-              onClick={() => sendMutation.mutate()}
-              disabled={sendMutation.isPending || current.status !== "DRAFT"}
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-            >
-              <Send size={16} /> Envoyer
-            </button>
-            <button
-              onClick={() => acceptMutation.mutate()}
-              disabled={
-                acceptMutation.isPending ||
-                !["SENT", "VIEWED"].includes(String(current.status))
-              }
-              className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-            >
-              <CheckCircle2 size={16} /> Accepter
-            </button>
-            <button
-              onClick={() => rejectMutation.mutate()}
-              disabled={
-                rejectMutation.isPending ||
-                !["SENT", "VIEWED"].includes(String(current.status))
-              }
-              className="inline-flex items-center gap-2 rounded-xl bg-red-50 px-4 py-2 text-sm font-medium text-red-700 disabled:opacity-40"
-            >
-              <XCircle size={16} /> Rejeter
-            </button>
+
+        {isLoading ? (
+          <div className="mt-5">
+            <DetailsSkeleton />
           </div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Info
-              label="Destinataire"
-              value={current.recipientName || current.recipientCode || "—"}
-            />
-            <Info label="Email" value={current.recipientEmail || "—"} />
-            <Info label="Valide jusqu'au" value={current.validUntil || "—"} />
-            <Info
-              label="Assigné à"
-              value={current.assignedTo ? String(current.assignedTo) : "—"}
-            />
-            <Info
-              label="Sous-total"
-              value={money(current.subtotalAmount, current.currency)}
-            />
-            <Info
-              label="TVA"
-              value={money(current.taxAmount, current.currency)}
-            />
-            <Info
-              label="Total"
-              value={money(current.totalAmount, current.currency)}
-            />
-            <Info label="Envoyée" value={fmt(current.sentAt)} />
-          </div>
-          {(current.notes ||
-            current.internalNotes ||
-            current.rejectionReason) && (
-            <div className="grid gap-3 md:grid-cols-3">
-              {current.notes && (
-                <Note title="Notes client" text={current.notes} />
-              )}{" "}
-              {current.internalNotes && (
-                <Note title="Notes internes" text={current.internalNotes} />
-              )}{" "}
-              {current.rejectionReason && (
-                <Note title="Motif rejet" text={current.rejectionReason} />
-              )}
+        ) : (
+          <>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <ActionButton variant="ghost" icon={Pencil} onClick={() => setIsEditOpen(true)}>Modifier</ActionButton>
+              <ActionButton icon={Send} pending={sendMutation.isPending} disabled={current.status !== "DRAFT"} onClick={() => sendMutation.mutate()}>
+                Envoyer
+              </ActionButton>
+              <ActionButton icon={CheckCircle2} pending={acceptMutation.isPending} disabled={!awaitingAnswer} onClick={() => acceptMutation.mutate()}>
+                Accepter
+              </ActionButton>
+              <ActionButton variant="ghost" icon={XCircle} disabled={!awaitingAnswer} onClick={() => setIsRejectOpen(true)}>
+                Rejeter
+              </ActionButton>
             </div>
-          )}
-          <section className="rounded-3xl bg-gray-50 p-4">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h4 className="font-semibold text-gray-950">
-                  Lignes de proposition
-                </h4>
-                <p className="text-sm text-gray-500">
-                  Les montants sont recalculés par le backend.
-                </p>
+
+            {isRejectOpen && (
+              <div className="mt-4">
+                <ReasonPanel
+                  title="Rejeter la proposition"
+                  subtitle="Indiquez le motif du refus."
+                  required
+                  submitLabel="Rejeter"
+                  pending={rejectMutation.isPending}
+                  onSubmit={(reason) => rejectMutation.mutate(reason)}
+                  onCancel={() => setIsRejectOpen(false)}
+                />
               </div>
-              <button
-                onClick={() => {
-                  setEditingLine(null);
-                  setIsLineOpen(true);
-                }}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-medium text-white"
-              >
-                <Plus size={16} /> Ligne
-              </button>
+            )}
+
+            <div className="mt-5 grid grid-cols-1 gap-x-6 gap-y-4 rounded-2xl bg-gray-50 p-5 sm:grid-cols-2 lg:grid-cols-4">
+              <Detail label="Destinataire">{current.recipientName || current.recipientCode}</Detail>
+              <Detail label="Email">{current.recipientEmail}</Detail>
+              <Detail label="Valide jusqu'au">{current.validUntil ? formatDate(current.validUntil) : ""}</Detail>
+              <Detail label="Assignée à">{current.assignedTo ? String(current.assignedTo) : ""}</Detail>
+              <Detail label="Sous-total">{formatMoney(current.subtotalAmount, current.currency)}</Detail>
+              <Detail label="TVA">{formatMoney(current.taxAmount, current.currency)}</Detail>
+              <Detail label="Total">{formatMoney(current.totalAmount, current.currency)}</Detail>
+              <Detail label="Envoyée le">{current.sentAt ? formatDateTime(current.sentAt) : ""}</Detail>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full border-separate border-spacing-y-2">
-                <thead>
-                  <tr className="text-left text-xs uppercase tracking-wide text-gray-400">
-                    <th className="px-3 py-2">Libellé</th>
-                    <th className="px-3 py-2">Service</th>
-                    <th className="px-3 py-2 text-right">Qté</th>
-                    <th className="px-3 py-2 text-right">PU</th>
-                    <th className="px-3 py-2 text-right">Total</th>
-                    <th className="px-3 py-2 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
+
+            {(current.notes || current.internalNotes || current.rejectionReason) && (
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                {current.notes && <Note title="Notes client" text={current.notes} />}
+                {current.internalNotes && <Note title="Notes internes" text={current.internalNotes} />}
+                {current.rejectionReason && <Note title="Motif du rejet" text={current.rejectionReason} />}
+              </div>
+            )}
+
+            <Section
+              className="mt-5"
+              title="Lignes de la proposition"
+              description="Les montants sont recalculés par le serveur."
+              action={
+                <ActionButton
+                  icon={Plus}
+                  onClick={() => {
+                    setEditingLine(null);
+                    setIsLineOpen(true);
+                  }}
+                  className="px-4 py-2"
+                >
+                  Ligne
+                </ActionButton>
+              }
+            >
+              <ProposalLineFormModal
+                isOpen={isLineOpen}
+                onClose={closeLinePanel}
+                proposalId={current.id}
+                editingLine={editingLine}
+                onSuccess={closeLinePanel}
+              />
+              {lines.length === 0 ? (
+                <p className="py-6 text-center text-sm text-gray-500">Aucune ligne pour l'instant.</p>
+              ) : (
+                <div className="space-y-2">
                   {lines.map((line) => (
-                    <tr key={line.id} className="bg-white">
-                      <td className="rounded-l-2xl px-3 py-3">
-                        <p className="font-medium text-gray-900">
-                          {line.label}
+                    <ItemRow key={line.id} className="flex items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold text-gray-950">{line.label}</p>
+                        <p className="mt-0.5 truncate text-xs text-gray-500">
+                          {[serviceLabel(line.serviceType), line.serviceRefCode, line.description].filter(Boolean).join(" · ")}
                         </p>
-                        <p className="text-xs text-gray-500">
-                          {line.description}
+                        <p className="mt-1 text-xs text-gray-400">
+                          {line.quantity} × {formatMoney(line.unitPrice, line.currency)}
+                          {line.discountPercent ? ` · remise ${line.discountPercent} %` : ""}
                         </p>
-                      </td>
-                      <td className="px-3 py-3 text-sm text-gray-600">
-                        {line.serviceType || "—"}
-                        <br />
-                        <span className="font-mono text-xs text-gray-400">
-                          {line.serviceRefCode}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-right text-sm">
-                        {line.quantity}
-                      </td>
-                      <td className="px-3 py-3 text-right text-sm">
-                        {money(line.unitPrice, line.currency)}
-                      </td>
-                      <td className="px-3 py-3 text-right text-sm font-semibold">
-                        {money(line.totalAmount, line.currency)}
-                      </td>
-                      <td className="rounded-r-2xl px-3 py-3">
-                        <div className="flex justify-end gap-1">
-                          <button
-                            onClick={() => {
-                              setEditingLine(line);
-                              setIsLineOpen(true);
-                            }}
-                            className="rounded-lg p-2 text-blue-600 hover:bg-blue-50"
-                          >
-                            <Edit size={15} />
-                          </button>
-                          <button
-                            onClick={() => deleteLineMutation.mutate(line.id)}
-                            className="rounded-lg p-2 text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                      </div>
+                      <p className="shrink-0 text-sm font-bold text-gray-950">{formatMoney(line.totalAmount, line.currency)}</p>
+                      <div className="flex shrink-0">
+                        <IconButton
+                          icon={Pencil}
+                          label="Modifier la ligne"
+                          onClick={() => {
+                            setEditingLine(line);
+                            setIsLineOpen(true);
+                          }}
+                        />
+                        <IconButton
+                          icon={Trash2}
+                          label="Supprimer la ligne"
+                          tone="danger"
+                          pending={deleteLineMutation.isPending && deleteLineMutation.variables === line.id}
+                          onClick={() =>
+                            toast.confirm({
+                              message: "Supprimer cette ligne ?",
+                              detail: line.label,
+                              confirmLabel: "Supprimer",
+                              successMessage: "Ligne supprimée",
+                              errorMessage: "Suppression impossible.",
+                              onConfirm: () => deleteLineMutation.mutateAsync(line.id),
+                            })
+                          }
+                        />
+                      </div>
+                    </ItemRow>
                   ))}
-                </tbody>
-              </table>
-              {lines.length === 0 && (
-                <div className="rounded-2xl bg-white p-8 text-center text-sm text-gray-500">
-                  Aucune ligne.
                 </div>
               )}
-            </div>
-          </section>
-          {(current.convertedInvoiceNumber ||
-            current.convertedContractCode ||
-            current.convertedSubscriptionNumber ||
-            current.convertedPassNumber) && (
-            <section className="rounded-3xl bg-gray-950 p-5 text-white">
-              <h4 className="mb-3 flex items-center gap-2 font-semibold">
-                <Mail size={16} /> Conversion tracée
-              </h4>
-              <div className="grid gap-2 md:grid-cols-4">
-                <InfoDark
-                  label="Facture"
-                  value={current.convertedInvoiceNumber || "—"}
-                />
-                <InfoDark
-                  label="Contrat"
-                  value={current.convertedContractCode || "—"}
-                />
-                <InfoDark
-                  label="Abonnement"
-                  value={current.convertedSubscriptionNumber || "—"}
-                />
-                <InfoDark
-                  label="Pass"
-                  value={current.convertedPassNumber || "—"}
-                />
+            </Section>
+
+            {converted && (
+              <div className="mt-5 grid grid-cols-1 gap-x-6 gap-y-4 rounded-2xl bg-gray-50 p-5 sm:grid-cols-2 lg:grid-cols-4">
+                <Detail label="Facture" mono>{current.convertedInvoiceNumber}</Detail>
+                <Detail label="Contrat" mono>{current.convertedContractCode}</Detail>
+                <Detail label="Abonnement" mono>{current.convertedSubscriptionNumber}</Detail>
+                <Detail label="Pass" mono>{current.convertedPassNumber}</Detail>
               </div>
-            </section>
-          )}
-        </div>
-      )}
+            )}
+          </>
+        )}
+      </div>
+
       <ProposalFormModal
         isOpen={isEditOpen}
         onClose={() => setIsEditOpen(false)}
@@ -316,45 +247,14 @@ export const ProposalDetailModal: React.FC<Props> = ({
           invalidate();
         }}
       />
-      <ProposalLineFormModal
-        isOpen={isLineOpen}
-        onClose={() => {
-          setIsLineOpen(false);
-          setEditingLine(null);
-        }}
-        proposalId={current.id}
-        editingLine={editingLine}
-        onSuccess={() => {
-          setIsLineOpen(false);
-          setEditingLine(null);
-          invalidate();
-        }}
-      />
+    </div>
     </ModalPortal>
   );
 };
-const Info: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="rounded-2xl bg-gray-50 p-4">
-    <p className="text-xs uppercase tracking-wide text-gray-400">{label}</p>
-    <p className="mt-1 break-words text-sm font-semibold text-gray-900">
-      {value}
-    </p>
-  </div>
-);
+
 const Note: React.FC<{ title: string; text: string }> = ({ title, text }) => (
-  <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-100">
-    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-      {title}
-    </p>
-    <p className="mt-2 text-sm leading-6 text-gray-600">{text}</p>
-  </div>
-);
-const InfoDark: React.FC<{ label: string; value: string }> = ({
-  label,
-  value,
-}) => (
-  <div className="rounded-2xl bg-white/10 p-4">
-    <p className="text-xs text-white/50">{label}</p>
-    <p className="mt-1 font-mono text-sm text-white">{value}</p>
+  <div className="rounded-2xl bg-gray-50 p-4">
+    <p className="text-xs font-semibold text-gray-400">{title}</p>
+    <p className="mt-1.5 text-sm leading-6 text-gray-700">{text}</p>
   </div>
 );

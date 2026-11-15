@@ -132,11 +132,6 @@ export const customerService = {
     await apiClient.delete(`/sni/api/v1/customers/${customerId}`);
   },
 
-  //   searchCustomers: async (query: string): Promise<CustomerSummaryResponse[]> => {
-  //   const response = await apiClient.get(`/sni/api/v1/customers/search/basic?query=${query}`);
-  //   return response.data;
-  // },
-
   searchCustomers: async (
     query: string,
     type?: "PERSON" | "COMPANY",

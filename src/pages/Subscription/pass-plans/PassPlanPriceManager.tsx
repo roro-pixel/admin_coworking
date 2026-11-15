@@ -1,12 +1,16 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus } from "lucide-react";
+import { Plus, DollarSign } from "lucide-react";
 import { subscriptionService } from "../../../services/subscription.service";
 import type { PassPlanPriceResponse } from "../../../services/subscription.service";
+import { toast } from "../../../components/ui/toastStore";
+import { ActionButton, Field, ItemRow, Section, Tag } from "../../../components/subscription/kit";
+import { FIELD, apiMessage, formatMoney } from "../../../components/subscription/kitUtils";
 
 interface Props {
   versionId: number;
 }
+
 export const PassPlanPriceManager: React.FC<Props> = ({ versionId }) => {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
@@ -17,114 +21,103 @@ export const PassPlanPriceManager: React.FC<Props> = ({ versionId }) => {
     taxIncluded: true,
     taxCode: "",
   });
+
   const { data = [], isLoading } = useQuery({
     queryKey: ["pass-plan-prices", versionId],
     queryFn: () => subscriptionService.getPassPlanPrices(versionId),
     enabled: !!versionId,
   });
+
   const mutation = useMutation({
     mutationFn: () =>
-      subscriptionService.upsertPassPlanPrice(versionId, {
-        ...form,
-        taxCode: form.taxCode || null,
-      }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: ["pass-plan-prices", versionId],
-      }),
+      subscriptionService.upsertPassPlanPrice(versionId, { ...form, taxCode: form.taxCode || null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pass-plan-prices", versionId] });
+      toast.success("Prix enregistré");
+    },
+    onError: (e: unknown) => toast.error(apiMessage(e, "Erreur lors de l'enregistrement du prix.")),
   });
+
   const prices = data as PassPlanPriceResponse[];
+
   return (
-    <section className="space-y-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
-      <div>
-        <h3 className="text-lg font-semibold text-gray-950">Prix</h3>
-        <p className="text-sm text-gray-500">
-          Un prix par devise. L'appel crée ou met à jour le prix.
-        </p>
-      </div>
+    <Section title="Prix" description="Un prix par devise : l'enregistrement crée ou met à jour le prix." icon={DollarSign}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
           mutation.mutate();
         }}
-        className="grid grid-cols-1 gap-3 md:grid-cols-6"
+        className="space-y-3"
       >
-        <input
-          value={form.currency}
-          maxLength={3}
-          onChange={(e) =>
-            setForm({ ...form, currency: e.target.value.toUpperCase() })
-          }
-          className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-          placeholder="XAF"
-        />
-        <input
-          type="number"
-          value={form.amount}
-          onChange={(e) =>
-            setForm({ ...form, amount: Number(e.target.value) || 0 })
-          }
-          className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-          placeholder="Montant"
-        />
-        <input
-          type="number"
-          value={form.setupFee}
-          onChange={(e) =>
-            setForm({ ...form, setupFee: Number(e.target.value) || 0 })
-          }
-          className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-          placeholder="Setup"
-        />
-        <input
-          type="number"
-          value={form.depositAmount}
-          onChange={(e) =>
-            setForm({ ...form, depositAmount: Number(e.target.value) || 0 })
-          }
-          className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-          placeholder="Caution"
-        />
-        <label className="flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm">
-          <input
-            type="checkbox"
-            checked={form.taxIncluded}
-            onChange={(e) =>
-              setForm({ ...form, taxIncluded: e.target.checked })
-            }
-          />{" "}
-          TTC
-        </label>
-        <button
-          disabled={mutation.isPending}
-          className="rounded-xl bg-primary-600 px-3 py-2 text-sm font-medium text-white"
-        >
-          {mutation.isPending ? (
-            <Loader2 className="mx-auto animate-spin" size={16} />
-          ) : (
-            <>
-              <Plus size={16} className="inline" /> Prix
-            </>
-          )}
-        </button>
-      </form>
-      {isLoading ? (
-        <p className="text-sm text-gray-500">Chargement...</p>
-      ) : (
-        <div className="grid gap-2 md:grid-cols-3">
-          {prices.map((p) => (
-            <div key={p.id} className="rounded-2xl bg-gray-50 p-4">
-              <p className="font-semibold text-gray-900">
-                {p.amount.toLocaleString("fr-FR")} {p.currency}
-              </p>
-              <p className="text-xs text-gray-500">
-                Setup {p.setupFee ?? 0} · Caution {p.depositAmount ?? 0} ·{" "}
-                {p.taxIncluded ? "TTC" : "HT"}
-              </p>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Field label="Devise">
+            <input
+              value={form.currency}
+              maxLength={3}
+              onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
+              className={FIELD}
+              placeholder="XAF"
+            />
+          </Field>
+          <Field label="Montant">
+            <input
+              type="number"
+              value={form.amount}
+              onChange={(e) => setForm({ ...form, amount: Number(e.target.value) || 0 })}
+              className={FIELD}
+            />
+          </Field>
+          <Field label="Frais d'activation">
+            <input
+              type="number"
+              value={form.setupFee}
+              onChange={(e) => setForm({ ...form, setupFee: Number(e.target.value) || 0 })}
+              className={FIELD}
+            />
+          </Field>
+          <Field label="Caution">
+            <input
+              type="number"
+              value={form.depositAmount}
+              onChange={(e) => setForm({ ...form, depositAmount: Number(e.target.value) || 0 })}
+              className={FIELD}
+            />
+          </Field>
         </div>
+        <div className="flex items-center justify-between gap-3">
+          <label className="flex cursor-pointer items-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm">
+            <input
+              type="checkbox"
+              checked={form.taxIncluded}
+              onChange={(e) => setForm({ ...form, taxIncluded: e.target.checked })}
+              className="h-4 w-4 rounded accent-[color:var(--logo-pink-dark)]"
+            />
+            Prix TTC
+          </label>
+          <ActionButton type="submit" icon={Plus} pending={mutation.isPending}>
+            Enregistrer le prix
+          </ActionButton>
+        </div>
+      </form>
+
+      <div className="mt-4 grid gap-2 md:grid-cols-3">
+        {isLoading
+          ? [0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-2xl bg-white" />)
+          : prices.map((p) => (
+              <ItemRow key={p.id}>
+                <p className="font-bold text-gray-950">{formatMoney(p.amount, p.currency)}</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  Activation {p.setupFee ?? 0} · Caution {p.depositAmount ?? 0}
+                </p>
+                <p className="mt-2">
+                  <Tag tone={p.taxIncluded ? "pink" : "gray"}>{p.taxIncluded ? "TTC" : "HT"}</Tag>
+                </p>
+              </ItemRow>
+            ))}
+      </div>
+      {!isLoading && prices.length === 0 && (
+        <p className="py-4 text-center text-sm text-gray-500">Aucun prix défini pour cette version.</p>
       )}
-    </section>
+    </Section>
   );
 };

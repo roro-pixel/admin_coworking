@@ -2,16 +2,14 @@ import React, { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
-  Search,
   X,
-  ChevronLeft,
-  ChevronRight,
   ClipboardList,
   Calendar,
-  MessageSquare,
-  UserPlus,
   BarChart3,
-  Trash2,
+  KanbanSquare,
+  ListTodo,
+  MessageSquare,
+  CheckSquare,
 } from "lucide-react";
 import { operationsService } from "../../services/operations.service";
 import type {
@@ -21,44 +19,91 @@ import type {
   TaskCard,
   TaskRecurrence,
 } from "../../services/operations.service";
-import { useAuth } from "../../contexts/AuthContext";
-import { ModalPortal } from "../../components/ui/ModalPortal";
 import { RichTextEditor } from "../../components/ui/RichTextEditor";
 import { AgentAutocomplete } from "../../components/auth/AgentAutocomplete";
 import { TaskSourceAutocomplete } from "../../components/tasks/TaskSourceAutocomplete";
 import type { AdminUser } from "../../services/auth.service";
+import {
+  ActionButton,
+  DataCard,
+  EmptyState,
+  Field,
+  FilterButton,
+  FilterPanel,
+  HeadRow,
+  IconButton,
+  ListHeader,
+  Pagination,
+  SearchField,
+  Section,
+  StatusChip,
+} from "../../components/subscription/kit";
+import { FIELD, FIELD_SOFT, ROW_HOVER, apiMessage } from "../../components/subscription/kitUtils";
+import { statusOf } from "../../components/subscription/labels";
+import { ListSkeleton, Skeleton } from "../../components/ui/Skeleton";
+import { toast } from "../../components/ui/toastStore";
+import { DueText, PillChoice, SectionBar, ViewSwitch } from "../../components/operations/opsKit";
+import type { ViewItem } from "../../components/operations/opsKit";
+import {
+  BarBreakdown,
+  ChartCard,
+  ChartSkeleton,
+  DonutBreakdown,
+  KpiRow,
+  KpiRowSkeleton,
+  StackBar,
+} from "../../components/operations/OpsCharts";
+import { TaskDetailModal } from "../../components/operations/TaskDetailModal";
+import {
+  ACTIVE_TASK_STATUSES,
+  PRIORITY_STYLE,
+  RECURRENCE_LABELS,
+  SOURCE_TYPE_LABELS,
+  TASK_SOURCES,
+  TASK_STATUS,
+  styleLabels,
+} from "../../components/operations/opsLabels";
+import { toSlices } from "../../components/operations/opsChartData";
 
-const activeStatuses: Exclude<TaskStatus, "ARCHIVED">[] = [
-  "OPEN",
-  "IN_PROGRESS",
-  "COMPLETED",
-  "CANCELLED",
-];
-const statusConfig: Record<TaskStatus, { label: string; color: string }> = {
-  OPEN: { label: "À faire", color: "bg-gray-100 text-gray-700" },
-  IN_PROGRESS: { label: "En cours", color: "bg-blue-100 text-blue-700" },
-  COMPLETED: { label: "Terminée", color: "bg-green-100 text-green-700" },
-  CANCELLED: { label: "Annulée", color: "bg-red-100 text-red-700" },
-  ARCHIVED: { label: "Archivée", color: "bg-gray-100 text-gray-500" },
+const activeStatuses: Exclude<TaskStatus, "ARCHIVED">[] = [...ACTIVE_TASK_STATUSES];
+const recurrenceOptions: TaskRecurrence[] = ["NONE", "DAILY", "WEEKLY", "MONTHLY", "AFTER_BOOKING"];
+const priorityOptions = (Object.keys(PRIORITY_STYLE) as TaskPriority[]).map((p) => ({
+  value: p,
+  label: PRIORITY_STYLE[p].label,
+}));
+
+const PRIORITY_LABELS = styleLabels(PRIORITY_STYLE);
+const PRIORITY_ORDER = ["URGENT", "HIGH", "MEDIUM", "LOW"] as const;
+const PRIORITY_COLORS: Record<string, string> = {
+  URGENT: "#D64545",
+  HIGH: "#E8A33D",
+  MEDIUM: "#9B8FD1",
+  LOW: "#B9B4B0",
 };
-const priorityConfig: Record<TaskPriority, { label: string; color: string }> = {
-  LOW: { label: "Faible", color: "bg-gray-100 text-gray-600" },
-  MEDIUM: { label: "Moyen", color: "bg-blue-100 text-blue-700" },
-  HIGH: { label: "Élevé", color: "bg-orange-100 text-orange-700" },
-  URGENT: { label: "Urgent", color: "bg-red-100 text-red-700" },
+const STATUS_COLORS: Record<string, string> = {
+  OPEN: "#B9B4B0",
+  IN_PROGRESS: "#9B8FD1",
+  COMPLETED: "#7FB08A",
+  CANCELLED: "#D64545",
+  ARCHIVED: "#E4C7D6",
 };
-const recurrenceOptions: TaskRecurrence[] = [
-  "NONE",
-  "DAILY",
-  "WEEKLY",
-  "MONTHLY",
-  "AFTER_BOOKING",
-];
 
 type SubTab = "board" | "my" | "today" | "metrics" | "create";
 
+const EMPTY_CREATE = {
+  title: "",
+  description: "",
+  assignedTo: "",
+  priority: "MEDIUM" as TaskPriority,
+  dueAt: "",
+  sourceType: "",
+  sourceCode: "",
+  recurrence: "NONE" as TaskRecurrence,
+};
+
+const LIST_COLS = "lg:grid-cols-[minmax(0,2.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]";
+
 export const TaskMaster: React.FC = () => {
-  const { admin } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<SubTab>("board");
   const [visitedTabs, setVisitedTabs] = useState<Set<SubTab>>(
@@ -70,30 +115,16 @@ export const TaskMaster: React.FC = () => {
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | "">("");
   const [sourceTypeFilter, setSourceTypeFilter] = useState("");
   const [assignedToFilter, setAssignedToFilter] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(0);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [comment, setComment] = useState("");
-  const [assignTo, setAssignTo] = useState("");
-  const [selectedAssignAgent, setSelectedAssignAgent] =
-    useState<AdminUser | null>(null);
   const [selectedCreateAgent, setSelectedCreateAgent] =
     useState<AdminUser | null>(null);
-  const [newChecklistItem, setNewChecklistItem] = useState("");
   const [checklistItems, setChecklistItems] = useState<
     { label: string; completed: boolean }[]
   >([]);
-  const [createForm, setCreateForm] = useState({
-    title: "",
-    description: "",
-    assignedTo: "",
-    priority: "MEDIUM" as TaskPriority,
-    dueAt: "",
-    sourceType: "",
-    sourceCode: "",
-    recurrence: "NONE" as TaskRecurrence,
-  });
+  const [createForm, setCreateForm] = useState(EMPTY_CREATE);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -104,16 +135,7 @@ export const TaskMaster: React.FC = () => {
   }, [search]);
   useEffect(() => {
     if (activeTab !== "create") return;
-    setCreateForm({
-      title: "",
-      description: "",
-      assignedTo: "",
-      priority: "MEDIUM",
-      dueAt: "",
-      sourceType: "",
-      sourceCode: "",
-      recurrence: "NONE",
-    });
+    setCreateForm(EMPTY_CREATE);
     setChecklistItems([]);
     setSelectedCreateAgent(null);
   }, [activeTab]);
@@ -121,7 +143,6 @@ export const TaskMaster: React.FC = () => {
   const switchTab = (tab: SubTab) => {
     setActiveTab(tab);
     setVisitedTabs((prev) => new Set([...prev, tab]));
-    setActionError(null);
   };
 
   const boardParams = {
@@ -172,7 +193,7 @@ export const TaskMaster: React.FC = () => {
     enabled: !!selectedTask && isDetailOpen,
   });
 
-  const myTasks = myTasksData?.content || [];
+  const myTasks: Task[] = myTasksData?.content || [];
   const totalPages = myTasksData?.totalPages ?? 0;
   const currentTask = taskDetail || selectedTask;
 
@@ -205,218 +226,204 @@ export const TaskMaster: React.FC = () => {
       }),
     onSuccess: () => {
       invalidate();
+      toast.success("Tâche créée");
       switchTab("board");
     },
-    onError: (e: any) =>
-      setActionError(e?.response?.data?.message || "Erreur création tâche"),
+    onError: (e: any) => toast.error(apiMessage(e, "Erreur création tâche")),
   });
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: TaskStatus }) =>
       operationsService.updateTaskStatus(id, status),
-    onSuccess: invalidate,
-    onError: (e: any) =>
-      setActionError(e?.response?.data?.message || "Erreur changement statut"),
-  });
-  const completeMutation = useMutation({
-    mutationFn: (id: number) => operationsService.completeTask(id),
-    onSuccess: invalidate,
-    onError: (e: any) =>
-      setActionError(e?.response?.data?.message || "Erreur finalisation tâche"),
-  });
-  const archiveMutation = useMutation({
-    mutationFn: (id: number) => operationsService.archiveTask(id),
-    onSuccess: invalidate,
-    onError: (e: any) =>
-      setActionError(e?.response?.data?.message || "Erreur archivage tâche"),
-  });
-  const assignMutation = useMutation({
-    mutationFn: ({
-      id,
-      assignedTo,
-    }: {
-      id: number;
-      assignedTo: number | null;
-    }) => operationsService.assignTask(id, assignedTo),
     onSuccess: () => {
-      setAssignTo("");
-      setSelectedAssignAgent(null);
       invalidate();
+      toast.success("Statut mis à jour");
     },
-    onError: (e: any) =>
-      setActionError(e?.response?.data?.message || "Erreur assignation"),
-  });
-  const commentMutation = useMutation({
-    mutationFn: () =>
-      operationsService.addTaskComment(selectedTask!.id, {
-        authorId: admin?.email || "admin",
-        authorName: admin?.email || "Admin",
-        comment,
-      }),
-    onSuccess: () => {
-      refetchDetail();
-      setComment("");
-    },
-    onError: (e: any) =>
-      setActionError(e?.response?.data?.message || "Erreur ajout commentaire"),
-  });
-  const addChecklistMutation = useMutation({
-    mutationFn: () =>
-      operationsService.addTaskChecklistItem(selectedTask!.id, {
-        label: newChecklistItem,
-        completed: false,
-        displayOrder: (currentTask?.checklist?.length || 0) + 1,
-      }),
-    onSuccess: () => {
-      setNewChecklistItem("");
-      refetchDetail();
-      invalidate();
-    },
-    onError: (e: any) =>
-      setActionError(e?.response?.data?.message || "Erreur ajout checklist"),
-  });
-  const toggleChecklistMutation = useMutation({
-    mutationFn: ({
-      itemId,
-      completed,
-      label,
-      displayOrder,
-    }: {
-      itemId: number;
-      completed: boolean;
-      label: string;
-      displayOrder: number;
-    }) =>
-      operationsService.updateTaskChecklistItem(selectedTask!.id, itemId, {
-        completed,
-        label,
-        displayOrder,
-      }),
-    onSuccess: () => {
-      refetchDetail();
-      invalidate();
-    },
-    onError: (e: any) =>
-      setActionError(
-        e?.response?.data?.message || "Erreur mise à jour checklist",
-      ),
-  });
-  const deleteChecklistMutation = useMutation({
-    mutationFn: (itemId: number) =>
-      operationsService.deleteTaskChecklistItem(selectedTask!.id, itemId),
-    onSuccess: () => {
-      refetchDetail();
-      invalidate();
-    },
-    onError: (e: any) =>
-      setActionError(
-        e?.response?.data?.message || "Erreur suppression checklist",
-      ),
+    onError: (e: any) => toast.error(apiMessage(e, "Erreur changement statut")),
   });
 
-  const tabs: { id: SubTab; label: string; icon: React.ElementType }[] = [
-    { id: "board", label: "Kanban", icon: ClipboardList },
-    {
-      id: "today",
-      label: `Aujourd'hui (${todayTasks.length})`,
-      icon: Calendar,
-    },
-    { id: "my", label: "Liste", icon: ClipboardList },
+  const openTask = (t: Task | TaskCard) => {
+    setSelectedTask(t as Task);
+    setIsDetailOpen(true);
+  };
+
+  const views: ViewItem<SubTab>[] = [
+    { id: "board", label: "Kanban", icon: KanbanSquare },
+    { id: "today", label: "Aujourd'hui", icon: Calendar, count: todayTasks.length },
+    { id: "my", label: "Liste", icon: ListTodo },
     { id: "metrics", label: "Métriques", icon: BarChart3 },
-    { id: "create", label: "Nouvelle tâche", icon: Plus },
   ];
 
-  return (
-    <div>
-      <div className="mb-6 overflow-x-auto rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex min-w-max gap-1">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => switchTab(tab.id)}
-            className={`px-4 py-2 text-sm font-medium rounded-xl transition-colors flex items-center gap-1.5 ${activeTab === tab.id ? "bg-primary-600 text-white shadow-sm" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"}`}
-          >
-            <tab.icon size={14} />
-            {tab.label}
-          </button>
-        ))}
-        </div>
+  const filtersActive = !!(assignedToFilter || priorityFilter || sourceTypeFilter);
+  const filters = (withStatus: boolean) => (
+    <>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <SearchField value={search} onChange={setSearch} placeholder="Rechercher une tâche" className="flex-1" />
+        <FilterButton open={showFilters} active={filtersActive || (withStatus && !!statusFilter)} onClick={() => setShowFilters((v) => !v)} />
       </div>
-      {actionError && (
-        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex justify-between">
-          {actionError}
-          <button onClick={() => setActionError(null)}>
-            <X size={14} />
-          </button>
-        </div>
+      {showFilters && (
+        <FilterPanel
+          canReset={filtersActive || (withStatus && !!statusFilter)}
+          onReset={() => {
+            setAssignedToFilter("");
+            setPriorityFilter("");
+            setSourceTypeFilter("");
+            setStatusFilter("");
+          }}
+        >
+          <div>
+            <p className="mb-1.5 text-xs font-semibold text-gray-600">Agent</p>
+            <AgentAutocomplete
+              value={assignedToFilter}
+              onValueChange={setAssignedToFilter}
+              onSelect={() => undefined}
+              placeholder="Filtrer par agent..."
+            />
+          </div>
+          <Field label="Priorité">
+            <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value as TaskPriority | "")} className={FIELD_SOFT}>
+              <option value="">Toutes les priorités</option>
+              {priorityOptions.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Source">
+            <select value={sourceTypeFilter} onChange={(e) => setSourceTypeFilter(e.target.value)} className={FIELD_SOFT}>
+              <option value="">Toutes les sources</option>
+              {TASK_SOURCES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {withStatus && (
+            <Field label="Statut">
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as TaskStatus | "")} className={FIELD_SOFT}>
+                <option value="">Statuts actifs</option>
+                {Object.entries(TASK_STATUS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+        </FilterPanel>
       )}
+    </>
+  );
+
+  return (
+    <div className="space-y-5">
+      <SectionBar
+        action={
+          <ActionButton icon={Plus} onClick={() => switchTab("create")} className="w-full sm:w-auto">
+            Nouvelle tâche
+          </ActionButton>
+        }
+      >
+        <ViewSwitch items={views} active={activeTab} onChange={switchTab} />
+      </SectionBar>
 
       {activeTab === "board" && (
         <div className="space-y-4">
-          <TaskFilters
-            search={search}
-            setSearch={setSearch}
-            assignedToFilter={assignedToFilter}
-            setAssignedToFilter={setAssignedToFilter}
-            priorityFilter={priorityFilter}
-            setPriorityFilter={setPriorityFilter}
-            sourceTypeFilter={sourceTypeFilter}
-            setSourceTypeFilter={setSourceTypeFilter}
-          />
+          {filters(false)}
           {metrics && (
-            <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-              <Metric label="Total" value={metrics.totalTasks} />
-              <Metric label="Ouvertes" value={metrics.openTasks} />
-              <Metric
-                label="En retard"
-                value={metrics.overdueTasks}
-                color="text-red-600"
-              />
-              <Metric
-                label="Taux complétion"
-                value={`${Number(metrics.completionRate ?? 0).toFixed(1)}%`}
-                color="text-green-600"
-              />
-            </div>
+            <KpiRow
+              items={[
+                { label: "Total", value: metrics.totalTasks },
+                { label: "Ouvertes", value: metrics.openTasks },
+                { label: "En retard", value: metrics.overdueTasks, tone: "danger" },
+                { label: "Taux de complétion", value: `${Number(metrics.completionRate ?? 0).toFixed(1)} %`, tone: "success" },
+              ]}
+            />
           )}
           {boardLoading ? (
-            <div className="py-12 text-center">Chargement...</div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="space-y-3 rounded-[1.75rem] bg-gray-100/70 p-3">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-28 w-full" />
+                  <Skeleton className="h-28 w-full" />
+                </div>
+              ))}
+            </div>
           ) : (
-            <div className="flex flex-col sm:flex-row gap-4 overflow-x-auto pb-4">
+            <div className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-3 lg:grid lg:grid-cols-4 lg:overflow-visible">
               {activeStatuses.map((status) => {
-                const col = boardData?.columns?.find(
-                  (c) => c.status === status,
-                );
+                const col = boardData?.columns?.find((c: any) => c.status === status);
+                const st = TASK_STATUS[status];
                 return (
-                  <div key={status} className="flex-shrink-0 w-80">
-                    <div
-                      className={`px-3 py-2 rounded-xl font-medium text-sm ${statusConfig[status].color}`}
-                    >
-                      {statusConfig[status].label} ({col?.count ?? 0})
-                    </div>
-                    <div className="space-y-2 bg-gray-50 rounded-b-lg p-2 min-h-32">
-                      {(col?.cards || []).map((card) => (
-                        <TaskCardView
-                          key={card.id}
-                          card={card}
-                          onOpen={() => {
-                            setSelectedTask(card as any);
-                            setIsDetailOpen(true);
-                          }}
-                          onMove={(target) =>
-                            statusMutation.mutate({
-                              id: card.id,
-                              status: target,
-                            })
-                          }
-                        />
-                      ))}
+                  <section key={status} className="w-[85vw] shrink-0 snap-start rounded-[1.75rem] bg-gray-100/70 p-3 sm:w-80 lg:w-auto">
+                    <header className="flex items-center justify-between gap-2 px-2 pb-3 pt-1">
+                      <StatusChip tone={st.tone}>{st.label}</StatusChip>
+                      <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-bold text-gray-700 shadow-sm">
+                        {col?.count ?? 0}
+                      </span>
+                    </header>
+                    <div className="min-h-24 space-y-2.5">
+                      {(col?.cards || []).map((card: TaskCard) => {
+                        const pr = statusOf(PRIORITY_STYLE, card.priority);
+                        const total = card.checklistTotal ?? 0;
+                        const doneCount = card.checklistDone ?? 0;
+                        return (
+                          <article key={card.id} className="rounded-2xl bg-white p-4 shadow-sm">
+                            <button type="button" onClick={() => openTask(card)} className="block w-full text-left focus:outline-none">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="line-clamp-2 font-semibold text-gray-950">{card.title}</p>
+                                <StatusChip tone={pr.tone}>{pr.label}</StatusChip>
+                              </div>
+                              {card.dueAt && (
+                                <p className="mt-2 text-xs">
+                                  <DueText value={card.dueAt} overdue={card.overdue} withTime />
+                                </p>
+                              )}
+                              {card.sourceType && (
+                                <p className="mt-1 text-xs font-semibold text-[color:var(--logo-pink-dark)]">
+                                  {SOURCE_TYPE_LABELS[card.sourceType] ?? card.sourceType} · {card.sourceCode}
+                                </p>
+                              )}
+                              <div className="mt-3 flex items-center gap-3 text-xs text-gray-500">
+                                <span className="flex flex-1 items-center gap-2">
+                                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
+                                    <span
+                                      className="block h-full rounded-full bg-[color:var(--logo-pink)]"
+                                      style={{ width: `${total > 0 ? (doneCount / total) * 100 : 0}%` }}
+                                    />
+                                  </span>
+                                  <span className="tabular-nums">
+                                    {doneCount}/{total}
+                                  </span>
+                                </span>
+                                <span className="inline-flex items-center gap-1 tabular-nums">
+                                  <MessageSquare size={12} />
+                                  {card.commentCount ?? 0}
+                                </span>
+                              </div>
+                            </button>
+                            <select
+                              aria-label={`Changer le statut de ${card.title}`}
+                              value={card.status}
+                              onChange={(e) => statusMutation.mutate({ id: card.id, status: e.target.value as TaskStatus })}
+                              className={`${FIELD_SOFT} mt-3 !py-2 text-xs`}
+                            >
+                              {activeStatuses.map((s) => (
+                                <option key={s} value={s}>
+                                  {TASK_STATUS[s].label}
+                                </option>
+                              ))}
+                            </select>
+                          </article>
+                        );
+                      })}
                       {(!col?.cards || col.cards.length === 0) && (
-                        <p className="text-xs text-gray-400 p-3">
-                          Aucune tâche
-                        </p>
+                        <p className="px-2 py-4 text-center text-xs text-gray-400">Aucune tâche</p>
                       )}
                     </div>
-                  </div>
+                  </section>
                 );
               })}
             </div>
@@ -425,667 +432,293 @@ export const TaskMaster: React.FC = () => {
       )}
 
       {activeTab === "today" && (
-        <TaskSimpleList
-          tasks={todayTasks}
-          loading={todayLoading}
-          open={(t) => {
-            setSelectedTask(t);
-            setIsDetailOpen(true);
-          }}
-        />
+        <div className="space-y-4">
+          <ListHeader title="À faire aujourd'hui" subtitle={`${todayTasks.length} tâche${todayTasks.length > 1 ? "s" : ""} à échéance du jour`} />
+          <TaskList tasks={todayTasks} loading={todayLoading} open={openTask} />
+        </div>
       )}
 
       {activeTab === "my" && (
         <div className="space-y-4">
-          <TaskFilters
-            search={search}
-            setSearch={setSearch}
-            assignedToFilter={assignedToFilter}
-            setAssignedToFilter={setAssignedToFilter}
-            priorityFilter={priorityFilter}
-            setPriorityFilter={setPriorityFilter}
-            sourceTypeFilter={sourceTypeFilter}
-            setSourceTypeFilter={setSourceTypeFilter}
-          />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="px-3 py-2 border rounded-lg bg-white"
-          >
-            <option value="">Statut actif</option>
-            <option value="OPEN">À faire</option>
-            <option value="IN_PROGRESS">En cours</option>
-            <option value="COMPLETED">Terminée</option>
-            <option value="CANCELLED">Annulée</option>
-            <option value="ARCHIVED">Archivée</option>
-          </select>
-          <TaskSimpleList
-            tasks={myTasks}
-            loading={myLoading}
-            open={(t) => {
-              setSelectedTask(t);
-              setIsDetailOpen(true);
-            }}
-          />
-          {totalPages > 1 && (
-            <Pagination page={page} setPage={setPage} totalPages={totalPages} />
-          )}
+          {filters(true)}
+          <TaskList tasks={myTasks} loading={myLoading} open={openTask} />
+          <Pagination page={page} totalPages={totalPages} total={myTasksData?.totalElements ?? 0} noun="tâche" onChange={setPage} />
         </div>
       )}
 
       {activeTab === "metrics" && (
-        <div>
+        <div className="space-y-5">
+          <ListHeader title="Métriques des tâches" subtitle="Avancement, retards et répartition" />
           {metricsLoading ? (
-            <div>Chargement...</div>
+            <>
+              <KpiRowSkeleton count={8} />
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                <ChartSkeleton />
+                <ChartSkeleton />
+              </div>
+            </>
           ) : (
             metrics && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-                  <Metric label="Total" value={metrics.totalTasks} />
-                  <Metric label="Ouvertes" value={metrics.openTasks} />
-                  <Metric label="En cours" value={metrics.inProgressTasks} />
-                  <Metric
-                    label="Terminées"
-                    value={metrics.completedTasks}
-                    color="text-green-600"
+              <>
+                <KpiRow
+                  items={[
+                    { label: "Total", value: metrics.totalTasks },
+                    { label: "Ouvertes", value: metrics.openTasks },
+                    { label: "En cours", value: metrics.inProgressTasks },
+                    { label: "Terminées", value: metrics.completedTasks, tone: "success" },
+                    { label: "Annulées", value: metrics.cancelledTasks },
+                    { label: "Archivées", value: metrics.archivedTasks },
+                    { label: "En retard", value: metrics.overdueTasks, tone: "danger" },
+                    { label: "Durée moyenne", value: `${Number(metrics.avgCompletionHours ?? 0).toFixed(1)} h` },
+                  ]}
+                />
+                <ChartCard title="Répartition par statut">
+                  <StackBar
+                    data={toSlices(
+                      {
+                        OPEN: metrics.openTasks ?? 0,
+                        IN_PROGRESS: metrics.inProgressTasks ?? 0,
+                        COMPLETED: metrics.completedTasks ?? 0,
+                        CANCELLED: metrics.cancelledTasks ?? 0,
+                        ARCHIVED: metrics.archivedTasks ?? 0,
+                      },
+                      styleLabels(TASK_STATUS),
+                      ["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED", "ARCHIVED"],
+                      STATUS_COLORS,
+                    )}
                   />
-                  <Metric label="Annulées" value={metrics.cancelledTasks} />
-                  <Metric label="Archivées" value={metrics.archivedTasks} />
-                  <Metric
-                    label="En retard"
-                    value={metrics.overdueTasks}
-                    color="text-red-600"
-                  />
-                  <Metric
-                    label="Durée moy."
-                    value={`${Number(metrics.avgCompletionHours ?? 0).toFixed(1)} h`}
-                  />
+                </ChartCard>
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                  <ChartCard title="Par priorité">
+                    <DonutBreakdown
+                      centerLabel="tâches"
+                      data={toSlices(metrics.byPriority, PRIORITY_LABELS, PRIORITY_ORDER, PRIORITY_COLORS)}
+                    />
+                  </ChartCard>
+                  <ChartCard title="Par origine" subtitle="D'où viennent les tâches">
+                    <BarBreakdown data={toSlices(metrics.bySourceType, SOURCE_TYPE_LABELS)} />
+                  </ChartCard>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:p-6">
-                  <Breakdown title="Par priorité" data={metrics.byPriority} />
-                  <Breakdown title="Par source" data={metrics.bySourceType} />
-                </div>
-              </div>
+              </>
             )
           )}
         </div>
       )}
 
       {activeTab === "create" && (
-        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 max-w-4xl space-y-4">
-          <TaskCreateForm
-            form={createForm}
-            setForm={setCreateForm}
-            checklistItems={checklistItems}
-            setChecklistItems={setChecklistItems}
-            selectedAgent={selectedCreateAgent}
-            setSelectedAgent={setSelectedCreateAgent}
-          />
-          <button
-            onClick={() => createMutation.mutate()}
-            disabled={!createForm.title || createMutation.isPending}
-            className="w-full sm:w-auto justify-center px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
+        <form
+          className="mx-auto w-full max-w-4xl space-y-5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (createForm.title) createMutation.mutate();
+          }}
+        >
+          <Section title="La tâche" icon={CheckSquare}>
+            <div className="space-y-4">
+              <Field label="Titre" required>
+                <input
+                  value={createForm.title}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, title: e.target.value }))}
+                  className={FIELD}
+                />
+              </Field>
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-gray-600">Description</p>
+                <RichTextEditor
+                  value={createForm.description}
+                  onChange={(v: string) => setCreateForm((f) => ({ ...f, description: v }))}
+                  minHeight="120px"
+                />
+              </div>
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-gray-600">Priorité</p>
+                <PillChoice
+                  label="Priorité"
+                  options={priorityOptions}
+                  value={createForm.priority}
+                  onChange={(priority) => setCreateForm((f) => ({ ...f, priority }))}
+                />
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Planification et suivi" description="Qui, quand, et à quoi la tâche se rattache" icon={Calendar}>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-gray-600">Assigner à un agent</p>
+                <AgentAutocomplete
+                  value={createForm.assignedTo}
+                  selectedAgent={selectedCreateAgent}
+                  onValueChange={(value) => setCreateForm((f) => ({ ...f, assignedTo: value }))}
+                  onSelect={setSelectedCreateAgent}
+                  placeholder="Assigner à un agent..."
+                />
+              </div>
+              <Field label="Échéance">
+                <input
+                  type="datetime-local"
+                  value={createForm.dueAt}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, dueAt: e.target.value }))}
+                  className={FIELD}
+                />
+              </Field>
+              <Field label="Source">
+                <select
+                  value={createForm.sourceType}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, sourceType: e.target.value, sourceCode: "" }))}
+                  className={FIELD}
+                >
+                  <option value="">Source manuelle</option>
+                  {TASK_SOURCES.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-gray-600">Élément rattaché</p>
+                <TaskSourceAutocomplete
+                  sourceType={createForm.sourceType}
+                  value={createForm.sourceCode}
+                  onChange={(sourceCode) => setCreateForm((f) => ({ ...f, sourceCode }))}
+                />
+              </div>
+              <Field label="Récurrence" className="md:col-span-2">
+                <select
+                  value={createForm.recurrence}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, recurrence: e.target.value as TaskRecurrence }))}
+                  className={FIELD}
+                >
+                  {recurrenceOptions.map((r) => (
+                    <option key={r} value={r}>
+                      {RECURRENCE_LABELS[r]}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+          </Section>
+
+          <Section
+            title="Checklist initiale"
+            description="Les étapes à cocher au fil du travail"
+            icon={ListTodo}
+            action={
+              <ActionButton
+                variant="ghost"
+                icon={Plus}
+                className="!py-2"
+                onClick={() => setChecklistItems([...checklistItems, { label: "", completed: false }])}
+              >
+                Ajouter un item
+              </ActionButton>
+            }
           >
-            Créer la tâche
-          </button>
-        </div>
+            {checklistItems.length === 0 ? (
+              <p className="py-2 text-center text-sm text-gray-400">Aucun item pour l'instant.</p>
+            ) : (
+              <ul className="space-y-2">
+                {checklistItems.map((item, i) => (
+                  <li key={i} className="flex gap-2">
+                    <input
+                      value={item.label}
+                      aria-label={`Item ${i + 1}`}
+                      onChange={(e) => {
+                        const arr = [...checklistItems];
+                        arr[i] = { ...arr[i], label: e.target.value };
+                        setChecklistItems(arr);
+                      }}
+                      className={FIELD}
+                    />
+                    <IconButton
+                      icon={X}
+                      label="Retirer l'item"
+                      tone="danger"
+                      className="!h-11 !w-11 self-center bg-white shadow-sm"
+                      onClick={() => setChecklistItems(checklistItems.filter((_, idx) => idx !== i))}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <ActionButton variant="ghost" onClick={() => switchTab("board")} disabled={createMutation.isPending}>
+              Annuler
+            </ActionButton>
+            <ActionButton type="submit" pending={createMutation.isPending} disabled={!createForm.title}>
+              Créer la tâche
+            </ActionButton>
+          </div>
+        </form>
       )}
 
       {isDetailOpen && currentTask && (
-        <ModalPortal onClose={() => setIsDetailOpen(false)}>
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-start rounded-t-2xl">
-            <div>
-              <h3 className="text-lg sm:text-xl font-bold">{currentTask.title}</h3>
-              <p className="text-sm text-gray-500">#{currentTask.id}</p>
-            </div>
-            <button onClick={() => setIsDetailOpen(false)}>
-              <X size={20} />
-            </button>
-          </div>
-          <div className="p-4 sm:p-6 space-y-6">
-            <div className="flex flex-wrap gap-2">
-              <span
-                className={`px-2 py-1 rounded-full text-xs ${statusConfig[currentTask.status].color}`}
-              >
-                {statusConfig[currentTask.status].label}
-              </span>
-              <span
-                className={`px-2 py-1 rounded-full text-xs ${priorityConfig[currentTask.priority].color}`}
-              >
-                {priorityConfig[currentTask.priority].label}
-              </span>
-              <span className="px-2 py-1 rounded-full text-xs bg-gray-100">
-                {currentTask.recurrence}
-              </span>
-              {currentTask.sourceType && (
-                <span className="px-2 py-1 rounded-full text-xs bg-blue-50 text-blue-700">
-                  {currentTask.sourceType} · {currentTask.sourceCode}
-                </span>
-              )}
-            </div>
-            <div
-              className="prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{
-                __html: currentTask.description || "",
-              }}
-            />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <AgentAutocomplete
-                    value={assignTo}
-                    selectedAgent={selectedAssignAgent}
-                    onValueChange={setAssignTo}
-                    onSelect={setSelectedAssignAgent}
-                    placeholder="Rechercher un agent..."
-                  />
-                </div>
-                <button
-                  onClick={() =>
-                    assignMutation.mutate({
-                      id: currentTask.id,
-                      assignedTo: assignTo ? Number(assignTo) : null,
-                    })
-                  }
-                  className="px-3 py-2 bg-primary-600 text-white rounded-lg flex items-center gap-1"
-                >
-                  <UserPlus size={15} /> Assigner
-                </button>
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                {activeStatuses.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() =>
-                      statusMutation.mutate({ id: currentTask.id, status: s })
-                    }
-                    className="px-2 py-1 border rounded text-xs"
-                  >
-                    {statusConfig[s].label}
-                  </button>
-                ))}
-                <button
-                  onClick={() => completeMutation.mutate(currentTask.id)}
-                  className="px-2 py-1 border rounded text-xs"
-                >
-                  Terminer
-                </button>
-                <button
-                  onClick={() => archiveMutation.mutate(currentTask.id)}
-                  className="px-2 py-1 border rounded text-xs"
-                >
-                  Archiver
-                </button>
-              </div>
-            </div>
-            <div className="border rounded-xl p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
-                <h4 className="font-semibold">Checklist</h4>
-                <span className="text-xs text-gray-500">
-                  {
-                    (currentTask.checklist || []).filter((i) => i.completed)
-                      .length
-                  }{" "}
-                  / {(currentTask.checklist || []).length}
-                </span>
-              </div>
-              <div className="space-y-2">
-                {(currentTask.checklist || []).map((item) => (
-                  <div
-                    key={item.id || item.displayOrder}
-                    className="flex items-center gap-2"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={item.completed}
-                      onChange={(e) =>
-                        item.id &&
-                        toggleChecklistMutation.mutate({
-                          itemId: item.id,
-                          completed: e.target.checked,
-                          label: item.label,
-                          displayOrder: item.displayOrder,
-                        })
-                      }
-                    />
-                    <span
-                      className={
-                        item.completed ? "line-through text-gray-400" : ""
-                      }
-                    >
-                      {item.label}
-                    </span>
-                    {item.id && (
-                      <button
-                        onClick={() => deleteChecklistMutation.mutate(item.id!)}
-                        className="ml-auto text-red-600"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-                {(!currentTask.checklist ||
-                  currentTask.checklist.length === 0) && (
-                  <p className="text-sm text-gray-500">Aucun item.</p>
-                )}
-              </div>
-              <div className="flex gap-2 mt-3">
-                <input
-                  value={newChecklistItem}
-                  onChange={(e) => setNewChecklistItem(e.target.value)}
-                  placeholder="Nouvel item"
-                  className="flex-1 px-3 py-2 border rounded-lg"
-                />
-                <button
-                  onClick={() =>
-                    newChecklistItem.trim() && addChecklistMutation.mutate()
-                  }
-                  className="px-3 py-2 bg-primary-600 text-white rounded-lg"
-                >
-                  Ajouter
-                </button>
-              </div>
-            </div>
-            <div className="border rounded-xl p-4 space-y-3">
-              <h4 className="font-semibold">Commentaires</h4>
-              <div className="space-y-2">
-                {(currentTask.comments || []).map((c) => (
-                  <div key={c.id} className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-xs text-gray-500">
-                      {c.authorName} ·{" "}
-                      {new Date(c.createdAt).toLocaleString("fr-FR")}
-                    </p>
-                    <div
-                      className="prose prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{ __html: c.comment }}
-                    />
-                  </div>
-                ))}
-              </div>
-              <RichTextEditor
-                value={comment}
-                onChange={setComment}
-                minHeight="90px"
-              />
-              <button
-                onClick={() => commentMutation.mutate()}
-                disabled={!comment.trim()}
-                className="px-3 py-2 bg-primary-600 text-white rounded-lg text-sm disabled:opacity-50"
-              >
-                <MessageSquare size={14} className="inline mr-1" /> Commenter
-              </button>
-            </div>
-          </div>
-        </ModalPortal>
+        <TaskDetailModal
+          task={currentTask}
+          onClose={() => setIsDetailOpen(false)}
+          onStatus={(status) => statusMutation.mutate({ id: currentTask.id, status })}
+          statusBusy={statusMutation.isPending ? (statusMutation.variables?.status ?? null) : null}
+          onChanged={invalidate}
+          refetch={refetchDetail}
+        />
       )}
     </div>
   );
 };
 
-const Metric = ({
-  label,
-  value,
-  color = "text-gray-900",
-}: {
-  label: string;
-  value: string | number;
-  color?: string;
-}) => (
-  <div className="bg-white rounded-xl p-4 shadow-sm">
-    <p className={`text-lg sm:text-xl font-bold ${color}`}>{value}</p>
-    <p className="text-xs text-gray-500">{label}</p>
-  </div>
-);
-const TaskFilters = ({
-  search,
-  setSearch,
-  assignedToFilter,
-  setAssignedToFilter,
-  priorityFilter,
-  setPriorityFilter,
-  sourceTypeFilter,
-  setSourceTypeFilter,
-}: any) => (
-  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-    <div className="relative">
-      <Search
-        size={16}
-        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-      />
-      <input
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Rechercher..."
-        className="w-full pl-9 pr-3 py-2 border rounded-lg"
-      />
-    </div>
-    <AgentAutocomplete
-      value={assignedToFilter}
-      onValueChange={setAssignedToFilter}
-      onSelect={() => undefined}
-      placeholder="Filtrer par agent..."
-    />
-    <select
-      value={priorityFilter}
-      onChange={(e) => setPriorityFilter(e.target.value)}
-      className="px-3 py-2 border rounded-lg bg-white"
-    >
-      <option value="">Toutes priorités</option>
-      <option value="LOW">Faible</option>
-      <option value="MEDIUM">Moyenne</option>
-      <option value="HIGH">Élevée</option>
-      <option value="URGENT">Urgente</option>
-    </select>
-    <select
-      value={sourceTypeFilter}
-      onChange={(e) => setSourceTypeFilter(e.target.value)}
-      className="px-3 py-2 border rounded-lg bg-white"
-    >
-      <option value="">Toutes sources</option>
-      <option value="CRM_LEAD">CRM lead</option>
-      <option value="BOOKING">Booking</option>
-      <option value="INVENTORY">Inventory</option>
-    </select>
-  </div>
-);
-const TaskCardView = ({
-  card,
-  onOpen,
-  onMove,
-}: {
-  card: TaskCard;
-  onOpen: () => void;
-  onMove: (status: TaskStatus) => void;
-}) => (
-  <div className="bg-white rounded-lg p-3 shadow-sm">
-    <div onClick={onOpen} className="cursor-pointer">
-      <div className="flex justify-between gap-2">
-        <p className="font-medium text-sm line-clamp-2">{card.title}</p>
-        <span
-          className={`px-1.5 py-0.5 rounded text-xs ${priorityConfig[card.priority].color}`}
-        >
-          {priorityConfig[card.priority].label}
-        </span>
-      </div>
-      {card.dueAt && (
-        <p
-          className={`text-xs mt-2 ${card.overdue ? "text-red-600" : "text-gray-500"}`}
-        >
-          {new Date(card.dueAt).toLocaleString("fr-FR")}
-        </p>
-      )}
-      {card.sourceType && (
-        <p className="text-xs mt-1 text-blue-600">
-          {card.sourceType} · {card.sourceCode}
-        </p>
-      )}
-      <div className="flex gap-2 text-xs text-gray-500 mt-2">
-        <span>
-          {card.checklistDone ?? 0}/{card.checklistTotal ?? 0} checklist
-        </span>
-        <span>{card.commentCount ?? 0} commentaires</span>
-      </div>
-    </div>
-    <select
-      value={card.status}
-      onChange={(e) => onMove(e.target.value as TaskStatus)}
-      className="mt-2 w-full px-2 py-1 border rounded text-xs bg-white"
-    >
-      {activeStatuses.map((s) => (
-        <option key={s} value={s}>
-          {statusConfig[s].label}
-        </option>
-      ))}
-    </select>
-  </div>
-);
-const TaskSimpleList = ({
-  tasks,
-  loading,
-  open,
-}: {
+const TaskList: React.FC<{
   tasks: Task[];
   loading?: boolean;
   open: (task: Task) => void;
-}) =>
-  loading ? (
-    <div className="py-12 text-center">Chargement...</div>
-  ) : (
-    <div className="bg-white rounded-xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-      <table className="w-full border-separate border-spacing-y-2 text-sm max-md:block max-md:border-spacing-0 max-md:[&_thead]:hidden max-md:[&_tbody]:block max-md:[&_tr]:mb-3 max-md:[&_tr]:block max-md:[&_tr]:rounded-2xl max-md:[&_tr]:bg-gray-50 max-md:[&_tr]:p-3 max-md:[&_tr]:shadow-sm max-md:[&_tr]:ring-1 max-md:[&_tr]:ring-gray-100 max-md:[&_td]:block max-md:[&_td]:px-0 max-md:[&_td]:py-1.5 max-md:[&_td]:text-left max-md:[&_td]:text-xs max-md:[&_td]:break-words">
-        <tbody className="divide-y-0">
-          {tasks.map((task) => (
-            <tr
+}> = ({ tasks, loading, open }) => {
+  if (loading) return <ListSkeleton rows={5} />;
+  if (tasks.length === 0) {
+    return <EmptyState icon={ClipboardList} title="Aucune tâche" hint="Rien à afficher pour ce filtre." />;
+  }
+  return (
+    <DataCard>
+      <HeadRow cols={LIST_COLS}>
+        <span>Tâche</span>
+        <span>Statut</span>
+        <span>Priorité</span>
+        <span className="text-right">Échéance</span>
+      </HeadRow>
+      <div className="space-y-1">
+        {tasks.map((task) => {
+          const st = statusOf(TASK_STATUS, task.status);
+          const pr = statusOf(PRIORITY_STYLE, task.priority);
+          return (
+            <button
               key={task.id}
+              type="button"
               onClick={() => open(task)}
-              className="cursor-pointer hover:bg-gray-50"
+              className={`grid w-full grid-cols-1 items-center gap-2 rounded-2xl max-lg:bg-gray-50 px-4 py-3 text-left transition lg:gap-4 ${LIST_COLS} ${ROW_HOVER} focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--logo-pink)]`}
             >
-              <td className="px-4 py-3">
-                <p className="font-medium">{task.title}</p>
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-gray-950">{task.title}</p>
                 <p className="text-xs text-gray-500">
                   {task.sourceType
-                    ? `${task.sourceType} · ${task.sourceCode}`
+                    ? `${SOURCE_TYPE_LABELS[task.sourceType] ?? task.sourceType} · ${task.sourceCode}`
                     : "Source manuelle"}
                 </p>
-              </td>
-              <td className="px-4 py-3">
-                <span
-                  className={`px-2 py-1 rounded-full text-xs ${statusConfig[task.status].color}`}
-                >
-                  {statusConfig[task.status].label}
-                </span>
-              </td>
-              <td className="px-4 py-3">
-                <span
-                  className={`px-2 py-1 rounded-full text-xs ${priorityConfig[task.priority].color}`}
-                >
-                  {priorityConfig[task.priority].label}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-right">
-                {task.dueAt
-                  ? new Date(task.dueAt).toLocaleDateString("fr-FR")
-                  : "—"}
-              </td>
-            </tr>
-          ))}
-          {tasks.length === 0 && (
-            <tr>
-              <td colSpan={4} className="py-12 text-center text-gray-500">
-                Aucune tâche.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-const Pagination = ({
-  page,
-  setPage,
-  totalPages,
-}: {
-  page: number;
-  setPage: React.Dispatch<React.SetStateAction<number>>;
-  totalPages: number;
-}) => (
-  <div className="flex justify-end items-center gap-2 mt-4">
-    <button
-      disabled={page === 0}
-      onClick={() => setPage((p) => p - 1)}
-      className="p-2 border rounded-lg disabled:opacity-50"
-    >
-      <ChevronLeft size={16} />
-    </button>
-    <span className="text-sm">
-      Page {page + 1} / {totalPages}
-    </span>
-    <button
-      disabled={page >= totalPages - 1}
-      onClick={() => setPage((p) => p + 1)}
-      className="p-2 border rounded-lg disabled:opacity-50"
-    >
-      <ChevronRight size={16} />
-    </button>
-  </div>
-);
-const Breakdown = ({
-  title,
-  data,
-}: {
-  title: string;
-  data?: Record<string, number>;
-}) => {
-  const entries = Object.entries(data || {});
-  const max = Math.max(1, ...entries.map(([, v]) => v));
-  return (
-    <div className="bg-white rounded-xl shadow-sm p-5">
-      <h3 className="font-semibold mb-4">{title}</h3>
-      <div className="space-y-3">
-        {entries.map(([k, v]) => (
-          <div key={k}>
-            <div className="flex justify-between text-sm mb-1">
-              <span>{k}</span>
-              <span>{v}</span>
-            </div>
-            <div className="h-2 bg-gray-100 rounded-full">
-              <div
-                className="h-2 bg-primary-600 rounded-full"
-                style={{ width: `${(v / max) * 100}%` }}
-              />
-            </div>
-          </div>
-        ))}
+              </div>
+              <div>
+                <StatusChip tone={st.tone}>{st.label}</StatusChip>
+              </div>
+              <div>
+                <StatusChip tone={pr.tone}>{pr.label}</StatusChip>
+              </div>
+              <p className="text-sm lg:text-right">
+                <DueText value={task.dueAt} />
+              </p>
+            </button>
+          );
+        })}
       </div>
-    </div>
+    </DataCard>
   );
 };
-const TaskCreateForm = ({
-  form,
-  setForm,
-  checklistItems,
-  setChecklistItems,
-  selectedAgent,
-  setSelectedAgent,
-}: any) => (
-  <div className="space-y-4">
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <input
-        value={form.title}
-        onChange={(e) => setForm((f: any) => ({ ...f, title: e.target.value }))}
-        placeholder="Titre *"
-        className="px-3 py-2 border rounded-lg"
-      />
-      <AgentAutocomplete
-        value={form.assignedTo}
-        selectedAgent={selectedAgent}
-        onValueChange={(value) =>
-          setForm((f: any) => ({ ...f, assignedTo: value }))
-        }
-        onSelect={setSelectedAgent}
-        placeholder="Assigner à un agent..."
-      />
-      <select
-        value={form.priority}
-        onChange={(e) =>
-          setForm((f: any) => ({
-            ...f,
-            priority: e.target.value as TaskPriority,
-          }))
-        }
-        className="px-3 py-2 border rounded-lg bg-white"
-      >
-        <option value="LOW">Faible</option>
-        <option value="MEDIUM">Moyenne</option>
-        <option value="HIGH">Élevée</option>
-        <option value="URGENT">Urgente</option>
-      </select>
-      <input
-        type="datetime-local"
-        value={form.dueAt}
-        onChange={(e) => setForm((f: any) => ({ ...f, dueAt: e.target.value }))}
-        className="px-3 py-2 border rounded-lg"
-      />
-      <select
-        value={form.sourceType}
-        onChange={(e) =>
-          setForm((f: any) => ({
-            ...f,
-            sourceType: e.target.value,
-            sourceCode: "",
-          }))
-        }
-        className="px-3 py-2 border rounded-lg bg-white"
-      >
-        <option value="">Source manuelle</option>
-        <option value="CRM_LEAD">CRM lead</option>
-        <option value="BOOKING">Booking</option>
-        <option value="INVENTORY">Inventory</option>
-      </select>
-      <TaskSourceAutocomplete
-        sourceType={form.sourceType}
-        value={form.sourceCode}
-        onChange={(sourceCode) => setForm((f: any) => ({ ...f, sourceCode }))}
-      />
-      <select
-        value={form.recurrence}
-        onChange={(e) =>
-          setForm((f: any) => ({
-            ...f,
-            recurrence: e.target.value as TaskRecurrence,
-          }))
-        }
-        className="px-3 py-2 border rounded-lg bg-white"
-      >
-        {recurrenceOptions.map((r) => (
-          <option key={r} value={r}>
-            {r}
-          </option>
-        ))}
-      </select>
-    </div>
-    <RichTextEditor
-      value={form.description}
-      onChange={(v: string) => setForm((f: any) => ({ ...f, description: v }))}
-      minHeight="120px"
-    />
-    <div className="border rounded-xl p-4">
-      <h4 className="font-semibold mb-3">Checklist initiale</h4>
-      {checklistItems.map((item: any, i: number) => (
-        <div key={i} className="flex gap-2 mb-2">
-          <input
-            value={item.label}
-            onChange={(e) => {
-              const arr = [...checklistItems];
-              arr[i] = { ...arr[i], label: e.target.value };
-              setChecklistItems(arr);
-            }}
-            className="flex-1 px-3 py-2 border rounded-lg"
-          />
-          <button
-            onClick={() =>
-              setChecklistItems(
-                checklistItems.filter((_: any, idx: number) => idx !== i),
-              )
-            }
-            className="px-3 py-2 border rounded-lg"
-          >
-            <X size={14} />
-          </button>
-        </div>
-      ))}
-      <button
-        onClick={() =>
-          setChecklistItems([
-            ...checklistItems,
-            { label: "", completed: false },
-          ])
-        }
-        className="text-primary-600 text-sm flex items-center gap-1"
-      >
-        <Plus size={14} /> Ajouter un item
-      </button>
-    </div>
-  </div>
-);
+

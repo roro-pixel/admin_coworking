@@ -1,377 +1,133 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Plus,
-  Eye,
-  Play,
-  CheckCircle,
-  XCircle,
-  Search,
-  X,
-  Loader2,
-  ClipboardList,
-} from "lucide-react";
-import { ModalPortal } from "../../../components/ui/ModalPortal";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { CheckCircle2, ClipboardList, Eye, Pencil, Play, Plus, XCircle } from "lucide-react";
 import { inventoryService } from "../../../services/inventory.service";
-import { useAuth } from "../../../contexts/AuthContext";
-import { InventoryCountEntry } from "./InventoryCountEntry";
+import type { InventoryCount } from "../../../services/inventory.service";
+import { ActionButton, DataCard, EmptyState, ErrorBlock, Field, FilterButton, FilterPanel, HeadRow, IconButton, ListHeader, PanelForm, Pagination, SearchField } from "../../../components/subscription/kit";
+import { FIELD, ROW_HOVER, apiMessage, formatDate } from "../../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../../components/ui/Skeleton";
+import { toast } from "../../../components/ui/toastStore";
+import { COUNT_STATUS_LABEL, COUNT_STATUS_TONE, Cell, Chip, LocationSelect, useActor, useServerPaged } from "../../../components/inventory/invKit";
+import { CountEntry } from "./CountEntry";
 
-const statusConfig: Record<
-  string,
-  { label: string; color: string; icon: any }
-> = {
-  DRAFT: {
-    label: "Brouillon",
-    color: "bg-gray-100 text-gray-700",
-    icon: ClipboardList,
-  },
-  IN_PROGRESS: {
-    label: "En cours",
-    color: "bg-blue-100 text-blue-700",
-    icon: Play,
-  },
-  UNDER_REVIEW: {
-    label: "En revue",
-    color: "bg-yellow-100 text-yellow-700",
-    icon: Eye,
-  },
-  VALIDATED: {
-    label: "Validé",
-    color: "bg-green-100 text-green-700",
-    icon: CheckCircle,
-  },
-  CANCELLED: {
-    label: "Annulé",
-    color: "bg-red-100 text-red-700",
-    icon: XCircle,
-  },
-};
+const COLS = "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_9rem_minmax(0,1fr)_7rem_auto]";
+const SIZE = 15;
+const STATUSES = ["DRAFT", "IN_PROGRESS", "UNDER_REVIEW", "VALIDATED", "CANCELLED"] as const;
 
 export const InventoryCountsList: React.FC = () => {
-  const { admin } = useAuth();
   const queryClient = useQueryClient();
+  const actor = useActor();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedCount, setSelectedCount] = useState<any>(null);
-  const [showEntry, setShowEntry] = useState(false);
-  const [formData, setFormData] = useState({
-    locationCode: "",
-    notes: "",
+  const [status, setStatus] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({ locationCode: "", notes: "" });
+  const [error, setError] = useState<string | null>(null);
+  const [entry, setEntry] = useState<InventoryCount | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  // Le backend ne documente pas de recherche texte : filtre côté client sur la page chargée
+  const list = useServerPaged<InventoryCount>({
+    key: ["inventory-counts", status],
+    size: SIZE,
+    search,
+    resetKey: status,
+    match: (c, q) => c.countCode.toLowerCase().includes(q) || String((c as any).locationName ?? c.locationCode).toLowerCase().includes(q),
+    fetch: (p) => inventoryService.getInventoryCounts({ status: status || undefined, ...p }),
   });
+  const hasFilters = !!(search || status);
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["inventory-counts"] });
 
-  const { data: countsData, isLoading } = useQuery({
-    queryKey: ["inventory-counts", statusFilter],
-    queryFn: () =>
-      inventoryService.getInventoryCounts({
-        status: statusFilter || undefined,
-        size: 100,
-      }),
-  });
-
-  const { data: locations = [] } = useQuery({
-    queryKey: ["inventory-locations"],
-    queryFn: () => inventoryService.getLocations(true),
-  });
-
-  const counts = countsData?.content || [];
-
-  const createMutation = useMutation({
-    mutationFn: () =>
-      inventoryService.createInventoryCount({
-        locationCode: formData.locationCode,
-        createdBy: admin?.email || "admin",
-        notes: formData.notes,
-      }),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["inventory-counts"] });
-      setIsModalOpen(false);
-      setFormData({ locationCode: "", notes: "" });
-      setSelectedCount(data);
-      setShowEntry(true);
+  const create = useMutation({
+    mutationFn: () => inventoryService.createInventoryCount({ locationCode: form.locationCode, createdBy: actor, notes: form.notes.trim() || undefined }),
+    onSuccess: async (c) => {
+      toast.success("Comptage créé");
+      await refresh();
+      setCreating(false);
+      setForm({ locationCode: "", notes: "" });
+      setEntry(c);
     },
+    onError: (e) => setError(apiMessage(e, "Création impossible")),
   });
-
-  const startMutation = useMutation({
-    mutationFn: (countCode: string) =>
-      inventoryService.startInventoryCount(countCode),
-    onSuccess: (_, countCode) => {
-      queryClient.invalidateQueries({ queryKey: ["inventory-counts"] });
-      const count = counts.find((c: any) => c.countCode === countCode);
-      setSelectedCount(count);
-      setShowEntry(true);
-    },
+  const start = useMutation({
+    mutationFn: (code: string) => inventoryService.startInventoryCount(code),
+    onMutate: (code) => setBusy(`start-${code}`),
+    onSuccess: async (c) => { toast.success("Comptage démarré"); await refresh(); setEntry(c); },
+    onError: (e) => toast.error(apiMessage(e, "Démarrage impossible")),
+    onSettled: () => setBusy(null),
   });
-
-  const reviewMutation = useMutation({
-    mutationFn: (countCode: string) =>
-      inventoryService.reviewInventoryCount(countCode),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventory-counts"] });
-    },
+  const review = useMutation({ mutationFn: (code: string) => inventoryService.reviewInventoryCount(code), onSuccess: refresh });
+  const validate = useMutation({
+    mutationFn: (code: string) => inventoryService.validateInventoryCount(code),
+    onSuccess: async () => { await refresh(); queryClient.invalidateQueries({ queryKey: ["stock-levels"] }); },
   });
+  const cancel = useMutation({ mutationFn: (code: string) => inventoryService.cancelInventoryCount(code), onSuccess: refresh });
 
-  const validateMutation = useMutation({
-    mutationFn: (countCode: string) =>
-      inventoryService.validateInventoryCount(countCode),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventory-counts"] });
-      queryClient.invalidateQueries({ queryKey: ["stock-levels"] });
-    },
-  });
-
-  const cancelMutation = useMutation({
-    mutationFn: (countCode: string) =>
-      inventoryService.cancelInventoryCount(countCode),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventory-counts"] });
-    },
-  });
-
-  const filteredCounts = counts.filter(
-    (count: any) =>
-      count.countCode.toLowerCase().includes(search.toLowerCase()) ||
-      count.locationName.toLowerCase().includes(search.toLowerCase()),
-  );
-
-  const handleOpenModal = () => {
-    setFormData({ locationCode: "", notes: "" });
-    setIsModalOpen(true);
-  };
-
-  const handleViewEntry = (count: any) => {
-    setSelectedCount(count);
-    setShowEntry(true);
-  };
-
-  if (isLoading) {
-    return <div className="text-center py-8">Chargement...</div>;
-  }
+  if (entry) return <CountEntry count={list.rows.find((c) => c.countCode === entry.countCode) ?? entry} onBack={() => { setEntry(null); refresh(); }} />;
 
   return (
-    <div className="p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
-        <h2 className="text-lg sm:text-xl sm:text-2xl font-semibold text-gray-900">
-          Comptages physiques
-        </h2>
-        <button
-          onClick={handleOpenModal}
-          className="bg-primary-600 text-white px-4 py-2.5 sm:px-5 rounded-2xl hover:bg-primary-700 flex items-center gap-2 text-sm sm:text-base w-full sm:w-auto justify-center"
-        >
-          <Plus size={20} />
-          Nouveau comptage
-        </button>
-      </div>
+    <div className="space-y-5">
+      <ListHeader title="Comptages physiques" subtitle={list.isLoading ? undefined : `${list.total} comptage${list.total > 1 ? "s" : ""}`} action={<ActionButton icon={Plus} onClick={() => { setError(null); setCreating(true); }}>Nouveau comptage</ActionButton>} />
 
-      {/* Filtres - AGRANDIS */}
-      <div className="flex flex-col md:flex-row gap-5 mb-8">
-        <div className="flex-1 relative">
-          <Search
-            size={20}
-            className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Rechercher un comptage..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-          />
-        </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-5 py-3 ring-1 ring-gray-100 rounded-2xl bg-white text-sm sm:text-base min-w-[180px]"
-        >
-          <option value="">Tous les statuts</option>
-          <option value="DRAFT">Brouillon</option>
-          <option value="IN_PROGRESS">En cours</option>
-          <option value="UNDER_REVIEW">En revue</option>
-          <option value="VALIDATED">Validés</option>
-          <option value="CANCELLED">Annulés</option>
-        </select>
-      </div>
-
-      {/* Tableau - AGRANDI */}
-      <div className="bg-white rounded-3xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-        <table className="w-full text-sm sm:text-base block md:table">
-          <thead className="bg-gray-50 ring-1 ring-gray-100 hidden md:table-header-group">
-            <tr>
-              <th className="px-6 py-4 text-left font-semibold hidden md:table-cell">Code</th>
-              <th className="px-6 py-4 text-left font-semibold hidden md:table-cell">Emplacement</th>
-              <th className="px-6 py-4 text-left font-semibold hidden md:table-cell">Statut</th>
-              <th className="px-6 py-4 text-left font-semibold hidden md:table-cell">Créé par</th>
-              <th className="px-6 py-4 text-left font-semibold hidden md:table-cell">Date</th>
-              <th className="px-6 py-4 text-center font-semibold hidden md:table-cell">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="space-y-2 md:space-y-0 block md:table-row-group">
-            {filteredCounts.map((count: any) => {
-              const status = statusConfig[count.status];
-              const StatusIcon = status?.icon;
-              return (
-                <tr key={count.countCode} className="hover:bg-gray-50 block md:table-row rounded-3xl bg-white p-4 mb-3 shadow-sm ring-1 ring-gray-100">
-                  <td className="px-6 py-4 font-mono text-sm flex justify-between gap-4 md:table-cell text-sm">
-                    {count.countCode}
-                  </td>
-                  <td className="px-6 py-4 flex justify-between gap-4 md:table-cell text-sm">{count.locationName}</td>
-                  <td className="px-6 py-4 flex justify-between gap-4 md:table-cell text-sm">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs ${status?.color}`}
-                    >
-                      {StatusIcon && <StatusIcon size={14} />}
-                      {status?.label}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 flex justify-between gap-4 md:table-cell text-sm">{count.createdBy}</td>
-                  <td className="px-6 py-4 flex justify-between gap-4 md:table-cell text-sm">
-                    {new Date(count.createdAt).toLocaleDateString("fr-FR")}
-                  </td>
-                  <td className="px-6 py-4 text-center flex justify-between gap-4 md:table-cell text-sm">
-                    <div className="flex justify-center gap-3">
-                      {count.status === "DRAFT" && (
-                        <button
-                          onClick={() => startMutation.mutate(count.countCode)}
-                          className="p-1.5 text-blue-600 hover:text-blue-800"
-                          title="Démarrer"
-                        >
-                          <Play size={20} />
-                        </button>
-                      )}
-                      {count.status === "IN_PROGRESS" && (
-                        <button
-                          onClick={() => handleViewEntry(count)}
-                          className="p-1.5 text-primary-600 hover:text-primary-800"
-                          title="Saisir"
-                        >
-                          <ClipboardList size={20} />
-                        </button>
-                      )}
-                      {count.status === "IN_PROGRESS" && (
-                        <button
-                          onClick={() => reviewMutation.mutate(count.countCode)}
-                          className="p-1.5 text-yellow-600 hover:text-yellow-800"
-                          title="Envoyer en revue"
-                        >
-                          <Eye size={20} />
-                        </button>
-                      )}
-                      {count.status === "UNDER_REVIEW" && (
-                        <button
-                          onClick={() =>
-                            validateMutation.mutate(count.countCode)
-                          }
-                          className="p-1.5 text-green-600 hover:text-green-800"
-                          title="Valider"
-                        >
-                          <CheckCircle size={20} />
-                        </button>
-                      )}
-                      {(count.status === "DRAFT" ||
-                        count.status === "IN_PROGRESS") && (
-                        <button
-                          onClick={() => cancelMutation.mutate(count.countCode)}
-                          className="p-1.5 text-red-600 hover:text-red-800"
-                          title="Annuler"
-                        >
-                          <XCircle size={20} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {filteredCounts.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-3xl">
-          <ClipboardList size={64} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500 text-sm sm:text-base">Aucun comptage trouvé</p>
-        </div>
+      {creating && (
+        <PanelForm title="Nouveau comptage" onCancel={() => setCreating(false)} pending={create.isPending} submitLabel="Créer et saisir" submitDisabled={!form.locationCode} error={error} onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
+          <Field label="Emplacement à compter" required><LocationSelect value={form.locationCode} onChange={(v) => setForm({ ...form, locationCode: v })} /></Field>
+          <Field label="Notes"><textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={`${FIELD} resize-none`} /></Field>
+        </PanelForm>
       )}
 
-      {/* Modal de création - AGRANDI */}
-      {isModalOpen && (
-        <ModalPortal onClose={() => setIsModalOpen(false)}>
-          <div className="sticky top-0 bg-white ring-1 ring-gray-100 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
-            <h3 className="text-lg sm:text-xl sm:text-2xl font-bold">Nouveau comptage physique</h3>
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="p-2 hover:bg-gray-100 rounded-2xl"
-            >
-              <X size={24} />
-            </button>
-          </div>
-          <div className="p-8 space-y-6">
-            <div>
-              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                Emplacement *
-              </label>
-              <select
-                value={formData.locationCode}
-                onChange={(e) =>
-                  setFormData({ ...formData, locationCode: e.target.value })
-                }
-                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-              >
-                <option value="">Sélectionner</option>
-                {locations.map((loc: any) => (
-                  <option key={loc.locationCode} value={loc.locationCode}>
-                    {loc.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                Notes
-              </label>
-              <textarea
-                value={formData.notes}
-                onChange={(e) =>
-                  setFormData({ ...formData, notes: e.target.value })
-                }
-                rows={4}
-                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-              />
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 pt-6">
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="flex-1 px-4 py-3 sm:px-5 ring-1 rounded-2xl text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={() => createMutation.mutate()}
-                disabled={!formData.locationCode || createMutation.isPending}
-                className="flex-1 bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 text-sm sm:text-base flex items-center justify-center gap-2 w-full sm:w-auto justify-center"
-              >
-                {createMutation.isPending ? (
-                  <Loader2 size={20} className="animate-spin" />
-                ) : (
-                  "Créer"
-                )}
-              </button>
-            </div>
-          </div>
-        </ModalPortal>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <SearchField className="flex-1" value={search} onChange={setSearch} placeholder="Code ou emplacement" />
+        <FilterButton open={showFilters} active={!!status} onClick={() => setShowFilters(!showFilters)} />
+      </div>
+      {showFilters && (
+        <FilterPanel canReset={hasFilters} onReset={() => { setSearch(""); setStatus(""); }}>
+          <Field label="Statut">
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className={FIELD}>
+              <option value="">Tous les statuts</option>
+              {STATUSES.map((s) => <option key={s} value={s}>{COUNT_STATUS_LABEL[s]}</option>)}
+            </select>
+          </Field>
+        </FilterPanel>
       )}
 
-      {/* Écran de saisie */}
-      {showEntry && selectedCount && (
-        <InventoryCountEntry
-          isOpen={showEntry}
-          onClose={() => {
-            setShowEntry(false);
-            setSelectedCount(null);
-            queryClient.invalidateQueries({ queryKey: ["inventory-counts"] });
-          }}
-          count={selectedCount}
-        />
+      {list.isLoading ? (
+        <ListSkeleton rows={6} />
+      ) : list.isError ? (
+        <ErrorBlock message="Impossible de charger les comptages." onRetry={() => list.refetch()} />
+      ) : list.rows.length === 0 ? (
+        <EmptyState icon={ClipboardList} title="Aucun comptage" hint={hasFilters ? "Aucun résultat pour ces filtres." : "Lancez un comptage pour comparer le stock réel au stock système."} />
+      ) : (
+        <>
+          <HeadRow cols={COLS}>
+            <span>Code</span><span>Emplacement</span><span>Statut</span><span>Créé par</span><span>Date</span><span className="text-right">Actions</span>
+          </HeadRow>
+          <DataCard>
+            {list.rows.map((c) => (
+              <div key={c.countCode} className={`grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl p-4 max-lg:mb-2 max-lg:bg-gray-50 ${COLS} ${ROW_HOVER}`}>
+                <p className="font-mono text-sm font-semibold text-gray-900">{c.countCode}</p>
+                <Cell title="Emplacement" className="max-lg:order-3 max-lg:col-span-2"><span className="text-sm text-gray-600">{(c as any).locationName || c.locationCode}</span></Cell>
+                <div className="max-lg:order-2 max-lg:justify-self-end"><Chip map={COUNT_STATUS_LABEL} tones={COUNT_STATUS_TONE} value={c.status} /></div>
+                <Cell title="Créé par" className="max-lg:order-3"><span className="truncate text-sm text-gray-600">{c.createdBy || "Non renseigné"}</span></Cell>
+                <Cell title="Date" className="max-lg:order-3"><span className="text-sm text-gray-600">{c.createdAt ? formatDate(c.createdAt) : "Non renseignée"}</span></Cell>
+                <div className="flex items-center gap-1 max-lg:order-4 max-lg:col-span-2 lg:justify-end">
+                  {c.status === "DRAFT" && <IconButton icon={Play} label="Démarrer" pending={busy === `start-${c.countCode}`} onClick={() => start.mutate(c.countCode)} />}
+                  {c.status === "IN_PROGRESS" && <IconButton icon={Pencil} label="Saisir les quantités" onClick={() => setEntry(c)} />}
+                  {c.status === "IN_PROGRESS" && (
+                    <IconButton icon={Eye} label="Envoyer en revue" onClick={() => toast.confirm({ message: `Envoyer le comptage ${c.countCode} en revue ?`, detail: "Les quantités ne seront plus modifiables.", confirmLabel: "Envoyer en revue", pendingLabel: "Envoi", successMessage: "Comptage en revue", errorMessage: "Envoi impossible", onConfirm: () => review.mutateAsync(c.countCode) })} />
+                  )}
+                  {c.status === "UNDER_REVIEW" && (
+                    <IconButton icon={CheckCircle2} label="Valider" tone="success" onClick={() => toast.confirm({ message: `Valider le comptage ${c.countCode} ?`, detail: "Le stock sera ajusté selon les écarts constatés.", confirmLabel: "Valider", pendingLabel: "Validation", successMessage: "Comptage validé, stock ajusté", errorMessage: "Validation impossible", onConfirm: () => validate.mutateAsync(c.countCode) })} />
+                  )}
+                  {(c.status === "DRAFT" || c.status === "IN_PROGRESS") && (
+                    <IconButton icon={XCircle} label="Annuler" tone="danger" onClick={() => toast.confirm({ message: `Annuler le comptage ${c.countCode} ?`, confirmLabel: "Annuler le comptage", pendingLabel: "Annulation", successMessage: "Comptage annulé", errorMessage: "Annulation impossible", onConfirm: () => cancel.mutateAsync(c.countCode) })} />
+                  )}
+                </div>
+              </div>
+            ))}
+          </DataCard>
+          <Pagination page={list.page} totalPages={list.totalPages} total={list.total} noun="comptage" onChange={list.setPage} />
+        </>
       )}
     </div>
   );

@@ -1,50 +1,74 @@
-import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Clock,
-  RefreshCw,
-  Calendar as CalendarIcon,
-  XCircle,
-  AlertCircle,
-  Bell,
-  Users,
-  Loader2,
-  Eye,
-  ArrowRight,
-  CheckCircle,
-  X,
-} from "lucide-react";
+import React, { useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowRight, Bell, Clock, Eye, RefreshCw, Users, XCircle } from "lucide-react";
 import { waitlistService } from "../../services/waitlist.service";
 import { bookingService } from "../../services/booking.service";
 import type {
-  WaitlistEntry,
   WaitlistAlternative,
+  WaitlistEntry,
   WaitlistStatus,
 } from "../../services/waitlist.service";
-import { ModalPortal } from "../../components/ui/ModalPortal";
+import { toast } from "../../components/ui/toastStore";
+import { TableSkeleton } from "../../components/ui/Skeleton";
+import {
+  ActionButton,
+  DataCard,
+  EmptyState,
+  Field,
+  FilterButton,
+  FilterPanel,
+  HeadRow,
+  IconButton,
+  ListHeader,
+  StatusChip,
+  Tag,
+} from "../../components/subscription/kit";
+import {
+  FIELD_SOFT,
+  ROW_HOVER,
+  apiMessage,
+  formatDate,
+  formatMoney,
+} from "../../components/subscription/kitUtils";
+import {
+  OWNER_TYPE_LABELS,
+  PAYMENT_MODE_LABELS,
+  WAITLIST_STATUS,
+  formatTime,
+  statusOf,
+} from "../../components/bookings/bookingLabels";
 
-const statusConfig: Record<WaitlistStatus, { label: string; color: string }> = {
-  WAITING: { label: "En attente", color: "bg-yellow-100 text-yellow-700" },
-  OFFERED: { label: "Offre envoyée", color: "bg-blue-100 text-blue-700" },
-  PROMOTED: { label: "Promue", color: "bg-green-100 text-green-700" },
-  EXPIRED: { label: "Expirée", color: "bg-gray-100 text-gray-500" },
-  CANCELLED: { label: "Annulée", color: "bg-red-100 text-red-700" },
+const COLS =
+  "lg:grid-cols-[4rem_minmax(0,1.3fr)_minmax(0,1.3fr)_minmax(0,1.3fr)_minmax(0,1fr)_9rem_minmax(0,1.1fr)_5.5rem]";
+
+// Identité envoyée au serveur, construite comme avant à partir de l'entrée
+const buildIdentity = (entry: WaitlistEntry) => {
+  const identityLookup: any = {};
+  if (entry.ownerCode) {
+    if (entry.ownerType === "MEMBER")
+      identityLookup.memberId = parseInt(entry.ownerCode.replace(/\D/g, "")) || entry.ownerCode;
+    else if (entry.ownerType === "CUSTOMER") identityLookup.customerId = entry.ownerCode;
+    else if (entry.ownerType === "BUSINESS") identityLookup.businessCode = entry.ownerCode;
+  }
+  if (entry.contactEmail) identityLookup.email = entry.contactEmail;
+  if (entry.contactPhone) identityLookup.phone = entry.contactPhone;
+  return identityLookup;
 };
+
+const clientName = (e: WaitlistEntry): string => e.ownerName || e.contactName || e.ownerCode || "";
 
 export const WaitlistManager: React.FC = () => {
   const queryClient = useQueryClient();
+  const panelRef = useRef<HTMLDivElement>(null);
+
   const [statusFilter, setStatusFilter] = useState<WaitlistStatus | "">("");
   const [resourceFilter, setResourceFilter] = useState("");
-  const [selectedEntry, setSelectedEntry] = useState<WaitlistEntry | null>(
-    null,
-  );
-  const [showAlternativesModal, setShowAlternativesModal] = useState(false);
-  const [bookingResult, setBookingResult] = useState<{
-    success: boolean;
-    message: string;
-  } | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<WaitlistEntry | null>(null);
+  const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [bookingIdx, setBookingIdx] = useState<number | null>(null);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["waitlist-entries", statusFilter, resourceFilter],
     queryFn: () =>
       waitlistService.getWaitlistEntries({
@@ -55,66 +79,51 @@ export const WaitlistManager: React.FC = () => {
       }),
   });
 
-  // CORRECTION : promoteAvailable attend un objet PromoteAvailableRequest
   const promoteMutation = useMutation({
-    mutationFn: (limit: number) =>
-      waitlistService.promoteAvailable({ limit, dryRun: false }),
+    mutationFn: (limit: number) => waitlistService.promoteAvailable({ limit, dryRun: false }),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["waitlist-entries"] });
-      alert(`${result.promotedCount} créneau(x) disponible(s) ont été promus.`);
+      toast.success(`${result.promotedCount} créneau(x) disponible(s) ont été promus.`);
     },
-    onError: (error: any) => {
-      alert(error?.response?.data?.message || "Erreur lors de la promotion");
-    },
+    onError: (error: unknown) => toast.error(apiMessage(error, "Erreur lors de la promotion")),
   });
 
-  // CORRECTION : expireOffers attend un objet ExpireOffersRequest
   const expireMutation = useMutation({
-    mutationFn: (limit: number) =>
-      waitlistService.expireOffers({ limit, dryRun: false }),
+    mutationFn: (limit: number) => waitlistService.expireOffers({ limit, dryRun: false }),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["waitlist-entries"] });
-      alert(`${result.expiredCount} offre(s) expirée(s) ont été traitées.`);
+      toast.success(`${result.expiredCount} offre(s) expirée(s) ont été traitées.`);
     },
-    onError: (error: any) => {
-      alert(error?.response?.data?.message || "Erreur lors de l'expiration");
-    },
+    onError: (error: unknown) => toast.error(apiMessage(error, "Erreur lors de l'expiration")),
   });
 
+  // Confirmé par toast : le toast affiche lui-même le résultat
   const cancelMutation = useMutation({
     mutationFn: (id: number) => waitlistService.cancelWaitlistEntry(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["waitlist-entries"] });
-      if (selectedEntry) {
-        setSelectedEntry(null);
-        setShowAlternativesModal(false);
-      }
-    },
-    onError: (error: any) => {
-      alert(error?.response?.data?.message || "Erreur lors de l'annulation");
+      setSelectedEntry(null);
     },
   });
 
-  const getAlternativesForEntry = async (
-    entry: WaitlistEntry,
-  ): Promise<WaitlistAlternative[]> => {
-    try {
-      const identityLookup: any = {};
-      if (entry.ownerCode) {
-        if (entry.ownerType === "MEMBER")
-          identityLookup.memberId =
-            parseInt(entry.ownerCode.replace(/\D/g, "")) || entry.ownerCode;
-        else if (entry.ownerType === "CUSTOMER")
-          identityLookup.customerId = entry.ownerCode;
-        else if (entry.ownerType === "BUSINESS")
-          identityLookup.businessCode = entry.ownerCode;
-      }
-      if (entry.contactEmail) identityLookup.email = entry.contactEmail;
-      if (entry.contactPhone) identityLookup.phone = entry.contactPhone;
+  const askCancel = (entry: WaitlistEntry) =>
+    toast.confirm({
+      message: "Annuler cette entrée en liste d'attente ?",
+      detail: clientName(entry),
+      confirmLabel: "Annuler l'entrée",
+      pendingLabel: "Annulation en cours",
+      successMessage: "Entrée annulée",
+      errorMessage: "L'annulation a échoué",
+      onConfirm: () => cancelMutation.mutateAsync(entry.id),
+    });
 
-      const alternatives = await waitlistService.getAlternatives({
+  const handleViewAlternatives = async (entry: WaitlistEntry) => {
+    setLoadingId(entry.id);
+    let alternatives: WaitlistAlternative[] = [];
+    try {
+      alternatives = await waitlistService.getAlternatives({
         resourceCode: entry.resourceCode,
-        identityLookup,
+        identityLookup: buildIdentity(entry),
         startedAt: entry.startedAt,
         endedAt: entry.endedAt,
         quantity: 1,
@@ -123,41 +132,18 @@ export const WaitlistManager: React.FC = () => {
         contactEmail: entry.contactEmail,
         contactPhone: entry.contactPhone,
       });
-      return alternatives;
-    } catch (error) {
-      console.error("Erreur chargement alternatives:", error);
-      return [];
+    } catch {
+      alternatives = [];
     }
-  };
-
-  const handleViewAlternatives = async (entry: WaitlistEntry) => {
-    setSelectedEntry(entry);
-    setBookingResult(null);
-    const alternatives = await getAlternativesForEntry(entry);
     setSelectedEntry({ ...entry, alternatives });
-    setShowAlternativesModal(true);
+    setLoadingId(null);
+    setTimeout(() => panelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
   };
 
-  const handleBookAlternative = async (alternative: WaitlistAlternative) => {
+  const handleBookAlternative = async (alternative: WaitlistAlternative, idx: number) => {
     if (!selectedEntry) return;
-
+    setBookingIdx(idx);
     try {
-      const identityLookup: any = {};
-      if (selectedEntry.ownerCode) {
-        if (selectedEntry.ownerType === "MEMBER")
-          identityLookup.memberId =
-            parseInt(selectedEntry.ownerCode.replace(/\D/g, "")) ||
-            selectedEntry.ownerCode;
-        else if (selectedEntry.ownerType === "CUSTOMER")
-          identityLookup.customerId = selectedEntry.ownerCode;
-        else if (selectedEntry.ownerType === "BUSINESS")
-          identityLookup.businessCode = selectedEntry.ownerCode;
-      }
-      if (selectedEntry.contactEmail)
-        identityLookup.email = selectedEntry.contactEmail;
-      if (selectedEntry.contactPhone)
-        identityLookup.phone = selectedEntry.contactPhone;
-
       const booking = await bookingService.createBooking({
         resourceCode: alternative.resourceCode,
         startedAt: alternative.startedAt,
@@ -169,465 +155,274 @@ export const WaitlistManager: React.FC = () => {
         contactName: selectedEntry.contactName,
         contactEmail: selectedEntry.contactEmail,
         contactPhone: selectedEntry.contactPhone,
-        ...identityLookup,
+        ...buildIdentity(selectedEntry),
       });
-
       await waitlistService.cancelWaitlistEntry(selectedEntry.id);
-
-      setBookingResult({
-        success: true,
-        message: `Réservation ${booking.bookingNumber} créée avec succès. L'entrée en liste d'attente a été annulée.`,
-      });
-
+      toast.success(`Réservation ${booking.bookingNumber} créée. L'entrée en liste d'attente a été annulée.`);
       queryClient.invalidateQueries({ queryKey: ["waitlist-entries"] });
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
-
-      setTimeout(() => {
-        setShowAlternativesModal(false);
-        setSelectedEntry(null);
-        setBookingResult(null);
-      }, 2000);
-    } catch (error: any) {
-      setBookingResult({
-        success: false,
-        message:
-          error?.response?.data?.message ||
-          "Erreur lors de la réservation alternative",
-      });
+      setSelectedEntry(null);
+    } catch (error: unknown) {
+      toast.error(apiMessage(error, "Erreur lors de la réservation alternative"));
+    } finally {
+      setBookingIdx(null);
     }
   };
 
   const entries: WaitlistEntry[] = data?.content || [];
   const totalElements = data?.totalElements || 0;
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="animate-spin h-8 w-8 text-primary-600" />
-      </div>
-    );
-  }
+  const hasActiveFilters = !!(statusFilter || resourceFilter);
+  const handleReset = () => {
+    setStatusFilter("");
+    setResourceFilter("");
+  };
 
   return (
-    <div>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">
-            Liste d'attente
-          </h2>
-          {totalElements > 0 && (
-            <p className="text-sm text-gray-500 mt-0.5">
-              {totalElements} entrée{totalElements > 1 ? "s" : ""}
-            </p>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => promoteMutation.mutate(50)}
-            disabled={promoteMutation.isPending}
-            className="px-3 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 flex items-center gap-2 text-sm disabled:opacity-50"
-          >
-            {promoteMutation.isPending ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Bell size={14} />
-            )}
-            Promouvoir disponibles
-          </button>
-          <button
-            onClick={() => expireMutation.mutate(50)}
-            disabled={expireMutation.isPending}
-            className="px-3 py-2 bg-orange-600 text-white rounded-xl hover:bg-orange-700 flex items-center gap-2 text-sm disabled:opacity-50"
-          >
-            {expireMutation.isPending ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Clock size={14} />
-            )}
-            Expirer offres
-          </button>
-          <button
-            onClick={() => refetch()}
-            className="p-2 border border-gray-200 rounded-xl hover:bg-primary-50/40"
-            title="Actualiser"
-          >
-            <RefreshCw size={16} className="text-gray-500" />
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl p-4 shadow-sm ring-1 ring-gray-100 mb-6">
-        <div className="flex flex-col gap-3 md:flex-row">
-          <select
-            value={statusFilter}
-            onChange={(e) =>
-              setStatusFilter(e.target.value as WaitlistStatus | "")
-            }
-            className="px-4 py-2 border border-gray-200 rounded-xl bg-white"
-          >
-            <option value="">Tous les statuts</option>
-            {Object.entries(statusConfig).map(([value, cfg]) => (
-              <option key={value} value={value}>
-                {cfg.label}
-              </option>
-            ))}
-          </select>
-          <input
-            type="text"
-            placeholder="Code ressource..."
-            value={resourceFilter}
-            onChange={(e) => setResourceFilter(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 px-4 py-2 md:w-64"
-          />
-          {(statusFilter || resourceFilter) && (
-            <button
-              onClick={() => {
-                setStatusFilter("");
-                setResourceFilter("");
-              }}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-primary-50/40 md:w-auto"
+    <div className="space-y-5">
+      <ListHeader
+        title="Liste d'attente"
+        subtitle={
+          totalElements > 0 ? `${totalElements} entrée${totalElements > 1 ? "s" : ""}` : undefined
+        }
+        action={
+          <div className="flex flex-wrap gap-2">
+            <ActionButton
+              icon={Bell}
+              pending={promoteMutation.isPending}
+              disabled={expireMutation.isPending}
+              onClick={() => promoteMutation.mutate(50)}
             >
-              Réinitialiser
-            </button>
-          )}
-        </div>
+              Promouvoir disponibles
+            </ActionButton>
+            <ActionButton
+              variant="ghost"
+              icon={Clock}
+              pending={expireMutation.isPending}
+              disabled={promoteMutation.isPending}
+              onClick={() => expireMutation.mutate(50)}
+            >
+              Expirer offres
+            </ActionButton>
+            <ActionButton
+              variant="ghost"
+              icon={RefreshCw}
+              pending={isFetching && !isLoading}
+              onClick={() => refetch()}
+            >
+              Actualiser
+            </ActionButton>
+          </div>
+        }
+      />
+
+      <div className="flex justify-end">
+        <FilterButton open={showFilters} active={hasActiveFilters} onClick={() => setShowFilters(!showFilters)} />
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-        <div className="hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[900px]">
-            <thead className="bg-gray-50 ">
-              <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                  ID
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                  Client
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                  Ressource
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                  Créneau demandé
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                  Mode
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                  Statut
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                  Offre
-                </th>
-                <th className="px-6 py-4 text-center text-sm font-semibold text-gray-600">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((entry) => {
-                const status = statusConfig[entry.status];
-                return (
-                  <tr key={entry.id} className="hover:bg-primary-50/40">
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-mono text-gray-500">
-                        {entry.id}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-medium text-gray-900">
-                        {entry.ownerName ||
-                          entry.contactName ||
-                          entry.ownerCode ||
-                          "—"}
-                      </p>
-                      <p className="text-xs text-gray-500">{entry.ownerType}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm text-gray-900">
-                        {entry.resourceName}
-                      </p>
-                      <p className="text-xs text-gray-500 font-mono">
-                        {entry.resourceCode}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <CalendarIcon
-                          size={12}
-                          className="mr-1 text-gray-400"
-                        />
-                        {new Date(entry.startedAt).toLocaleDateString("fr-FR")}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {new Date(entry.startedAt).toLocaleTimeString("fr-FR", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                        {" — "}
-                        {new Date(entry.endedAt).toLocaleTimeString("fr-FR", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-xs px-2 py-1 rounded-full bg-gray-100">
-                        {entry.paymentMode === "SUBSCRIPTION"
-                          ? "Abonnement"
-                          : entry.paymentMode === "PASS"
-                            ? "Pass"
-                            : "Direct"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {status && (
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${status.color}`}
-                        >
-                          {status.label}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      {entry.offeredAt ? (
-                        <p className="text-xs text-gray-500">
-                          Offerte le{" "}
-                          {new Date(entry.offeredAt).toLocaleDateString(
-                            "fr-FR",
-                          )}
-                          {entry.expiresAt && (
-                            <span className="block text-orange-600">
-                              expire le{" "}
-                              {new Date(entry.expiresAt).toLocaleDateString(
-                                "fr-FR",
-                              )}
-                            </span>
-                          )}
-                        </p>
-                      ) : (
-                        <p className="text-xs text-gray-400">—</p>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <div className="flex justify-center gap-2">
-                        {entry.status === "WAITING" && (
-                          <button
-                            onClick={() => handleViewAlternatives(entry)}
-                            className="p-1 text-blue-600 hover:text-blue-800"
-                            title="Voir créneaux alternatifs"
-                          >
-                            <Eye size={16} />
-                          </button>
-                        )}
-                        {entry.status === "WAITING" && (
-                          <button
-                            onClick={() => {
-                              if (
-                                confirm(
-                                  "Annuler cette entrée en liste d'attente ?",
-                                )
-                              ) {
-                                cancelMutation.mutate(entry.id);
-                              }
-                            }}
-                            disabled={cancelMutation.isPending}
-                            className="p-1 text-red-600 hover:text-red-800"
-                            title="Annuler"
-                          >
-                            <XCircle size={16} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      {showFilters && (
+        <FilterPanel canReset={hasActiveFilters} onReset={handleReset}>
+          <Field label="Statut">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as WaitlistStatus | "")}
+              className={FIELD_SOFT}
+            >
+              <option value="">Tous les statuts</option>
+              {Object.entries(WAITLIST_STATUS).map(([value, cfg]) => (
+                <option key={value} value={value}>
+                  {cfg.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Code ressource">
+            <input
+              value={resourceFilter}
+              onChange={(e) => setResourceFilter(e.target.value)}
+              placeholder="Ex : SALLE-A"
+              className={FIELD_SOFT}
+            />
+          </Field>
+        </FilterPanel>
+      )}
 
-        <div className="space-y-3 p-3 md:hidden">
-          {entries.map((entry) => {
-            const status = statusConfig[entry.status];
-            return (
-              <article key={entry.id} className="rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-100">
-                <div className="mb-3 flex items-start justify-between gap-3">
+      {selectedEntry && (
+        <div
+          ref={panelRef}
+          className="rounded-[1.75rem] bg-white p-4 shadow-sm ring-2 ring-[color:color-mix(in_srgb,var(--logo-pink)_30%,white)] sm:p-5"
+        >
+          <h4 className="text-base font-bold text-gray-950">Créneaux alternatifs</h4>
+          <div className="mt-3 rounded-2xl bg-gray-50 p-4 text-sm">
+            <p className="text-xs font-semibold text-gray-400">Demande originale</p>
+            <p className="mt-1 font-semibold text-gray-900">{selectedEntry.resourceName}</p>
+            <p className="text-gray-600">
+              {formatDate(selectedEntry.startedAt)} · {formatTime(selectedEntry.startedAt)} -{" "}
+              {formatTime(selectedEntry.endedAt)}
+            </p>
+            <p className="text-gray-600">{clientName(selectedEntry)}</p>
+          </div>
+
+          <p className="mb-2 mt-4 text-sm font-semibold text-gray-700">
+            {selectedEntry.alternatives?.length || 0} créneau(x) alternatif(s) disponible(s)
+          </p>
+
+          {selectedEntry.alternatives && selectedEntry.alternatives.length > 0 ? (
+            <div className="space-y-2">
+              {selectedEntry.alternatives.map((alt, idx) => (
+                <div
+                  key={idx}
+                  className="flex flex-col gap-3 rounded-2xl bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
                   <div className="min-w-0">
-                    <p className="font-mono text-xs font-black text-primary-700">#{entry.id}</p>
-                    <p className="mt-1 truncate text-sm font-black text-gray-950">{entry.ownerName || entry.contactName || entry.ownerCode || "—"}</p>
-                    <p className="text-[11px] font-semibold text-gray-400">{entry.ownerType}</p>
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-gray-900">
+                      {new Date(alt.startedAt).toLocaleString("fr-FR", {
+                        weekday: "short",
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                      <ArrowRight size={13} className="text-gray-400" />
+                      {formatTime(alt.endedAt)}
+                    </p>
+                    <p className="mt-0.5 text-sm text-gray-600">{alt.resourceName}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {alt.remainingCapacity} place(s) · score {alt.score}% ·{" "}
+                      <span className="font-semibold text-gray-800">{formatMoney(alt.estimatedAmount)}</span>
+                    </p>
+                    {alt.reason && <p className="mt-0.5 text-xs text-gray-400">{alt.reason}</p>}
                   </div>
-                  {status && <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold ${status.color}`}>{status.label}</span>}
-                </div>
-                <div className="space-y-2 rounded-2xl bg-white p-3 text-xs">
-                  <div className="flex justify-between gap-3"><span className="font-bold text-gray-400">Ressource</span><span className="text-right font-black text-gray-800">{entry.resourceName || entry.resourceCode}</span></div>
-                  <div className="flex justify-between gap-3"><span className="font-bold text-gray-400">Créneau</span><span className="text-right font-semibold text-gray-700">{new Date(entry.startedAt).toLocaleDateString("fr-FR")} · {new Date(entry.startedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span></div>
-                  <div className="flex justify-between gap-3"><span className="font-bold text-gray-400">Mode</span><span className="font-semibold text-gray-700">{entry.paymentMode === "SUBSCRIPTION" ? "Abonnement" : entry.paymentMode === "PASS" ? "Pass" : "Direct"}</span></div>
-                </div>
-                {entry.status === "WAITING" && (
-                  <div className="mt-3 flex gap-2">
-                    <button type="button" onClick={() => handleViewAlternatives(entry)} className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700"><Eye size={14} /> Alternatives</button>
-                    <button type="button" onClick={() => { if (confirm("Annuler cette entrée en liste d'attente ?")) cancelMutation.mutate(entry.id); }} disabled={cancelMutation.isPending} className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-700 disabled:opacity-50"><XCircle size={14} /> Annuler</button>
-                  </div>
-                )}
-              </article>
-            );
-          })}
-        </div>
-
-        {entries.length === 0 && (
-          <div className="text-center py-12">
-            <Users size={48} className="mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500">Aucune entrée en liste d'attente</p>
-          </div>
-        )}
-      </div>
-
-      {/* MODALE DES ALTERNATIVES */}
-      {showAlternativesModal && selectedEntry && (
-        <ModalPortal onClose={() => setShowAlternativesModal(false)}>
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-xl font-bold">Créneaux alternatifs</h3>
-            <button
-              onClick={() => setShowAlternativesModal(false)}
-              className="p-1 hover:bg-gray-100 rounded-xl"
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          <div className="p-6 overflow-y-auto max-h-[70vh]">
-            {bookingResult && (
-              <div
-                className={`mb-4 p-3 rounded-xl ${bookingResult.success ? "bg-green-50 border border-green-200 text-green-700" : "bg-red-50 border border-red-200 text-red-700"}`}
-              >
-                {bookingResult.success ? (
-                  <CheckCircle size={16} className="inline mr-2" />
-                ) : (
-                  <AlertCircle size={16} className="inline mr-2" />
-                )}
-                {bookingResult.message}
-              </div>
-            )}
-
-            <div className="mb-4 p-3 bg-gray-50 rounded-xl">
-              <p className="text-sm font-medium text-gray-700">
-                Demande originale
-              </p>
-              <p className="text-sm">
-                <span className="font-medium">Ressource:</span>{" "}
-                {selectedEntry.resourceName}
-              </p>
-              <p className="text-sm">
-                <span className="font-medium">Créneau:</span>{" "}
-                {new Date(selectedEntry.startedAt).toLocaleString("fr-FR")} →{" "}
-                {new Date(selectedEntry.endedAt).toLocaleString("fr-FR")}
-              </p>
-              <p className="text-sm">
-                <span className="font-medium">Client:</span>{" "}
-                {selectedEntry.ownerName ||
-                  selectedEntry.contactName ||
-                  selectedEntry.ownerCode}
-              </p>
-            </div>
-
-            <p className="text-sm font-medium text-gray-700 mb-3">
-              {selectedEntry.alternatives?.length || 0} créneau(x) alternatif(s)
-              disponible(s)
-            </p>
-
-            {selectedEntry.alternatives &&
-            selectedEntry.alternatives.length > 0 ? (
-              <div className="space-y-3">
-                {selectedEntry.alternatives.map((alt, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3 border border-gray-200 rounded-xl hover:bg-primary-50/40"
+                  <ActionButton
+                    className="w-full shrink-0 sm:w-auto"
+                    pending={bookingIdx === idx}
+                    disabled={bookingIdx !== null}
+                    onClick={() => handleBookAlternative(alt, idx)}
                   >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {new Date(alt.startedAt).toLocaleString("fr-FR", {
-                            weekday: "short",
-                            day: "numeric",
-                            month: "short",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                          <ArrowRight
-                            size={12}
-                            className="inline mx-2 text-gray-400"
-                          />
-                          {new Date(alt.endedAt).toLocaleTimeString("fr-FR", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {alt.resourceName}
-                        </p>
-                        <div className="flex gap-3 mt-1 text-xs text-gray-500">
-                          <span>
-                            Capacité: {alt.remainingCapacity} place(s)
-                          </span>
-                          <span>Score: {alt.score}%</span>
-                          <span className="text-green-600 font-medium">
-                            {alt.estimatedAmount.toLocaleString("fr-FR")} FCFA
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {alt.reason}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleBookAlternative(alt)}
-                        disabled={!!bookingResult}
-                        className="px-3 py-1.5 bg-primary-600 text-white rounded-xl text-sm hover:bg-primary-700 disabled:opacity-50"
-                      >
-                        Réserver
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <AlertCircle size={32} className="mx-auto mb-2 text-gray-300" />
-                <p>Aucun créneau alternatif trouvé pour le moment.</p>
-                <p className="text-sm mt-1">
-                  Le client reste en liste d'attente.
-                </p>
-              </div>
-            )}
-
-            <div className="mt-6 pt-4 border-t flex gap-3">
-              <button
-                onClick={() => {
-                  if (confirm("Annuler cette entrée en liste d'attente ?")) {
-                    cancelMutation.mutate(selectedEntry.id);
-                    setShowAlternativesModal(false);
-                  }
-                }}
-                disabled={cancelMutation.isPending}
-                className="flex-1 px-4 py-2 border border-red-300 text-red-700 rounded-xl hover:bg-red-50 disabled:opacity-50"
-              >
-                {cancelMutation.isPending ? (
-                  <Loader2 size={16} className="animate-spin inline mr-2" />
-                ) : (
-                  <XCircle size={16} className="inline mr-2" />
-                )}
-                Annuler la liste d'attente
-              </button>
-              <button
-                onClick={() => setShowAlternativesModal(false)}
-                className="flex-1 px-4 py-2 border rounded-xl text-gray-700 hover:bg-primary-50/40"
-              >
-                Fermer
-              </button>
+                    Réserver
+                  </ActionButton>
+                </div>
+              ))}
             </div>
+          ) : (
+            <div className="rounded-2xl bg-gray-50 px-4 py-8 text-center">
+              <p className="text-sm font-semibold text-gray-600">Aucun créneau alternatif trouvé pour le moment.</p>
+              <p className="mt-1 text-xs text-gray-400">Le client reste en liste d'attente.</p>
+            </div>
+          )}
+
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <ActionButton variant="ghost" onClick={() => setSelectedEntry(null)} disabled={bookingIdx !== null}>
+              Fermer
+            </ActionButton>
+            <ActionButton
+              variant="danger"
+              icon={XCircle}
+              disabled={bookingIdx !== null}
+              onClick={() => askCancel(selectedEntry)}
+            >
+              Annuler la liste d'attente
+            </ActionButton>
           </div>
-        </ModalPortal>
+        </div>
+      )}
+
+      {isLoading ? (
+        <TableSkeleton rows={5} cols={6} />
+      ) : entries.length === 0 ? (
+        <EmptyState icon={Users} title="Aucune entrée en liste d'attente" />
+      ) : (
+        <DataCard>
+          <HeadRow cols={COLS}>
+            <span>ID</span>
+            <span>Client</span>
+            <span>Ressource</span>
+            <span>Créneau demandé</span>
+            <span>Mode</span>
+            <span>Statut</span>
+            <span>Offre</span>
+            <span />
+          </HeadRow>
+
+          <div className="space-y-2">
+            {entries.map((entry) => {
+              const st = statusOf(WAITLIST_STATUS, entry.status);
+              const mode = PAYMENT_MODE_LABELS[entry.paymentMode] ?? entry.paymentMode;
+              const slot = `${formatTime(entry.startedAt)} - ${formatTime(entry.endedAt)}`;
+              const canAct = entry.status === "WAITING";
+              const actions = canAct ? (
+                <>
+                  <IconButton
+                    icon={Eye}
+                    label="Voir les créneaux alternatifs"
+                    pending={loadingId === entry.id}
+                    disabled={loadingId !== null}
+                    onClick={() => handleViewAlternatives(entry)}
+                  />
+                  <IconButton
+                    icon={XCircle}
+                    label="Annuler l'entrée"
+                    tone="danger"
+                    disabled={cancelMutation.isPending}
+                    onClick={() => askCancel(entry)}
+                  />
+                </>
+              ) : null;
+              return (
+                <div key={entry.id} className={`rounded-2xl bg-gray-50 p-3 ${ROW_HOVER}`}>
+                  {/* Desktop */}
+                  <div className={`hidden items-center gap-4 px-1 lg:grid ${COLS}`}>
+                    <span className="font-mono text-xs text-gray-500">{entry.id}</span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-gray-900">{clientName(entry)}</p>
+                      <p className="mt-0.5 text-xs text-gray-400">
+                        {OWNER_TYPE_LABELS[entry.ownerType] ?? entry.ownerType}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm text-gray-900">{entry.resourceName}</p>
+                      <p className="mt-0.5 truncate font-mono text-xs text-gray-400">{entry.resourceCode}</p>
+                    </div>
+                    <div className="text-sm text-gray-700">
+                      <p>{formatDate(entry.startedAt)}</p>
+                      <p className="mt-0.5 text-xs text-gray-400">{slot}</p>
+                    </div>
+                    <span className="truncate text-sm text-gray-700">{mode}</span>
+                    <span>
+                      <StatusChip tone={st.tone}>{st.label}</StatusChip>
+                    </span>
+                    <div className="text-xs text-gray-500">
+                      {entry.offeredAt && <p>Offerte le {formatDate(entry.offeredAt)}</p>}
+                      {entry.expiresAt && <p className="text-amber-600">Expire le {formatDate(entry.expiresAt)}</p>}
+                    </div>
+                    <div className="flex justify-end gap-0.5">{actions}</div>
+                  </div>
+
+                  {/* Mobile et tablette */}
+                  <div className="lg:hidden">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-gray-900">{clientName(entry)}</p>
+                        <p className="mt-0.5 font-mono text-xs text-gray-500">#{entry.id}</p>
+                      </div>
+                      <StatusChip tone={st.tone}>{st.label}</StatusChip>
+                    </div>
+                    <p className="mt-2 truncate text-sm text-gray-700">{entry.resourceName}</p>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      {formatDate(entry.startedAt)} · {slot}
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Tag>{mode}</Tag>
+                      {entry.expiresAt && (
+                        <span className="text-xs text-amber-600">Expire le {formatDate(entry.expiresAt)}</span>
+                      )}
+                    </div>
+                    {actions && <div className="mt-3 flex justify-end gap-0.5">{actions}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </DataCard>
       )}
     </div>
   );

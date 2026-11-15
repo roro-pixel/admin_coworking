@@ -1,241 +1,158 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Plus,
-  Trash2,
-  Search,
-  Package,
-  CheckCircle,
-  XCircle,
-} from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, Package, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { resourceService } from "../../../services/resource.service";
 import type { AmenityResponse } from "../../../services/resource.service";
-import { AmenityFormModal } from "./AmenityFormModal";
-import { AmenityDetailModal } from "./AmenityDetailModal";
+import { ActionButton, CheckField, DataCard, EmptyState, ErrorBlock, Field, HeadRow, IconButton, ListHeader, PanelForm, Pagination, SearchField, StatusChip } from "../../../components/subscription/kit";
+import { FIELD, ROW_HOVER, apiMessage } from "../../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../../components/ui/Skeleton";
+import { toast } from "../../../components/ui/toastStore";
+import { Cell, Fact, useDebounced } from "../../../components/resources/resKit";
+
+const COLS = "lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_7rem_auto]";
+const SIZE = 15;
+const EMPTY = { name: "", description: "", active: true };
 
 export const AmenitiesList: React.FC = () => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [editingAmenity, setEditingAmenity] = useState<AmenityResponse | null>(
-    null,
-  );
-  const [selectedAmenity, setSelectedAmenity] =
-    useState<AmenityResponse | null>(null);
+  const [page, setPage] = useState(0);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ code: string | null; form: typeof EMPTY } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const q = useDebounced(search.trim());
 
-  const { data: amenitiesData, isLoading } = useQuery({
-    queryKey: ["resource-amenities"],
-    queryFn: () => resourceService.getAmenities({ size: 500 }),
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["resource-amenities", page, q],
+    queryFn: () => (q ? resourceService.searchAmenities(q, { page, size: SIZE }) : resourceService.getAmenities({ page, size: SIZE })),
   });
+  const items = data?.content ?? [];
+  const total = data?.totalElements ?? 0;
 
-  const deleteMutation = useMutation({
-    mutationFn: (code: string) => resourceService.deleteAmenity(code),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resource-amenities"] });
-      queryClient.invalidateQueries({ queryKey: ["all-amenities"] });
+  const invalidate = () => Promise.all([queryClient.invalidateQueries({ queryKey: ["resource-amenities"] }), queryClient.invalidateQueries({ queryKey: ["all-amenities"] })]);
+  const save = useMutation({
+    mutationFn: async () => {
+      const f = editing!.form;
+      const body = { name: f.name.trim(), description: f.description.trim() || undefined, active: f.active };
+      if (editing!.code === null) await resourceService.createAmenity(body);
+      else await resourceService.updateAmenity(editing!.code, body);
     },
-    onError: () =>
-      alert(
-        "Erreur lors de la suppression. Cet équipement est peut-être associé à des ressources.",
-      ),
+    onSuccess: async () => {
+      toast.success(editing?.code === null ? "Équipement créé" : "Équipement modifié");
+      await invalidate();
+      setEditing(null);
+      setError(null);
+    },
+    onError: (e) => setError(apiMessage(e, "Enregistrement impossible")),
   });
+  const toggle = useMutation({
+    mutationFn: (a: AmenityResponse) => resourceService.updateAmenity(a.code, { name: a.name, description: a.description ?? undefined, active: !a.active }),
+    onSuccess: invalidate,
+    onError: (e) => toast.error(apiMessage(e, "Changement d'état impossible")),
+  });
+  const remove = useMutation({ mutationFn: (code: string) => resourceService.deleteAmenity(code), onSuccess: invalidate });
 
-  const amenities: AmenityResponse[] = amenitiesData?.content || [];
-  const filteredAmenities = search
-    ? amenities.filter(
-        (a) =>
-          a.name.toLowerCase().includes(search.toLowerCase()) ||
-          a.code.toLowerCase().includes(search.toLowerCase()),
-      )
-    : amenities;
-
-  const handleDelete = (code: string) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer cet équipement ?"))
-      deleteMutation.mutate(code);
-  };
-
-  const openDetail = (amenity: AmenityResponse) => {
-    setSelectedAmenity(amenity);
-    setIsDetailOpen(true);
-  };
-
-  const openEdit = (amenity: AmenityResponse) => {
-    setIsDetailOpen(false);
-    setEditingAmenity(amenity);
-    setIsModalOpen(true);
-  };
-
-  if (isLoading) return <div className="text-center py-8">Chargement...</div>;
+  const f = editing?.form;
+  const set = (patch: Partial<typeof EMPTY>) => setEditing((p) => (p ? { ...p, form: { ...p.form, ...patch } } : p));
 
   return (
-    <div>
-      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">Équipements</h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Gérez le référentiel des équipements associables aux ressources.
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            setEditingAmenity(null);
-            setIsModalOpen(true);
-          }}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-700"
+    <div className="space-y-5">
+      <ListHeader
+        title="Équipements"
+        subtitle={isLoading ? undefined : `${total} équipement${total > 1 ? "s" : ""} associables aux ressources`}
+        action={<ActionButton icon={Plus} onClick={() => { setError(null); setEditing({ code: null, form: { ...EMPTY } }); }}>Nouvel équipement</ActionButton>}
+      />
+
+      {editing && f && (
+        <PanelForm
+          title={editing.code === null ? "Nouvel équipement" : `Modifier ${editing.code}`}
+          onCancel={() => setEditing(null)}
+          pending={save.isPending}
+          submitLabel={editing.code === null ? "Créer" : "Enregistrer"}
+          submitDisabled={!f.name.trim()}
+          error={error}
+          onSubmit={(e) => { e.preventDefault(); save.mutate(); }}
         >
-          <Plus size={18} /> Nouvel équipement
-        </button>
-      </div>
-
-      <div className="mb-6 grid gap-3 md:grid-cols-3">
-        <Metric label="Équipements" value={amenities.length} />
-        <Metric
-          label="Actifs"
-          value={amenities.filter((a) => a.active).length}
-        />
-        <Metric
-          label="Avec supplément"
-          value={amenities.filter((a) => (a.extraPrice ?? 0) > 0).length}
-        />
-      </div>
-
-      <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-        <div className="relative">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Rechercher par nom ou code..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-          />
-        </div>
-      </div>
-
-      <div className="overflow-x-auto">
-        <table className="w-full border-separate border-spacing-y-2">
-          <thead>
-            <tr className="text-xs uppercase tracking-wide text-gray-400">
-              <th className="px-4 py-2 text-left font-semibold">Équipement</th>
-              <th className="px-4 py-2 text-center font-semibold">Quantité</th>
-              <th className="px-4 py-2 text-center font-semibold">Option</th>
-              <th className="px-4 py-2 text-right font-semibold">Supplément</th>
-              <th className="px-4 py-2 text-center font-semibold">Statut</th>
-              <th className="px-4 py-2 text-right font-semibold">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredAmenities.map((amenity) => (
-              <tr
-                key={amenity.code}
-                onClick={() => openDetail(amenity)}
-                className={`cursor-pointer bg-white shadow-sm ring-1 ring-gray-100 transition hover:-translate-y-0.5 hover:shadow-md ${!amenity.active ? "opacity-60" : ""}`}
-              >
-                <td className="rounded-l-2xl px-4 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-xl bg-primary-50 p-2 text-primary-600">
-                      <Package size={18} />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {amenity.name}
-                      </p>
-                      <p className="font-mono text-xs text-gray-400">
-                        {amenity.code}
-                      </p>
-                      {amenity.description && (
-                        <p className="mt-1 line-clamp-1 text-xs text-gray-500">
-                          {amenity.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-4 text-center text-sm font-medium text-gray-700">
-                  {amenity.quantity ?? "—"}
-                </td>
-                <td className="px-4 py-4 text-center">
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${amenity.optional ? "bg-blue-50 text-blue-700" : "bg-gray-50 text-gray-600"}`}
-                  >
-                    {amenity.optional ? "Optionnel" : "Inclus"}
-                  </span>
-                </td>
-                <td className="px-4 py-4 text-right text-sm font-semibold text-gray-900">
-                  {(amenity.extraPrice ?? 0).toLocaleString("fr-FR")} FCFA
-                </td>
-                <td className="px-4 py-4 text-center">
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${amenity.active ? "bg-green-50 text-green-700" : "bg-gray-50 text-gray-500"}`}
-                  >
-                    {amenity.active ? (
-                      <CheckCircle size={13} />
-                    ) : (
-                      <XCircle size={13} />
-                    )}
-                    {amenity.active ? "Actif" : "Inactif"}
-                  </span>
-                </td>
-                <td className="rounded-r-2xl px-4 py-4 text-right">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(amenity.code);
-                    }}
-                    className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {filteredAmenities.length === 0 && (
-        <div className="rounded-2xl bg-white p-12 text-center shadow-sm ring-1 ring-gray-100">
-          <Package size={42} className="mx-auto mb-3 text-gray-300" />
-          <p className="font-medium text-gray-700">Aucun équipement trouvé</p>
-        </div>
+          <Field label="Nom" required>
+            <input value={f.name} onChange={(e) => set({ name: e.target.value })} className={FIELD} autoFocus />
+          </Field>
+          <Field label="Description">
+            <textarea value={f.description} onChange={(e) => set({ description: e.target.value })} rows={2} className={`${FIELD} resize-none`} />
+          </Field>
+          <CheckField checked={f.active} onChange={(v) => set({ active: v })} label="Équipement actif" />
+          <p className="text-sm text-gray-500">Ici, seul le référentiel global est géré. La quantité, le caractère optionnel et le supplément se renseignent au moment d'associer l'équipement à une ressource.</p>
+        </PanelForm>
       )}
 
-      <AmenityFormModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingAmenity(null);
-        }}
-        editingAmenity={editingAmenity}
-        onSuccess={() => {
-          setIsModalOpen(false);
-          setEditingAmenity(null);
-        }}
-      />
-      <AmenityDetailModal
-        isOpen={isDetailOpen}
-        onClose={() => setIsDetailOpen(false)}
-        amenity={selectedAmenity}
-        onEdit={openEdit}
-      />
+      <SearchField value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Nom ou code de l'équipement" />
+
+      {isLoading ? (
+        <ListSkeleton rows={6} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les équipements." onRetry={() => refetch()} />
+      ) : items.length === 0 ? (
+        <EmptyState icon={Package} title="Aucun équipement" hint={q ? "Aucun résultat pour cette recherche." : "Ajoutez par exemple « Écran », « Wi-Fi » ou « Tableau blanc »."} />
+      ) : (
+        <>
+          <HeadRow cols={COLS}>
+            <span>Équipement</span>
+            <span>Description</span>
+            <span>État</span>
+            <span className="text-right">Actions</span>
+          </HeadRow>
+          <DataCard>
+            {items.map((a) => {
+              const open = expanded === a.code;
+              return (
+                <div key={a.code} className={`rounded-2xl max-lg:mb-2 max-lg:bg-gray-50 ${ROW_HOVER}`}>
+                  <div onClick={() => setExpanded(open ? null : a.code)} className={`grid cursor-pointer grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 p-4 ${COLS}`}>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <ChevronDown size={16} className={`shrink-0 text-gray-400 transition ${open ? "" : "-rotate-90"}`} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-900">{a.name}</p>
+                        <p className="font-mono text-xs text-gray-400">{a.code}</p>
+                      </div>
+                    </div>
+                    <Cell title="Description" className="max-lg:order-3 max-lg:col-span-2">
+                      <span className="line-clamp-1 text-sm text-gray-600">{a.description || "Sans description"}</span>
+                    </Cell>
+                    <div className="max-lg:order-2 max-lg:justify-self-end">
+                      <StatusChip tone={a.active ? "success" : "neutral"}>{a.active ? "Actif" : "Inactif"}</StatusChip>
+                    </div>
+                    <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 max-lg:order-4 max-lg:col-span-2 lg:justify-end">
+                      <IconButton icon={Power} label={a.active ? "Désactiver" : "Activer"} tone={a.active ? "success" : "neutral"} pending={toggle.isPending && toggle.variables?.code === a.code} onClick={() => toggle.mutate(a)} />
+                      <IconButton icon={Pencil} label="Modifier" onClick={() => { setError(null); setEditing({ code: a.code, form: { name: a.name, description: a.description ?? "", active: a.active } }); }} />
+                      <IconButton
+                        icon={Trash2}
+                        label="Supprimer"
+                        tone="danger"
+                        onClick={() =>
+                          toast.confirm({
+                            message: `Supprimer l'équipement « ${a.name} » ?`,
+                            detail: "La suppression échoue s'il est associé à des ressources.",
+                            confirmLabel: "Supprimer",
+                            pendingLabel: "Suppression",
+                            successMessage: "Équipement supprimé",
+                            errorMessage: "Suppression impossible : l'équipement est probablement associé à des ressources",
+                            onConfirm: () => remove.mutateAsync(a.code),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                  {open && (
+                    <div className="grid gap-3 rounded-2xl bg-gray-50 p-3 sm:grid-cols-2 lg:mx-3 lg:mb-3">
+                      <Fact title="Code"><span className="font-mono">{a.code}</span></Fact>
+                      <Fact title="Description">{a.description || "Aucune"}</Fact>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </DataCard>
+          <Pagination page={page} totalPages={data?.totalPages ?? 1} total={total} noun="équipement" onChange={setPage} />
+        </>
+      )}
     </div>
   );
 };
-
-const Metric: React.FC<{ label: string; value: number }> = ({
-  label,
-  value,
-}) => (
-  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-    <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-      {label}
-    </p>
-    <p className="mt-1 text-2xl font-bold text-gray-900">
-      {value.toLocaleString("fr-FR")}
-    </p>
-  </div>
-);

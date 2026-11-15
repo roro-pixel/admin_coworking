@@ -1,364 +1,92 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Loader2, Search, AlertTriangle } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { inventoryService } from "../../../services/inventory.service";
-import type {
-  InventoryItem,
-  StockLevel,
-  StockOutReasonCode,
-} from "../../../services/inventory.service";
-import { useAuth } from "../../../contexts/AuthContext";
-import { ModalPortal } from "../../../components/ui/ModalPortal";
+import type { InventoryItem, StockOutReasonCode } from "../../../services/inventory.service";
+import { Field, PanelForm } from "../../../components/subscription/kit";
+import { FIELD, apiMessage } from "../../../components/subscription/kitUtils";
+import { toast } from "../../../components/ui/toastStore";
+import { ItemPicker, LocationSelect, REASON_LABEL, qty, useActor } from "../../../components/inventory/invKit";
+import { AvailableFact, ReferenceFields, useAvailable } from "./StockParts";
 
-interface StockAdjustmentFormProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
+const REASONS: StockOutReasonCode[] = ["LOSS", "DAMAGE", "INTERNAL_USE", "CONSUMPTION", "OTHER"];
+const EMPTY = { locationCode: "", delta: 0, reasonCode: "LOSS" as StockOutReasonCode, reasonDetails: "", referenceType: "", referenceCode: "" };
 
-const reasonOptions: { value: StockOutReasonCode; label: string }[] = [
-  { value: "LOSS", label: "Perte / introuvable" },
-  { value: "DAMAGE", label: "Article endommagé" },
-  { value: "INTERNAL_USE", label: "Usage interne" },
-  { value: "CONSUMPTION", label: "Consommation" },
-  { value: "OTHER", label: "Autre" },
-];
-
-export const StockAdjustmentForm: React.FC<StockAdjustmentFormProps> = ({
-  isOpen,
-  onClose,
-}) => {
-  const { admin } = useAuth();
+export const StockAdjustmentForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const actor = useActor();
   const queryClient = useQueryClient();
-  const [formData, setFormData] = useState({
-    itemCode: "",
-    locationCode: "",
-    quantityDelta: 0,
-    reasonCode: "LOSS" as StockOutReasonCode,
-    reasonDetails: "",
-    referenceType: "",
-    referenceCode: "",
-  });
-  const [itemSearch, setItemSearch] = useState("");
-  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
-  const [currentStock, setCurrentStock] = useState<number>(0);
-  const [showItemResults, setShowItemResults] = useState(false);
-  const [error, setError] = useState("");
+  const [item, setItem] = useState<InventoryItem | null>(null);
+  const [f, setF] = useState(EMPTY);
+  const [error, setError] = useState<string | null>(null);
+  const set = (p: Partial<typeof EMPTY>) => setF((x) => ({ ...x, ...p }));
+  const { available, loaded } = useAvailable(item?.itemCode ?? "", f.locationCode);
 
-  const { data: itemsData } = useQuery({
-    queryKey: ["inventory-items-search", itemSearch],
-    queryFn: () =>
-      inventoryService.getItems({ query: itemSearch || undefined, size: 20 }),
-    enabled: itemSearch.length > 1,
-  });
-
-  const { data: locations = [] } = useQuery({
-    queryKey: ["inventory-locations-active"],
-    queryFn: () => inventoryService.getLocations(true),
-  });
-
-  const { data: stockLevels } = useQuery({
-    queryKey: ["stock-levels-check", formData.itemCode, formData.locationCode],
-    queryFn: () =>
-      inventoryService.getStockLevels({
-        itemCode: formData.itemCode,
-        locationCode: formData.locationCode,
-      }),
-    enabled: !!formData.itemCode && !!formData.locationCode,
-  });
-
-  const items = itemsData?.content || [];
-
-  const createMutation = useMutation({
+  const save = useMutation({
     mutationFn: () =>
       inventoryService.stockAdjust({
-        itemCode: formData.itemCode,
-        locationCode: formData.locationCode,
-        quantityDelta: formData.quantityDelta,
-        reasonCode: formData.reasonCode,
-        reasonDetails: formData.reasonDetails || undefined,
-        referenceType: formData.referenceType || undefined,
-        referenceCode: formData.referenceCode || undefined,
-        performedBy: admin?.email || "admin",
+        itemCode: item!.itemCode,
+        locationCode: f.locationCode,
+        quantityDelta: f.delta,
+        reasonCode: f.reasonCode,
+        reasonDetails: f.reasonDetails || undefined,
+        referenceType: f.referenceType || undefined,
+        referenceCode: f.referenceCode || undefined,
+        performedBy: actor,
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["stock-levels"] });
-      queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+    onSuccess: async () => {
+      toast.success("Ajustement appliqué");
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ["stock-levels"] }), queryClient.invalidateQueries({ queryKey: ["stock-movements"] })]);
       onClose();
-      resetForm();
     },
-    onError: (err: any) => {
-      setError(err.response?.data?.message || "Erreur lors de l'ajustement");
-    },
+    onError: (e) => setError(apiMessage(e, "Ajustement impossible")),
   });
 
-  const resetForm = () => {
-    setFormData({
-      itemCode: "",
-      locationCode: "",
-      quantityDelta: 0,
-      reasonCode: "LOSS",
-      reasonDetails: "",
-      referenceType: "",
-      referenceCode: "",
-    });
-    setSelectedItem(null);
-    setItemSearch("");
-    setCurrentStock(0);
-    setError("");
+  const validate = (): string | null => {
+    if (!item || !f.locationCode) return "Choisissez un article et un emplacement.";
+    if (f.delta === 0) return "La variation ne peut pas être nulle.";
+    if (f.referenceType && !f.referenceCode) return "Le code de référence est obligatoire quand le type de référence est renseigné.";
+    if (f.delta < 0 && f.reasonCode === "OTHER" && !f.reasonDetails.trim()) return "Le détail du motif est obligatoire pour un ajustement négatif avec le motif Autre.";
+    if (f.delta < 0 && Math.abs(f.delta) > available) return `Ajustement négatif trop important : stock actuel ${available}.`;
+    return null;
   };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (formData.quantityDelta === 0) {
-      setError("La variation ne peut pas être nulle");
-      return;
-    }
-    if (formData.referenceType && !formData.referenceCode) {
-      setError(
-        "Le code de référence est obligatoire quand le type de référence est renseigné.",
-      );
-      return;
-    }
-    if (
-      formData.quantityDelta < 0 &&
-      formData.reasonCode === "OTHER" &&
-      !formData.reasonDetails.trim()
-    ) {
-      setError(
-        "Le détail du motif est obligatoire pour un ajustement négatif avec motif Autre.",
-      );
-      return;
-    }
-    if (
-      formData.quantityDelta < 0 &&
-      Math.abs(formData.quantityDelta) > currentStock
-    ) {
-      setError(
-        `Ajustement négatif trop important! Stock actuel: ${currentStock}`,
-      );
-      return;
-    }
-    createMutation.mutate();
-  };
-
-  const selectItem = (item: InventoryItem) => {
-    setSelectedItem(item);
-    setFormData({ ...formData, itemCode: item.itemCode });
-    setItemSearch(item.name);
-    setShowItemResults(false);
-  };
-
-  const updateLocation = (locationCode: string) => {
-    setFormData({ ...formData, locationCode });
-    const level = stockLevels?.data?.find(
-      (l: StockLevel) => l.locationCode === locationCode,
-    );
-    setCurrentStock(level?.quantityAvailable || 0);
-  };
-
-  const isIncrease = formData.quantityDelta > 0;
-  const newStock = currentStock + formData.quantityDelta;
-
-  if (!isOpen) return null;
 
   return (
-    <ModalPortal onClose={onClose} size="2xl">
-      <div className="sticky top-0 bg-white ring-1 ring-gray-100 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
-        <h3 className="text-lg sm:text-xl sm:text-2xl font-bold">Ajustement de stock</h3>
-        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-2xl">
-          <X size={24} />
-        </button>
+    <PanelForm
+      title="Ajustement de stock"
+      onCancel={onClose}
+      pending={save.isPending}
+      submitLabel="Appliquer l'ajustement"
+      submitDisabled={!item || !f.locationCode || f.delta === 0}
+      error={error}
+      onSubmit={(e) => {
+        e.preventDefault();
+        const v = validate();
+        setError(v);
+        if (!v) save.mutate();
+      }}
+    >
+      <Field label="Article" required>
+        <ItemPicker value={item} onChange={(it) => { setItem(it); setError(null); }} />
+      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Emplacement" required>
+          <LocationSelect value={f.locationCode} onChange={(v) => { set({ locationCode: v }); setError(null); }} />
+        </Field>
+        {f.locationCode && item && <AvailableFact title="Stock actuel" value={available} loaded={loaded} />}
       </div>
-      <div className="overflow-y-auto max-h-[80vh]">
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
-          <div>
-            <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-              Article *
-            </label>
-            <div className="relative">
-              <Search
-                size={20}
-                className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
-              />
-              <input
-                type="text"
-                value={itemSearch}
-                onChange={(e) => {
-                  setItemSearch(e.target.value);
-                  setShowItemResults(true);
-                }}
-                placeholder="Rechercher un article..."
-                className="w-full pl-12 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-              />
-            </div>
-            {showItemResults && items.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full bg-white ring-1 rounded-2xl shadow-lg max-h-60 overflow-y-auto">
-                {items.map((item: InventoryItem) => (
-                  <button
-                    key={item.itemCode}
-                    type="button"
-                    onClick={() => selectItem(item)}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 ring-1 ring-gray-100 text-sm sm:text-base"
-                  >
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-sm text-gray-500">{item.itemCode}</p>
-                  </button>
-                ))}
-              </div>
-            )}
-            {selectedItem && (
-              <div className="mt-3 p-3 bg-gray-50 rounded-2xl">
-                <p className="text-base font-medium">{selectedItem.name}</p>
-                <p className="text-sm text-gray-500">
-                  Code: {selectedItem.itemCode}
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-              Emplacement *
-            </label>
-            <select
-              value={formData.locationCode}
-              onChange={(e) => updateLocation(e.target.value)}
-              required
-              className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-            >
-              <option value="">Sélectionner</option>
-              {locations.map((loc: any) => (
-                <option key={loc.locationCode} value={loc.locationCode}>
-                  {loc.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {formData.locationCode && (
-            <div className="p-3 bg-gray-50 rounded-2xl text-center">
-              <p className="text-base text-gray-600">
-                Stock actuel:{" "}
-                <span className="font-bold text-lg sm:text-xl">{currentStock}</span>
-              </p>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-              Variation (+, -) *
-            </label>
-            <input
-              type="number"
-              value={formData.quantityDelta}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  quantityDelta: Number(e.target.value) || 0,
-                })
-              }
-              required
-              className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-              placeholder="Ex: +10 ou -5"
-            />
-            {formData.quantityDelta !== 0 && (
-              <div
-                className={`mt-3 p-3 rounded-2xl text-sm sm:text-base ${isIncrease ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
-              >
-                {isIncrease ? (
-                  <>
-                    Nouveau stock:{" "}
-                    <span className="font-bold">
-                      {currentStock} → {newStock}
-                    </span>{" "}
-                    (+{formData.quantityDelta})
-                  </>
-                ) : (
-                  <>
-                    Nouveau stock:{" "}
-                    <span className="font-bold">
-                      {currentStock} → {newStock}
-                    </span>{" "}
-                    ({formData.quantityDelta})
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                Motif d'ajustement
-              </label>
-              <select
-                value={formData.reasonCode}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    reasonCode: e.target.value as StockOutReasonCode,
-                  })
-                }
-                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base bg-white"
-              >
-                {reasonOptions.map((reason) => (
-                  <option key={reason.value} value={reason.value}>
-                    {reason.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                Détail du motif
-              </label>
-              <input
-                value={formData.reasonDetails}
-                onChange={(e) =>
-                  setFormData({ ...formData, reasonDetails: e.target.value })
-                }
-                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-                placeholder="Correction après comptage, perte, casse..."
-              />
-            </div>
-          </div>
-
-          {error && (
-            <div className="p-4 bg-red-50 ring-1 ring-1 ring-red-100 rounded-2xl flex items-center gap-2 text-red-700">
-              <AlertTriangle size={18} />
-              <span className="text-base">{error}</span>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 pt-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-3 sm:px-5 ring-1 ring-gray-100 rounded-2xl text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={
-                createMutation.isPending ||
-                !formData.itemCode ||
-                !formData.locationCode ||
-                formData.quantityDelta === 0 ||
-                (formData.quantityDelta < 0 &&
-                  formData.reasonCode === "OTHER" &&
-                  !formData.reasonDetails)
-              }
-              className="flex-1 bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base font-medium w-full sm:w-auto justify-center"
-            >
-              {createMutation.isPending ? (
-                <Loader2 size={20} className="animate-spin" />
-              ) : null}
-              Appliquer l'ajustement
-            </button>
-          </div>
-        </form>
+      <Field label="Variation" required hint={f.delta !== 0 ? `Nouveau stock : ${qty(available)} vers ${qty(available + f.delta)}` : "Positive pour ajouter, négative pour retirer. Exemple : 10 ou -5."}>
+        <input type="number" value={f.delta} onChange={(e) => set({ delta: Number(e.target.value) || 0 })} className={FIELD} />
+      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Motif">
+          <select value={f.reasonCode} onChange={(e) => set({ reasonCode: e.target.value as StockOutReasonCode })} className={FIELD}>
+            {REASONS.map((r) => <option key={r} value={r}>{REASON_LABEL[r]}</option>)}
+          </select>
+        </Field>
+        <Field label="Détail du motif">
+          <input value={f.reasonDetails} onChange={(e) => set({ reasonDetails: e.target.value })} placeholder="Correction après comptage, casse" className={FIELD} />
+        </Field>
       </div>
-    </ModalPortal>
+      <ReferenceFields type={f.referenceType} code={f.referenceCode} onType={(v) => set({ referenceType: v })} onCode={(v) => set({ referenceCode: v })} />
+    </PanelForm>
   );
 };

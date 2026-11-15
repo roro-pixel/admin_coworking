@@ -1,19 +1,25 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Send,
-  Loader2,
   UserCheck,
-  ArrowLeft,
-  X,
   Paperclip,
   Tags,
   History,
   CheckSquare,
   Shuffle,
+  Download,
+  Trash2,
+  X,
+  FileText,
+  Upload,
+  Gauge,
+  Info as InfoIcon,
+  LifeBuoy,
 } from "lucide-react";
 import { AdminLayout } from "../../components/layout/AdminLayout";
+import { brandVars } from "../../components/layout/adminTheme";
 import { operationsService } from "../../services/operations.service";
 import type {
   TicketStatus,
@@ -21,21 +27,39 @@ import type {
 } from "../../services/operations.service";
 import { useAuth } from "../../contexts/AuthContext";
 import { RichTextEditor } from "../../components/ui/RichTextEditor";
-import { ModalPortal } from "../../components/ui/ModalPortal";
 import { AgentAutocomplete } from "../../components/auth/AgentAutocomplete";
 import type { AdminUser } from "../../services/auth.service";
 import { useTicketRealtime } from "../../hooks/useTicketRealtime";
+import {
+  ActionButton,
+  CheckField,
+  Detail,
+  EmptyState,
+  Field,
+  IconButton,
+  ItemRow,
+  PageHeader,
+  PanelForm,
+  Section,
+  StatusChip,
+  Tag,
+  Tabs,
+} from "../../components/subscription/kit";
+import type { TabItem } from "../../components/subscription/kit";
+import { FIELD, FOCUS, PINK_SOFT, apiMessage, formatDateTime } from "../../components/subscription/kitUtils";
+import { statusOf } from "../../components/subscription/labels";
+import { Dots, Toaster } from "../../components/ui/Toaster";
+import { toast } from "../../components/ui/toastStore";
+import { DetailsSkeleton } from "../../components/ui/Skeleton";
+import { Avatar, PillChoice, RichHtml } from "../../components/operations/opsKit";
+import {
+  OWNER_TYPE_LABELS,
+  PRIORITY_STYLE,
+  TICKET_CATEGORY,
+  TICKET_STATUS,
+  nextTicketStatuses,
+} from "../../components/operations/opsLabels";
 
-const statusConfig: Record<TicketStatus, { label: string; color: string }> = {
-  OPEN: { label: "Ouvert", color: "bg-red-100 text-red-700" },
-  IN_PROGRESS: { label: "En cours", color: "bg-blue-100 text-blue-700" },
-  WAITING_CLIENT: {
-    label: "Attente client",
-    color: "bg-yellow-100 text-yellow-700",
-  },
-  RESOLVED: { label: "Résolu", color: "bg-green-100 text-green-700" },
-  CLOSED: { label: "Fermé", color: "bg-gray-100 text-gray-600" },
-};
 const ticketStatusOptions: TicketStatus[] = [
   "OPEN",
   "IN_PROGRESS",
@@ -44,48 +68,39 @@ const ticketStatusOptions: TicketStatus[] = [
   "CLOSED",
 ];
 
-const getNextTicketStatuses = (status: TicketStatus): TicketStatus[] => {
-  switch (status) {
-    case "OPEN":
-      return ["IN_PROGRESS", "WAITING_CLIENT", "RESOLVED", "CLOSED"];
-    case "IN_PROGRESS":
-      return ["WAITING_CLIENT", "RESOLVED", "CLOSED"];
-    case "WAITING_CLIENT":
-      return ["IN_PROGRESS", "RESOLVED", "CLOSED"];
-    case "RESOLVED":
-      return ["CLOSED", "OPEN"];
-    case "CLOSED":
-      return ["OPEN"];
-    default:
-      return [];
-  }
-};
-
-const priorityConfig: Record<string, { label: string; color: string }> = {
-  LOW: { label: "Faible", color: "bg-gray-100 text-gray-600" },
-  MEDIUM: { label: "Moyen", color: "bg-blue-100 text-blue-700" },
-  HIGH: { label: "Élevé", color: "bg-orange-100 text-orange-700" },
-  URGENT: { label: "Urgent", color: "bg-red-100 text-red-700" },
-};
-const categoryLabels: Record<string, string> = {
-  BILLING: "Facturation",
-  BOOKING: "Réservation",
-  ACCESS: "Accès",
-  TECHNICAL: "Technique",
-  OTHER: "Autre",
-};
+const priorityOptions = (Object.keys(PRIORITY_STYLE) as TicketPriority[]).map((p) => ({
+  value: p,
+  label: PRIORITY_STYLE[p].label,
+}));
 
 type DetailTab = "conversation" | "timeline" | "attachments" | "tags" | "task";
+
+const detailTabs: TabItem<DetailTab>[] = [
+  { id: "conversation", label: "Conversation", icon: Send },
+  { id: "timeline", label: "Chronologie", icon: History },
+  { id: "attachments", label: "Pièces jointes", icon: Paperclip },
+  { id: "tags", label: "Tags", icon: Tags },
+  { id: "task", label: "Tâche", icon: CheckSquare },
+];
+
+const DOT: Record<string, string> = {
+  success: "bg-emerald-500",
+  warn: "bg-amber-500",
+  danger: "bg-red-500",
+  neutral: "bg-gray-400",
+  info: "bg-sky-500",
+  pink: "bg-[color:var(--logo-pink-dark)]",
+};
 
 export const TicketDetailPage: React.FC = () => {
   const { ticketNumber } = useParams<{ ticketNumber: string }>();
   const { admin } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const fileInput = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("conversation");
   const [messageContent, setMessageContent] = useState("");
   const [internalNote, setInternalNote] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
   const [assignedTo, setAssignedTo] = useState("");
   const [selectedAgent, setSelectedAgent] = useState<AdminUser | null>(null);
   const [randomAgents, setRandomAgents] = useState("");
@@ -102,6 +117,7 @@ export const TicketDetailPage: React.FC = () => {
     null,
   );
   const [attachmentInternal, setAttachmentInternal] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   const {
     data: ticket,
@@ -161,11 +177,9 @@ export const TicketDetailPage: React.FC = () => {
     onSuccess: () => {
       invalidate();
       refetchTimeline();
+      toast.success("Statut mis à jour");
     },
-    onError: (e: any) =>
-      setActionError(
-        e?.response?.data?.message || "Erreur changement statut du ticket",
-      ),
+    onError: (e: any) => toast.error(apiMessage(e, "Erreur changement statut du ticket")),
   });
 
   const assignMutation = useMutation({
@@ -175,9 +189,9 @@ export const TicketDetailPage: React.FC = () => {
       invalidate();
       setAssignedTo("");
       setSelectedAgent(null);
+      toast.success("Ticket assigné");
     },
-    onError: (e: any) =>
-      setActionError(e?.response?.data?.message || "Erreur assignation"),
+    onError: (e: any) => toast.error(apiMessage(e, "Erreur assignation")),
   });
   const messageMutation = useMutation({
     mutationFn: () =>
@@ -194,9 +208,9 @@ export const TicketDetailPage: React.FC = () => {
       invalidate();
       setMessageContent("");
       setInternalNote(false);
+      toast.success(internalNote ? "Note interne ajoutée" : "Message envoyé");
     },
-    onError: (e: any) =>
-      setActionError(e?.response?.data?.message || "Erreur envoi message"),
+    onError: (e: any) => toast.error(apiMessage(e, "Erreur envoi message")),
   });
   const tagMutation = useMutation({
     mutationFn: (tag: string) =>
@@ -205,15 +219,13 @@ export const TicketDetailPage: React.FC = () => {
       invalidate();
       setNewTag("");
     },
-    onError: (e: any) =>
-      setActionError(e?.response?.data?.message || "Erreur ajout tag"),
+    onError: (e: any) => toast.error(apiMessage(e, "Erreur ajout tag")),
   });
   const removeTagMutation = useMutation({
     mutationFn: (tag: string) =>
       operationsService.removeTicketTag(ticketNumber!, tag),
     onSuccess: invalidate,
-    onError: (e: any) =>
-      setActionError(e?.response?.data?.message || "Erreur suppression tag"),
+    onError: (e: any) => toast.error(apiMessage(e, "Erreur suppression tag")),
   });
   const uploadMutation = useMutation({
     mutationFn: ({ file }: { file: File }) =>
@@ -224,11 +236,9 @@ export const TicketDetailPage: React.FC = () => {
     onSuccess: () => {
       refetchAttachments();
       invalidate();
+      toast.success("Pièce jointe ajoutée");
     },
-    onError: (e: any) =>
-      setActionError(
-        e?.response?.data?.message || "Erreur upload pièce jointe",
-      ),
+    onError: (e: any) => toast.error(apiMessage(e, "Erreur upload pièce jointe")),
   });
   const deleteAttachmentMutation = useMutation<void, any, number>({
     mutationFn: async (id: number) => {
@@ -237,10 +247,6 @@ export const TicketDetailPage: React.FC = () => {
     onSuccess: () => {
       refetchAttachments();
     },
-    onError: (e: any) =>
-      setActionError(
-        e?.response?.data?.message || "Erreur suppression pièce jointe",
-      ),
   });
   const taskMutation = useMutation({
     mutationFn: () =>
@@ -267,11 +273,9 @@ export const TicketDetailPage: React.FC = () => {
       setSelectedTaskAgent(null);
       invalidate();
       refetchTimeline();
+      toast.success("Tâche créée depuis le ticket");
     },
-    onError: (e: any) =>
-      setActionError(
-        e?.response?.data?.message || "Erreur conversion en tâche",
-      ),
+    onError: (e: any) => toast.error(apiMessage(e, "Erreur conversion en tâche")),
   });
 
   const assignRandom = () => {
@@ -280,7 +284,7 @@ export const TicketDetailPage: React.FC = () => {
       .map((a) => a.trim())
       .filter(Boolean);
     if (!agents.length) {
-      setActionError("Ajoutez au moins un agent dans la liste.");
+      toast.error("Ajoutez au moins un agent dans la liste.");
       return;
     }
     const pick = agents[Math.floor(Math.random() * agents.length)];
@@ -288,584 +292,444 @@ export const TicketDetailPage: React.FC = () => {
   };
 
   const downloadAttachment = async (id: number, fileName: string) => {
-    const blob = await operationsService.downloadTicketAttachment(
-      ticketNumber!,
-      id,
-    );
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    a.click();
-    window.URL.revokeObjectURL(url);
+    setDownloadingId(id);
+    try {
+      const blob = await operationsService.downloadTicketAttachment(
+        ticketNumber!,
+        id,
+      );
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(apiMessage(e, "Téléchargement impossible"));
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
-  if (isLoading)
-    return (
-      <AdminLayout>
-        <div className="text-center py-12">
-          <Loader2 className="animate-spin mx-auto mb-4" />
-          <p className="text-gray-500">Chargement du ticket...</p>
-        </div>
-      </AdminLayout>
-    );
-  if (!ticket)
-    return (
-      <AdminLayout>
-        <div className="text-center py-12 text-gray-500">
-          Ticket introuvable
-        </div>
-      </AdminLayout>
-    );
+  const confirmDeleteAttachment = (id: number, fileName: string) =>
+    toast.confirm({
+      message: `Supprimer « ${fileName} » ?`,
+      detail: "La pièce jointe sera retirée du ticket.",
+      confirmLabel: "Supprimer",
+      successMessage: "Pièce jointe supprimée",
+      errorMessage: "Suppression impossible",
+      onConfirm: () => deleteAttachmentMutation.mutateAsync(id),
+    });
 
-  return (
+  const shell = (children: React.ReactNode) => (
     <AdminLayout>
-      <button
-        onClick={() => navigate("/operations")}
-        className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-6"
-      >
-        <ArrowLeft size={18} /> Retour
-      </button>
-      <div className="max-w-6xl space-y-6">
-        {actionError && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex justify-between">
-            {actionError}
-            <button onClick={() => setActionError(null)}>
-              <X size={14} />
-            </button>
+      <div style={brandVars}>
+        <Toaster />
+        <div className="mx-auto w-full max-w-4xl">{children}</div>
+      </div>
+    </AdminLayout>
+  );
+
+  if (isLoading) return shell(<DetailsSkeleton />);
+  if (!ticket)
+    return shell(
+      <EmptyState
+        icon={LifeBuoy}
+        title="Ticket introuvable"
+        action={<ActionButton variant="ghost" onClick={() => navigate("/operations")}>Retour aux opérations</ActionButton>}
+      />,
+    );
+
+  const priority = statusOf(PRIORITY_STYLE, ticket.priority);
+  const status = statusOf(TICKET_STATUS, ticket.status);
+
+  return shell(
+    <>
+      <PageHeader
+        title={ticket.title}
+        subtitle={<span className="font-mono text-xs font-semibold text-[color:var(--logo-pink-dark)]">{ticket.ticketNumber}</span>}
+        onBack={() => navigate("/operations")}
+        badge={
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusChip tone={priority.tone}>{priority.label}</StatusChip>
+            <StatusChip tone={status.tone}>{status.label}</StatusChip>
+            <Tag>{TICKET_CATEGORY[ticket.category] ?? ticket.category}</Tag>
+            {ticket.escalationLevel ? <StatusChip tone="danger">Escalade N{ticket.escalationLevel}</StatusChip> : null}
           </div>
-        )}
+        }
+      />
 
-        <div className="bg-white rounded-2xl shadow-sm">
-          <div className="border-b px-4 py-3 sm:px-6 sm:py-4 flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-            <div>
-              <h2 className="text-lg sm:text-xl font-bold text-gray-900">
-                {ticket.title}
-              </h2>
-              <p className="text-sm text-gray-500 font-mono mt-1">
-                {ticket.ticketNumber}
-              </p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                <span
-                  className={`px-2 py-1 rounded-full text-xs font-medium ${priorityConfig[ticket.priority]?.color}`}
-                >
-                  {priorityConfig[ticket.priority]?.label}
-                </span>
-                <span
-                  className={`px-2 py-1 rounded-full text-xs font-medium ${statusConfig[ticket.status]?.color}`}
-                >
-                  {statusConfig[ticket.status]?.label}
-                </span>
-                <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
-                  {categoryLabels[ticket.category]}
-                </span>
-                {ticket.escalationLevel ? (
-                  <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-700">
-                    Escalade N{ticket.escalationLevel}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-            <div className="space-y-2 min-w-[280px]">
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <AgentAutocomplete
-                    value={assignedTo}
-                    selectedAgent={selectedAgent}
-                    onValueChange={setAssignedTo}
-                    onSelect={setSelectedAgent}
-                    placeholder="Rechercher un agent..."
-                  />
-                </div>
-                <button
-                  onClick={() =>
-                    assignedTo && assignMutation.mutate(assignedTo)
-                  }
-                  disabled={!assignedTo || assignMutation.isPending}
-                  className="px-3 py-2 bg-primary-600 text-white rounded-lg text-sm disabled:opacity-50"
-                >
-                  <UserCheck size={16} />
-                </button>
-              </div>
-              <div className="flex gap-2">
-                <AgentAutocomplete
-                  value={randomAgents}
-                  onValueChange={setRandomAgents}
-                  onSelect={() => undefined}
-                  placeholder="Ajouter un ID agent au tirage..."
-                />
-                <button
-                  onClick={assignRandom}
-                  className="px-3 py-2 ring-1 ring-gray-100 rounded-lg text-sm flex items-center gap-1"
-                >
-                  <Shuffle size={15} /> Aléatoire
-                </button>
-              </div>
-              <div className="rounded-xl bg-gray-50 p-3 ring-1 ring-gray-100">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500">
-                      Statut du ticket
-                    </p>
-                    <p className="text-sm font-semibold text-gray-900">
-                      {statusConfig[ticket.status]?.label}
-                    </p>
-                  </div>
-                  <select
-                    value={ticket.status}
-                    onChange={(e) =>
-                      statusMutation.mutate(e.target.value as TicketStatus)
-                    }
-                    disabled={statusMutation.isPending}
-                    className="w-full rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-100 disabled:opacity-50 sm:w-auto"
-                  >
-                    {ticketStatusOptions.map((status) => (
-                      <option key={status} value={status}>
-                        {statusConfig[status]?.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {getNextTicketStatuses(ticket.status).map((status) => (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() => statusMutation.mutate(status)}
-                      disabled={statusMutation.isPending}
-                      className={`rounded-full px-3 py-1 text-xs font-medium disabled:opacity-50 ${statusConfig[status]?.color}`}
-                    >
-                      {statusMutation.isPending
-                        ? "Mise à jour..."
-                        : statusConfig[status]?.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <p className="text-xs text-gray-500">
-                Assigné : {ticket.assignedTo || "non assigné"}
-              </p>
-            </div>
-          </div>
-          <div className="px-4 py-3 sm:px-6 sm:py-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <Info
-              label="Propriétaire"
-              value={`${ticket.ownerType || "—"} ${ticket.ownerCode || ""}`}
-            />
-            <Info
-              label="Contact"
-              value={ticket.contactName || ticket.contactEmail || "—"}
-            />
-            <Info
-              label="Objet lié"
-              value={
-                ticket.relatedType
-                  ? `${ticket.relatedType} · ${ticket.relatedCode}`
-                  : "—"
-              }
-            />
-            <Info
-              label="Première réponse SLA"
-              value={
-                ticket.firstResponseDueAt
-                  ? new Date(ticket.firstResponseDueAt).toLocaleString("fr-FR")
-                  : "—"
-              }
-            />
-            <Info
-              label="Résolution SLA"
-              value={
-                ticket.resolutionDueAt
-                  ? new Date(ticket.resolutionDueAt).toLocaleString("fr-FR")
-                  : "—"
-              }
-            />
-            <Info
-              label="Client 360"
-              value={
-                ownerSummary
-                  ? `${ownerSummary.openTickets} ouverts · ${ownerSummary.resolvedTickets} résolus`
-                  : "—"
-              }
-            />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-          <div className="flex flex-wrap gap-1 border-b px-4 pt-3">
-            <Tab
-              id="conversation"
-              active={activeTab}
-              setActive={setActiveTab}
-              label="Conversation"
-              icon={Send}
-            />
-            <Tab
-              id="timeline"
-              active={activeTab}
-              setActive={setActiveTab}
-              label="Timeline"
-              icon={History}
-            />
-            <Tab
-              id="attachments"
-              active={activeTab}
-              setActive={setActiveTab}
-              label="Pièces jointes"
-              icon={Paperclip}
-            />
-            <Tab
-              id="tags"
-              active={activeTab}
-              setActive={setActiveTab}
-              label="Tags"
-              icon={Tags}
-            />
-            <Tab
-              id="task"
-              active={activeTab}
-              setActive={setActiveTab}
-              label="Tâche"
-              icon={CheckSquare}
-            />
-          </div>
-
-          {activeTab === "conversation" && (
-            <div className="p-4 sm:p-6 space-y-5">
-              <div
-                className="prose max-w-none text-sm"
-                dangerouslySetInnerHTML={{ __html: ticket.description }}
-              />
-              <div className="space-y-3">
-                {(ticket.messages || []).map((m) => (
-                  <div
-                    key={m.id}
-                    className={`rounded-xl p-4 ${m.internal ? "bg-amber-50 border border-amber-100" : "bg-gray-50"}`}
-                  >
-                    <div className="flex justify-between text-xs text-gray-500 mb-2">
-                      <span>
-                        {m.authorName ||
-                          m.senderName ||
-                          m.authorId ||
-                          m.senderType ||
-                          "Auteur"}
-                      </span>
-                      <span>
-                        {new Date(m.createdAt).toLocaleString("fr-FR")}
-                      </span>
-                    </div>
-                    <div
-                      className="prose prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{ __html: m.content }}
+      <div className="space-y-5">
+        <Section title="Traitement" description="Assignation et statut du ticket" icon={UserCheck}>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className="space-y-4">
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-gray-600">
+                  Assigné à : <span className="text-gray-950">{ticket.assignedTo || "personne pour l'instant"}</span>
+                </p>
+                <div className="flex gap-2">
+                  <div className="min-w-0 flex-1">
+                    <AgentAutocomplete
+                      value={assignedTo}
+                      selectedAgent={selectedAgent}
+                      onValueChange={setAssignedTo}
+                      onSelect={setSelectedAgent}
+                      placeholder="Rechercher un agent..."
                     />
                   </div>
-                ))}
-              </div>
-              <div className="border rounded-xl p-4 space-y-3">
-                <RichTextEditor
-                  value={messageContent}
-                  onChange={setMessageContent}
-                  placeholder="Écrire une réponse ou une note interne..."
-                  minHeight="140px"
-                />
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <label className="text-sm flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={internalNote}
-                      onChange={(e) => setInternalNote(e.target.checked)}
-                    />{" "}
-                    Note interne
-                  </label>
-                  <button
-                    onClick={() => messageMutation.mutate()}
-                    disabled={
-                      !messageContent.trim() || messageMutation.isPending
-                    }
-                    className="w-full sm:w-auto justify-center px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50 flex items-center gap-2 text-sm"
+                  <ActionButton
+                    icon={UserCheck}
+                    pending={assignMutation.isPending}
+                    disabled={!assignedTo}
+                    onClick={() => assignedTo && assignMutation.mutate(assignedTo)}
                   >
-                    <Send size={16} /> Envoyer
-                  </button>
+                    Assigner
+                  </ActionButton>
+                </div>
+              </div>
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-gray-600">Tirage au sort entre plusieurs agents</p>
+                <div className="flex gap-2">
+                  <div className="min-w-0 flex-1">
+                    <AgentAutocomplete
+                      value={randomAgents}
+                      onValueChange={setRandomAgents}
+                      onSelect={() => undefined}
+                      placeholder="Ajouter un ID agent au tirage..."
+                    />
+                  </div>
+                  <ActionButton variant="ghost" icon={Shuffle} onClick={assignRandom} pending={assignMutation.isPending}>
+                    Aléatoire
+                  </ActionButton>
                 </div>
               </div>
             </div>
+
+            <div className="space-y-3">
+              <Field label="Statut du ticket">
+                <select
+                  value={ticket.status}
+                  onChange={(e) => statusMutation.mutate(e.target.value as TicketStatus)}
+                  disabled={statusMutation.isPending}
+                  className={FIELD}
+                >
+                  {ticketStatusOptions.map((s) => (
+                    <option key={s} value={s}>
+                      {TICKET_STATUS[s]?.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-gray-600">Passer directement à</p>
+                <div className="flex flex-wrap gap-2">
+                  {nextTicketStatuses(ticket.status).map((s) => {
+                    const st = statusOf(TICKET_STATUS, s);
+                    const busy = statusMutation.isPending && statusMutation.variables === s;
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => statusMutation.mutate(s as TicketStatus)}
+                        disabled={statusMutation.isPending}
+                        className={`relative inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS}`}
+                      >
+                        <span className={`inline-flex items-center gap-2 ${busy ? "invisible" : ""}`}>
+                          <span className={`h-2 w-2 rounded-full ${DOT[st.tone]}`} />
+                          {st.label}
+                        </span>
+                        {busy && (
+                          <span className="absolute inset-0 flex items-center justify-center">
+                            <Dots />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Informations" icon={InfoIcon}>
+          <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+            <Detail label="Propriétaire">
+              {ticket.ownerType
+                ? `${OWNER_TYPE_LABELS[ticket.ownerType] ?? ticket.ownerType} ${ticket.ownerCode || ""}`
+                : undefined}
+            </Detail>
+            <Detail label="Contact">{ticket.contactName || ticket.contactEmail}</Detail>
+            <Detail label="Objet lié">
+              {ticket.relatedType ? `${ticket.relatedType} · ${ticket.relatedCode}` : undefined}
+            </Detail>
+            <Detail label="Première réponse (SLA)">{formatDateTime(ticket.firstResponseDueAt)}</Detail>
+            <Detail label="Résolution (SLA)">{formatDateTime(ticket.resolutionDueAt)}</Detail>
+            <Detail label="Vue client">
+              {ownerSummary ? `${ownerSummary.openTickets} ouverts · ${ownerSummary.resolvedTickets} résolus` : undefined}
+            </Detail>
+          </div>
+        </Section>
+
+        <div className="space-y-4">
+          <Tabs variant="soft" items={detailTabs} active={activeTab} onChange={setActiveTab} />
+
+          {activeTab === "conversation" && (
+            <Section title="Conversation" icon={Send}>
+              <div className="space-y-5">
+                <RichHtml html={ticket.description} className="rounded-2xl bg-white p-4 shadow-sm" />
+                <ul className="space-y-3">
+                  {(ticket.messages || []).map((m: any) => {
+                    const author = m.authorName || m.senderName || m.authorId || m.senderType || "Auteur";
+                    return (
+                      <li
+                        key={m.id}
+                        className={`rounded-2xl p-4 ${m.internal ? "bg-amber-50" : "bg-white shadow-sm"}`}
+                      >
+                        <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <Avatar size="sm" name={author} />
+                          <span className="text-sm font-semibold text-gray-950">{author}</span>
+                          {m.internal && <StatusChip tone="warn">Note interne</StatusChip>}
+                          <span className="ml-auto text-xs text-gray-400">{formatDateTime(m.createdAt)}</span>
+                        </div>
+                        <RichHtml html={m.content} />
+                      </li>
+                    );
+                  })}
+                </ul>
+                <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+                  <RichTextEditor
+                    value={messageContent}
+                    onChange={setMessageContent}
+                    placeholder="Écrire une réponse ou une note interne..."
+                    minHeight="140px"
+                  />
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <CheckField checked={internalNote} onChange={setInternalNote} label="Note interne" />
+                    <ActionButton
+                      icon={Send}
+                      pending={messageMutation.isPending}
+                      disabled={!messageContent.trim()}
+                      onClick={() => messageMutation.mutate()}
+                    >
+                      Envoyer
+                    </ActionButton>
+                  </div>
+                </div>
+              </div>
+            </Section>
           )}
 
           {activeTab === "timeline" && (
-            <div className="p-4 sm:p-6 space-y-3">
-              {timeline.map((e: any, i) => (
-                <div
-                  key={e.id || i}
-                  className="flex flex-col sm:flex-row gap-3"
-                >
-                  <div className="mt-1 w-2 h-2 rounded-full bg-primary-600" />
-                  <div>
-                    <p className="font-medium text-sm">{e.eventType}</p>
-                    <p className="text-sm text-gray-500">
-                      {e.description ||
-                        `${e.oldValue || ""} ${e.newValue || ""}`}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {new Date(e.createdAt).toLocaleString("fr-FR")}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              {timeline.length === 0 && (
-                <p className="text-gray-500 text-sm">Aucun événement.</p>
+            <Section title="Chronologie" description="Les événements du ticket, du plus ancien au plus récent" icon={History}>
+              {timeline.length === 0 ? (
+                <p className="py-4 text-center text-sm text-gray-400">Aucun événement.</p>
+              ) : (
+                <ol className="relative space-y-5 pl-6 before:absolute before:bottom-1 before:left-[5px] before:top-1 before:w-px before:bg-gray-200">
+                  {timeline.map((e: any, i: number) => (
+                    <li key={e.id || i} className="relative">
+                      <span className="absolute -left-6 top-1.5 h-3 w-3 rounded-full bg-[color:var(--logo-pink-dark)] ring-4 ring-gray-50" />
+                      <p className="text-sm font-semibold text-gray-950">{e.eventType}</p>
+                      <p className="text-sm text-gray-600">
+                        {e.description || `${e.oldValue || ""} ${e.newValue || ""}`}
+                      </p>
+                      <p className="mt-0.5 text-xs text-gray-400">{formatDateTime(e.createdAt)}</p>
+                    </li>
+                  ))}
+                </ol>
               )}
-            </div>
+            </Section>
           )}
 
           {activeTab === "attachments" && (
-            <div className="p-4 sm:p-6 space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <input
-                  type="file"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) uploadMutation.mutate({ file });
-                  }}
-                  className="text-sm"
-                />
-                <label className="text-sm flex items-center gap-2">
+            <Section title="Pièces jointes" icon={Paperclip}>
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   <input
-                    type="checkbox"
-                    checked={attachmentInternal}
-                    onChange={(e) => setAttachmentInternal(e.target.checked)}
-                  />{" "}
-                  Interne
-                </label>
-              </div>
-              <div className="space-y-2">
-                {attachments.map((a: any) => (
-                  <div
-                    key={a.id}
-                    className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-gray-50 rounded-lg p-3"
+                    ref={fileInput}
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadMutation.mutate({ file });
+                      e.target.value = "";
+                    }}
+                  />
+                  <ActionButton
+                    icon={Upload}
+                    pending={uploadMutation.isPending}
+                    onClick={() => fileInput.current?.click()}
                   >
-                    <div>
-                      <p className="font-medium text-sm">{a.fileName}</p>
-                      <p className="text-xs text-gray-500">
-                        {a.contentType || "fichier"}{" "}
-                        {a.internal ? "· interne" : ""}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => downloadAttachment(a.id, a.fileName)}
-                        className="text-primary-600 text-sm"
-                      >
-                        Télécharger
-                      </button>
-                      <button
-                        onClick={() => deleteAttachmentMutation.mutate(a.id)}
-                        className="text-red-600 text-sm"
-                      >
-                        Supprimer
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                {attachments.length === 0 && (
-                  <p className="text-sm text-gray-500">Aucune pièce jointe.</p>
+                    Ajouter un fichier
+                  </ActionButton>
+                  <CheckField checked={attachmentInternal} onChange={setAttachmentInternal} label="Réservé à l'équipe (interne)" />
+                </div>
+                {attachments.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-gray-400">Aucune pièce jointe.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {attachments.map((a: any) => (
+                      <li key={a.id}>
+                        <ItemRow className="flex items-center gap-3">
+                          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[color:var(--logo-pink-dark)] ${PINK_SOFT}`}>
+                            <FileText size={18} />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-semibold text-gray-950">{a.fileName}</p>
+                            <p className="text-xs text-gray-500">{a.contentType || "fichier"}</p>
+                          </div>
+                          {a.internal && <Tag>Interne</Tag>}
+                          <IconButton
+                            icon={Download}
+                            label="Télécharger"
+                            pending={downloadingId === a.id}
+                            onClick={() => downloadAttachment(a.id, a.fileName)}
+                          />
+                          <IconButton
+                            icon={Trash2}
+                            label="Supprimer"
+                            tone="danger"
+                            onClick={() => confirmDeleteAttachment(a.id, a.fileName)}
+                          />
+                        </ItemRow>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
-            </div>
+            </Section>
           )}
 
           {activeTab === "tags" && (
-            <div className="p-4 sm:p-6 space-y-4">
-              <div className="flex gap-2">
-                <input
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  placeholder="Ajouter un tag"
-                  className="px-3 py-2 ring-1 ring-gray-100 rounded-lg text-sm"
-                />
-                <button
-                  onClick={() =>
-                    newTag.trim() && tagMutation.mutate(newTag.trim())
-                  }
-                  className="w-full sm:w-auto justify-center px-4 py-2 bg-primary-600 text-white rounded-lg text-sm"
+            <Section title="Tags" description="Mots-clés pour retrouver et regrouper les tickets" icon={Tags}>
+              <div className="space-y-4">
+                <form
+                  className="flex flex-col gap-2 sm:flex-row"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (newTag.trim()) tagMutation.mutate(newTag.trim());
+                  }}
                 >
-                  Ajouter
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {(ticket.tags || []).map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-sm"
-                  >
-                    {tag}
-                    <button onClick={() => removeTagMutation.mutate(tag)}>
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
-                {(!ticket.tags || ticket.tags.length === 0) && (
-                  <p className="text-sm text-gray-500">Aucun tag.</p>
+                  <input
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    placeholder="Ajouter un tag"
+                    className={FIELD}
+                  />
+                  <ActionButton type="submit" pending={tagMutation.isPending} disabled={!newTag.trim()}>
+                    Ajouter
+                  </ActionButton>
+                </form>
+                {!ticket.tags || ticket.tags.length === 0 ? (
+                  <p className="py-2 text-center text-sm text-gray-400">Aucun tag.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {ticket.tags.map((tag: string) => {
+                      const busy = removeTagMutation.isPending && removeTagMutation.variables === tag;
+                      return (
+                        <span
+                          key={tag}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-white py-1.5 pl-3.5 pr-1.5 text-sm font-semibold text-gray-700 shadow-sm"
+                        >
+                          {tag}
+                          <button
+                            type="button"
+                            aria-label={`Retirer le tag ${tag}`}
+                            disabled={busy}
+                            onClick={() => removeTagMutation.mutate(tag)}
+                            className={`flex h-6 w-6 items-center justify-center rounded-full text-gray-400 transition hover:bg-red-50 hover:text-red-600 ${FOCUS}`}
+                          >
+                            {busy ? <Dots /> : <X size={14} />}
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
-            </div>
+            </Section>
           )}
 
           {activeTab === "task" && (
-            <div className="p-4 sm:p-6">
-              <button
-                onClick={() => {
-                  setTaskForm({
-                    title: `Traiter ${ticket.ticketNumber}`,
-                    description: ticket.title,
-                    assignedTo: "",
-                    priority: ticket.priority,
-                    dueAt: "",
-                  });
-                  setIsTaskOpen(true);
-                }}
-                className="w-full sm:w-auto justify-center px-4 py-2 bg-primary-600 text-white rounded-lg text-sm flex items-center gap-2"
-              >
-                <CheckSquare size={16} /> Convertir le ticket en tâche
-              </button>
-            </div>
+            <Section title="Tâche liée" description="Transformez ce ticket en tâche à suivre par l'équipe" icon={CheckSquare}>
+              {isTaskOpen ? (
+                <PanelForm
+                  title="Créer une tâche depuis le ticket"
+                  submitLabel="Créer la tâche"
+                  pending={taskMutation.isPending}
+                  submitDisabled={!taskForm.title}
+                  onCancel={() => setIsTaskOpen(false)}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (taskForm.title) taskMutation.mutate();
+                  }}
+                >
+                  <Field label="Titre" required>
+                    <input
+                      value={taskForm.title}
+                      onChange={(e) => setTaskForm((f) => ({ ...f, title: e.target.value }))}
+                      className={FIELD}
+                    />
+                  </Field>
+                  <Field label="Description">
+                    <textarea
+                      value={taskForm.description}
+                      onChange={(e) => setTaskForm((f) => ({ ...f, description: e.target.value }))}
+                      rows={4}
+                      className={`${FIELD} resize-none`}
+                    />
+                  </Field>
+                  <div>
+                    <p className="mb-1.5 text-xs font-semibold text-gray-600">Priorité</p>
+                    <PillChoice
+                      label="Priorité"
+                      options={priorityOptions}
+                      value={taskForm.priority}
+                      onChange={(priority) => setTaskForm((f) => ({ ...f, priority }))}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <p className="mb-1.5 text-xs font-semibold text-gray-600">Agent</p>
+                      <AgentAutocomplete
+                        value={taskForm.assignedTo}
+                        selectedAgent={selectedTaskAgent}
+                        onValueChange={(value) => setTaskForm((f) => ({ ...f, assignedTo: value }))}
+                        onSelect={setSelectedTaskAgent}
+                        placeholder="Rechercher un agent..."
+                      />
+                    </div>
+                    <Field label="Échéance">
+                      <input
+                        type="datetime-local"
+                        value={taskForm.dueAt}
+                        onChange={(e) => setTaskForm((f) => ({ ...f, dueAt: e.target.value }))}
+                        className={FIELD}
+                      />
+                    </Field>
+                  </div>
+                </PanelForm>
+              ) : (
+                <ActionButton
+                  icon={Gauge}
+                  onClick={() => {
+                    setTaskForm({
+                      title: `Traiter ${ticket.ticketNumber}`,
+                      description: ticket.title,
+                      assignedTo: "",
+                      priority: ticket.priority,
+                      dueAt: "",
+                    });
+                    setIsTaskOpen(true);
+                  }}
+                >
+                  Convertir le ticket en tâche
+                </ActionButton>
+              )}
+            </Section>
           )}
         </div>
       </div>
-
-      {isTaskOpen && (
-        <ModalPortal onClose={() => setIsTaskOpen(false)}>
-          <div className="p-5 border-b flex justify-between">
-            <h3 className="font-bold text-lg">
-              Créer une tâche depuis le ticket
-            </h3>
-            <button onClick={() => setIsTaskOpen(false)}>
-              <X size={20} />
-            </button>
-          </div>
-          <div className="p-4 sm:p-6 space-y-4">
-            <Input
-              label="Titre"
-              value={taskForm.title}
-              onChange={(v) => setTaskForm((f) => ({ ...f, title: v }))}
-            />
-            <div>
-              <label className="text-sm font-medium">Description</label>
-              <textarea
-                value={taskForm.description}
-                onChange={(e) =>
-                  setTaskForm((f) => ({ ...f, description: e.target.value }))
-                }
-                rows={4}
-                className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
-              />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="text-sm font-medium">Agent</label>
-                <AgentAutocomplete
-                  value={taskForm.assignedTo}
-                  selectedAgent={selectedTaskAgent}
-                  onValueChange={(value) =>
-                    setTaskForm((f) => ({ ...f, assignedTo: value }))
-                  }
-                  onSelect={setSelectedTaskAgent}
-                  placeholder="Rechercher un agent..."
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Priorité</label>
-                <select
-                  value={taskForm.priority}
-                  onChange={(e) =>
-                    setTaskForm((f) => ({
-                      ...f,
-                      priority: e.target.value as TicketPriority,
-                    }))
-                  }
-                  className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg bg-white"
-                >
-                  <option value="LOW">Faible</option>
-                  <option value="MEDIUM">Moyenne</option>
-                  <option value="HIGH">Élevée</option>
-                  <option value="URGENT">Urgente</option>
-                </select>
-              </div>
-              <Input
-                type="datetime-local"
-                label="Échéance"
-                value={taskForm.dueAt}
-                onChange={(v) => setTaskForm((f) => ({ ...f, dueAt: v }))}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setIsTaskOpen(false)}
-                className="px-4 py-2 border rounded-lg"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={() => taskMutation.mutate()}
-                disabled={!taskForm.title || taskMutation.isPending}
-                className="w-full sm:w-auto justify-center px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
-              >
-                Créer
-              </button>
-            </div>
-          </div>
-        </ModalPortal>
-      )}
-    </AdminLayout>
+    </>,
   );
 };
-
-const Info = ({ label, value }: { label: string; value: string }) => (
-  <div>
-    <p className="text-xs text-gray-500">{label}</p>
-    <p className="font-medium text-gray-900">{value}</p>
-  </div>
-);
-const Tab = ({
-  id,
-  active,
-  setActive,
-  label,
-  icon: Icon,
-}: {
-  id: DetailTab;
-  active: DetailTab;
-  setActive: (v: DetailTab) => void;
-  label: string;
-  icon: React.ElementType;
-}) => (
-  <button
-    onClick={() => setActive(id)}
-    className={`px-4 py-2 text-sm flex items-center gap-2 rounded-xl ${active === id ? "bg-primary-600 text-white shadow-sm" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"}`}
-  >
-    <Icon size={15} />
-    {label}
-  </button>
-);
-const Input = ({
-  label,
-  value,
-  onChange,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-}) => (
-  <div>
-    <label className="text-sm font-medium">{label}</label>
-    <input
-      type={type}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full px-3 py-2 ring-1 ring-gray-100 rounded-lg"
-    />
-  </div>
-);

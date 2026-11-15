@@ -1,91 +1,44 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Plus,
-  Edit,
-  Trash2,
-  Eye,
-  EyeOff,
-  Search,
-  Package,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, EyeOff, ArrowUpRight, Package } from "lucide-react";
 import { subscriptionService } from "../../../services/subscription.service";
-import type { Plan, PlanVersion } from "../../../services/subscription.service";
-import { PlanFormModal } from "./PlanFormModal";
-import { PlanDetailPage } from "./PlanDetailPage";
-import { PlanVersionFormPage } from "./PlanVersionFormPage";
-import { PlanVersionDetailPage } from "./PlanVersionDetailPage";
-
-type View =
-  | { type: "list" }
-  | { type: "plan-detail"; plan: Plan }
-  | { type: "version-form"; plan: Plan; baseVersion?: PlanVersion }
-  | { type: "version-detail"; plan: Plan; version: PlanVersion };
-
-// ─── Labels ──────────────────────────────────────────────────────────────────
-
-const planTypeLabels: Record<string, string> = {
-  MEMBERSHIP: "Adhésion",
-  COWORKING_ACCESS: "Accès coworking",
-  DEDICATED_DESK: "Bureau dédié",
-  PRIVATE_OFFICE: "Bureau privé",
-  MEETING_ROOM_PACK: "Pack salle de réunion",
-  VIRTUAL_OFFICE: "Bureau virtuel",
-  COMPANY_PLAN: "Plan entreprise",
-  CUSTOM: "Personnalisé",
-};
-
-const targetAudienceLabels: Record<string, string> = {
-  INDIVIDUAL: "Particulier",
-  COMPANY: "Entreprise",
-  BOTH: "Les deux",
-};
-
-const statusConfig: Record<string, { label: string; color: string }> = {
-  DRAFT: { label: "Brouillon", color: "bg-gray-100 text-gray-700" },
-  ACTIVE: { label: "Actif", color: "bg-green-100 text-green-700" },
-  ARCHIVED: { label: "Archivé", color: "bg-gray-100 text-gray-500" },
-};
-
-const planTypeOptions = [
-  { value: "", label: "Tous les types" },
-  { value: "MEMBERSHIP", label: "Adhésion" },
-  { value: "COWORKING_ACCESS", label: "Accès coworking" },
-  { value: "DEDICATED_DESK", label: "Bureau dédié" },
-  { value: "PRIVATE_OFFICE", label: "Bureau privé" },
-  { value: "MEETING_ROOM_PACK", label: "Pack salle de réunion" },
-  { value: "VIRTUAL_OFFICE", label: "Bureau virtuel" },
-  { value: "COMPANY_PLAN", label: "Plan entreprise" },
-  { value: "CUSTOM", label: "Personnalisé" },
-];
-
-const targetAudienceOptions = [
-  { value: "", label: "Tous publics" },
-  { value: "INDIVIDUAL", label: "Particulier" },
-  { value: "COMPANY", label: "Entreprise" },
-  { value: "BOTH", label: "Les deux" },
-];
-
-const visibleOptions = [
-  { value: "", label: "Tous" },
-  { value: "true", label: "Visible" },
-  { value: "false", label: "Masqué" },
-];
+import type { Plan } from "../../../services/subscription.service";
+import { TableSkeleton } from "../../../components/ui/Skeleton";
+import { toast } from "../../../components/ui/toastStore";
+import {
+  ActionButton,
+  DataCard,
+  EmptyState,
+  Field,
+  FilterButton,
+  FilterPanel,
+  HeadRow,
+  IconButton,
+  ListHeader,
+  Pagination,
+  SearchField,
+  StatusChip,
+  Tag,
+} from "../../../components/subscription/kit";
+import { FIELD_SOFT, ROW_HOVER, apiMessage } from "../../../components/subscription/kitUtils";
+import {
+  PLAN_STATUS,
+  PLAN_TYPE_LABELS,
+  TARGET_AUDIENCE_LABELS,
+  statusOf,
+} from "../../../components/subscription/labels";
+import { PlanPanel } from "./PlanPanel";
 
 const PAGE_SIZE = 20;
 
-// ─── Composant ───────────────────────────────────────────────────────────────
+const COLS =
+  "lg:grid-cols-[2.5rem_minmax(0,1.8fr)_minmax(0,1.3fr)_minmax(0,1fr)_7rem_9.5rem]";
 
 export const PlansList: React.FC = () => {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // ── Navigation interne ────────────────────────────────────────────────────
-  const [view, setView] = useState<View>({ type: "list" });
-
-  // ── État de la liste ──────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -94,10 +47,9 @@ export const PlansList: React.FC = () => {
   const [visibleFilter, setVisibleFilter] = useState("");
   const [page, setPage] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
 
-  // Debounce 400 ms
   useEffect(() => {
     const t = setTimeout(() => {
       setDebouncedSearch(search);
@@ -111,7 +63,6 @@ export const PlansList: React.FC = () => {
     setPage(0);
   };
 
-  // ── Queries ───────────────────────────────────────────────────────────────
   const { data: plansData, isLoading } = useQuery({
     queryKey: [
       "subscription-plans",
@@ -132,27 +83,22 @@ export const PlansList: React.FC = () => {
         page,
         size: PAGE_SIZE,
       }),
-    // Seulement sur la vue liste
-    enabled: view.type === "list",
   });
 
-  // ── Mutations ─────────────────────────────────────────────────────────────
+  // Suppression : toast de confirmation, l'erreur de l'API y est affichée
   const deleteMutation = useMutation({
     mutationFn: (code: string) => subscriptionService.deletePlan(code),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["subscription-plans"] }),
-    onError: (e: any) =>
-      alert(
-        e?.response?.data?.message ?? "Erreur lors de la suppression du plan.",
-      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["subscription-plans"] }),
   });
 
-  const updateVisibilityMutation = useMutation({
+  const visibilityMutation = useMutation({
     mutationFn: ({ code, visible }: { code: string; visible: boolean }) =>
       subscriptionService.updatePlan(code, { visible }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["subscription-plans"] }),
-    onError: () => alert("Erreur lors de la mise à jour de la visibilité."),
+    onSuccess: (_d, v) => {
+      queryClient.invalidateQueries({ queryKey: ["subscription-plans"] });
+      toast.success(v.visible ? "Plan rendu visible" : "Plan masqué");
+    },
+    onError: (e: unknown) => toast.error(apiMessage(e, "Erreur lors de la mise à jour de la visibilité.")),
   });
 
   const plans = plansData?.content ?? [];
@@ -160,14 +106,15 @@ export const PlansList: React.FC = () => {
   const totalElements = plansData?.totalElements ?? 0;
   const sortedPlans = [...plans].sort((a, b) => a.sortOrder - b.sortOrder);
 
-  const hasActiveFilters =
+  const hasActiveFilters = !!(
     statusFilter ||
     planTypeFilter ||
     targetAudienceFilter ||
     visibleFilter ||
-    search;
+    search
+  );
 
-  const handleResetFilters = () => {
+  const handleReset = () => {
     setSearch("");
     setDebouncedSearch("");
     setStatusFilter("");
@@ -177,382 +124,247 @@ export const PlansList: React.FC = () => {
     setPage(0);
   };
 
-  // ── Navigations ───────────────────────────────────────────────────────────
+  const openPlan = (plan: Plan) => navigate(`/subscriptions/plans/${plan.code}`);
 
-  const goToPlanDetail = (plan: Plan) => setView({ type: "plan-detail", plan });
+  const askDelete = (plan: Plan) =>
+    toast.confirm({
+      message: `Supprimer « ${plan.name} » ?`,
+      detail:
+        plan.status !== "DRAFT"
+          ? `Ce plan est « ${statusOf(PLAN_STATUS, plan.status).label} » : la suppression sera refusée si des souscriptions y sont rattachées.`
+          : plan.code,
+      confirmLabel: "Supprimer",
+      pendingLabel: "Suppression en cours",
+      successMessage: "Plan supprimé",
+      errorMessage: "La suppression a échoué",
+      onConfirm: () => deleteMutation.mutateAsync(plan.code),
+    });
 
-  // NOTE : navigations version-form et version-detail gérées inline dans les rendus ci-dessous
+  const closePanel = () => {
+    setPanelOpen(false);
+    setEditingPlan(null);
+  };
 
-  // ── Rendu des vues non-liste ───────────────────────────────────────────────
-
-  if (view.type === "plan-detail") {
-    return (
-      <PlanDetailPage
-        plan={view.plan}
-        onBack={() => setView({ type: "list" })}
-        onNewVersion={(planCode) => {
-          const plan = plans.find((p) => p.code === planCode) ?? view.plan;
-          setView({ type: "version-form", plan });
-        }}
-        onVersionDetail={(planCode, version) => {
-          const plan = plans.find((p) => p.code === planCode) ?? view.plan;
-          setView({ type: "version-detail", plan, version });
-        }}
-      />
-    );
-  }
-
-  if (view.type === "version-form") {
-    return (
-      <PlanVersionFormPage
-        plan={view.plan}
-        baseVersion={view.baseVersion}
-        onBack={() => setView({ type: "plan-detail", plan: view.plan })}
-        onSuccess={(newVersion) => {
-          queryClient.invalidateQueries({
-            queryKey: ["plan-versions", view.plan.code],
-          });
-          // Après création → on affiche le détail de la version créée
-          setView({
-            type: "version-detail",
-            plan: view.plan,
-            version: newVersion,
-          });
-        }}
-      />
-    );
-  }
-
-  if (view.type === "version-detail") {
-    return (
-      <PlanVersionDetailPage
-        plan={view.plan}
-        version={view.version}
-        onBack={() => setView({ type: "plan-detail", plan: view.plan })}
-      />
-    );
-  }
-
-  // ── Vue liste ─────────────────────────────────────────────────────────────
-
-  if (isLoading) return <div className="text-center py-8">Chargement...</div>;
+  const busyVisibility = (code: string) =>
+    visibilityMutation.isPending && visibilityMutation.variables?.code === code;
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">
-          Plans d'abonnement
-        </h2>
-        <button
-          onClick={() => {
-            setEditingPlan(null);
-            setIsFormOpen(true);
-          }}
-          className="bg-primary-600 text-white px-4 py-2 rounded-xl hover:bg-primary-700 flex items-center gap-2"
-        >
-          <Plus size={18} /> Nouveau plan
-        </button>
-      </div>
+    <div className="space-y-5">
+      <ListHeader
+        title="Plans d'abonnement"
+        action={
+          <ActionButton
+            icon={Plus}
+            className="w-full sm:w-auto"
+            onClick={() => {
+              setEditingPlan(null);
+              setPanelOpen(true);
+            }}
+          >
+            Nouveau plan
+          </ActionButton>
+        }
+      />
 
-      {/* Barre de recherche + bouton filtres */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Rechercher un plan par nom ou code..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl"
-          />
-        </div>
-        <button
+      {panelOpen && (
+        <PlanPanel
+          key={editingPlan?.code ?? "new"}
+          editingPlan={editingPlan}
+          onDone={closePanel}
+          onCancel={closePanel}
+        />
+      )}
+
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <SearchField
+          className="flex-1"
+          value={search}
+          onChange={setSearch}
+          placeholder="Rechercher un plan par nom ou code..."
+        />
+        <FilterButton
+          open={showFilters}
+          active={hasActiveFilters}
           onClick={() => setShowFilters(!showFilters)}
-          className={`px-4 py-2 border rounded-lg flex items-center gap-2 ${
-            showFilters || hasActiveFilters
-              ? "bg-primary-50 border-primary-300 text-primary-700"
-              : "bg-white border-gray-200 text-gray-600"
-          }`}
-        >
-          <Filter size={16} /> Filtres
-          {hasActiveFilters && (
-            <span className="ml-1 w-2 h-2 bg-primary-600 rounded-full" />
-          )}
-        </button>
+        />
       </div>
 
-      {/* Filtres avancés */}
       {showFilters && (
-        <div className="rounded-2xl bg-white p-5 mb-6 shadow-[0_16px_35px_rgba(15,23,42,0.05)] ring-1 ring-slate-100 grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Statut
-            </label>
+        <FilterPanel canReset={hasActiveFilters} onReset={handleReset}>
+          <Field label="Statut">
             <select
               value={statusFilter}
-              onChange={(e) =>
-                handleFilterChange(setStatusFilter, e.target.value)
-              }
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white"
+              onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)}
+              className={FIELD_SOFT}
             >
               <option value="">Tous les statuts</option>
-              <option value="DRAFT">Brouillon</option>
-              <option value="ACTIVE">Actif</option>
-              <option value="ARCHIVED">Archivé</option>
+              {Object.entries(PLAN_STATUS).map(([value, s]) => (
+                <option key={value} value={value}>
+                  {s.label}
+                </option>
+              ))}
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Type de plan
-            </label>
+          </Field>
+          <Field label="Type de plan">
             <select
               value={planTypeFilter}
-              onChange={(e) =>
-                handleFilterChange(setPlanTypeFilter, e.target.value)
-              }
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white"
+              onChange={(e) => handleFilterChange(setPlanTypeFilter, e.target.value)}
+              className={FIELD_SOFT}
             >
-              {planTypeOptions.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
+              <option value="">Tous les types</option>
+              {Object.entries(PLAN_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
                 </option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Public cible
-            </label>
+          </Field>
+          <Field label="Public cible">
             <select
               value={targetAudienceFilter}
-              onChange={(e) =>
-                handleFilterChange(setTargetAudienceFilter, e.target.value)
-              }
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white"
+              onChange={(e) => handleFilterChange(setTargetAudienceFilter, e.target.value)}
+              className={FIELD_SOFT}
             >
-              {targetAudienceOptions.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
+              <option value="">Tous publics</option>
+              {Object.entries(TARGET_AUDIENCE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
                 </option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Visibilité
-            </label>
+          </Field>
+          <Field label="Visibilité">
             <select
               value={visibleFilter}
-              onChange={(e) =>
-                handleFilterChange(setVisibleFilter, e.target.value)
-              }
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white"
+              onChange={(e) => handleFilterChange(setVisibleFilter, e.target.value)}
+              className={FIELD_SOFT}
             >
-              {visibleOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
+              <option value="">Tous</option>
+              <option value="true">Visible</option>
+              <option value="false">Masqué</option>
             </select>
-          </div>
-          {hasActiveFilters && (
-            <div className="md:col-span-4 flex justify-end">
-              <button
-                onClick={handleResetFilters}
-                className="text-sm text-primary-600 hover:text-primary-700"
-              >
-                Réinitialiser tous les filtres
-              </button>
-            </div>
-          )}
-        </div>
+          </Field>
+        </FilterPanel>
       )}
 
-      {/* Tableau */}
-      <div className="rounded-2xl bg-white shadow-[0_18px_45px_rgba(15,23,42,0.06)] ring-1 ring-slate-100 overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-slate-50/80">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Ordre
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Code
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Nom
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Type
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Public
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Statut
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Visible
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="[&>tr+tr]:border-t [&>tr+tr]:border-slate-100">
-            {sortedPlans.map((plan) => (
-              <tr
-                key={plan.code}
-                className="hover:bg-slate-50/80 cursor-pointer"
-                onClick={() => goToPlanDetail(plan)}
-              >
-                <td className="px-6 py-4 text-sm text-gray-500">
-                  {plan.sortOrder}
-                </td>
-                <td className="px-6 py-4 text-sm font-mono">{plan.code}</td>
-                <td className="px-6 py-4 text-sm font-medium">{plan.name}</td>
-                <td className="px-6 py-4 text-sm">
-                  {planTypeLabels[plan.planType] ?? plan.planType}
-                </td>
-                <td className="px-6 py-4 text-sm">
-                  {targetAudienceLabels[plan.targetAudience] ??
-                    plan.targetAudience}
-                </td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs ${statusConfig[plan.status]?.color ?? "bg-gray-100 text-gray-600"}`}
-                  >
-                    {statusConfig[plan.status]?.label ?? plan.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      updateVisibilityMutation.mutate({
-                        code: plan.code,
-                        visible: !plan.visible,
-                      });
+      {isLoading ? (
+        <TableSkeleton rows={6} cols={6} />
+      ) : sortedPlans.length === 0 ? (
+        <EmptyState
+          icon={Package}
+          title="Aucun plan trouvé"
+          action={
+            hasActiveFilters ? (
+              <ActionButton variant="ghost" onClick={handleReset}>
+                Réinitialiser les filtres
+              </ActionButton>
+            ) : undefined
+          }
+        />
+      ) : (
+        <DataCard>
+          <HeadRow cols={COLS}>
+            <span>#</span>
+            <span>Plan</span>
+            <span>Type</span>
+            <span>Public</span>
+            <span>Statut</span>
+            <span className="text-right">Actions</span>
+          </HeadRow>
+
+          <div className="space-y-2">
+            {sortedPlans.map((plan) => {
+              const st = statusOf(PLAN_STATUS, plan.status);
+              const typeLabel = PLAN_TYPE_LABELS[plan.planType] ?? plan.planType;
+              const audience = TARGET_AUDIENCE_LABELS[plan.targetAudience] ?? plan.targetAudience;
+              const actions = (
+                <>
+                  <IconButton icon={ArrowUpRight} label="Voir le plan" onClick={() => openPlan(plan)} />
+                  <IconButton
+                    icon={plan.visible ? EyeOff : Eye}
+                    label={plan.visible ? "Masquer" : "Rendre visible"}
+                    tone="neutral"
+                    pending={busyVisibility(plan.code)}
+                    onClick={() =>
+                      visibilityMutation.mutate({ code: plan.code, visible: !plan.visible })
+                    }
+                  />
+                  <IconButton
+                    icon={Pencil}
+                    label="Modifier"
+                    tone="neutral"
+                    onClick={() => {
+                      setEditingPlan(plan);
+                      setPanelOpen(true);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
-                    disabled={updateVisibilityMutation.isPending}
-                    className="p-1 text-gray-600 hover:text-primary-600 disabled:opacity-40"
-                    title={plan.visible ? "Masquer" : "Afficher"}
-                  >
-                    {plan.visible ? <Eye size={16} /> : <EyeOff size={16} />}
-                  </button>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div
-                    className="flex justify-end gap-2"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {/* Ouvre la page détail */}
-                    <button
-                      onClick={() => goToPlanDetail(plan)}
-                      className="p-1 text-gray-600 hover:text-primary-600"
-                      title="Voir le plan"
-                    >
-                      <Eye size={16} />
-                    </button>
-                    {/* Ouvre le formulaire d'édition (modal léger) */}
-                    <button
-                      onClick={() => {
-                        setEditingPlan(plan);
-                        setIsFormOpen(true);
-                      }}
-                      className="p-1 text-blue-600 hover:text-blue-800"
-                      title="Modifier"
-                    >
-                      <Edit size={16} />
-                    </button>
-                    {/* Suppression avec avertissement si non-DRAFT */}
-                    <button
-                      onClick={() => {
-                        const warning =
-                          plan.status !== "DRAFT"
-                            ? `\nCe plan est "${statusConfig[plan.status]?.label ?? plan.status}". La suppression sera refusée si des souscriptions y sont attachées.`
-                            : "";
-                        if (confirm(`Supprimer "${plan.name}" ?${warning}`)) {
-                          deleteMutation.mutate(plan.code);
-                        }
-                      }}
-                      disabled={deleteMutation.isPending}
-                      className="p-1 text-red-600 hover:text-red-800 disabled:opacity-40"
-                      title={
-                        plan.status !== "DRAFT"
-                          ? `Supprimer (peut être refusé si ${statusConfig[plan.status]?.label})`
-                          : "Supprimer"
-                      }
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                  />
+                  <IconButton
+                    icon={Trash2}
+                    label="Supprimer"
+                    tone="danger"
+                    pending={deleteMutation.isPending && deleteMutation.variables === plan.code}
+                    onClick={() => askDelete(plan)}
+                  />
+                </>
+              );
+              return (
+                <div
+                  key={plan.code}
+                  onClick={() => openPlan(plan)}
+                  className={`cursor-pointer rounded-2xl bg-gray-50 p-3 ${ROW_HOVER}`}
+                >
+                  {/* Desktop */}
+                  <div className={`hidden items-center gap-4 px-1 lg:grid ${COLS}`}>
+                    <span className="text-sm text-gray-400">{plan.sortOrder}</span>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-gray-900">{plan.name}</p>
+                      <p className="mt-0.5 flex items-center gap-2 text-xs text-gray-400">
+                        <span className="truncate font-mono">{plan.code}</span>
+                        {!plan.visible && <Tag>Masqué</Tag>}
+                      </p>
+                    </div>
+                    <span className="truncate text-sm text-gray-700">{typeLabel}</span>
+                    <span className="truncate text-sm text-gray-700">{audience}</span>
+                    <span>
+                      <StatusChip tone={st.tone}>{st.label}</StatusChip>
+                    </span>
+                    <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                      {actions}
+                    </div>
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
 
-      {sortedPlans.length === 0 && !isLoading && (
-        <div className="text-center py-12 rounded-2xl bg-white">
-          <Package size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500">Aucun plan trouvé</p>
-          {hasActiveFilters && (
-            <button
-              onClick={handleResetFilters}
-              className="mt-2 text-primary-600 hover:underline"
-            >
-              Réinitialiser les filtres
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 px-2">
-          <p className="text-sm text-gray-500">
-            {totalElements} plan{totalElements > 1 ? "s" : ""} au total
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-slate-50/80"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="text-sm text-gray-600">
-              Page {page + 1} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-slate-50/80"
-            >
-              <ChevronRight size={16} />
-            </button>
+                  {/* Mobile et tablette */}
+                  <div className="lg:hidden">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-gray-900">{plan.name}</p>
+                        <p className="mt-0.5 font-mono text-xs text-gray-400">{plan.code}</p>
+                      </div>
+                      <StatusChip tone={st.tone}>{st.label}</StatusChip>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Tag>{typeLabel}</Tag>
+                      <Tag>{audience}</Tag>
+                      {!plan.visible && <Tag>Masqué</Tag>}
+                    </div>
+                    <div className="mt-3 flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                      {actions}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        </DataCard>
       )}
 
-      {/* Modal léger création/édition plan */}
-      <PlanFormModal
-        isOpen={isFormOpen}
-        onClose={() => {
-          setIsFormOpen(false);
-          setEditingPlan(null);
-        }}
-        editingPlan={editingPlan}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["subscription-plans"] });
-          setIsFormOpen(false);
-          setEditingPlan(null);
-        }}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        total={totalElements}
+        noun="plan"
+        onChange={setPage}
       />
     </div>
   );

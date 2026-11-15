@@ -1,40 +1,33 @@
 import React, { useState } from "react";
-import { Ticket, Layers } from "lucide-react";
+import { Ticket, Layers, ScanLine } from "lucide-react";
 import { PassPlansList } from "./pass-plans/PassPlansList";
 import { PassesList } from "./passes/PassesList";
+import { PassAccessPanel } from "./passes/PassAccessPanel";
+import { Tabs } from "../../components/subscription/kit";
+import type { TabItem } from "../../components/subscription/kit";
 
-type Tab = "plans" | "passes";
+type Tab = "plans" | "passes" | "access";
+
+const tabs: TabItem<Tab>[] = [
+  { id: "plans", label: "Plans de pass", icon: Layers },
+  { id: "passes", label: "Passes", icon: Ticket },
+  { id: "access", label: "Contrôle d'accès", icon: ScanLine },
+];
+
+/** Rendu dans l'onglet "Pass commercial" de SubscriptionMaster (qui fournit layout, thème et Toaster). */
 export const PassCommercialMaster: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>("plans");
   const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(new Set(["plans"]));
+
   const switchTab = (tab: Tab) => {
     setActiveTab(tab);
     setVisitedTabs((prev) => new Set([...prev, tab]));
   };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Pass plans & passes
-        </h1>
-        <p className="mt-1 text-gray-600">
-          Catalogue de pass, achat, activation, renouvellement et suivi.
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-1 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100">
-        <button
-          onClick={() => switchTab("plans")}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium ${activeTab === "plans" ? "bg-primary-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}
-        >
-          <Layers size={16} /> Plans de pass
-        </button>
-        <button
-          onClick={() => switchTab("passes")}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium ${activeTab === "passes" ? "bg-primary-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}
-        >
-          <Ticket size={16} /> Passes
-        </button>
-      </div>
+      <Tabs variant="soft" items={tabs} active={activeTab} onChange={switchTab} />
+
       {visitedTabs.has("plans") && (
         <div className={activeTab !== "plans" ? "hidden" : ""}>
           <PassPlansList />
@@ -43,6 +36,11 @@ export const PassCommercialMaster: React.FC = () => {
       {visitedTabs.has("passes") && (
         <div className={activeTab !== "passes" ? "hidden" : ""}>
           <PassesList />
+        </div>
+      )}
+      {visitedTabs.has("access") && (
+        <div className={activeTab !== "access" ? "hidden" : ""}>
+          <PassAccessPanel />
         </div>
       )}
     </div>

@@ -142,6 +142,8 @@ export interface ResourceResponse {
   portalVisible: boolean;
   displayOrder: number | null;
   active: boolean;
+  /** Durée de créneau en vigueur sur la ressource (lecture seule). */
+  slotDurationMinutes?: number;
 }
 
 export interface ResourceSummaryResponse {
@@ -152,6 +154,7 @@ export interface ResourceSummaryResponse {
   bookingEnabled: boolean;
   portalVisible: boolean;
   active: boolean;
+  slotDurationMinutes?: number;
 }
 
 export interface ResourceSearchCriteria {
@@ -194,11 +197,20 @@ export interface ResourceAmenityLinkRequest {
   extraPrice?: number;
 }
 
+/** Diviseurs de 60 : seules valeurs acceptées par le backend pour slotDurationMinutes. */
+export const SLOT_DURATION_OPTIONS = [5, 10, 15, 20, 30, 60] as const;
+export type SlotDurationMinutes = (typeof SLOT_DURATION_OPTIONS)[number];
+
 export interface ResourceAvailabilityRequest {
   resourceCode: string;
   startedAt: string;
   endedAt: string;
-  slotDurationMinutes: number;
+  /**
+   * Facultatif : la durée déjà en vigueur sur la ressource s'applique (30 si aucune).
+   * Une autre valeur n'est acceptée que si la ressource n'a aucun créneau futur,
+   * sinon 409 (message à afficher tel quel). Diviseurs de 60 uniquement, sinon 400.
+   */
+  slotDurationMinutes?: SlotDurationMinutes;
   totalCapacity?: number;
   active?: boolean;
 }
@@ -335,6 +347,78 @@ export interface ResourcePhoto {
   cover: boolean;
   displayOrder: number;
   active: boolean;
+}
+
+// ─── Ouverture / tarification groupees sur plusieurs ressources ───────────────
+
+export interface BulkAvailabilityRequest {
+  resourceCodes: string[];
+  startedAt: string;
+  endedAt: string;
+  slotDurationMinutes?: SlotDurationMinutes;
+  totalCapacity?: number;
+  active?: boolean;
+}
+
+export interface BulkPricingRuleRequest {
+  resourceCodes: string[];
+  bookingUnit: ResourceBookingUnit;
+  price: number;
+  label?: string;
+  dayOfWeek?: string | number | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  adjustmentType?: AdjustmentType | null;
+  adjustmentValue?: number | null;
+  lastMinuteMinutes?: number | null;
+  priority?: number | null;
+  validFrom?: string | null;
+  validUntil?: string | null;
+  active?: boolean;
+}
+
+export type BulkResultStatus = "PROCESSED" | "SKIPPED";
+
+/**
+ * Réponse commune aux endpoints /bulk. Toujours 200 : le statut "SKIPPED" n'est pas une erreur.
+ * detail = nombre de créneaux écrits (disponibilités), null pour les tarifs.
+ */
+export interface BulkOperationResult {
+  processed: number;
+  skipped: number;
+  results: {
+    resourceCode: string;
+    status: BulkResultStatus;
+    /** Motif de l'écart, affichable tel quel ; null si succès. */
+    reason: string | null;
+    detail: number | null;
+  }[];
+}
+
+export interface PricingRuleOverlap {
+  id: number;
+  label: string | null;
+  price: number;
+  priority: number;
+  dayOfWeek: string | number | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  /** true = la règle existante l'emporterait (priorité supérieure) : la règle proposée ne serait jamais appliquée. */
+  wins: boolean;
+}
+
+export interface PricingRuleOverlapPreviewItem {
+  resourceCode: string;
+  /** true = une règle active strictement identique existe déjà. Un chevauchement n'est pas une faute en soi. */
+  duplicate: boolean;
+  overlapping: PricingRuleOverlap[];
+}
+
+export interface PricingRuleBulkPreviewResponse {
+  resourcesInspected: number;
+  resourcesWithOverlap: number;
+  strictDuplicates: number;
+  results: PricingRuleOverlapPreviewItem[];
 }
 
 export const resourceService = {
@@ -662,6 +746,15 @@ export const resourceService = {
     data: ResourceAvailabilityRequest,
   ): Promise<ResourceAvailabilityResponse> =>
     (await apiClient.post(`${API}/resource-availabilities`, data)).data,
+  /**
+   * Ouvre la même plage sur jusqu'à 20 ressources. Répond 200 avec un compte-rendu même
+   * en cas d'échecs partiels ; les doublons dans resourceCodes sont ignorés.
+   * 400 si durée hors diviseurs de 60, liste vide ou plus de 20 codes.
+   */
+  createAvailabilitiesBulk: async (
+    data: BulkAvailabilityRequest,
+  ): Promise<BulkOperationResult> =>
+    (await apiClient.post(`${API}/resource-availabilities/bulk`, data)).data,
   getAvailabilities: async (params?: {
     resourceCode?: string;
     from?: string;
@@ -784,6 +877,24 @@ export const resourceService = {
     data: ResourcePricingRuleRequest,
   ): Promise<ResourcePricingRuleResponse> =>
     (await apiClient.post(`${API}/resource-pricing-rules`, data)).data,
+  /** Pose la même grille tarifaire sur jusqu'à 20 ressources (detail toujours null). */
+  createPricingRulesBulk: async (
+    data: BulkPricingRuleRequest,
+  ): Promise<BulkOperationResult> =>
+    (await apiClient.post(`${API}/resource-pricing-rules/bulk`, data)).data,
+  /**
+   * N'écrit rien : à appeler avant de valider un lot. Un code ressource inconnu
+   * fait échouer toute la prévisualisation (404). Seul `wins: true` mérite un avertissement.
+   */
+  previewPricingRulesBulk: async (
+    data: BulkPricingRuleRequest,
+  ): Promise<PricingRuleBulkPreviewResponse> =>
+    (
+      await apiClient.post(
+        `${API}/resource-pricing-rules/bulk/preview`,
+        data,
+      )
+    ).data,
   getPricingRule: async (id: number): Promise<ResourcePricingRuleResponse> =>
     (await apiClient.get(`${API}/resource-pricing-rules/${id}`)).data,
   getPricingRules: async (params?: {

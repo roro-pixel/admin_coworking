@@ -1,41 +1,52 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Search,
-  Eye,
-  Play,
-  Pause,
-  XCircle,
-  Users,
-  Plus,
-  RefreshCw,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { Eye, Play, Pause, XCircle, Repeat, Plus, RefreshCw } from "lucide-react";
 import { subscriptionService } from "../../../services/subscription.service";
 import type { Subscription } from "../../../services/subscription.service";
-import { CreateSubscriptionModal } from "./CreateSubscriptionModal";
-
-const statusConfig: Record<string, { label: string; color: string }> = {
-  DRAFT: { label: "Brouillon", color: "bg-gray-100 text-gray-700" },
-  PENDING_ACTIVATION: {
-    label: "En attente",
-    color: "bg-yellow-100 text-yellow-700",
-  },
-  ACTIVE: { label: "Actif", color: "bg-green-100 text-green-700" },
-  PAST_DUE: { label: "En retard", color: "bg-red-100 text-red-700" },
-  SUSPENDED: { label: "Suspendu", color: "bg-orange-100 text-orange-700" },
-  CANCELLED: { label: "Annulé", color: "bg-gray-100 text-gray-500" },
-  EXPIRED: { label: "Expiré", color: "bg-gray-100 text-gray-500" },
-};
+import { TableSkeleton } from "../../../components/ui/Skeleton";
+import { toast } from "../../../components/ui/toastStore";
+import {
+  ActionButton,
+  DataCard,
+  EmptyState,
+  FilterButton,
+  FilterPanel,
+  Field,
+  HeadRow,
+  IconButton,
+  ListHeader,
+  Pagination,
+  SearchField,
+  StatusChip,
+  Tag,
+} from "../../../components/subscription/kit";
+import {
+  FIELD_SOFT,
+  MONO_LINK,
+  ROW_HOVER,
+  apiMessage,
+  formatDate,
+} from "../../../components/subscription/kitUtils";
+import {
+  SUBSCRIBER_TYPE_LABELS,
+  SUBSCRIPTION_STATUS,
+  statusOf,
+} from "../../../components/subscription/labels";
 
 const PAGE_SIZE = 20;
+
+const COLS =
+  "lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.3fr)_minmax(0,1.5fr)_minmax(0,1.3fr)_7rem_5rem_9.5rem]";
+
+type RowMutation = { isPending: boolean; variables: string | undefined };
+const busy = (m: RowMutation, id: string) => m.isPending && m.variables === id;
 
 export const SubscriptionsList: React.FC = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const statusParam = searchParams.get("status") ?? "";
 
   // Recherche locale (l'API subscriptions n'expose pas d'endpoint search)
   const [search, setSearch] = useState("");
@@ -48,15 +59,22 @@ export const SubscriptionsList: React.FC = () => {
   const [planCodeFilter, setPlanCodeFilter] = useState("");
   const [nextBillingBefore, setNextBillingBefore] = useState("");
   const [page, setPage] = useState(0);
-
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
-  // FIX : debounce 400 ms sur la recherche locale pour ne pas re-filtrer à chaque frappe
+  // Debounce 400 ms sur la recherche locale pour ne pas re-filtrer à chaque frappe
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(timer);
   }, [search]);
+
+  // Le panneau reste monté quand on change d'onglet : le statut demandé dans l'URL
+  // (lien depuis les métriques) doit donc être repris à chaque changement.
+  useEffect(() => {
+    if (!statusParam) return;
+    setStatusFilter(statusParam);
+    setPage(0);
+    setShowFilters(true);
+  }, [statusParam]);
 
   const handleFilterChange = <T,>(setter: (v: T) => void, value: T) => {
     setter(value);
@@ -92,77 +110,64 @@ export const SubscriptionsList: React.FC = () => {
 
   const plans = plansData?.content ?? [];
 
-  // FIX : changedBy = 'ADMIN' aligné sur la doc
+  const done = (message: string) => {
+    queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+    toast.success(message);
+  };
+
+  // changedBy = 'ADMIN' aligné sur la doc
   const activateMutation = useMutation({
     mutationFn: (subscriptionNumber: string) =>
-      subscriptionService.activateSubscription(
-        subscriptionNumber,
-        "Activé par admin",
-        "ADMIN",
-      ),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["subscriptions"] }),
-    onError: (error: any) =>
-      alert(error?.response?.data?.message ?? "Erreur lors de l'activation."),
+      subscriptionService.activateSubscription(subscriptionNumber, "Activé par admin", "ADMIN"),
+    onSuccess: () => done("Souscription activée"),
+    onError: (error: unknown) => toast.error(apiMessage(error, "Erreur lors de l'activation.")),
   });
 
   const suspendMutation = useMutation({
     mutationFn: (subscriptionNumber: string) =>
-      subscriptionService.suspendSubscription(
-        subscriptionNumber,
-        "Suspendu par admin",
-        "ADMIN",
-      ),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["subscriptions"] }),
-    onError: (error: any) =>
-      alert(error?.response?.data?.message ?? "Erreur lors de la suspension."),
+      subscriptionService.suspendSubscription(subscriptionNumber, "Suspendu par admin", "ADMIN"),
+    onSuccess: () => done("Souscription suspendue"),
+    onError: (error: unknown) => toast.error(apiMessage(error, "Erreur lors de la suspension.")),
   });
 
+  // L'annulation passe par un toast de confirmation : l'erreur est gérée par le toast
   const cancelMutation = useMutation({
     mutationFn: (subscriptionNumber: string) =>
-      subscriptionService.cancelSubscription(
-        subscriptionNumber,
-        "Annulé par admin",
-        "ADMIN",
-      ),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["subscriptions"] }),
-    onError: (error: any) =>
-      alert(error?.response?.data?.message ?? "Erreur lors de l'annulation."),
+      subscriptionService.cancelSubscription(subscriptionNumber, "Annulé par admin", "ADMIN"),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["subscriptions"] }),
   });
 
   const renewMutation = useMutation({
     mutationFn: (subscriptionNumber: string) =>
-      subscriptionService.renewSubscription(
-        subscriptionNumber,
-        "Renouvelé par admin",
-      ),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["subscriptions"] }),
-    onError: (error: any) =>
-      alert(error?.response?.data?.message ?? "Erreur lors du renouvellement."),
+      subscriptionService.renewSubscription(subscriptionNumber, "Renouvelé par admin"),
+    onSuccess: () => done("Souscription renouvelée"),
+    onError: (error: unknown) => toast.error(apiMessage(error, "Erreur lors du renouvellement.")),
   });
+
+  const askCancel = (sub: Subscription) =>
+    toast.confirm({
+      message: "Annuler cette souscription ?",
+      detail: `${sub.subscriptionNumber} · ${sub.planName}`,
+      confirmLabel: "Annuler la souscription",
+      pendingLabel: "Annulation en cours",
+      successMessage: "Souscription annulée",
+      errorMessage: "L'annulation a échoué",
+      onConfirm: () => cancelMutation.mutateAsync(sub.subscriptionNumber),
+    });
 
   const subscriptions = subscriptionsData?.content ?? [];
   const totalPages = subscriptionsData?.totalPages ?? 0;
   const totalElements = subscriptionsData?.totalElements ?? 0;
 
-  // Filtre client-side sur la page courante (search local)
+  // Filtre client-side sur la page courante (recherche locale)
+  const needle = debouncedSearch.toLowerCase();
   const filteredSubscriptions = debouncedSearch
     ? subscriptions.filter(
         (sub) =>
-          sub.subscriptionNumber
-            .toLowerCase()
-            .includes(debouncedSearch.toLowerCase()) ||
-          sub.planName.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-          (sub.subscriberName &&
-            sub.subscriberName
-              .toLowerCase()
-              .includes(debouncedSearch.toLowerCase())) ||
-          sub.subscriberCode
-            .toLowerCase()
-            .includes(debouncedSearch.toLowerCase()),
+          sub.subscriptionNumber.toLowerCase().includes(needle) ||
+          sub.planName.toLowerCase().includes(needle) ||
+          (sub.subscriberName && sub.subscriberName.toLowerCase().includes(needle)) ||
+          sub.subscriberCode.toLowerCase().includes(needle),
       )
     : subscriptions;
 
@@ -181,385 +186,265 @@ export const SubscriptionsList: React.FC = () => {
     setPage(0);
   };
 
-  const hasActiveFilters =
+  const hasActiveFilters = !!(
     statusFilter ||
     subscriberTypeFilter ||
     subscriberCodeFilter ||
     planCodeFilter ||
     nextBillingBefore ||
-    search;
+    search
+  );
 
-  if (isLoading) {
-    return <div className="text-center py-8">Chargement...</div>;
-  }
+  const rowActions = (sub: Subscription) => {
+    const n = sub.subscriptionNumber;
+    return (
+      <>
+        <IconButton icon={Eye} label="Voir le détail" onClick={() => handleViewDetail(sub)} />
+        {sub.status === "PENDING_ACTIVATION" && (
+          <IconButton
+            icon={Play}
+            label="Activer"
+            tone="success"
+            pending={busy(activateMutation, n)}
+            onClick={() => activateMutation.mutate(n)}
+          />
+        )}
+        {/* PAST_DUE : réactivation possible */}
+        {sub.status === "PAST_DUE" && (
+          <IconButton
+            icon={Play}
+            label="Réactiver"
+            tone="success"
+            pending={busy(activateMutation, n)}
+            onClick={() => activateMutation.mutate(n)}
+          />
+        )}
+        {sub.status === "ACTIVE" && (
+          <>
+            <IconButton
+              icon={Pause}
+              label="Suspendre"
+              pending={busy(suspendMutation, n)}
+              onClick={() => suspendMutation.mutate(n)}
+            />
+            <IconButton
+              icon={RefreshCw}
+              label="Renouveler"
+              pending={busy(renewMutation, n)}
+              onClick={() => renewMutation.mutate(n)}
+            />
+          </>
+        )}
+        {(sub.status === "ACTIVE" || sub.status === "SUSPENDED" || sub.status === "PAST_DUE") && (
+          <IconButton icon={XCircle} label="Annuler" tone="danger" onClick={() => askCancel(sub)} />
+        )}
+      </>
+    );
+  };
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Souscriptions</h2>
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2"
-        >
-          <Plus size={18} />
-          Nouvelle souscription
-        </button>
+    <div className="space-y-5">
+      <ListHeader
+        title="Souscriptions"
+        action={
+          <ActionButton
+            icon={Plus}
+            className="w-full sm:w-auto"
+            onClick={() => navigate("/subscriptions/subscriptions/create")}
+          >
+            Nouvelle souscription
+          </ActionButton>
+        }
+      />
+
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <SearchField
+          className="flex-1"
+          value={search}
+          onChange={setSearch}
+          placeholder="Rechercher par n° souscription, plan ou souscripteur..."
+        />
+        <FilterButton
+          open={showFilters}
+          active={hasActiveFilters}
+          onClick={() => setShowFilters(!showFilters)}
+        />
       </div>
 
-      {/* Barre de recherche + filtres */}
-      <div className="flex flex-col gap-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
+      {showFilters && (
+        <FilterPanel canReset={hasActiveFilters} onReset={handleResetFilters}>
+          <Field label="Statut">
+            <select
+              value={statusFilter}
+              onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)}
+              className={FIELD_SOFT}
+            >
+              <option value="">Tous les statuts</option>
+              {Object.entries(SUBSCRIPTION_STATUS).map(([value, s]) => (
+                <option key={value} value={value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Type souscripteur">
+            <select
+              value={subscriberTypeFilter}
+              onChange={(e) => handleFilterChange(setSubscriberTypeFilter, e.target.value)}
+              className={FIELD_SOFT}
+            >
+              <option value="">Tous les types</option>
+              {Object.entries(SUBSCRIBER_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Plan">
+            <select
+              value={planCodeFilter}
+              onChange={(e) => handleFilterChange(setPlanCodeFilter, e.target.value)}
+              className={FIELD_SOFT}
+            >
+              <option value="">Tous les plans</option>
+              {plans.map((plan) => (
+                <option key={plan.code} value={plan.code}>
+                  {plan.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Code souscripteur">
             <input
               type="text"
-              placeholder="Rechercher par n° souscription, plan ou souscripteur..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg"
+              value={subscriberCodeFilter}
+              onChange={(e) => handleFilterChange(setSubscriberCodeFilter, e.target.value)}
+              placeholder="ex: MBR-000001"
+              className={FIELD_SOFT}
             />
-          </div>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`px-4 py-2 border rounded-lg flex items-center gap-2 ${
-              showFilters || hasActiveFilters
-                ? "bg-primary-50 border-primary-300 text-primary-700"
-                : "bg-white border-gray-200 text-gray-600"
-            }`}
-          >
-            <Filter size={16} />
-            Filtres
-            {hasActiveFilters && (
-              <span className="ml-1 w-2 h-2 bg-primary-600 rounded-full" />
-            )}
-          </button>
-        </div>
+          </Field>
+          <Field label="Prochaine facture avant">
+            <input
+              type="date"
+              value={nextBillingBefore}
+              onChange={(e) => handleFilterChange(setNextBillingBefore, e.target.value)}
+              className={FIELD_SOFT}
+            />
+          </Field>
+        </FilterPanel>
+      )}
 
-        {showFilters && (
-          <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Statut
-              </label>
-              <select
-                value={statusFilter}
-                onChange={(e) =>
-                  handleFilterChange(setStatusFilter, e.target.value)
-                }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
-              >
-                <option value="">Tous les statuts</option>
-                <option value="DRAFT">Brouillon</option>
-                <option value="PENDING_ACTIVATION">En attente</option>
-                <option value="ACTIVE">Actif</option>
-                <option value="PAST_DUE">En retard</option>
-                <option value="SUSPENDED">Suspendu</option>
-                <option value="CANCELLED">Annulé</option>
-                <option value="EXPIRED">Expiré</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Type souscripteur
-              </label>
-              <select
-                value={subscriberTypeFilter}
-                onChange={(e) =>
-                  handleFilterChange(setSubscriberTypeFilter, e.target.value)
-                }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
-              >
-                <option value="">Tous les types</option>
-                <option value="MEMBER">Membre</option>
-                <option value="CUSTOMER">Customer</option>
-                <option value="BUSINESS_ENTITY">Entreprise</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Plan
-              </label>
-              <select
-                value={planCodeFilter}
-                onChange={(e) =>
-                  handleFilterChange(setPlanCodeFilter, e.target.value)
-                }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
-              >
-                <option value="">Tous les plans</option>
-                {plans.map((plan) => (
-                  <option key={plan.code} value={plan.code}>
-                    {plan.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Code souscripteur
-              </label>
-              <input
-                type="text"
-                value={subscriberCodeFilter}
-                onChange={(e) =>
-                  handleFilterChange(setSubscriberCodeFilter, e.target.value)
-                }
-                placeholder="ex: MBR-000001"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Prochaine facture avant
-              </label>
-              <input
-                type="date"
-                value={nextBillingBefore}
-                onChange={(e) =>
-                  handleFilterChange(setNextBillingBefore, e.target.value)
-                }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-              />
-            </div>
-            {hasActiveFilters && (
-              <div className="md:col-span-3 flex justify-end">
-                <button
-                  onClick={handleResetFilters}
-                  className="text-sm text-primary-600 hover:text-primary-700"
-                >
-                  Réinitialiser tous les filtres
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {isLoading ? (
+        <TableSkeleton rows={6} cols={5} />
+      ) : filteredSubscriptions.length === 0 ? (
+        <EmptyState
+          icon={Repeat}
+          title="Aucune souscription trouvée"
+          action={
+            hasActiveFilters ? (
+              <ActionButton variant="ghost" onClick={handleResetFilters}>
+                Réinitialiser les filtres
+              </ActionButton>
+            ) : undefined
+          }
+        />
+      ) : (
+        <DataCard>
+          <HeadRow cols={COLS}>
+            <span>N° souscription</span>
+            <span>Plan</span>
+            <span>Souscripteur</span>
+            <span>Période</span>
+            <span>Statut</span>
+            <span>Renouv.</span>
+            <span className="text-right">Actions</span>
+          </HeadRow>
 
-      {/* Tableau */}
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
-        <div className="overflow-x-auto p-2">
-          <table className="w-full border-separate border-spacing-y-2">
-            <thead className="bg-transparent">
-              <tr>
-                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                  N° Souscription
-                </th>
-                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                  Plan
-                </th>
-                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                  Souscripteur
-                </th>
-                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                  Période
-                </th>
-                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                  Statut
-                </th>
-                <th className="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">
-                  Renouvellement
-                </th>
-                <th className="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredSubscriptions.map((sub) => (
-                <tr
+          <div className="space-y-2">
+            {filteredSubscriptions.map((sub) => {
+              const st = statusOf(SUBSCRIPTION_STATUS, sub.status);
+              const subscriberType =
+                SUBSCRIBER_TYPE_LABELS[sub.subscriberType] ?? sub.subscriberType;
+              return (
+                <div
                   key={sub.subscriptionNumber}
-                  className="group cursor-pointer rounded-xl transition-colors hover:bg-primary-50/40"
+                  className={`cursor-pointer rounded-2xl bg-gray-50 p-3 transition ${ROW_HOVER}`}
                   onClick={() => handleViewDetail(sub)}
                 >
-                  <td className="rounded-l-xl px-5 py-4 text-sm font-mono text-gray-700 group-hover:bg-transparent">
-                    {sub.subscriptionNumber}
-                  </td>
-                  <td className="px-5 py-4 text-sm font-semibold text-gray-900">
-                    {sub.planName}
-                  </td>
-                  <td className="px-5 py-4 text-sm text-gray-700">
-                    <div>
-                      <p>{sub.subscriberName ?? sub.subscriberCode}</p>
-                      <p className="text-xs text-gray-500">
-                        {sub.subscriberType}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4 text-sm text-gray-700">
-                    <div>
-                      <p>
-                        Début :{" "}
-                        {new Date(sub.startDate).toLocaleDateString("fr-FR")}
-                      </p>
-                      {sub.endDate && (
-                        <p className="text-xs text-gray-500">
-                          Fin :{" "}
-                          {new Date(sub.endDate).toLocaleDateString("fr-FR")}
-                        </p>
-                      )}
-                      {/* FIX : prochaine facturation affichée si disponible */}
-                      {sub.nextBillingDate && (
-                        <p className="text-xs text-amber-600 mt-0.5">
-                          Facture :{" "}
-                          {new Date(sub.nextBillingDate).toLocaleDateString(
-                            "fr-FR",
-                          )}
-                        </p>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        statusConfig[sub.status]?.color ??
-                        "bg-gray-100 text-gray-600"
-                      }`}
-                    >
-                      {statusConfig[sub.status]?.label ?? sub.status}
+                  {/* Desktop */}
+                  <div className={`hidden items-center gap-4 px-1 lg:grid ${COLS}`}>
+                    <span className={MONO_LINK}>{sub.subscriptionNumber}</span>
+                    <span className="truncate text-sm font-semibold text-gray-900">
+                      {sub.planName}
                     </span>
-                  </td>
-                  <td className="px-5 py-4 text-center text-sm text-gray-700">
-                    {sub.autoRenew ? "Auto" : "Manuel"}
-                  </td>
-                  <td className="rounded-r-xl px-5 py-4 text-center">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm text-gray-800">
+                        {sub.subscriberName ?? sub.subscriberCode}
+                      </p>
+                      <p className="mt-0.5 text-xs text-gray-400">{subscriberType}</p>
+                    </div>
+                    <div className="min-w-0 text-sm text-gray-700">
+                      <p>
+                        {formatDate(sub.startDate)}
+                        {sub.endDate && <span className="text-gray-400"> → {formatDate(sub.endDate)}</span>}
+                      </p>
+                      {sub.nextBillingDate && (
+                        <p className="mt-0.5 text-xs text-amber-600">
+                          Facture le {formatDate(sub.nextBillingDate)}
+                        </p>
+                      )}
+                    </div>
+                    <span>
+                      <StatusChip tone={st.tone}>{st.label}</StatusChip>
+                    </span>
+                    <span className="text-sm text-gray-700">{sub.autoRenew ? "Auto" : "Manuel"}</span>
+                    <div className="flex justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
+                      {rowActions(sub)}
+                    </div>
+                  </div>
+
+                  {/* Mobile et tablette */}
+                  <div className="lg:hidden">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-gray-900">{sub.planName}</p>
+                        <p className="mt-0.5 truncate text-sm text-gray-600">
+                          {sub.subscriberName ?? sub.subscriberCode}
+                        </p>
+                      </div>
+                      <StatusChip tone={st.tone}>{st.label}</StatusChip>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className={MONO_LINK}>{sub.subscriptionNumber}</span>
+                      <Tag>{subscriberType}</Tag>
+                      <Tag>{sub.autoRenew ? "Renouv. auto" : "Renouv. manuel"}</Tag>
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">
+                      {formatDate(sub.startDate)}
+                      {sub.endDate && ` → ${formatDate(sub.endDate)}`}
+                      {sub.nextBillingDate && ` · facture le ${formatDate(sub.nextBillingDate)}`}
+                    </p>
                     <div
-                      className="flex justify-center gap-2"
+                      className="mt-2 flex justify-end gap-0.5"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <button
-                        onClick={() => handleViewDetail(sub)}
-                        className="rounded-lg p-2 text-gray-500 hover:bg-white hover:text-primary-600"
-                        title="Voir détail"
-                      >
-                        <Eye size={16} />
-                      </button>
-                      {sub.status === "PENDING_ACTIVATION" && (
-                        <button
-                          onClick={() =>
-                            activateMutation.mutate(sub.subscriptionNumber)
-                          }
-                          disabled={activateMutation.isPending}
-                          className="rounded-lg p-2 text-green-600 hover:bg-white hover:text-green-800 disabled:opacity-40"
-                          title="Activer"
-                        >
-                          <Play size={16} />
-                        </button>
-                      )}
-                      {/* FIX : PAST_DUE — réactivation possible */}
-                      {sub.status === "PAST_DUE" && (
-                        <button
-                          onClick={() =>
-                            activateMutation.mutate(sub.subscriptionNumber)
-                          }
-                          disabled={activateMutation.isPending}
-                          className="rounded-lg p-2 text-green-600 hover:bg-white hover:text-green-800 disabled:opacity-40"
-                          title="Réactiver"
-                        >
-                          <Play size={16} />
-                        </button>
-                      )}
-                      {sub.status === "ACTIVE" && (
-                        <>
-                          <button
-                            onClick={() =>
-                              suspendMutation.mutate(sub.subscriptionNumber)
-                            }
-                            disabled={suspendMutation.isPending}
-                            className="rounded-lg p-2 text-orange-600 hover:bg-white hover:text-orange-800 disabled:opacity-40"
-                            title="Suspendre"
-                          >
-                            <Pause size={16} />
-                          </button>
-                          <button
-                            onClick={() =>
-                              renewMutation.mutate(sub.subscriptionNumber)
-                            }
-                            disabled={renewMutation.isPending}
-                            className="rounded-lg p-2 text-blue-600 hover:bg-white hover:text-blue-800 disabled:opacity-40"
-                            title="Renouveler"
-                          >
-                            <RefreshCw size={16} />
-                          </button>
-                        </>
-                      )}
-                      {(sub.status === "ACTIVE" ||
-                        sub.status === "SUSPENDED" ||
-                        sub.status === "PAST_DUE") && (
-                        <button
-                          onClick={() => {
-                            if (confirm("Confirmer l'annulation ?")) {
-                              cancelMutation.mutate(sub.subscriptionNumber);
-                            }
-                          }}
-                          disabled={cancelMutation.isPending}
-                          className="rounded-lg p-2 text-red-600 hover:bg-white hover:text-red-800 disabled:opacity-40"
-                          title="Annuler"
-                        >
-                          <XCircle size={16} />
-                        </button>
-                      )}
+                      {rowActions(sub)}
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {filteredSubscriptions.length === 0 && !isLoading && (
-        <div className="text-center py-12 bg-white rounded-xl">
-          <Users size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500">Aucune souscription trouvée</p>
-          {hasActiveFilters && (
-            <button
-              onClick={handleResetFilters}
-              className="mt-2 text-primary-600 hover:underline"
-            >
-              Réinitialiser les filtres
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 px-2">
-          <p className="text-sm text-gray-500">
-            {totalElements} souscription{totalElements > 1 ? "s" : ""} au total
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-gray-50"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="text-sm text-gray-600">
-              Page {page + 1} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-gray-50"
-            >
-              <ChevronRight size={16} />
-            </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        </DataCard>
       )}
 
-      <CreateSubscriptionModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
-          setIsCreateModalOpen(false);
-        }}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        total={totalElements}
+        noun="souscription"
+        onChange={setPage}
       />
     </div>
   );

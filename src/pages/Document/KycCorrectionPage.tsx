@@ -1,325 +1,207 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  AlertCircle,
-  Upload,
-  Eye,
-  XCircle,
-  CheckCircle,
-  Loader2,
-  RefreshCw,
-  FileText,
-  User,
-  Building2,
-} from "lucide-react";
-import { kycService, documentService } from "../../services/document.service";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CheckCircle2, Eye, FileWarning, Upload } from "lucide-react";
+import { documentService, kycService } from "../../services/document.service";
+import type { KycCaseResponse, KycDocumentResponse } from "../../services/document.service";
+import { ActionButton, EmptyState, ErrorBlock, IconButton, ListHeader, Pagination } from "../../components/subscription/kit";
+import { apiMessage } from "../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../components/ui/Skeleton";
+import { toast } from "../../components/ui/toastStore";
+import { RefreshButton } from "../../components/reporting/reportKit";
+import { KycStatusChip, RiskChip } from "../../components/documents/docKit";
+import { OWNER_LABEL, label } from "../../components/documents/docUtils";
+import { Dots } from "../../components/ui/Toaster";
+
+const PAGE_SIZE = 10;
+// Le type déclare VERIFIED/PENDING, mais d'autres écrans reçoivent APPROVED/PENDING_REVIEW : on accepte les deux.
+const TO_FIX = ["REJECTED", "NEEDS_CORRECTION"];
+const WAITING = ["PENDING", "PENDING_REVIEW"];
+const VALID = ["VERIFIED", "APPROVED"];
+
+const reasonOf = (d: KycDocumentResponse): string | undefined => d.rejectionReason ?? d.correctionNote ?? d.reviewComment ?? d.rejectReason ?? undefined;
+const typeCode = (d: KycDocumentResponse) => d.documentTypeCode ?? d.documentType;
 
 export const KycCorrectionPage: React.FC = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [uploading, setUploading] = useState<string | null>(null);
 
-
-  // Récupérer les dossiers en correction
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["kyc-cases-pending-correction"],
-    queryFn: () =>
-      kycService.getAllKycCases({
-        status: "PENDING_CORRECTION", // compat legacy; correction documentaire canonique = document status NEEDS_CORRECTION
-        page: 0,
-        size: 50,
-      }),
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
+    queryKey: ["kyc-cases-pending-correction", page],
+    queryFn: () => kycService.getAllKycCases({ status: "PENDING_CORRECTION", page, size: PAGE_SIZE }),
   });
 
-  const cases = data?.content || [];
-
-  // Upload de document
-  const uploadMutation = useMutation({
-    mutationFn: async ({
-      documentTypeCode,
-      file,
-      ownerType,
-      ownerCode,
-    }: {
-      documentTypeCode: string;
-      file: File;
-      ownerType: string;
-      ownerCode: string;
-    }) => {
-      return documentService.uploadKycDocumentAsAdmin({
-        ownerType,
-        ownerCode,
-        documentTypeCode,
-        file,
-      });
-    },
+  const upload = useMutation({
+    mutationFn: (v: { documentTypeCode: string; file: File; ownerType: string; ownerCode: string }) => documentService.uploadKycDocumentAsAdmin(v),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["kyc-cases-pending-correction"],
-      });
-      setUploadingDocType(null);
-      setUploadError(null);
+      queryClient.invalidateQueries({ queryKey: ["kyc-cases-pending-correction"] });
+      toast.success("Document remplacé");
     },
-    onError: (e: any) => {
-      setUploadingDocType(null);
-      setUploadError(e?.response?.data?.message || "Erreur lors de l'upload.");
-    },
+    onError: (e) => toast.error(apiMessage(e, "Envoi du document impossible")),
+    onSettled: () => setUploading(null),
   });
 
-  // Re-soumettre après correction
-  const resubmitMutation = useMutation({
+  const resubmit = useMutation({
     mutationFn: (code: string) => kycService.submitKycCase(code),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["kyc-cases-pending-correction"],
-      });
-      alert("Dossier re-soumis avec succès");
-    },
-    onError: (e: any) =>
-      alert(e?.response?.data?.message || "Erreur lors de la re-soumission"),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["kyc-cases-pending-correction"] }),
   });
 
-  if (isLoading) {
-    return (
-      <div className="text-center py-12">
-        <RefreshCw className="animate-spin mx-auto mb-4" size={32} />
-        <p className="text-gray-500">Chargement des corrections...</p>
-      </div>
-    );
-  }
+  const askResubmit = (code: string) =>
+    toast.confirm({
+      message: `Re-soumettre le dossier ${code} ?`,
+      detail: "Toutes les corrections doivent avoir été apportées.",
+      confirmLabel: "Re-soumettre",
+      pendingLabel: "Envoi",
+      successMessage: "Dossier re-soumis",
+      errorMessage: "Re-soumission impossible",
+      onConfirm: () => resubmit.mutateAsync(code),
+    });
+
+  const cases: KycCaseResponse[] = data?.content ?? [];
+  const total = data?.totalElements ?? 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">
-            Corrections demandées
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Dossiers nécessitant des corrections avant validation
-          </p>
-        </div>
-        <button
-          onClick={() => refetch()}
-          className="p-2 border border-gray-200 rounded-xl hover:bg-gray-100"
-          title="Actualiser"
-        >
-          <RefreshCw size={16} className="text-gray-500" />
-        </button>
-      </div>
+    <div className="space-y-5">
+      <ListHeader
+        title="Corrections demandées"
+        subtitle={isLoading ? undefined : `${total} dossier${total > 1 ? "s" : ""} en attente de correction`}
+        action={<RefreshButton fetching={isFetching} onClick={() => refetch()} />}
+      />
 
-      {uploadError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-          {uploadError}
-          <button
-            onClick={() => setUploadError(null)}
-            className="ml-2 underline"
-          >
-            Fermer
-          </button>
-        </div>
-      )}
-
-      {cases.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl">
-          <CheckCircle size={48} className="mx-auto text-green-300 mb-4" />
-          <p className="text-gray-500">
-            Aucun dossier en attente de correction
-          </p>
-          <p className="text-sm text-gray-400">
-            Tous les dossiers sont en règle
-          </p>
-        </div>
+      {isLoading ? (
+        <ListSkeleton rows={4} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les corrections." onRetry={() => refetch()} />
+      ) : cases.length === 0 ? (
+        <EmptyState icon={CheckCircle2} title="Aucune correction en attente" hint="Tous les dossiers sont en règle." />
       ) : (
-        <div className="space-y-4">
-          {cases.map((kycCase) => {
-            const rejectedDocs =
-              kycCase.documents?.filter((d) => d.status === "REJECTED") || [];
-            const pendingDocs =
-              kycCase.documents?.filter((d) => d.status === "PENDING_REVIEW") ||
-              [];
-
-            return (
-              <div
-                key={kycCase.code}
-                className="bg-white rounded-xl shadow-sm overflow-hidden"
-              >
-                {/* En-tête du dossier */}
-                <div className="p-5 border-b bg-orange-50">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <AlertCircle size={20} className="text-orange-500" />
-                        <span className="font-mono font-bold text-lg">
-                          {kycCase.code}
-                        </span>
-                        <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">
-                          Correction demandée
-                        </span>
+        <>
+          <div className="space-y-4">
+            {cases.map((c) => {
+              const docs = c.documents ?? [];
+              const toFix = docs.filter((d) => TO_FIX.includes(d.status));
+              const waiting = docs.filter((d) => WAITING.includes(d.status));
+              const valid = docs.filter((d) => VALID.includes(d.status));
+              // Sans code propriétaire on n'envoie rien : un identifiant numérique pourrait rattacher le fichier au mauvais dossier.
+              const canUpload = !!c.ownerCode;
+              return (
+                <section key={c.code} className="rounded-[1.5rem] bg-white p-4 shadow-sm sm:p-5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-sm font-bold text-[color:var(--logo-pink-dark)]">{c.code}</span>
+                        <KycStatusChip status={c.status} />
+                        <RiskChip level={c.riskLevel} />
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        {kycCase.ownerType === "BUSINESS" ? (
-                          <Building2 size={14} />
-                        ) : (
-                          <User size={14} />
-                        )}
-                        <span>{kycCase.ownerType}</span>
-                        <span className="text-gray-400">·</span>
-                        <span className="font-mono">
-                          {kycCase.ownerCode || `ID: ${kycCase.ownerId}`}
-                        </span>
-                      </div>
+                      <p className="mt-1 text-sm text-gray-600">
+                        {c.ownerName || c.ownerCode || `#${c.ownerId ?? ""}`}
+                        <span className="ml-2 text-xs text-gray-400">{label(OWNER_LABEL, c.ownerType)}</span>
+                      </p>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => navigate(`/documents/kyc/cases/${kycCase.code}`)}
-                        className="px-4 py-2 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
-                      >
-                        <Eye size={14} /> Voir détails
-                      </button>
-                      {kycCase.complete &&
-                        kycCase.status === "PENDING_CORRECTION" && (
-                          <button
-                            onClick={() => {
-                              if (
-                                confirm(
-                                  "Toutes les corrections ont-elles été apportées ? Re-soumettre le dossier ?",
-                                )
-                              ) {
-                                resubmitMutation.mutate(kycCase.code);
-                              }
-                            }}
-                            disabled={resubmitMutation.isPending}
-                            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2 text-sm"
-                          >
-                            {resubmitMutation.isPending ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              <CheckCircle size={14} />
-                            )}
-                            Re-soumettre
-                          </button>
-                        )}
+                    <div className="flex items-center gap-2">
+                      <IconButton icon={Eye} label="Voir le dossier" onClick={() => navigate(`/documents/kyc/cases/${c.code}`)} />
+                      {c.complete && c.status === "PENDING_CORRECTION" && (
+                        <ActionButton icon={CheckCircle2} pending={resubmit.isPending && resubmit.variables === c.code} onClick={() => askResubmit(c.code)}>
+                          Re-soumettre
+                        </ActionButton>
+                      )}
                     </div>
                   </div>
-                </div>
 
-                {/* Documents rejetés à corriger */}
-                {rejectedDocs.length > 0 && (
-                  <div className="p-5 border-b">
-                    <h4 className="font-semibold text-red-700 mb-3 flex items-center gap-2">
-                      <XCircle size={16} />
-                      Documents à corriger ({rejectedDocs.length})
-                    </h4>
-                    <div className="space-y-3">
-                      {rejectedDocs.map((doc) => (
-                        <div
-                          key={doc.code}
-                          className="bg-red-50 rounded-lg p-4"
-                        >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium text-gray-900">
-                                {doc.documentTypeName}
-                              </p>
-                              <p className="text-sm text-red-600 mt-1">
-                                {doc.status === "REJECTED" &&
-                                  "Motif: Document rejeté"}
-                              </p>
-                              {doc.description && (
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {doc.description}
-                                </p>
-                              )}
+                  {toFix.length > 0 && (
+                    <div className="mt-4">
+                      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-red-600">À corriger ({toFix.length})</p>
+                      <div className="space-y-2">
+                        {toFix.map((d) => {
+                          const tc = typeCode(d);
+                          const key = `${c.code}:${d.documentCode}`;
+                          const busy = uploading === key && upload.isPending;
+                          return (
+                            <div key={d.documentCode} className="flex flex-col gap-3 rounded-2xl bg-red-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-gray-900">{d.documentTypeName ?? tc}</p>
+                                {reasonOf(d) && <p className="mt-0.5 text-sm text-red-700">{reasonOf(d)}</p>}
+                                {d.fileName && <p className="mt-0.5 truncate text-xs text-gray-500">{d.fileName}</p>}
+                              </div>
+                              <label
+                                className={`relative inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-[color:var(--logo-pink-dark)] px-5 py-2.5 text-sm font-semibold text-white transition focus-within:ring-2 focus-within:ring-[color:var(--logo-pink)] ${
+                                  canUpload && tc && !busy ? "cursor-pointer hover:opacity-90" : "pointer-events-none opacity-50"
+                                }`}
+                                title={canUpload ? undefined : "Code propriétaire manquant : remplacement impossible depuis cette page"}
+                              >
+                                <span className={`inline-flex items-center gap-2 ${busy ? "invisible" : ""}`}>
+                                  <Upload size={16} />
+                                  Remplacer
+                                </span>
+                                {busy && (
+                                  <span className="absolute inset-0 flex items-center justify-center">
+                                    <Dots />
+                                  </span>
+                                )}
+                                <input
+                                  type="file"
+                                  className="sr-only"
+                                  accept="application/pdf,image/jpeg,image/png,image/webp"
+                                  disabled={!canUpload || !tc || busy}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    e.target.value = "";
+                                    if (!file || !tc || !c.ownerCode) return;
+                                    setUploading(key);
+                                    upload.mutate({ documentTypeCode: tc, file, ownerType: c.ownerType, ownerCode: c.ownerCode });
+                                  }}
+                                />
+                              </label>
                             </div>
-                            <label className="cursor-pointer bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs hover:bg-red-700 flex items-center gap-1.5">
-                              {uploadingDocType === doc.documentTypeCode &&
-                              uploadMutation.isPending ? (
-                                <Loader2 size={12} className="animate-spin" />
-                              ) : (
-                                <Upload size={12} />
-                              )}
-                              Remplacer
-                              <input
-                                type="file"
-                                className="hidden"
-                                accept="application/pdf,image/jpeg,image/png,image/webp"
-                                onChange={(e) => {
-                                  const documentTypeCode =
-                                    doc.documentTypeCode || doc.documentType;
-                                  const file = e.target.files?.[0];
-                                  if (file && documentTypeCode) {
-                                    setUploadingDocType(documentTypeCode);
-                                    uploadMutation.mutate({
-                                      documentTypeCode,
-                                      file,
-                                      ownerType: kycCase.ownerType,
-                                      ownerCode:
-                                        kycCase.ownerCode ||
-                                        String(kycCase.ownerId),
-                                    });
-                                  }
-                                }}
-                              />
-                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {(waiting.length > 0 || valid.length > 0) && (
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      {waiting.length > 0 && (
+                        <div>
+                          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-amber-600">En attente de revue ({waiting.length})</p>
+                          <div className="flex flex-wrap gap-2">
+                            {waiting.map((d) => (
+                              <span key={d.documentCode} className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                                {d.documentTypeName ?? typeCode(d)}
+                              </span>
+                            ))}
                           </div>
                         </div>
-                      ))}
+                      )}
+                      {valid.length > 0 && (
+                        <div>
+                          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-emerald-600">Validés ({valid.length})</p>
+                          <div className="flex flex-wrap gap-2">
+                            {valid.map((d) => (
+                              <span key={d.documentCode} className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                {d.documentTypeName ?? typeCode(d)}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Documents en attente de revue */}
-                {pendingDocs.length > 0 && (
-                  <div className="p-5 border-b bg-yellow-50">
-                    <h4 className="font-semibold text-yellow-700 mb-3 flex items-center gap-2">
-                      <FileText size={16} />
-                      Documents en attente de revue ({pendingDocs.length})
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {pendingDocs.map((doc) => (
-                        <span
-                          key={doc.code}
-                          className="text-sm text-yellow-600 bg-yellow-100 px-2 py-1 rounded"
-                        >
-                          {doc.documentTypeName}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Documents déjà approuvés */}
-                {kycCase.documents?.filter((d) => d.status === "APPROVED")
-                  .length > 0 && (
-                  <div className="p-5 bg-gray-50">
-                    <h4 className="font-semibold text-green-700 mb-3 flex items-center gap-2">
-                      <CheckCircle size={16} />
-                      Documents validés
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {kycCase.documents
-                        ?.filter((d) => d.status === "APPROVED")
-                        .map((doc) => (
-                          <span
-                            key={doc.code}
-                            className="text-sm text-green-600 bg-green-100 px-2 py-1 rounded"
-                          >
-                            {doc.documentTypeName}
-                          </span>
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  {toFix.length === 0 && waiting.length === 0 && valid.length === 0 && (
+                    <p className="mt-4 flex items-center gap-2 text-sm text-gray-400">
+                      <FileWarning size={16} /> Aucun document dans ce dossier.
+                    </p>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+          <Pagination page={page} totalPages={data?.totalPages ?? 0} total={total} noun="dossier" onChange={setPage} />
+        </>
       )}
-
-      {/* Modal détail */}
     </div>
   );
 };

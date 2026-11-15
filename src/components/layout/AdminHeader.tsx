@@ -3,7 +3,15 @@ import { User, LogOut, Settings, ChevronDown } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { NotificationDropdown } from "../notifications/NotificationDropdown";
+import { brandVars } from "./adminTheme";
 import Logo from "../../assets/img/logo.jpeg";
+
+const HEADER_FONT_SIZE = "clamp(1rem, 0.4rem + 0.65vw, 1.5rem)";
+
+const greeting = (): string => {
+  const h = new Date().getHours();
+  return h >= 18 || h < 5 ? "Bonsoir" : "Bonjour";
+};
 
 export const AdminHeader: React.FC = () => {
   const [showMenu, setShowMenu] = useState(false);
@@ -13,6 +21,7 @@ export const AdminHeader: React.FC = () => {
   const navigate = useNavigate();
 
   const username = admin?.email?.split("@")[0] || "Utilisateur";
+  const hello = greeting();
 
   const handleLogout = async () => {
     setShowMenu(false);
@@ -29,8 +38,8 @@ export const AdminHeader: React.FC = () => {
   };
 
   return (
-    <header className="fixed left-3 right-3 top-3 z-40 h-16 rounded-[1.7rem] border border-gray-100 bg-white/90 shadow-xl shadow-slate-950/5 backdrop-blur">
-      <div className="flex h-full items-center justify-between px-4 md:px-6">
+    <header className="shrink-0 px-4 pt-4 lg:px-6" style={{ ...brandVars, fontSize: HEADER_FONT_SIZE }}>
+      <div className="flex items-center justify-between rounded-full border border-gray-100 bg-white py-[0.5em] pl-[1.25em] pr-[0.5em] shadow-sm">
         <button
           type="button"
           onClick={() => navigate("/")}
@@ -40,35 +49,34 @@ export const AdminHeader: React.FC = () => {
           <img
             src={Logo}
             alt="logo"
-            className="h-10 w-auto object-contain md:h-11 lg:h-12"
+            className="h-[2.2em] w-auto object-contain"
           />
         </button>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-[0.5em]">
           <NotificationDropdown />
 
           <div className="relative">
             <button
               type="button"
               onClick={() => setShowMenu(!showMenu)}
-              className="flex items-center gap-2 rounded-2xl px-2 py-1.5 transition-colors hover:bg-gray-50 md:gap-3 md:px-3"
+              className="flex items-center gap-2 rounded-full py-[0.25em] pl-[0.25em] pr-[0.7em] transition-colors hover:bg-gray-50 md:gap-[0.6em]"
             >
-              <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 ring-1 ring-primary-100">
-                <User size={17} />
+              <div className="flex h-[2.2em] w-[2.2em] items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--logo-pink)_16%,white)] text-[color:var(--logo-pink-dark)] ring-1 ring-[color:color-mix(in_srgb,var(--logo-pink)_30%,white)]">
+                <User className="h-[50%] w-[50%]" />
               </div>
 
               <div className="hidden text-left md:block">
-                <span className="block text-sm font-bold text-gray-800">
+                <span className="block text-[0.9em] font-bold text-gray-800">
                   {username}
                 </span>
-                <span className="block text-xs text-gray-400">
-                  Bonjour, {username}
+                <span className="block text-[0.75em] text-gray-400">
+                  {hello}, {username}
                 </span>
               </div>
 
               <ChevronDown
-                size={16}
-                className={`text-gray-400 transition-transform ${
+                className={`h-[1.1em] w-[1.1em] text-gray-400 transition-transform ${
                   showMenu ? "rotate-180" : ""
                 }`}
               />
@@ -81,10 +89,10 @@ export const AdminHeader: React.FC = () => {
                   onClick={() => setShowMenu(false)}
                 />
 
-                <div className="absolute right-0 z-40 mt-3 w-72 overflow-hidden rounded-3xl bg-white p-2 shadow-xl ring-1 ring-gray-100">
+                <div className="absolute right-0 z-40 mt-3 w-72 text-base overflow-hidden rounded-3xl bg-white p-2 shadow-xl ring-1 ring-gray-100">
                   <div className="rounded-2xl bg-gray-50 p-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-primary-600 shadow-sm ring-1 ring-gray-100">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[color:var(--logo-pink-dark)] shadow-sm ring-1 ring-gray-100">
                         <User size={18} />
                       </div>
 

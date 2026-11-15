@@ -1,166 +1,123 @@
 import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Download, Filter, History, Search } from "lucide-react";
+import { Download, History } from "lucide-react";
 import { documentService } from "../../services/document.service";
+import { ActionButton, EmptyState, ErrorBlock, Field, Pagination, SearchField } from "../../components/subscription/kit";
+import { FIELD_SOFT } from "../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../components/ui/Skeleton";
+import { RefreshButton } from "../../components/reporting/reportKit";
+import { saveBlob } from "../../components/payment/paymentUtils";
+import { dateTime, toCsv, usePaged } from "../../components/documents/docUtils";
 
-export const DocumentAccessLogsPanel: React.FC<{ documentCode: string }> = ({
-  documentCode,
-}) => {
+type Log = Record<string, unknown>;
+const FETCH_SIZE = 100;
+const text = (v: unknown): string => (v === undefined || v === null ? "" : String(v));
+const actorOf = (l: Log) => text(l.actorName || l.userId || l.performedBy || l.email);
+const actionOf = (l: Log) => text(l.action || l.eventType);
+const dateOf = (l: Log) => text(l.createdAt || l.occurredAt || l.accessedAt);
+const ipOf = (l: Log) => text(l.ipAddress || l.ip);
+
+export const DocumentAccessLogsPanel: React.FC<{ documentCode: string }> = ({ documentCode }) => {
   const [actor, setActor] = useState("");
   const [action, setAction] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ["document-access-logs", documentCode],
-    queryFn: () =>
-      documentService.getDocumentAccessLogs(documentCode, { size: 100 }),
+    queryFn: () => documentService.getDocumentAccessLogs(documentCode, { size: FETCH_SIZE }),
     enabled: !!documentCode,
   });
 
-  const logs = data?.content || [];
+  const logs = (data?.content ?? []) as Log[];
+  const total = data?.totalElements ?? logs.length;
 
-  const filteredLogs = useMemo(
+  const filtered = useMemo(
     () =>
-      logs.filter((log: any) => {
-        const actorText = String(
-          log.actorName || log.userId || log.performedBy || log.email || "",
-        ).toLowerCase();
-        const actionText = String(
-          log.action || log.eventType || "",
-        ).toLowerCase();
-        const dateValue = log.createdAt || log.occurredAt || log.accessedAt;
-        const date = dateValue ? new Date(dateValue) : null;
-
-        if (actor && !actorText.includes(actor.toLowerCase())) return false;
-        if (action && !actionText.includes(action.toLowerCase())) return false;
-        if (fromDate && date && date < new Date(`${fromDate}T00:00:00`))
-          return false;
-        if (toDate && date && date > new Date(`${toDate}T23:59:59`))
-          return false;
+      logs.filter((l) => {
+        const raw = dateOf(l);
+        const date = raw ? new Date(raw) : null;
+        if (actor && !actorOf(l).toLowerCase().includes(actor.toLowerCase())) return false;
+        if (action && !actionOf(l).toLowerCase().includes(action.toLowerCase())) return false;
+        if (fromDate && date && date < new Date(`${fromDate}T00:00:00`)) return false;
+        if (toDate && date && date > new Date(`${toDate}T23:59:59`)) return false;
         return true;
       }),
     [logs, actor, action, fromDate, toDate],
   );
+  const { page, setPage, slice, totalPages } = usePaged(filtered, 10);
 
   const exportCsv = () => {
-    const header = ["action", "actor", "date", "ip", "userAgent"];
-    const rows = filteredLogs.map((log: any) => [
-      log.action || log.eventType || "Accès",
-      log.actorName || log.userId || log.performedBy || "",
-      log.createdAt || log.occurredAt || log.accessedAt || "",
-      log.ipAddress || log.ip || "",
-      log.userAgent || "",
-    ]);
-    const csv = [header, ...rows]
-      .map((row) =>
-        row
-          .map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`)
-          .join(","),
-      )
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = window.document.createElement("a");
-    a.href = url;
-    a.download = `access_logs_${documentCode}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const rows = [["action", "acteur", "date", "ip", "agent"], ...filtered.map((l) => [actionOf(l) || "Accès", actorOf(l), dateOf(l), ipOf(l), text(l.userAgent)])];
+    saveBlob(new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8" }), `access_logs_${documentCode}.csv`);
   };
 
   return (
-    <div className="border rounded-xl p-4 space-y-3">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <h4 className="font-semibold flex items-center gap-2">
-          <History size={16} /> Journal d’accès
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="flex items-center gap-2 text-base font-bold text-gray-950">
+          <History size={18} /> Journal d'accès
         </h4>
-        <div className="flex gap-2">
-          <button
-            onClick={() => refetch()}
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
-          >
-            Actualiser
-          </button>
-          <button
-            onClick={exportCsv}
-            disabled={filteredLogs.length === 0}
-            className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-xs text-white hover:bg-primary-700 disabled:opacity-50"
-          >
-            <Download size={13} /> Export CSV
-          </button>
+        <div className="flex items-center gap-2">
+          <RefreshButton fetching={isFetching} onClick={() => refetch()} />
+          <ActionButton variant="ghost" icon={Download} disabled={filtered.length === 0} onClick={exportCsv}>
+            Export CSV
+          </ActionButton>
         </div>
       </div>
 
-      <div className="rounded-xl bg-gray-50 p-3">
-        <div className="mb-2 flex items-center gap-2 text-xs font-medium text-gray-500">
-          <Filter size={13} /> Filtres audit
-        </div>
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
-          <div className="relative">
-            <Search
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              value={actor}
-              onChange={(e) => setActor(e.target.value)}
-              placeholder="Acteur"
-              className="w-full rounded-lg border border-gray-200 py-2 pl-8 pr-3 text-xs"
-            />
-          </div>
-          <input
-            value={action}
-            onChange={(e) => setAction(e.target.value)}
-            placeholder="Action"
-            className="rounded-lg border border-gray-200 px-3 py-2 text-xs"
-          />
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-xs"
-          />
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-xs"
-          />
-        </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <SearchField
+          value={actor}
+          onChange={(v) => {
+            setActor(v);
+            setPage(0);
+          }}
+          placeholder="Acteur"
+        />
+        <input
+          value={action}
+          onChange={(e) => {
+            setAction(e.target.value);
+            setPage(0);
+          }}
+          placeholder="Action"
+          aria-label="Action"
+          className={FIELD_SOFT}
+        />
+        <Field label="Du" className="sm:col-span-1">
+          <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(0); }} className={FIELD_SOFT} />
+        </Field>
+        <Field label="Au">
+          <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(0); }} className={FIELD_SOFT} />
+        </Field>
       </div>
+
+      {total > FETCH_SIZE && <p className="text-xs text-gray-400">Seuls les {FETCH_SIZE} accès les plus récents sont chargés, sur {total} au total.</p>}
 
       {isLoading ? (
-        <div className="text-sm text-gray-500">Chargement...</div>
-      ) : filteredLogs.length === 0 ? (
-        <div className="text-sm text-gray-500">Aucun accès enregistré.</div>
+        <ListSkeleton rows={4} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger le journal d'accès." onRetry={() => refetch()} />
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={History} title="Aucun accès enregistré" hint="Aucune entrée ne correspond aux filtres." />
       ) : (
-        <div className="divide-y divide-gray-100">
-          {filteredLogs.map((log: any, i: number) => (
-            <div key={log.id || i} className="py-2 text-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium">
-                    {log.action || log.eventType || "Accès"}
-                  </p>
+        <>
+          <div className="space-y-2">
+            {slice.map((l, i) => (
+              <div key={`${dateOf(l)}-${i}`} className="flex items-start justify-between gap-3 rounded-2xl bg-gray-50 p-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">{actionOf(l) || "Accès"}</p>
                   <p className="text-xs text-gray-500">
-                    {log.actorName || log.userId || log.performedBy || "—"} ·{" "}
-                    {log.createdAt || log.occurredAt || log.accessedAt || "—"}
+                    {actorOf(l) || "Acteur inconnu"} · {dateOf(l) ? dateTime(dateOf(l)) : "Date inconnue"}
                   </p>
                 </div>
-                {(log.ipAddress || log.ip) && (
-                  <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-500">
-                    {log.ipAddress || log.ip}
-                  </span>
-                )}
+                {ipOf(l) && <span className="shrink-0 font-mono text-xs text-gray-400">{ipOf(l)}</span>}
               </div>
-              {log.userAgent && (
-                <p className="mt-1 truncate text-xs text-gray-400">
-                  {log.userAgent}
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          <Pagination page={page} totalPages={totalPages} total={filtered.length} noun="accès" onChange={setPage} />
+        </>
       )}
     </div>
   );

@@ -1,0 +1,21 @@
+
+html {
+  font-size: clamp(13px, min(0.3125vw + 10px, 0.5vh + 10.6px), 20px);
+}
+
+/* Sur mobile, on garde la taille standard pour la lisibilité */
+@media (max-width: 1023px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+/*
+ * Les pages sont enveloppées dans un conteneur `max-w-7xl` (80rem) qui les centre avec de
+ * grandes marges sur un écran large. Dans les layouts, le contenu doit occuper toute la
+ * largeur à côté du rail : on lève cette limite pour le conteneur de page uniquement.
+ * (Même effet que `[&>.max-w-7xl]:max-w-none` sur le <main> des layouts : double sécurité.)
+ */
+main > .max-w-7xl {
+  max-width: none;
+}

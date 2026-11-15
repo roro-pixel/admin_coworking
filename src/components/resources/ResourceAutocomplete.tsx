@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Search, X, Box } from "lucide-react";
+import { Search, X, DoorOpen } from "lucide-react";
 import { resourceService } from "../../services/resource.service";
 import type { ResourceSummaryResponse } from "../../services/resource.service";
+import { FIELD } from "../subscription/kitUtils";
+import { StatusBadge } from "./resKit";
 
 interface ResourceAutocompleteProps {
   onSelect: (resource: ResourceSummaryResponse | null) => void;
@@ -11,16 +13,15 @@ interface ResourceAutocompleteProps {
   required?: boolean;
 }
 
+/** Recherche d'une ressource par nom ou code, avec liste de suggestions */
 export const ResourceAutocomplete: React.FC<ResourceAutocompleteProps> = ({
   onSelect,
   selectedResource,
   selectedCode,
-  placeholder = "Rechercher une ressource...",
+  placeholder = "Rechercher une ressource",
   required = false,
 }) => {
-  const [query, setQuery] = useState(
-    selectedResource?.name || selectedCode || "",
-  );
+  const [query, setQuery] = useState(selectedResource?.name || selectedCode || "");
   const [results, setResults] = useState<ResourceSummaryResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
@@ -28,11 +29,7 @@ export const ResourceAutocomplete: React.FC<ResourceAutocompleteProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        wrapperRef.current &&
-        !wrapperRef.current.contains(event.target as Node)
-      )
-        setShowResults(false);
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) setShowResults(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -45,11 +42,7 @@ export const ResourceAutocomplete: React.FC<ResourceAutocompleteProps> = ({
 
   useEffect(() => {
     const search = async () => {
-      if (
-        query.trim().length < 2 ||
-        query === selectedResource?.name ||
-        query === selectedCode
-      ) {
+      if (query.trim().length < 2 || query === selectedResource?.name || query === selectedCode) {
         setResults([]);
         return;
       }
@@ -58,8 +51,7 @@ export const ResourceAutocomplete: React.FC<ResourceAutocompleteProps> = ({
         const data = await resourceService.searchResources(query.trim());
         setResults(data);
         setShowResults(true);
-      } catch (error) {
-        console.error("Erreur recherche ressources", error);
+      } catch {
         setResults([]);
       } finally {
         setIsLoading(false);
@@ -82,61 +74,44 @@ export const ResourceAutocomplete: React.FC<ResourceAutocompleteProps> = ({
     onSelect(null);
   };
 
+  const missing = required && !selectedCode && !selectedResource;
+
   return (
     <div ref={wrapperRef} className="relative">
       <div className="relative">
-        <Search
-          size={18}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-        />
+        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => query.length >= 2 && setShowResults(true)}
+          onFocus={() => query.length >= 2 && results.length > 0 && setShowResults(true)}
           placeholder={placeholder}
-          className={`w-full pl-10 pr-10 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${required && !selectedCode && !selectedResource ? "border-red-300" : ""}`}
+          aria-invalid={missing && query.length > 0}
+          className={`${FIELD} !pl-10 !pr-10`}
         />
         {query && (
-          <button
-            type="button"
-            onClick={handleClear}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-          >
-            <X size={16} />
+          <button type="button" onClick={handleClear} aria-label="Effacer la ressource" className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+            <X size={15} />
           </button>
         )}
       </div>
 
-      {isLoading && (
-        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500">
-          Recherche...
-        </div>
-      )}
+      {isLoading && <div className="absolute z-30 mt-2 w-full rounded-2xl bg-white p-4 text-center text-sm text-gray-500 shadow-lg">Recherche en cours</div>}
 
-      {showResults && results.length > 0 && (
-        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+      {showResults && !isLoading && results.length > 0 && (
+        <div className="absolute z-30 mt-2 max-h-64 w-full overflow-y-auto rounded-2xl bg-white p-1.5 shadow-lg">
           {results.map((resource) => (
-            <button
-              key={resource.code}
-              type="button"
-              onClick={() => handleSelect(resource)}
-              className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 border-b last:border-0"
-            >
-              <div className="w-8 h-8 bg-primary-50 rounded-full flex items-center justify-center">
-                <Box size={16} className="text-primary-600" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-gray-900">{resource.name}</p>
-                <p className="text-xs text-gray-500">
-                  {resource.code} · {resource.typeCode || "Type non défini"}
-                </p>
-              </div>
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full ${resource.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
-              >
-                {resource.status}
+            <button key={resource.code} type="button" onClick={() => handleSelect(resource)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-gray-50">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500">
+                <DoorOpen size={15} />
               </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold text-gray-900">{resource.name}</span>
+                <span className="block truncate text-xs text-gray-500">
+                  {resource.code} · {resource.typeCode || "Type non défini"}
+                </span>
+              </span>
+              <StatusBadge status={String(resource.status)} />
             </button>
           ))}
         </div>

@@ -1,240 +1,157 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Plus,
-  Edit,
-  Trash2,
-  Search,
-  Tag,
-  Layers,
-  CheckCircle2,
-  Archive,
-} from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, Pencil, Plus, Power, Shapes, Trash2 } from "lucide-react";
 import { resourceService } from "../../../services/resource.service";
 import type { ResourceTypeResponse } from "../../../services/resource.service";
-import { ResourceTypeFormModal } from "./ResourceTypeFormModal";
+import { ActionButton, CheckField, DataCard, EmptyState, ErrorBlock, Field, HeadRow, IconButton, ListHeader, PanelForm, Pagination, SearchField, StatusChip } from "../../../components/subscription/kit";
+import { FIELD, ROW_HOVER, apiMessage } from "../../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../../components/ui/Skeleton";
+import { toast } from "../../../components/ui/toastStore";
+import { Cell, Fact, useDebounced } from "../../../components/resources/resKit";
+
+const COLS = "lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_7rem_auto]";
+const SIZE = 15;
+const EMPTY = { name: "", description: "", active: true };
 
 export const ResourceTypesList: React.FC = () => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingType, setEditingType] = useState<ResourceTypeResponse | null>(
-    null,
-  );
+  const [page, setPage] = useState(0);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ code: string | null; form: typeof EMPTY } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const q = useDebounced(search.trim());
 
-  const { data: typesData, isLoading } = useQuery({
-    queryKey: ["resource-types"],
-    queryFn: () => resourceService.getResourceTypes({ size: 500 }),
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["resource-types", page, q],
+    queryFn: () => (q ? resourceService.searchResourceTypes(q, { page, size: SIZE }) : resourceService.getResourceTypes({ page, size: SIZE })),
   });
+  const types = data?.content ?? [];
+  const total = data?.totalElements ?? 0;
 
-  const deleteMutation = useMutation({
-    mutationFn: (code: string) => resourceService.deleteResourceType(code),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resource-types"] });
-      queryClient.invalidateQueries({ queryKey: ["resource-types-list"] });
+  const invalidate = () => Promise.all([queryClient.invalidateQueries({ queryKey: ["resource-types"] }), queryClient.invalidateQueries({ queryKey: ["resource-types-list"] })]);
+  const save = useMutation({
+    mutationFn: async () => {
+      const f = editing!.form;
+      const body = { name: f.name.trim(), description: f.description.trim() || undefined, active: f.active };
+      if (editing!.code === null) await resourceService.createResourceType(body);
+      else await resourceService.updateResourceType(editing!.code, body);
     },
-    onError: () =>
-      alert(
-        "Erreur lors de la suppression du type. Il est peut-être utilisé par des ressources.",
-      ),
+    onSuccess: async () => {
+      toast.success(editing?.code === null ? "Type créé" : "Type modifié");
+      await invalidate();
+      setEditing(null);
+      setError(null);
+    },
+    onError: (e) => setError(apiMessage(e, "Enregistrement impossible")),
   });
+  const toggle = useMutation({
+    mutationFn: (t: ResourceTypeResponse) => resourceService.updateResourceType(t.code, { name: t.name, description: t.description ?? undefined, active: !t.active }),
+    onSuccess: invalidate,
+    onError: (e) => toast.error(apiMessage(e, "Changement d'état impossible")),
+  });
+  const remove = useMutation({ mutationFn: (code: string) => resourceService.deleteResourceType(code), onSuccess: invalidate });
 
-  const types: ResourceTypeResponse[] = typesData?.content || [];
-
-  const filteredTypes = search
-    ? types.filter(
-        (t) =>
-          t.name.toLowerCase().includes(search.toLowerCase()) ||
-          t.code.toLowerCase().includes(search.toLowerCase()),
-      )
-    : types;
-
-  const activeCount = types.filter((type) => type.active).length;
-  const inactiveCount = types.length - activeCount;
-
-  const handleDelete = (code: string) => {
-    if (
-      confirm(
-        "Êtes-vous sûr de vouloir supprimer ce type ? Cette action est irréversible.",
-      )
-    ) {
-      deleteMutation.mutate(code);
-    }
-  };
-
-  if (isLoading) {
-    return <div className="text-center py-8">Chargement...</div>;
-  }
+  const f = editing?.form;
+  const set = (patch: Partial<typeof EMPTY>) => setEditing((p) => (p ? { ...p, form: { ...p.form, ...patch } } : p));
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            Types de ressources
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Organisez les espaces par typologie : bureaux, salles, postes ou
-            zones dédiées.
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            setEditingType(null);
-            setIsModalOpen(true);
-          }}
-          className="bg-primary-600 text-white px-4 py-2.5 rounded-xl hover:bg-primary-700 flex items-center justify-center gap-2 shadow-sm"
+    <div className="space-y-5">
+      <ListHeader
+        title="Types de ressources"
+        subtitle={isLoading ? undefined : `${total} type${total > 1 ? "s" : ""}`}
+        action={<ActionButton icon={Plus} onClick={() => { setError(null); setEditing({ code: null, form: { ...EMPTY } }); }}>Nouveau type</ActionButton>}
+      />
+
+      {editing && f && (
+        <PanelForm
+          title={editing.code === null ? "Nouveau type de ressource" : `Modifier ${editing.code}`}
+          onCancel={() => setEditing(null)}
+          pending={save.isPending}
+          submitLabel={editing.code === null ? "Créer" : "Enregistrer"}
+          submitDisabled={!f.name.trim()}
+          error={error}
+          onSubmit={(e) => { e.preventDefault(); save.mutate(); }}
         >
-          <Plus size={18} />
-          Nouveau type
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-500">Total</p>
-            <Layers size={18} className="text-gray-400" />
-          </div>
-          <p className="text-2xl font-bold text-gray-900 mt-2">
-            {types.length}
-          </p>
-        </div>
-        <div className="bg-white rounded-2xl border border-green-100 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-green-700">Actifs</p>
-            <CheckCircle2 size={18} className="text-green-500" />
-          </div>
-          <p className="text-2xl font-bold text-green-700 mt-2">
-            {activeCount}
-          </p>
-        </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-500">Inactifs</p>
-            <Archive size={18} className="text-gray-400" />
-          </div>
-          <p className="text-2xl font-bold text-gray-700 mt-2">
-            {inactiveCount}
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-gray-100 p-3">
-        <div className="relative">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Rechercher un type par nom ou code..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          />
-        </div>
-      </div>
-
-      {filteredTypes.length === 0 ? (
-        <div className="text-center py-14 bg-white rounded-2xl border border-gray-100">
-          <Tag size={46} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-600 font-medium">Aucun type trouvé</p>
-          <p className="text-sm text-gray-400 mt-1">
-            Modifiez votre recherche ou créez un nouveau type.
-          </p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full border-separate border-spacing-y-2 p-2">
-              <thead>
-                <tr className="text-xs uppercase tracking-wide text-gray-400">
-                  <th className="px-4 py-2 text-left font-semibold">Type</th>
-                  <th className="px-4 py-2 text-left font-semibold">
-                    Description
-                  </th>
-                  <th className="px-4 py-2 text-center font-semibold">
-                    Statut
-                  </th>
-                  <th className="px-4 py-2 text-right font-semibold">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTypes.map((type) => (
-                  <tr
-                    key={type.code}
-                    className={`group bg-gray-50/60 hover:bg-primary-50/40 transition-colors ${
-                      !type.active ? "opacity-70" : ""
-                    }`}
-                  >
-                    <td className="px-4 py-4 rounded-l-2xl">
-                      <p className="text-sm font-semibold text-gray-900">
-                        {type.name}
-                      </p>
-                      <p className="text-xs text-gray-400 font-mono mt-0.5">
-                        {type.code}
-                      </p>
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-600 max-w-xl">
-                      {type.description || "—"}
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                          type.active
-                            ? "bg-green-50 text-green-700"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {type.active ? "Actif" : "Inactif"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 rounded-r-2xl">
-                      <div className="flex justify-end gap-1">
-                        <button
-                          onClick={() => {
-                            setEditingType(type);
-                            setIsModalOpen(true);
-                          }}
-                          className="p-2 rounded-xl text-blue-600 hover:bg-blue-50"
-                          title="Modifier"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(type.code)}
-                          disabled={deleteMutation.isPending}
-                          className="p-2 rounded-xl text-red-600 hover:bg-red-50 disabled:opacity-40"
-                          title="Supprimer"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+          <Field label="Nom" required>
+            <input value={f.name} onChange={(e) => set({ name: e.target.value })} className={FIELD} autoFocus />
+          </Field>
+          <Field label="Description">
+            <textarea value={f.description} onChange={(e) => set({ description: e.target.value })} rows={2} className={`${FIELD} resize-none`} />
+          </Field>
+          <CheckField checked={f.active} onChange={(v) => set({ active: v })} label="Type actif" />
+        </PanelForm>
       )}
 
-      <ResourceTypeFormModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingType(null);
-        }}
-        editingType={editingType}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["resource-types"] });
-          setIsModalOpen(false);
-          setEditingType(null);
-        }}
-      />
+      <SearchField value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Nom ou code du type" />
+
+      {isLoading ? (
+        <ListSkeleton rows={6} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les types de ressources." onRetry={() => refetch()} />
+      ) : types.length === 0 ? (
+        <EmptyState icon={Shapes} title="Aucun type de ressource" hint={q ? "Aucun résultat pour cette recherche." : "Créez le premier type, par exemple « Salle de réunion »."} />
+      ) : (
+        <>
+          <HeadRow cols={COLS}>
+            <span>Type</span>
+            <span>Description</span>
+            <span>État</span>
+            <span className="text-right">Actions</span>
+          </HeadRow>
+          <DataCard>
+            {types.map((t) => {
+              const open = expanded === t.code;
+              return (
+                <div key={t.code} className={`rounded-2xl max-lg:mb-2 max-lg:bg-gray-50 ${ROW_HOVER}`}>
+                  <div onClick={() => setExpanded(open ? null : t.code)} className={`grid cursor-pointer grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 p-4 ${COLS}`}>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <ChevronDown size={16} className={`shrink-0 text-gray-400 transition ${open ? "" : "-rotate-90"}`} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-900">{t.name}</p>
+                        <p className="font-mono text-xs text-gray-400">{t.code}</p>
+                      </div>
+                    </div>
+                    <Cell title="Description" className="max-lg:order-3 max-lg:col-span-2">
+                      <span className="line-clamp-1 text-sm text-gray-600">{t.description || "Sans description"}</span>
+                    </Cell>
+                    <div className="max-lg:order-2 max-lg:justify-self-end">
+                      <StatusChip tone={t.active ? "success" : "neutral"}>{t.active ? "Actif" : "Inactif"}</StatusChip>
+                    </div>
+                    <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 max-lg:order-4 max-lg:col-span-2 lg:justify-end">
+                      <IconButton icon={Power} label={t.active ? "Désactiver" : "Activer"} tone={t.active ? "success" : "neutral"} pending={toggle.isPending && toggle.variables?.code === t.code} onClick={() => toggle.mutate(t)} />
+                      <IconButton icon={Pencil} label="Modifier" onClick={() => { setError(null); setEditing({ code: t.code, form: { name: t.name, description: t.description ?? "", active: t.active } }); }} />
+                      <IconButton
+                        icon={Trash2}
+                        label="Supprimer"
+                        tone="danger"
+                        onClick={() =>
+                          toast.confirm({
+                            message: `Supprimer le type « ${t.name} » ?`,
+                            detail: "La suppression échoue si des ressources utilisent ce type.",
+                            confirmLabel: "Supprimer",
+                            pendingLabel: "Suppression",
+                            successMessage: "Type supprimé",
+                            errorMessage: "Suppression impossible : le type est probablement utilisé",
+                            onConfirm: () => remove.mutateAsync(t.code),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                  {open && (
+                    <div className="grid gap-3 rounded-2xl bg-gray-50 p-3 sm:grid-cols-2 lg:mx-3 lg:mb-3">
+                      <Fact title="Code">{<span className="font-mono">{t.code}</span>}</Fact>
+                      <Fact title="Description">{t.description || "Aucune"}</Fact>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </DataCard>
+          <Pagination page={page} totalPages={data?.totalPages ?? 1} total={total} noun="type" onChange={setPage} />
+        </>
+      )}
     </div>
   );
 };

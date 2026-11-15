@@ -1,11 +1,23 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { AdminLayout } from "../components/layout/AdminLayout";
-import { ArrowLeft, Save, Building2, User, Users } from "lucide-react";
+import { ArrowLeft, Save, Building2, Users, KeyRound, PenLine, Check } from "lucide-react";
 import { CustomerAutocomplete } from "../components/customers/CustomerAutocomplete";
 import { memberService } from "../services/member.service";
+import { customerService } from "../services/customer.service";
+import { companyService } from "../services/company.service";
+import type { CompanyMemberRole, CompanyResponse } from "../services/company.service";
+import { CompanyPicker } from "../components/companies/CompanyPicker";
 import type { CreateMemberRequest } from "../services/member.service";
 import type { CustomerSummaryResponse } from "../services/customer.service";
+import { brandVars } from "../components/layout/adminTheme";
+import { Dots } from "../components/ui/Toaster";
+
+const FOCUS =
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--logo-pink)]";
+const FIELD =
+  "w-full rounded-2xl border border-transparent bg-white px-4 py-3 text-sm shadow-sm text-gray-900 placeholder:text-gray-400 transition focus:border-[color:var(--logo-pink)] focus:outline-none focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--logo-pink)_20%,white)]";
 
 const countries = [
   { code: "CG", name: "Congo", phoneCode: "+242" },
@@ -72,6 +84,72 @@ const countries = [
   { code: "NL", name: "Pays-Bas", phoneCode: "+31" },
 ];
 
+const Section: React.FC<{ title: string; hint?: string; children: React.ReactNode }> = ({
+  title,
+  hint,
+  children,
+}) => (
+  <section className="rounded-[1.75rem] border border-gray-100 bg-white p-3 shadow-sm">
+    <div className="px-3 pb-3 pt-2">
+      <h2 className="text-base font-semibold text-gray-950">{title}</h2>
+      {hint && <p className="mt-0.5 text-xs text-gray-500">{hint}</p>}
+    </div>
+    <div className="rounded-2xl bg-gray-50/60 p-3 sm:p-4">{children}</div>
+  </section>
+);
+
+const Field: React.FC<{ label: string; required?: boolean; children: React.ReactNode }> = ({
+  label,
+  required,
+  children,
+}) => (
+  <label className="block">
+    <span className="mb-1.5 block text-sm font-medium text-gray-700">
+      {label}
+      {required && <span className="ml-0.5 text-[color:var(--logo-pink-dark)]">*</span>}
+    </span>
+    {children}
+  </label>
+);
+
+const TypeTile: React.FC<{
+  active: boolean;
+  onClick: () => void;
+  icon: React.ElementType;
+  title: string;
+  text: string;
+}> = ({ active, onClick, icon: Icon, title, text }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-pressed={active}
+    className={`relative flex items-center gap-4 rounded-2xl p-4 text-left transition ${FOCUS} ${
+      active
+        ? "bg-[color:color-mix(in_srgb,var(--logo-pink)_16%,white)] ring-2 ring-[color:var(--logo-pink)]"
+        : "bg-white ring-1 ring-gray-100 hover:bg-gray-50"
+    }`}
+  >
+    <span
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+        active ? "bg-white text-[color:var(--logo-pink-dark)]" : "bg-gray-50 text-gray-400"
+      }`}
+    >
+      <Icon size={21} />
+    </span>
+    <span className="min-w-0">
+      <span className={`block text-sm font-semibold ${active ? "text-[color:var(--logo-pink-dark)]" : "text-gray-900"}`}>
+        {title}
+      </span>
+      <span className="mt-0.5 block text-xs text-gray-500">{text}</span>
+    </span>
+    {active && (
+      <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-[color:var(--logo-pink)] text-white">
+        <Check size={12} strokeWidth={3} />
+      </span>
+    )}
+  </button>
+);
+
 export const CreateMember: React.FC = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
@@ -85,10 +163,36 @@ export const CreateMember: React.FC = () => {
   const [selectedCustomer, setSelectedCustomer] =
     useState<CustomerSummaryResponse | null>(null);
 
-  // Type de customer pour nouveau customer
-  const [customerType, setCustomerType] = useState<"PERSON" | "COMPANY">(
-    "PERSON",
-  );
+  // Arrivée depuis la fiche d'un customer (?customerId=...) : on pré-sélectionne ce customer
+  const [searchParams] = useSearchParams();
+  const presetCustomerId = searchParams.get("customerId");
+  const { data: presetCustomer } = useQuery({
+    queryKey: ["customer", presetCustomerId],
+    queryFn: () => customerService.getCustomerById(presetCustomerId!),
+    enabled: !!presetCustomerId,
+  });
+
+  useEffect(() => {
+    if (!presetCustomer) return;
+    setMode("existing");
+    setSelectedCustomer({
+      id: 0,
+      customerId: presetCustomer.customerId,
+      displayName:
+        (presetCustomer.type === "PERSON"
+          ? `${presetCustomer.firstname || ""} ${presetCustomer.lastname || ""}`.trim()
+          : presetCustomer.companyName) || presetCustomer.customerId,
+      email: presetCustomer.email,
+      phone: presetCustomer.phone,
+      status: presetCustomer.status,
+    });
+  }, [presetCustomer]);
+
+  // Rattachement facultatif à une organisation, fait après la création du membre
+  const [company, setCompany] = useState<CompanyResponse | null>(null);
+  const [companyRole, setCompanyRole] = useState<CompanyMemberRole>("EMPLOYEE");
+  const [canSign, setCanSign] = useState(false);
+  const [canCollectMail, setCanCollectMail] = useState(false);
 
   // Informations du member
   const [formData, setFormData] = useState({
@@ -103,8 +207,6 @@ export const CreateMember: React.FC = () => {
 
   // Informations du nouveau customer (si mode new)
   const [newCustomerData, setNewCustomerData] = useState({
-    companyName: "",
-    billingEmail: "",
     address: {
       streetNumber: "",
       streetName: "",
@@ -116,15 +218,6 @@ export const CreateMember: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleNewCustomerChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
-    setNewCustomerData({
-      ...newCustomerData,
-      [e.target.name]: e.target.value,
-    });
   };
 
   const handleAddressChange = (
@@ -160,16 +253,7 @@ export const CreateMember: React.FC = () => {
     }
 
     if (mode === "existing" && !selectedCustomer) {
-      setError("Veuillez sélectionner un customer");
-      return false;
-    }
-
-    if (
-      mode === "new" &&
-      customerType === "COMPANY" &&
-      !newCustomerData.companyName
-    ) {
-      setError("Le nom de l'entreprise est requis");
+      setError("Veuillez sélectionner un client existant");
       return false;
     }
 
@@ -199,13 +283,7 @@ export const CreateMember: React.FC = () => {
           existingCustomerId: selectedCustomer.customerId,
         }),
       ...(mode === "new" && {
-        customerType,
-        ...(customerType === "COMPANY" && {
-          companyName: newCustomerData.companyName,
-        }),
-        ...(newCustomerData.billingEmail && {
-          billingEmail: newCustomerData.billingEmail,
-        }),
+        customerType: "PERSON" as const,
         ...(newCustomerData.address.streetNumber ||
         newCustomerData.address.streetName ||
         newCustomerData.address.city
@@ -226,8 +304,24 @@ export const CreateMember: React.FC = () => {
 
     try {
       const response = await memberService.createMemberAdmin(payload);
-      setSuccess(`Member créé avec succès ! ID: ${response.memberId}`);
-      setTimeout(() => navigate(`/members/${response.memberId}`), 2000);
+      let message = `Member créé avec succès ! ID: ${response.memberId}`;
+      let delay = 2000;
+      if (company) {
+        try {
+          await companyService.addMember(company.customerId, {
+            memberId: response.memberId,
+            role: companyRole,
+            canSign,
+            canCollectMail,
+          });
+          message += `, rattaché à ${company.name}`;
+        } catch (err: any) {
+          message += `. Le rattachement à ${company.name} a échoué : ${err.response?.data?.message || "erreur"}. Refais-le depuis la fiche du membre.`;
+          delay = 4000;
+        }
+      }
+      setSuccess(message);
+      setTimeout(() => navigate(`/members/${response.memberId}`), delay);
     } catch (err: any) {
       setError(err.response?.data?.message || "Erreur lors de la création");
     } finally {
@@ -235,368 +329,228 @@ export const CreateMember: React.FC = () => {
     }
   };
 
+
   return (
     <AdminLayout>
-      <div className="mb-6 flex items-center rounded-2xl bg-white p-3 shadow-sm ring-1 ring-gray-100 sm:p-4">
-        <button
-          onClick={() => navigate("/members")}
-          className="mr-3 shrink-0 rounded-xl p-2 transition-colors hover:bg-gray-100 sm:mr-4"
-        >
-          <ArrowLeft size={20} className="text-gray-600" />
-        </button>
-        <h1 className="text-xl font-black text-gray-900 sm:text-2xl">Créer un member</h1>
-      </div>
-
-      <form onSubmit={handleSubmit} className="w-full max-w-5xl space-y-5 pb-24 sm:space-y-6 sm:pb-0">
-        {/* Choix du mode */}
-        <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:mb-6 sm:p-6">
-          <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">
-            Rattachement customer
-          </h2>
-          <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-            <button
-              type="button"
-              onClick={() => setMode("new")}
-              className={`flex-1 p-4 border-2 rounded-xl text-center transition-all ${
-                mode === "new"
-                  ? "border-primary-600 bg-primary-50 text-primary-700"
-                  : "border-gray-200 hover:border-primary-200"
-              }`}
-            >
-              <Users
-                size={24}
-                className={`mx-auto mb-2 ${mode === "new" ? "text-primary-600" : "text-gray-400"}`}
-              />
-              <span className="font-medium">Nouveau customer</span>
-              <p className="text-xs text-gray-500 mt-1">
-                Crée un customer + member
-              </p>
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("existing")}
-              className={`flex-1 p-4 border-2 rounded-xl text-center transition-all ${
-                mode === "existing"
-                  ? "border-primary-600 bg-primary-50 text-primary-700"
-                  : "border-gray-200 hover:border-primary-200"
-              }`}
-            >
-              <Building2
-                size={24}
-                className={`mx-auto mb-2 ${mode === "existing" ? "text-primary-600" : "text-gray-400"}`}
-              />
-              <span className="font-medium">Customer existant</span>
-              <p className="text-xs text-gray-500 mt-1">
-                Rattache à un customer
-              </p>
-            </button>
-          </div>
-
-          {mode === "existing" ? (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Rechercher un customer
-              </label>
-              <CustomerAutocomplete
-                onSelect={setSelectedCustomer}
-                selectedCustomer={selectedCustomer}
-                placeholder="Rechercher par nom, email..."
-              />
-            </div>
-          ) : (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Type de customer
-              </label>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                <button
-                  type="button"
-                  onClick={() => setCustomerType("PERSON")}
-                  className={`flex-1 p-3 border rounded-xl text-center transition-all ${
-                    customerType === "PERSON"
-                      ? "border-primary-600 bg-primary-50 text-primary-700"
-                      : "border-gray-200 hover:border-primary-200"
-                  }`}
-                >
-                  <User size={20} className="mx-auto mb-1" />
-                  <span className="text-sm">Personne</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCustomerType("COMPANY")}
-                  className={`flex-1 p-3 border rounded-xl text-center transition-all ${
-                    customerType === "COMPANY"
-                      ? "border-primary-600 bg-primary-50 text-primary-700"
-                      : "border-gray-200 hover:border-primary-200"
-                  }`}
-                >
-                  <Building2 size={20} className="mx-auto mb-1" />
-                  <span className="text-sm">Entreprise</span>
-                </button>
-              </div>
-
-              {customerType === "COMPANY" && mode === "new" && (
-                <div className="mt-4 p-4 bg-gray-50/70 rounded-xl">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nom de l'entreprise *
-                  </label>
-                  <input
-                    type="text"
-                    name="companyName"
-                    value={newCustomerData.companyName}
-                    onChange={handleNewCustomerChange}
-                    className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-                  />
-                  <label className="block text-sm font-medium text-gray-700 mt-3 mb-1">
-                    Email de facturation
-                  </label>
-                  <input
-                    type="email"
-                    name="billingEmail"
-                    value={newCustomerData.billingEmail}
-                    onChange={handleNewCustomerChange}
-                    className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Informations du member */}
-        <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:mb-6 sm:p-6">
-          <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">
-            Informations du member
-          </h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Prénom *
-              </label>
-              <input
-                type="text"
-                name="firstname"
-                value={formData.firstname}
-                onChange={handleChange}
-                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nom *
-              </label>
-              <input
-                type="text"
-                name="lastname"
-                value={formData.lastname}
-                onChange={handleChange}
-                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email *
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Téléphone *
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                WhatsApp
-              </label>
-              <input
-                type="tel"
-                name="whatsappPhone"
-                value={formData.whatsappPhone}
-                onChange={handleChange}
-                placeholder="Laissez vide = téléphone"
-                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Accès portail */}
-        <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:mb-6 sm:p-6">
-          <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">
-            Accès portail
-          </h2>
-          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="flex items-center">
-              <input
-                type="radio"
-                checked={formData.generatePassword}
-                onChange={() =>
-                  setFormData({
-                    ...formData,
-                    generatePassword: true,
-                    password: "",
-                  })
-                }
-                className="mr-2"
-              />
-              <span className="text-sm">
-                Générer un mot de passe automatiquement
-              </span>
-            </label>
-            <label className="flex items-center">
-              <input
-                type="radio"
-                checked={!formData.generatePassword}
-                onChange={() =>
-                  setFormData({ ...formData, generatePassword: false })
-                }
-                className="mr-2"
-              />
-              <span className="text-sm">Définir un mot de passe</span>
-            </label>
-          </div>
-
-          {!formData.generatePassword && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Mot de passe *
-              </label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Adresse (si nouveau customer) */}
-        {mode === "new" && (
-          <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:mb-6 sm:p-6">
-            <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">
-              Adresse du customer
-            </h2>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Numéro rue
-                </label>
-                <input
-                  type="text"
-                  name="streetNumber"
-                  value={newCustomerData.address.streetNumber}
-                  onChange={handleAddressChange}
-                  className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nom rue
-                </label>
-                <input
-                  type="text"
-                  name="streetName"
-                  value={newCustomerData.address.streetName}
-                  onChange={handleAddressChange}
-                  className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Quartier
-                </label>
-                <input
-                  type="text"
-                  name="district"
-                  value={newCustomerData.address.district}
-                  onChange={handleAddressChange}
-                  className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Ville
-                </label>
-                <input
-                  type="text"
-                  name="city"
-                  value={newCustomerData.address.city}
-                  onChange={handleAddressChange}
-                  className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Pays
-                </label>
-                <select
-                  name="countryCode"
-                  value={newCustomerData.address.countryCode}
-                  onChange={handleAddressChange}
-                  className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-                >
-                  <option value="">Sélectionner un pays</option>
-                  {countries.map((country) => (
-                    <option key={country.code} value={country.code}>
-                      {country.name} ({country.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Messages */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
-            {error}
-          </div>
-        )}
-        {success && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl text-green-600 text-sm">
-            {success}
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+      <div className="mx-auto w-full max-w-4xl" style={brandVars}>
+        <div className="mb-6 flex items-center gap-3">
           <button
             type="button"
             onClick={() => navigate("/members")}
-            className="inline-flex w-full items-center justify-center rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50/70 sm:w-auto"
+            aria-label="Retour aux membres"
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-gray-100 bg-white text-gray-600 shadow-sm transition hover:bg-gray-50 ${FOCUS}`}
           >
-            Annuler
+            <ArrowLeft size={19} />
           </button>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="inline-flex w-full items-center justify-center rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50 sm:w-auto"
-          >
-            {isLoading ? (
-              <div className="animate-spin rounded-full h-5 w-5 -2 border-white mr-2"></div>
-            ) : (
-              <Save size={16} className="mr-2" />
-            )}
-            {isLoading ? "Création..." : "Créer le member"}
-          </button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-950 sm:text-3xl">Créer un membre</h1>
+            <p className="mt-0.5 text-sm text-gray-500">Les champs marqués d'un astérisque sont requis.</p>
+          </div>
         </div>
-      </form>
+
+        <form onSubmit={handleSubmit} className="space-y-4 pb-28 lg:pb-0">
+          <Section title="Rattachement client">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <TypeTile
+                  active={mode === "new"}
+                  onClick={() => setMode("new")}
+                  icon={Users}
+                  title="Nouveau client"
+                  text="Crée un client et un membre"
+                />
+                <TypeTile
+                  active={mode === "existing"}
+                  onClick={() => setMode("existing")}
+                  icon={Building2}
+                  title="Client existant"
+                  text="Rattache le membre à un client existant"
+                />
+              </div>
+
+              {mode === "existing" ? (
+                <Field label="Rechercher un client" required>
+                  <CustomerAutocomplete
+                    onSelect={setSelectedCustomer}
+                    selectedCustomer={selectedCustomer}
+                    placeholder="Rechercher par nom, email..."
+                  />
+                </Field>
+              ) : (
+                <p className="rounded-2xl bg-white px-4 py-3 text-sm text-gray-600 shadow-sm">
+                  Le membre reçoit sa propre fiche client. Pour une entreprise, crée-la d'abord dans{" "}
+                  <Link to="/companies/create" className="font-semibold text-[color:var(--logo-pink-dark)] hover:underline">
+                    Entreprises
+                  </Link>
+                  , puis rattache le membre ci-dessous.
+                </p>
+              )}
+            </div>
+          </Section>
+
+          <Section title="Organisation" hint="Facultatif : rattache le membre à une entreprise déjà créée">
+            <div className="space-y-4">
+              <Field label="Organisation">
+                <CompanyPicker selected={company} onSelect={setCompany} />
+              </Field>
+              {company && (
+                <>
+                  <Field label="Rôle">
+                    <select
+                      value={companyRole}
+                      onChange={(e) => setCompanyRole(e.target.value as CompanyMemberRole)}
+                      className={FIELD}
+                    >
+                      <option value="EMPLOYEE">Employé</option>
+                      <option value="OWNER">Gérant</option>
+                    </select>
+                  </Field>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-gray-800 shadow-sm">
+                      <input
+                        type="checkbox"
+                        checked={canSign}
+                        onChange={(e) => setCanSign(e.target.checked)}
+                        className="h-4 w-4 rounded accent-[color:var(--logo-pink-dark)]"
+                      />
+                      Peut signer pour l'organisation
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-gray-800 shadow-sm">
+                      <input
+                        type="checkbox"
+                        checked={canCollectMail}
+                        onChange={(e) => setCanCollectMail(e.target.checked)}
+                        className="h-4 w-4 rounded accent-[color:var(--logo-pink-dark)]"
+                      />
+                      Peut retirer le courrier
+                    </label>
+                  </div>
+                </>
+              )}
+            </div>
+          </Section>
+
+          <Section title="Informations du membre">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Field label="Prénom" required>
+                <input type="text" name="firstname" value={formData.firstname} onChange={handleChange} className={FIELD} />
+              </Field>
+              <Field label="Nom" required>
+                <input type="text" name="lastname" value={formData.lastname} onChange={handleChange} className={FIELD} />
+              </Field>
+              <Field label="Email" required>
+                <input type="email" name="email" value={formData.email} onChange={handleChange} className={FIELD} />
+              </Field>
+              <Field label="Téléphone" required>
+                <input type="tel" name="phone" value={formData.phone} onChange={handleChange} className={FIELD} />
+              </Field>
+              <Field label="WhatsApp">
+                <input
+                  type="tel"
+                  name="whatsappPhone"
+                  value={formData.whatsappPhone}
+                  onChange={handleChange}
+                  placeholder="Laissez vide pour utiliser le téléphone"
+                  className={FIELD}
+                />
+              </Field>
+            </div>
+          </Section>
+
+          <Section title="Accès portail">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <TypeTile
+                  active={formData.generatePassword}
+                  onClick={() => setFormData({ ...formData, generatePassword: true, password: "" })}
+                  icon={KeyRound}
+                  title="Mot de passe automatique"
+                  text="Généré à la création"
+                />
+                <TypeTile
+                  active={!formData.generatePassword}
+                  onClick={() => setFormData({ ...formData, generatePassword: false })}
+                  icon={PenLine}
+                  title="Définir un mot de passe"
+                  text="Saisi par vous"
+                />
+              </div>
+
+              {!formData.generatePassword && (
+                <Field label="Mot de passe" required>
+                  <input
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    className={FIELD}
+                  />
+                </Field>
+              )}
+            </div>
+          </Section>
+
+          {mode === "new" && (
+            <Section title="Adresse du client" hint="Facultative">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Field label="Numéro rue">
+                  <input type="text" name="streetNumber" value={newCustomerData.address.streetNumber} onChange={handleAddressChange} className={FIELD} />
+                </Field>
+                <Field label="Nom rue">
+                  <input type="text" name="streetName" value={newCustomerData.address.streetName} onChange={handleAddressChange} className={FIELD} />
+                </Field>
+                <Field label="Quartier">
+                  <input type="text" name="district" value={newCustomerData.address.district} onChange={handleAddressChange} className={FIELD} />
+                </Field>
+                <Field label="Ville">
+                  <input type="text" name="city" value={newCustomerData.address.city} onChange={handleAddressChange} className={FIELD} />
+                </Field>
+                <div className="md:col-span-2">
+                  <Field label="Pays">
+                    <select name="countryCode" value={newCustomerData.address.countryCode} onChange={handleAddressChange} className={FIELD}>
+                      <option value="">Sélectionner un pays</option>
+                      {countries.map((country) => (
+                        <option key={country.code} value={country.code}>
+                          {country.name} ({country.code})
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+              </div>
+            </Section>
+          )}
+
+          {error && (
+            <div role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div role="status" className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+              {success}
+            </div>
+          )}
+
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => navigate("/members")}
+              className={`w-full rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-gray-100 transition hover:bg-gray-50 sm:w-auto ${FOCUS}`}
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className={`flex w-full items-center justify-center gap-2 rounded-full bg-[color:var(--logo-pink-dark)] px-6 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50 sm:w-auto ${FOCUS}`}
+            >
+              {isLoading ? <Dots /> : <Save size={16} />}
+              {isLoading ? "Création en cours" : "Créer le membre"}
+            </button>
+          </div>
+        </form>
+      </div>
     </AdminLayout>
   );
 };

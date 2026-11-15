@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { Search, X, Building2 } from "lucide-react";
 import { customerService } from "../../services/customer.service";
 import type { CustomerSummaryResponse } from "../../services/customer.service";
+import { Dots } from "../ui/Toaster";
+import { FIELD, FOCUS } from "../subscription/kitUtils";
 
 interface CustomerAutocompleteProps {
   onSelect: (customer: CustomerSummaryResponse | null) => void;
@@ -22,10 +24,7 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        wrapperRef.current &&
-        !wrapperRef.current.contains(event.target as Node)
-      ) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setShowResults(false);
       }
     };
@@ -82,58 +81,56 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
   return (
     <div ref={wrapperRef} className="relative">
       <div className="relative">
-        <Search
-          size={18}
-          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-        />
+        <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => query.length >= 2 && setShowResults(true)}
           placeholder={placeholder}
-          className="w-full pl-10 pr-10 py-2 ring-1 ring-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className={`${FIELD} pl-10 pr-10`}
         />
         {query && (
           <button
             type="button"
+            aria-label="Effacer"
             onClick={handleClear}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            className={`absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 ${FOCUS}`}
           >
-            <X size={16} />
+            <X size={15} />
           </button>
         )}
       </div>
 
-      {/* Indicateur de chargement */}
       {isLoading && (
-        <div className="absolute z-20 mt-1 w-full bg-white ring-1 ring-gray-100 rounded-xl shadow-lg p-4">
-          <div className="flex justify-center">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600"></div>
-          </div>
+        <div className="absolute z-20 mt-2 flex w-full justify-center rounded-2xl bg-white p-4 shadow-lg ring-1 ring-gray-100">
+          <Dots />
         </div>
       )}
 
-      {!isLoading && showResults && results.length > 0 && (
-        <div className="absolute z-20 mt-1 w-full bg-white ring-1 ring-gray-100 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-          {results.map((customer) => (
-            <button
-              key={customer.customerId}
-              onClick={() => handleSelect(customer)}
-              className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center space-x-3 border-b border-gray-100 last:border-0"
-            >
-              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                <Building2 size={16} className="text-gray-500" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-gray-900">
-                  {customer.displayName}
-                </p>
-                <p className="text-xs text-gray-500">{customer.email}</p>
-              </div>
-              <p className="text-xs text-gray-500">{customer.customerId}</p>
-            </button>
-          ))}
+      {!isLoading && showResults && (
+        <div className="absolute z-20 mt-2 max-h-64 w-full overflow-y-auto rounded-2xl bg-white p-1.5 shadow-lg ring-1 ring-gray-100">
+          {results.length === 0 ? (
+            <p className="px-3 py-3 text-sm text-gray-500">Aucun résultat</p>
+          ) : (
+            results.map((customer) => (
+              <button
+                key={customer.customerId}
+                type="button"
+                onClick={() => handleSelect(customer)}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-gray-50"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500">
+                  <Building2 size={16} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-gray-900">{customer.displayName}</span>
+                  <span className="block truncate text-xs text-gray-500">{customer.email}</span>
+                </span>
+                <span className="shrink-0 font-mono text-xs text-gray-400">{customer.customerId}</span>
+              </button>
+            ))
+          )}
         </div>
       )}
     </div>

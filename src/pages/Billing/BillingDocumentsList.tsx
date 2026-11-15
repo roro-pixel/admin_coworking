@@ -1,68 +1,34 @@
-import React, { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import React, { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import {
-  Search,
-  Eye,
-  FileText,
-  Download,
-  Send,
-  RefreshCw,
-  Plus,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  Filter,
-  Calendar,
-  AlertCircle,
-  Copy,
-  Check,
-} from "lucide-react";
+import { Check, Copy, Download, FileMinus2, FileText, Mail, Plus, Send, Stamp } from "lucide-react";
 import { billingService } from "../../services/billing.service";
 import type { BillingDocument } from "../../services/billing.service";
-import { CreateCreditNoteModal } from "./CreateCreditNoteModal";
-
-const documentTypeLabels: Record<string, string> = {
-  QUOTE: "Devis",
-  PROFORMA_INVOICE: "Proforma",
-  INVOICE: "Facture",
-  CREDIT_NOTE: "Avoir",
-  DEBIT_NOTE: "Note de débit",
-  CORRECTIVE_INVOICE: "Rectificative",
-};
-
-const statusConfig: Record<string, { label: string; color: string }> = {
-  DRAFT: { label: "Brouillon", color: "bg-gray-100 text-gray-700" },
-  ISSUED: { label: "Émis(e)", color: "bg-blue-100 text-blue-700" },
-  SENT: { label: "Envoyé(e)", color: "bg-purple-100 text-purple-700" },
-  ACCEPTED: { label: "Accepté(e)", color: "bg-green-100 text-green-700" },
-  REJECTED: { label: "Rejeté(e)", color: "bg-red-100 text-red-700" },
-  EXPIRED: { label: "Expiré(e)", color: "bg-gray-100 text-gray-500" },
-  CONVERTED: { label: "Converti(e)", color: "bg-blue-100 text-blue-700" },
-  PARTIALLY_PAID: {
-    label: "Partiellement payé(e)",
-    color: "bg-yellow-100 text-yellow-700",
-  },
-  PAID: { label: "Payé(e)", color: "bg-green-100 text-green-700" },
-  OVERDUE: { label: "En retard", color: "bg-red-100 text-red-700" },
-  CANCELLED: { label: "Annulé(e)", color: "bg-gray-100 text-gray-500" },
-  VOIDED: { label: "Annulé(e)", color: "bg-gray-100 text-gray-500" },
-  REFUNDED: { label: "Remboursé(e)", color: "bg-orange-100 text-orange-700" },
-  WRITTEN_OFF: {
-    label: "Passé(e) en perte",
-    color: "bg-gray-100 text-gray-500",
-  },
-  VIEWED: { label: "Vu", color: "bg-teal-100 text-teal-700" },
-  NEGOTIATION: { label: "Négociation", color: "bg-amber-100 text-amber-700" },
-  DEPOSIT_REQUESTED: {
-    label: "Acompte demandé",
-    color: "bg-violet-100 text-violet-700",
-  },
-  DEPOSIT_PAID: { label: "Acompte reçu", color: "bg-green-100 text-green-600" },
-  VALIDATED: { label: "Validé SEFC", color: "bg-emerald-100 text-emerald-700" },
-};
+import {
+  ActionButton,
+  DataCard,
+  EmptyState,
+  ErrorBlock,
+  Field,
+  FilterButton,
+  FilterPanel,
+  HeadRow,
+  IconButton,
+  ListHeader,
+  Pagination,
+  SearchField,
+  StatusChip,
+  Tag,
+} from "../../components/subscription/kit";
+import { FIELD, ROW_HOVER, apiMessage, formatDate, formatMoney } from "../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../components/ui/Skeleton";
+import { Dots } from "../../components/ui/Toaster";
+import { toast } from "../../components/ui/toastStore";
+import { saveBlob, currencyLabel } from "../../components/payment/paymentUtils";
+import { DOC_TYPE_LABEL, DOC_TYPE_OPTIONS, STATUS_LABEL, STATUS_OPTIONS, STATUS_TONE } from "../../components/billing/billingLabels";
 
 const PAGE_SIZE = 20;
+const COLS = "lg:grid-cols-[minmax(0,1.1fr)_7rem_minmax(0,1.2fr)_9rem_9rem_7rem_9.5rem_9rem]";
 
 export const BillingDocumentsList: React.FC = () => {
   const queryClient = useQueryClient();
@@ -73,10 +39,7 @@ export const BillingDocumentsList: React.FC = () => {
     e.stopPropagation();
     navigator.clipboard.writeText(documentNumber).then(() => {
       setCopiedNumber(documentNumber);
-      setTimeout(
-        () => setCopiedNumber((c) => (c === documentNumber ? null : c)),
-        1500,
-      );
+      setTimeout(() => setCopiedNumber((c) => (c === documentNumber ? null : c)), 1500);
     });
   };
 
@@ -88,9 +51,7 @@ export const BillingDocumentsList: React.FC = () => {
   const [toDate, setToDate] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(0);
-
-  const [isCreditNoteOpen, setIsCreditNoteOpen] = useState(false);
-  const [selectedInvoiceNumber, setSelectedInvoiceNumber] = useState("");
+  const [pdfFor, setPdfFor] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -108,18 +69,10 @@ export const BillingDocumentsList: React.FC = () => {
   const {
     data: documentsData,
     isLoading,
-    isFetching,
+    isError,
     refetch,
   } = useQuery({
-    queryKey: [
-      "billing-documents",
-      fromDate,
-      toDate,
-      page,
-      typeFilter,
-      statusFilter,
-      debouncedSearch,
-    ],
+    queryKey: ["billing-documents", fromDate, toDate, page, typeFilter, statusFilter, debouncedSearch],
     queryFn: () =>
       billingService.getDocuments({
         type: typeFilter || undefined,
@@ -137,82 +90,58 @@ export const BillingDocumentsList: React.FC = () => {
   const totalElements = documentsData?.totalElements ?? 0;
   const totalPages = documentsData?.totalPages ?? 1;
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["billing-documents"] });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["billing-documents"] });
 
   const issueMutation = useMutation({
-    mutationFn: (documentNumber: string) =>
-      billingService.issueDocument(documentNumber),
-    onSuccess: invalidate,
-    onError: () => alert("Erreur lors de l'émission du document."),
+    mutationFn: (documentNumber: string) => billingService.issueDocument(documentNumber),
+    onSuccess: () => {
+      invalidate();
+      toast.success("Document émis.");
+    },
+    // La dérogation (discountOverrideReason) se fait sur la fiche du document, où le contexte complet est visible.
+    onError: (e: unknown) => {
+      const violations = (e as { response?: { data?: { violations?: { message: string }[] } } })?.response?.data?.violations;
+      if (Array.isArray(violations) && violations.length > 0) {
+        toast.error(
+          `Émission bloquée par un dépassement de remise : ${violations.map((v) => v.message).join(" ; ")}. Ouvrez le document pour fournir un motif de dérogation.`,
+        );
+      } else {
+        toast.error(apiMessage(e, "Erreur lors de l'émission du document."));
+      }
+    },
   });
 
   const sendMutation = useMutation({
-    mutationFn: (documentNumber: string) =>
-      billingService.sendDocument(documentNumber),
-    onSuccess: invalidate,
-    onError: () => alert("Erreur lors de l'envoi du document."),
+    mutationFn: (documentNumber: string) => billingService.sendDocument(documentNumber),
+    onSuccess: () => {
+      invalidate();
+      toast.success("Document marqué comme envoyé.");
+    },
+    onError: (e: unknown) => toast.error(apiMessage(e, "Erreur lors de l'envoi du document.")),
   });
 
   const sendEmailMutation = useMutation({
-    mutationFn: (documentNumber: string) =>
-      billingService.sendEmail(documentNumber),
-    onError: () => alert("Erreur lors de l'envoi de l'email."),
+    mutationFn: (documentNumber: string) => billingService.sendEmail(documentNumber),
+    onSuccess: () => toast.success("E-mail envoyé."),
+    onError: (e: unknown) => toast.error(apiMessage(e, "Erreur lors de l'envoi de l'e-mail.")),
   });
 
-  const anyPending =
-    issueMutation.isPending ||
-    sendMutation.isPending ||
-    sendEmailMutation.isPending;
-
-  const handleDownloadPdf = async (
-    doc: BillingDocument,
-    e: React.MouseEvent,
-  ) => {
+  const handleDownloadPdf = async (doc: BillingDocument, e: React.MouseEvent) => {
     e.stopPropagation();
+    setPdfFor(doc.documentNumber);
     try {
       const blob = await billingService.getPdf(doc.documentNumber);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${doc.documentType}_${doc.documentNumber}.pdf`;
-      a.click();
-      window.URL.revokeObjectURL(url);
+      saveBlob(blob, `${doc.documentType}_${doc.documentNumber}.pdf`);
     } catch {
-      alert("Erreur lors du téléchargement du PDF.");
+      toast.error("Erreur lors du téléchargement du PDF.");
+    } finally {
+      setPdfFor(null);
     }
   };
 
-  const handleViewDetail = (documentNumber: string) => {
-    navigate(`/billing/documents/${documentNumber}`);
-  };
+  const open = (documentNumber: string) => navigate(`/billing/documents/${documentNumber}`);
 
-  const handleCreateCreditNote = (
-    invoiceNumber: string,
-    e: React.MouseEvent,
-  ) => {
-    e.stopPropagation();
-    setSelectedInvoiceNumber(invoiceNumber);
-    setIsCreditNoteOpen(true);
-  };
-
-  const handleIssue = (documentNumber: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    issueMutation.mutate(documentNumber);
-  };
-
-  const handleSend = (documentNumber: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    sendMutation.mutate(documentNumber);
-  };
-
-  const handleSendEmail = (documentNumber: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    sendEmailMutation.mutate(documentNumber);
-  };
-
-  const hasActiveFilters =
-    typeFilter || statusFilter || fromDate || toDate || search;
+  const hasActiveFilters = Boolean(typeFilter || statusFilter || fromDate || toDate || search);
 
   const handleReset = () => {
     setSearch("");
@@ -224,393 +153,185 @@ export const BillingDocumentsList: React.FC = () => {
     setPage(0);
   };
 
-  if (isLoading) return <div className="text-center py-8">Chargement...</div>;
+  const pendingOf = (m: { isPending: boolean; variables?: string }, n: string) => m.isPending && m.variables === n;
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">
-            Documents de facturation
-          </h2>
-          {totalElements > 0 && (
-            <p className="text-sm text-gray-500 mt-0.5">
-              {totalElements} document{totalElements > 1 ? "s" : ""}
-            </p>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => navigate("/billing/invoices/create")}
-            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2 text-sm font-medium"
-          >
-            <Plus size={15} /> Nouvelle facture
-          </button>
-          <button
-            onClick={() => navigate("/billing/quotes/create")}
-            className="border border-primary-600 text-primary-600 px-4 py-2 rounded-lg hover:bg-primary-50 flex items-center gap-2 text-sm"
-          >
-            <Plus size={15} /> Nouveau devis
-          </button>
-          <button
-            onClick={() => refetch()}
-            disabled={isFetching}
-            className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-          >
-            <RefreshCw size={16} className={isFetching ? "animate-spin" : ""} />
-          </button>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <ListHeader
+        title="Documents de facturation"
+        subtitle={totalElements > 0 ? `${totalElements.toLocaleString("fr-FR")} document${totalElements > 1 ? "s" : ""}` : undefined}
+        action={
+          <div className="flex flex-wrap gap-2">
+            <ActionButton icon={Plus} onClick={() => navigate("/billing/invoices/create")}>
+              Nouvelle facture
+            </ActionButton>
+            <ActionButton variant="ghost" icon={Plus} onClick={() => navigate("/billing/quotes/create")}>
+              Nouveau devis
+            </ActionButton>
+          </div>
+        }
+      />
 
-      {/* Barre de recherche + filtres */}
-      <div className="flex flex-col md:flex-row gap-4 mb-4">
-        <div className="flex-1 relative">
-          <Search
-            size={17}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Rechercher par numéro, client, titre..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm"
-          />
-          {isFetching && debouncedSearch && (
-            <Loader2
-              size={13}
-              className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400"
-            />
-          )}
-        </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`px-4 py-2 border rounded-lg flex items-center gap-2 text-sm ${
-            showFilters || hasActiveFilters
-              ? "bg-primary-50 border-primary-300 text-primary-700"
-              : "bg-white border-gray-200 text-gray-600"
-          }`}
-        >
-          <Filter size={15} /> Filtres
-          {hasActiveFilters && (
-            <span className="w-2 h-2 bg-primary-600 rounded-full" />
-          )}
-        </button>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <SearchField className="flex-1" value={search} onChange={setSearch} placeholder="Numéro, client, titre" />
+        <FilterButton open={showFilters} active={hasActiveFilters} onClick={() => setShowFilters(!showFilters)} />
       </div>
 
       {showFilters && (
-        <div className="bg-gray-50 rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
-              Type
-            </label>
-            <select
-              value={typeFilter}
-              onChange={(e) =>
-                handleFilterChange(setTypeFilter, e.target.value)
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm"
-            >
+        <FilterPanel canReset={hasActiveFilters} onReset={handleReset}>
+          <Field label="Type">
+            <select value={typeFilter} onChange={(e) => handleFilterChange(setTypeFilter, e.target.value)} className={FIELD}>
               <option value="">Tous les types</option>
-              {Object.entries(documentTypeLabels).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
+              {DOC_TYPE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
                 </option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
-              Statut
-            </label>
-            <select
-              value={statusFilter}
-              onChange={(e) =>
-                handleFilterChange(setStatusFilter, e.target.value)
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm"
-            >
+          </Field>
+          <Field label="Statut">
+            <select value={statusFilter} onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)} className={FIELD}>
               <option value="">Tous les statuts</option>
-              {Object.entries(statusConfig).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v.label}
+              {STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
                 </option>
               ))}
             </select>
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Du">
+              <input type="date" value={fromDate} onChange={(e) => handleFilterChange(setFromDate, e.target.value)} className={FIELD} />
+            </Field>
+            <Field label="Au">
+              <input type="date" value={toDate} min={fromDate} onChange={(e) => handleFilterChange(setToDate, e.target.value)} className={FIELD} />
+            </Field>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
-              <Calendar size={11} className="inline mr-1" />
-              Du
-            </label>
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => handleFilterChange(setFromDate, e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
-              <Calendar size={11} className="inline mr-1" />
-              Au
-            </label>
-            <input
-              type="date"
-              value={toDate}
-              min={fromDate}
-              onChange={(e) => handleFilterChange(setToDate, e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-            />
-          </div>
-          {hasActiveFilters && (
-            <div className="md:col-span-4 flex justify-end">
-              <button
-                onClick={handleReset}
-                className="text-sm text-primary-600 hover:text-primary-700"
-              >
-                Réinitialiser tous les filtres
-              </button>
-            </div>
-          )}
-        </div>
+        </FilterPanel>
       )}
 
-      {/* Tableau */}
-      <div className="bg-white rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50/80">
-              <tr>
-                <th className="px-5 py-3 text-left text-sm font-semibold">
-                  N° Document
-                </th>
-                <th className="px-5 py-3 text-left text-sm font-semibold">
-                  Type
-                </th>
-                <th className="px-5 py-3 text-left text-sm font-semibold">
-                  Client
-                </th>
-                <th className="px-5 py-3 text-right text-sm font-semibold">
-                  Total
-                </th>
-                <th className="px-5 py-3 text-right text-sm font-semibold">
-                  Solde dû
-                </th>
-                <th className="px-5 py-3 text-left text-sm font-semibold">
-                  Statut
-                </th>
-                <th className="px-5 py-3 text-left text-sm font-semibold">
-                  Échéance
-                </th>
-                <th className="px-5 py-3 text-center text-sm font-semibold">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {documents.map((doc) => {
-                const isOverdue = doc.status === "OVERDUE";
-                const hasBalance = doc.balanceDue > 0;
-                return (
-                  <tr
-                    key={doc.documentNumber}
-                    className={`hover:bg-gray-50 cursor-pointer transition-colors ${isOverdue ? "bg-red-50/20" : ""}`}
-                    onClick={() => handleViewDetail(doc.documentNumber)}
-                  >
-                    <td className="px-5 py-4 text-sm font-mono">
-                      <span className="group/copy inline-flex items-center gap-1.5">
-                        {doc.documentNumber}
-                        <button
-                          onClick={(e) => copyDocumentNumber(e, doc.documentNumber)}
-                          title="Copier le numéro"
-                          className="opacity-0 group-hover/copy:opacity-100 transition-opacity p-0.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700"
-                        >
-                          {copiedNumber === doc.documentNumber ? (
-                            <Check size={13} className="text-green-600" />
-                          ) : (
-                            <Copy size={13} />
-                          )}
-                        </button>
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 text-sm">
-                      {documentTypeLabels[doc.documentType] ?? doc.documentType}
-                    </td>
-                    <td className="px-5 py-4">
-                      <p className="text-sm font-medium truncate max-w-[140px]">
-                        {doc.customerName ?? doc.customerCode ?? "-"}
-                      </p>
-                      {doc.customerEmail && (
-                        <p className="text-xs text-gray-500 truncate max-w-[140px]">
-                          {doc.customerEmail}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-5 py-4 text-right font-semibold text-sm">
-                      {doc.totalAmount.toLocaleString("fr-FR")} FCFA
-                    </td>
-                    <td className="px-5 py-4 text-right text-sm">
-                      {hasBalance ? (
-                        <span
-                          className={`font-medium ${isOverdue ? "text-red-600" : "text-red-500"}`}
-                        >
-                          {doc.balanceDue.toLocaleString("fr-FR")} FCFA
-                        </span>
-                      ) : (
-                        <span className="text-green-600">Payé</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-4">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs ${statusConfig[doc.status]?.color ?? "bg-gray-100 text-gray-600"}`}
+      {isLoading ? (
+        <ListSkeleton rows={8} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les documents." onRetry={() => refetch()} />
+      ) : documents.length === 0 ? (
+        <EmptyState
+          icon={FileText}
+          title="Aucun document trouvé"
+          hint={hasActiveFilters ? "Ajustez ou réinitialisez les filtres." : "Créez une première facture ou un devis."}
+          action={
+            hasActiveFilters ? (
+              <ActionButton variant="ghost" onClick={handleReset}>
+                Réinitialiser les filtres
+              </ActionButton>
+            ) : undefined
+          }
+        />
+      ) : (
+        <>
+          <HeadRow cols={COLS}>
+            <span>N° document</span>
+            <span>Type</span>
+            <span>Client</span>
+            <span className="text-right">Total</span>
+            <span className="text-right">Solde dû</span>
+            <span>Échéance</span>
+            <span>Statut</span>
+            <span className="text-right">Actions</span>
+          </HeadRow>
+          <DataCard>
+            {documents.map((doc) => {
+              const overdue = doc.status === "OVERDUE";
+              const cur = currencyLabel(doc.currency);
+              return (
+                <div
+                  key={doc.documentNumber}
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => open(doc.documentNumber)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") open(doc.documentNumber);
+                  }}
+                  className={`grid cursor-pointer grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl p-4 transition max-lg:mb-2 max-lg:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--logo-pink)] ${COLS} ${ROW_HOVER}`}
+                >
+                  <div className="min-w-0">
+                    <span className="inline-flex max-w-full items-center gap-1.5">
+                      <span className="truncate font-mono text-xs font-semibold text-[color:var(--logo-pink-dark)]">{doc.documentNumber}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => copyDocumentNumber(e, doc.documentNumber)}
+                        title="Copier le numéro"
+                        aria-label="Copier le numéro"
+                        className="rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-700"
                       >
-                        {statusConfig[doc.status]?.label ?? doc.status}
+                        {copiedNumber === doc.documentNumber ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                      </button>
+                    </span>
+                    {doc.title && <p className="mt-0.5 truncate text-xs text-gray-400">{doc.title}</p>}
+                  </div>
+                  <div className="lg:order-none max-lg:text-right">
+                    <Tag>{DOC_TYPE_LABEL[doc.documentType] ?? doc.documentType}</Tag>
+                  </div>
+                  <div className="col-span-2 min-w-0 lg:col-span-1">
+                    <p className="truncate font-semibold text-gray-950">{doc.customerName ?? doc.customerCode}</p>
+                    {doc.customerEmail && <p className="truncate text-xs text-gray-400">{doc.customerEmail}</p>}
+                  </div>
+                  <p className="text-sm font-bold tabular-nums text-gray-950 lg:text-right">{formatMoney(doc.totalAmount, cur)}</p>
+                  <p className={`text-sm font-semibold tabular-nums max-lg:text-right lg:text-right ${doc.balanceDue > 0 ? (overdue ? "text-red-600" : "text-gray-800") : "text-emerald-600"}`}>
+                    {doc.balanceDue > 0 ? formatMoney(doc.balanceDue, cur) : "Soldé"}
+                  </p>
+                  <p className={`text-sm ${overdue ? "font-semibold text-red-600" : "text-gray-500"}`}>{formatDate(doc.dueDate)}</p>
+                  <div className="max-lg:text-right">
+                    <StatusChip tone={STATUS_TONE[doc.status] ?? "neutral"}>{STATUS_LABEL[doc.status] ?? doc.status}</StatusChip>
+                  </div>
+                  <div className="col-span-2 flex justify-end gap-1 lg:col-span-1" onClick={(e) => e.stopPropagation()}>
+                    {pdfFor === doc.documentNumber ? (
+                      <span className="flex h-9 w-9 items-center justify-center">
+                        <Dots />
                       </span>
-                    </td>
-                    <td className="px-5 py-4 text-sm text-gray-600">
-                      {doc.dueDate
-                        ? new Date(doc.dueDate).toLocaleDateString("fr-FR")
-                        : "-"}
-                      {isOverdue && (
-                        <AlertCircle
-                          size={10}
-                          className="ml-1 text-red-500 inline"
+                    ) : (
+                      <IconButton icon={Download} label="Télécharger le PDF" onClick={(e) => handleDownloadPdf(doc, e)} />
+                    )}
+                    {doc.documentType === "INVOICE" && ["PAID", "PARTIALLY_PAID"].includes(doc.status) && (
+                      <IconButton
+                        icon={FileMinus2}
+                        label="Créer un avoir"
+                        onClick={() => navigate(`/billing/documents/${doc.documentNumber}?panel=creditNote`)}
+                      />
+                    )}
+                    {doc.status === "DRAFT" && (
+                      <IconButton
+                        icon={Stamp}
+                        label="Émettre"
+                        pending={pendingOf(issueMutation, doc.documentNumber)}
+                        onClick={() => issueMutation.mutate(doc.documentNumber)}
+                      />
+                    )}
+                    {doc.status === "ISSUED" && (
+                      <>
+                        <IconButton
+                          icon={Send}
+                          label="Marquer comme envoyé"
+                          tone="success"
+                          pending={pendingOf(sendMutation, doc.documentNumber)}
+                          onClick={() => sendMutation.mutate(doc.documentNumber)}
                         />
-                      )}
-                    </td>
-                    <td className="px-5 py-4 text-center">
-                      <div
-                        className="flex justify-center gap-1 flex-wrap"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          onClick={() => handleViewDetail(doc.documentNumber)}
-                          className="p-1 text-gray-600 hover:text-primary-600"
-                          title="Voir détail"
-                        >
-                          <Eye size={15} />
-                        </button>
-                        <button
-                          onClick={(e) => handleDownloadPdf(doc, e)}
-                          className="p-1 text-gray-600 hover:text-primary-600"
-                          title="PDF"
-                        >
-                          <Download size={15} />
-                        </button>
-                        {doc.documentType === "INVOICE" &&
-                          ["PAID", "PARTIALLY_PAID"].includes(doc.status) && (
-                            <button
-                              onClick={(e) =>
-                                handleCreateCreditNote(doc.documentNumber, e)
-                              }
-                              className="p-1 text-orange-600 hover:text-orange-800"
-                              title="Créer un avoir"
-                            >
-                              <FileText size={15} />
-                            </button>
-                          )}
-                        {doc.status === "DRAFT" && (
-                          <button
-                            onClick={(e) => handleIssue(doc.documentNumber, e)}
-                            disabled={anyPending}
-                            className="p-1 text-blue-600 hover:text-blue-800 disabled:opacity-40"
-                            title="Émettre"
-                          >
-                            {issueMutation.isPending ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              <RefreshCw size={15} />
-                            )}
-                          </button>
-                        )}
-                        {doc.status === "ISSUED" && (
-                          <>
-                            <button
-                              onClick={(e) => handleSend(doc.documentNumber, e)}
-                              disabled={anyPending}
-                              className="p-1 text-green-600 hover:text-green-800 disabled:opacity-40"
-                              title="Marquer envoyé"
-                            >
-                              <Send size={15} />
-                            </button>
-                            <button
-                              onClick={(e) =>
-                                handleSendEmail(doc.documentNumber, e)
-                              }
-                              disabled={anyPending}
-                              className="p-1 text-purple-600 hover:text-purple-800 disabled:opacity-40"
-                              title="Envoyer par email"
-                            >
-                              {sendEmailMutation.isPending ? (
-                                <Loader2 size={14} className="animate-spin" />
-                              ) : (
-                                <FileText size={15} />
-                              )}
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {documents.length === 0 && !isLoading && (
-        <div className="text-center py-12 bg-white rounded-xl">
-          <FileText size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500">Aucun document trouvé</p>
-          {hasActiveFilters && (
-            <button
-              onClick={handleReset}
-              className="mt-2 text-primary-600 hover:underline text-sm"
-            >
-              Réinitialiser les filtres
-            </button>
-          )}
-        </div>
+                        <IconButton
+                          icon={Mail}
+                          label="Envoyer par e-mail"
+                          pending={pendingOf(sendEmailMutation, doc.documentNumber)}
+                          onClick={() => sendEmailMutation.mutate(doc.documentNumber)}
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </DataCard>
+          <Pagination page={page} totalPages={totalPages} total={totalElements} noun="document" onChange={setPage} />
+        </>
       )}
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 px-2">
-          <p className="text-sm text-gray-500">
-            {totalElements} document{totalElements > 1 ? "s" : ""} - Page{" "}
-            {page + 1} / {totalPages}
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="p-1.5 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
-              className="p-1.5 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Modal création avoir */}
-      <CreateCreditNoteModal
-        isOpen={isCreditNoteOpen}
-        onClose={() => setIsCreditNoteOpen(false)}
-        invoiceNumber={selectedInvoiceNumber}
-        onSuccess={() => {
-          invalidate();
-          setIsCreditNoteOpen(false);
-          setSelectedInvoiceNumber("");
-        }}
-      />
     </div>
   );
 };

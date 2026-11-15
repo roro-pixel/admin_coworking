@@ -77,60 +77,57 @@ export const InventoryCountEntry: React.FC<InventoryCountEntryProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-5">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-3xl w-full max-w-5xl w-full max-h-[92vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white ring-1 ring-gray-100 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-xl w-full max-w-5xl max-h-[92vh] overflow-y-auto border border-gray-200">
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-lg sm:text-xl sm:text-2xl font-bold">
-              Comptage physique - {count.countCode}
+            <h3 className="text-base font-semibold text-gray-900">
+              Comptage physique — {count.countCode}
             </h3>
-            <p className="text-base text-gray-500 mt-1">
-              Emplacement: {count.locationName}
+            <p className="text-sm text-gray-500 mt-0.5">
+              Emplacement : {count.locationName}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-2xl"
+            className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md hover:bg-gray-100"
           >
-            <X size={24} />
+            <X size={20} />
           </button>
         </div>
 
-        <div className="p-8">
-          {/* Barre de progression - AGRANDIE */}
-          <div className="mb-8">
-            <div className="flex justify-between text-sm sm:text-base text-gray-600 mb-3">
+        <div className="p-6">
+          <div className="mb-6">
+            <div className="flex justify-between text-sm text-gray-600 mb-2">
               <span>Progression</span>
               <span>
                 {completedCount} / {totalCount} articles
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
+            <div className="w-full bg-gray-100 rounded-full h-1.5">
               <div
-                className="bg-primary-600 h-3 rounded-full transition-all duration-500 w-full sm:w-auto justify-center"
+                className="bg-gray-900 h-1.5 rounded-full transition-all duration-500"
                 style={{ width: `${progress}%` }}
               />
             </div>
           </div>
 
-          {/* Recherche - AGRANDIE */}
-          <div className="relative mb-8">
+          <div className="relative mb-6">
             <Search
-              size={20}
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
+              size={16}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
             />
             <input
               type="text"
-              placeholder="Rechercher un article..."
+              placeholder="Rechercher un article…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg outline-none transition focus:border-gray-400 text-sm max-w-sm"
             />
           </div>
 
-          {/* Liste des articles à compter - AGRANDIE */}
-          <div className="space-y-4 max-h-96 overflow-y-auto">
+          <div className="space-y-2 max-h-96 overflow-y-auto">
             {filteredItems.map((item) => {
               const variance =
                 item.countedQuantity !== null &&
@@ -142,26 +139,24 @@ export const InventoryCountEntry: React.FC<InventoryCountEntryProps> = ({
               return (
                 <div
                   key={item.itemCode}
-                  className="border rounded-2xl p-4 sm:p-5 hover:bg-gray-50"
+                  className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50/60"
                 >
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div className="flex-1">
-                      <p className="font-medium text-sm sm:text-base">{item.itemName}</p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Code: {item.itemCode}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        Stock système: {item.systemQuantity}
+                      <p className="text-sm font-medium text-gray-900">{item.itemName}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Code : {item.itemCode}</p>
+                      <p className="text-xs text-gray-500">
+                        Stock système : {item.systemQuantity}
                       </p>
                       {hasVariance && (
                         <p
-                          className={`text-sm font-medium mt-1 ${variance > 0 ? "text-green-600" : "text-red-600"}`}
+                          className={`text-xs font-medium mt-1 ${variance > 0 ? "text-emerald-600" : "text-red-600"}`}
                         >
-                          Écart: {variance > 0 ? `+${variance}` : variance}
+                          Écart : {variance > 0 ? `+${variance}` : variance}
                         </p>
                       )}
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                       <input
                         type="text"
                         inputMode="numeric"
@@ -179,26 +174,23 @@ export const InventoryCountEntry: React.FC<InventoryCountEntryProps> = ({
                           );
                         }}
                         placeholder="Quantité comptée"
-                        className="w-40 px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-center text-sm sm:text-base"
+                        className="w-36 px-3.5 py-2 border border-gray-200 rounded-lg text-center text-sm outline-none focus:border-gray-400"
                       />
                       <button
                         onClick={() =>
-                          handleSaveLine(
-                            item.itemCode,
-                            item.countedQuantity || 0,
-                          )
+                          handleSaveLine(item.itemCode, item.countedQuantity || 0)
                         }
                         disabled={
                           saving ||
                           item.countedQuantity === null ||
                           item.countedQuantity === undefined
                         }
-                        className="px-4 py-3 bg-primary-600 text-white rounded-2xl hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2 text-sm sm:text-base w-full sm:w-auto justify-center"
+                        className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 flex items-center gap-2 text-sm font-medium whitespace-nowrap"
                       >
                         {saving ? (
-                          <Loader2 size={18} className="animate-spin" />
+                          <Loader2 size={15} className="animate-spin" />
                         ) : (
-                          <Save size={18} />
+                          <Save size={15} />
                         )}
                         Enregistrer
                       </button>
@@ -211,16 +203,15 @@ export const InventoryCountEntry: React.FC<InventoryCountEntryProps> = ({
 
           {filteredItems.length === 0 && (
             <div className="text-center py-16">
-              <p className="text-gray-500 text-sm sm:text-base">Aucun article trouvé</p>
+              <p className="text-sm text-gray-500">Aucun article trouvé</p>
             </div>
           )}
 
-          {/* Résumé des écarts - AGRANDI */}
           {completedCount === totalCount && totalCount > 0 && (
-            <div className="mt-8 p-4 sm:p-5 bg-yellow-50 rounded-2xl">
+            <div className="mt-6 p-4 bg-amber-50 border border-amber-100 rounded-xl">
               <div className="flex items-center gap-3">
-                <AlertTriangle size={24} className="text-yellow-600" />
-                <p className="text-base text-yellow-800">
+                <AlertTriangle size={18} className="text-amber-600 shrink-0" />
+                <p className="text-sm text-amber-800">
                   Tous les articles ont été comptés. Vous pouvez maintenant
                   envoyer en revue.
                 </p>

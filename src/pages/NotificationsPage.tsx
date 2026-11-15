@@ -11,6 +11,8 @@ import {
   XCircle,
 } from "lucide-react";
 import { notificationService } from "../services/notification.service";
+import { Skeleton, ListSkeleton } from "../components/ui/Skeleton";
+import { brandVars } from "../components/layout/adminTheme";
 
 const notificationIcons: Record<string, React.ElementType> = {
   BOOKING_CONFIRMATION: CheckCircle,
@@ -35,16 +37,16 @@ const notificationTone: Record<string, string> = {
   BOOKING_CANCELLATION: "text-rose-700 bg-rose-50 ring-rose-100",
   KYC_APPROVED: "text-emerald-700 bg-emerald-50 ring-emerald-100",
   KYC_REJECTED: "text-rose-700 bg-rose-50 ring-rose-100",
-  INVOICE_ISSUED: "text-slate-700 bg-slate-50 ring-slate-100",
+  INVOICE_ISSUED: "text-gray-700 bg-gray-50 ring-gray-100",
   PAYMENT_RECEIVED: "text-emerald-700 bg-emerald-50 ring-emerald-100",
   INVENTORY_ALERT: "text-amber-700 bg-amber-50 ring-amber-100",
   SUPPORT_CLIENT_REPLY: "text-sky-700 bg-sky-50 ring-sky-100",
   CASH_ANOMALY: "text-rose-700 bg-rose-50 ring-rose-100",
   BILLING_OVERDUE: "text-amber-700 bg-amber-50 ring-amber-100",
-  BILLING_DOCUMENT_ISSUED: "text-slate-700 bg-slate-50 ring-slate-100",
-  CONTRACT_SIGNING_REQUESTED: "text-violet-700 bg-violet-50 ring-violet-100",
+  BILLING_DOCUMENT_ISSUED: "text-gray-700 bg-gray-50 ring-gray-100",
+  CONTRACT_SIGNING_REQUESTED: "text-[color:var(--logo-pink-dark)] bg-[color:color-mix(in_srgb,var(--logo-pink)_16%,white)] ring-[color:color-mix(in_srgb,var(--logo-pink)_30%,white)]",
   CONTRACT_SIGNED_VIA_ESIGN: "text-emerald-700 bg-emerald-50 ring-emerald-100",
-  default: "text-slate-700 bg-slate-50 ring-slate-100",
+  default: "text-gray-700 bg-gray-50 ring-gray-100",
 };
 
 const typeLabels: Record<string, string> = {
@@ -131,11 +133,18 @@ export const NotificationsPage: React.FC = () => {
   if (isLoading) {
     return (
       <AdminLayout>
-        <div className="flex min-h-[360px] items-center justify-center">
-          <div className="text-center">
-            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-primary-600" />
-            <p className="mt-4 text-sm text-slate-500">Chargement...</p>
+        <div className="space-y-6" style={brandVars}>
+          <div>
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="mt-3 h-3.5 w-80 max-w-full" />
           </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-[5.5rem] rounded-3xl" />
+            ))}
+          </div>
+          <Skeleton className="h-[4.5rem] rounded-3xl" />
+          <ListSkeleton rows={5} />
         </div>
       </AdminLayout>
     );
@@ -143,11 +152,11 @@ export const NotificationsPage: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
+      <div className="space-y-6" style={brandVars}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-950">Notifications</h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <h1 className="text-2xl font-bold tracking-tight text-gray-950">Notifications</h1>
+            <p className="mt-1 text-sm text-gray-500">
               Suivez les messages système, alertes, paiements et réservations.
             </p>
           </div>
@@ -157,7 +166,7 @@ export const NotificationsPage: React.FC = () => {
               type="button"
               onClick={() => markAllAsReadMutation.mutate()}
               disabled={markAllAsReadMutation.isPending}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-[color:var(--logo-pink)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[color:var(--logo-pink-dark)] disabled:opacity-50"
             >
               <CheckCheck size={17} />
               Tout marquer comme lu
@@ -166,31 +175,31 @@ export const NotificationsPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <MetricCard label="Non lues" value={unreadCount} />
-          <MetricCard label="Envoyées" value={sentCount} />
-          <MetricCard label="Échecs" value={failedCount} tone="danger" />
+          <MetricCard label="Non lues" value={unreadCount} icon={Bell} />
+          <MetricCard label="Envoyées" value={sentCount} icon={CheckCircle} />
+          <MetricCard label="Échecs" value={failedCount} tone="danger" icon={AlertCircle} />
         </div>
 
-        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+        <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
             <div className="relative lg:col-span-6">
               <Search
                 size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
               />
               <input
                 type="text"
                 placeholder="Rechercher par objet, contenu, canal ou numéro..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-100"
+                className="w-full rounded-full border border-gray-200 bg-white py-2.5 pl-11 pr-4 text-sm outline-none transition focus:border-[color:var(--logo-pink)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--logo-pink)_25%,white)]"
               />
             </div>
 
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-100 lg:col-span-3"
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-gray-400 focus:ring-4 focus:ring-gray-100 lg:col-span-3"
             >
               <option value="">Tous les types</option>
               {Object.entries(typeLabels).map(([value, label]) => (
@@ -203,7 +212,7 @@ export const NotificationsPage: React.FC = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-100 lg:col-span-3"
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-gray-400 focus:ring-4 focus:ring-gray-100 lg:col-span-3"
             >
               <option value="">Tous les statuts</option>
               <option value="SENT">Envoyées</option>
@@ -213,12 +222,12 @@ export const NotificationsPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
+        <div className="rounded-3xl border border-gray-100 bg-white p-2 shadow-sm">
           {filteredNotifications.length === 0 ? (
             <div className="py-16 text-center">
-              <Bell size={48} className="mx-auto mb-3 text-slate-300" />
-              <p className="font-medium text-slate-700">Aucune notification</p>
-              <p className="mt-1 text-sm text-slate-500">
+              <Bell size={48} className="mx-auto mb-3 text-gray-300" />
+              <p className="font-medium text-gray-700">Aucune notification</p>
+              <p className="mt-1 text-sm text-gray-500">
                 Ajustez les filtres ou réessayez plus tard.
               </p>
             </div>
@@ -235,11 +244,13 @@ export const NotificationsPage: React.FC = () => {
                 return (
                   <div
                     key={notification.notificationNumber}
-                    className="rounded-xl px-4 py-4 transition hover:bg-slate-50"
+                    className={`rounded-2xl px-4 py-4 transition hover:bg-gray-50 ${
+                      isRead ? "" : "bg-[color:color-mix(in_srgb,var(--logo-pink)_10%,white)]"
+                    }`}
                   >
                     <div className="flex gap-4">
                       <div
-                        className={`mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ${tone}`}
+                        className={`mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full ring-1 ${tone}`}
                       >
                         <Icon size={19} />
                       </div>
@@ -248,16 +259,16 @@ export const NotificationsPage: React.FC = () => {
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <h3 className="truncate font-semibold text-slate-950">
+                              <h3 className="truncate font-semibold text-gray-950">
                                 {notification.subject ||
                                   typeLabels[notification.type] ||
                                   notification.type}
                               </h3>
                               {!isRead && (
-                                <span className="h-2 w-2 shrink-0 rounded-full bg-primary-600" />
+                                <span className="h-2 w-2 shrink-0 rounded-full bg-[color:var(--logo-pink)]" />
                               )}
                             </div>
-                            <p className="mt-1 text-sm leading-6 text-slate-600">
+                            <p className="mt-1 text-sm leading-6 text-gray-600">
                               {notification.body}
                             </p>
                           </div>
@@ -271,20 +282,20 @@ export const NotificationsPage: React.FC = () => {
                                 )
                               }
                               disabled={markAsReadMutation.isPending}
-                              className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                              className="shrink-0 rounded-full border border-[color:color-mix(in_srgb,var(--logo-pink)_30%,white)] px-3.5 py-1.5 text-xs font-semibold text-[color:var(--logo-pink-dark)] transition hover:bg-[color:color-mix(in_srgb,var(--logo-pink)_16%,white)] disabled:opacity-50"
                             >
                               Marquer comme lu
                             </button>
                           )}
                         </div>
 
-                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
                           <span>{formatDate(notification.createdAt)}</span>
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5">
                             {typeLabels[notification.type] || notification.type}
                           </span>
                           {notification.channel && (
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 capitalize">
+                            <span className="rounded-full bg-gray-100 px-2 py-0.5 capitalize">
                               {notification.channel}
                             </span>
                           )}
@@ -292,13 +303,13 @@ export const NotificationsPage: React.FC = () => {
                             className={`rounded-full px-2 py-0.5 ${
                               notification.status === "FAILED"
                                 ? "bg-rose-50 text-rose-700"
-                                : "bg-slate-100 text-slate-600"
+                                : "bg-gray-100 text-gray-600"
                             }`}
                           >
                             {statusLabels[notification.status] ||
                               notification.status}
                           </span>
-                          {isRead && <span className="text-slate-400">Lu</span>}
+                          {isRead && <span className="text-gray-400">Lu</span>}
                         </div>
                       </div>
                     </div>
@@ -317,15 +328,25 @@ const MetricCard: React.FC<{
   label: string;
   value: number;
   tone?: "default" | "danger";
-}> = ({ label, value, tone = "default" }) => (
-  <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-    <p className="text-sm text-slate-500">{label}</p>
-    <p
-      className={`mt-2 text-2xl font-bold ${
-        tone === "danger" ? "text-rose-600" : "text-slate-950"
+  icon: React.ElementType;
+}> = ({ label, value, tone = "default", icon: Icon }) => (
+  <div className="flex items-center gap-4 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
+    <span
+      className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+        tone === "danger" ? "bg-rose-50 text-rose-600" : "bg-[color:color-mix(in_srgb,var(--logo-pink)_16%,white)] text-[color:var(--logo-pink-dark)]"
       }`}
     >
-      {value.toLocaleString("fr-FR")}
-    </p>
+      <Icon size={22} />
+    </span>
+    <div>
+      <p className="text-sm text-gray-500">{label}</p>
+      <p
+        className={`text-2xl font-bold ${
+          tone === "danger" ? "text-rose-600" : "text-gray-950"
+        }`}
+      >
+        {value.toLocaleString("fr-FR")}
+      </p>
+    </div>
   </div>
 );

@@ -84,7 +84,6 @@ export type DocumentSpace =
   | "ASSET_SPACE"
   | "ADMINISTRATIVE_SPACE"
   | "GENERAL_SPACE"
-  // Compat anciens écrans / backend transitional values
   | "ADMINISTRATIVE"
   | "GENERIC";
 
@@ -113,7 +112,6 @@ export type KycCaseStatus =
   | "REJECTED"
   | "EXPIRED"
   | "CANCELLED"
-  // Compat legacy frontend/backend transitional values
   | "NOT_STARTED"
   | "IN_PROGRESS"
   | "SUBMITTED"
@@ -397,7 +395,7 @@ export interface KycOcrResult {
   rawOcrJson: { status: string; rawText?: string; [key: string]: any };
 }
 
-// ==================== GED V3 - FOLDERS / WORKFLOWS / SHARING ====================
+// ==================== FOLDERS / WORKFLOWS / SHARING ====================
 export interface FolderDetailResponse {
   code: string;
   name: string;
@@ -449,7 +447,7 @@ export interface DocumentBatchUploadRequest {
   folderCode?: string;
   referenceCode?: string;
   tagCodes?: string[];
-  tags?: string[]; // compat ancienne UI
+  tags?: string[];
   titlePrefix?: string;
   metadata?: Record<string, string>;
 }
@@ -484,7 +482,6 @@ export interface DocumentWorkflowStepRequest {
   approverValue: string;
   required?: boolean;
   autoApproveDays?: number;
-  // Compat anciens écrans
   name?: string;
   order?: number;
   assignedTo?: number;
@@ -525,7 +522,6 @@ export interface DocumentShareRequest {
   password?: string;
   allowDownload?: boolean;
   maxAccessCount?: number;
-  // Compat ancienne UI
   expiresAt?: string;
   note?: string;
 }
@@ -543,7 +539,6 @@ export interface DocumentShareResponse {
   createdAt?: string;
   createdBy?: string;
   active?: boolean;
-  // Compat ancienne UI
   targetType?: "DOCUMENT" | "FOLDER" | string;
   targetCode?: string;
   publicUrl?: string;
@@ -609,7 +604,6 @@ export interface KycCrossValidationRuleRequest {
   fieldToCompare: string;
   blocking?: boolean;
   active?: boolean;
-  // Compat ancienne UI
   name?: string;
   sourceField?: string;
   targetField?: string;
@@ -676,7 +670,6 @@ export const kycStatusLabels: Record<string, string> = {
   REJECTED: "Rejeté",
   EXPIRED: "Expiré",
   CANCELLED: "Annulé",
-  // Compatibilité ancienne UI
   NOT_STARTED: "Non commencé",
   IN_PROGRESS: "En cours",
   SUBMITTED: "Soumis",

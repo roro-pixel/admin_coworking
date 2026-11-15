@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, X } from "lucide-react";
-import { ModalPortal } from "../../ui/ModalPortal";
 import { operationsService } from "../../../services/operations.service";
-import type {
-  ProposalLineResponse,
-  ProposalServiceType,
-} from "../../../services/operations.service";
+import type { ProposalLineResponse, ProposalServiceType } from "../../../services/operations.service";
+import { CheckField, Field, PanelForm } from "../../subscription/kit";
+import { FIELD_SOFT, apiMessage } from "../../subscription/kitUtils";
+import { toast } from "../../ui/toastStore";
+import { PROPOSAL_SERVICE_TYPES } from "../opsLabels";
 
 interface Props {
   isOpen: boolean;
@@ -15,12 +14,7 @@ interface Props {
   editingLine: ProposalLineResponse | null;
   onSuccess: () => void;
 }
-const serviceTypes: { value: ProposalServiceType; label: string }[] = [
-  { value: "SUBSCRIPTION", label: "Abonnement" },
-  { value: "PASS", label: "Pass" },
-  { value: "BOOKING", label: "Réservation" },
-  { value: "CUSTOM", label: "Personnalisé" },
-];
+
 const buildForm = (l: ProposalLineResponse | null) => ({
   label: l?.label || "",
   description: l?.description || "",
@@ -34,220 +28,89 @@ const buildForm = (l: ProposalLineResponse | null) => ({
   sortOrder: l?.sortOrder ?? 0,
   currency: l?.currency || "XAF",
 });
-export const ProposalLineFormModal: React.FC<Props> = ({
-  isOpen,
-  onClose,
-  proposalId,
-  editingLine,
-  onSuccess,
-}) => {
+
+/** Panneau en ligne (ex-modale) : s'affiche dans le détail de la proposition. */
+export const ProposalLineFormModal: React.FC<Props> = ({ isOpen, onClose, proposalId, editingLine, onSuccess }) => {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(() => buildForm(editingLine));
+
   useEffect(() => {
     if (isOpen) setForm(buildForm(editingLine));
   }, [editingLine, isOpen]);
+
+  const done = (message: string) => {
+    queryClient.invalidateQueries({ queryKey: ["crm-proposal", proposalId] });
+    toast.success(message);
+    onSuccess();
+  };
   const addMutation = useMutation({
     mutationFn: () => operationsService.addProposalLine(proposalId, form),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["crm-proposal", proposalId] });
-      onSuccess();
-    },
+    onSuccess: () => done("Ligne ajoutée"),
+    onError: (e) => toast.error(apiMessage(e, "Ajout de la ligne impossible.")),
   });
   const updateMutation = useMutation({
-    mutationFn: () =>
-      operationsService.updateProposalLine(proposalId, editingLine!.id, form),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["crm-proposal", proposalId] });
-      onSuccess();
-    },
+    mutationFn: () => operationsService.updateProposalLine(proposalId, editingLine!.id, form),
+    onSuccess: () => done("Ligne mise à jour"),
+    onError: (e) => toast.error(apiMessage(e, "Modification de la ligne impossible.")),
   });
+
   if (!isOpen) return null;
-  const isPending = addMutation.isPending || updateMutation.isPending;
+  const pending = addMutation.isPending || updateMutation.isPending;
+  const num = (k: "quantity" | "unitPrice" | "discountPercent" | "taxRate" | "sortOrder", fallback: number) =>
+    (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [k]: Number(e.target.value) || fallback }));
+
   return (
-    <ModalPortal onClose={onClose} size="xl">
-      <div className="sticky top-0 z-10 flex justify-between rounded-t-2xl border-b bg-white px-6 py-4">
-        <h3 className="text-xl font-bold">
-          {editingLine ? "Modifier ligne" : "Ajouter ligne"}
-        </h3>
-        <button onClick={onClose} className="rounded-xl p-2 hover:bg-gray-100">
-          <X size={20} />
-        </button>
+    <PanelForm
+      title={editingLine ? "Modifier la ligne" : "Ajouter une ligne"}
+      pending={pending}
+      submitLabel="Enregistrer"
+      submitDisabled={!form.label.trim()}
+      onCancel={onClose}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (editingLine) updateMutation.mutate();
+        else addMutation.mutate();
+      }}
+    >
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Field label="Libellé" required className="md:col-span-2">
+          <input required value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} className={FIELD_SOFT} />
+        </Field>
+        <Field label="Service">
+          <select value={form.serviceType} onChange={(e) => setForm({ ...form, serviceType: e.target.value })} className={FIELD_SOFT}>
+            {PROPOSAL_SERVICE_TYPES.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Référence">
+          <input value={form.serviceRefCode || ""} onChange={(e) => setForm({ ...form, serviceRefCode: e.target.value })} className={FIELD_SOFT} />
+        </Field>
+        <Field label="Quantité">
+          <input type="number" value={form.quantity} onChange={num("quantity", 1)} className={FIELD_SOFT} />
+        </Field>
+        <Field label="Prix unitaire">
+          <input type="number" value={form.unitPrice} onChange={num("unitPrice", 0)} className={FIELD_SOFT} />
+        </Field>
+        <Field label="Remise (%)">
+          <input type="number" value={form.discountPercent} onChange={num("discountPercent", 0)} className={FIELD_SOFT} />
+        </Field>
+        <Field label="TVA (taux)">
+          <input type="number" step="0.01" value={form.taxRate} onChange={num("taxRate", 0)} className={FIELD_SOFT} />
+        </Field>
+        <Field label="Devise">
+          <input value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })} className={FIELD_SOFT} />
+        </Field>
+        <Field label="Ordre">
+          <input type="number" value={form.sortOrder} onChange={num("sortOrder", 0)} className={FIELD_SOFT} />
+        </Field>
+        <div className="md:col-span-2">
+          <CheckField label="Prix TTC" checked={form.taxIncluded} onChange={(v) => setForm({ ...form, taxIncluded: v })} />
+        </div>
+        <Field label="Description" className="md:col-span-2">
+          <textarea rows={3} value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} className={FIELD_SOFT} />
+        </Field>
       </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          editingLine ? updateMutation.mutate() : addMutation.mutate();
-        }}
-        className="space-y-4 p-6"
-      >
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <label className="md:col-span-2">
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Libellé *
-            </span>
-            <input
-              required
-              value={form.label}
-              onChange={(e) => setForm({ ...form, label: e.target.value })}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Service
-            </span>
-            <select
-              value={form.serviceType}
-              onChange={(e) =>
-                setForm({ ...form, serviceType: e.target.value })
-              }
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            >
-              {serviceTypes.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Référence
-            </span>
-            <input
-              value={form.serviceRefCode || ""}
-              onChange={(e) =>
-                setForm({ ...form, serviceRefCode: e.target.value })
-              }
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Quantité
-            </span>
-            <input
-              type="number"
-              value={form.quantity}
-              onChange={(e) =>
-                setForm({ ...form, quantity: Number(e.target.value) || 1 })
-              }
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              PU
-            </span>
-            <input
-              type="number"
-              value={form.unitPrice}
-              onChange={(e) =>
-                setForm({ ...form, unitPrice: Number(e.target.value) || 0 })
-              }
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Remise %
-            </span>
-            <input
-              type="number"
-              value={form.discountPercent}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  discountPercent: Number(e.target.value) || 0,
-                })
-              }
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              TVA
-            </span>
-            <input
-              type="number"
-              step="0.01"
-              value={form.taxRate}
-              onChange={(e) =>
-                setForm({ ...form, taxRate: Number(e.target.value) || 0 })
-              }
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Devise
-            </span>
-            <input
-              value={form.currency}
-              onChange={(e) =>
-                setForm({ ...form, currency: e.target.value.toUpperCase() })
-              }
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Ordre
-            </span>
-            <input
-              type="number"
-              value={form.sortOrder}
-              onChange={(e) =>
-                setForm({ ...form, sortOrder: Number(e.target.value) || 0 })
-              }
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={form.taxIncluded}
-              onChange={(e) =>
-                setForm({ ...form, taxIncluded: e.target.checked })
-              }
-            />{" "}
-            Prix TTC
-          </label>
-          <label className="md:col-span-2">
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Description
-            </span>
-            <textarea
-              rows={3}
-              value={form.description || ""}
-              onChange={(e) =>
-                setForm({ ...form, description: e.target.value })
-              }
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-        </div>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 rounded-xl border px-4 py-2.5"
-          >
-            Annuler
-          </button>
-          <button
-            type="submit"
-            disabled={isPending}
-            className="flex-1 rounded-xl bg-primary-600 px-4 py-2.5 text-white"
-          >
-            {isPending ? (
-              <Loader2 className="mx-auto animate-spin" size={16} />
-            ) : (
-              "Enregistrer"
-            )}
-          </button>
-        </div>
-      </form>
-    </ModalPortal>
+    </PanelForm>
   );
 };

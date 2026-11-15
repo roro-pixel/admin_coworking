@@ -1,85 +1,52 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  CalendarDays,
-  Eye,
-  Filter,
-  Loader2,
-  Plus,
-  Search,
-  TrendingDown,
-  TrendingUp,
-  X,
-} from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Banknote, Plus, X } from "lucide-react";
 import { paymentService } from "../../services/payment.service";
-import type {
-  CashMovement,
-  CashSession,
-  CreateCashMovementPayload,
-} from "../../services/payment.service";
+import type { CashMovement, CreateCashMovementPayload } from "../../services/payment.service";
 import { useAuth } from "../../contexts/AuthContext";
 import { ModalPortal } from "../../components/ui/ModalPortal";
-
-const movementTypeLabels: Record<string, string> = {
-  PAYMENT: "Paiement",
-  REFUND: "Remboursement",
-  CASH_IN: "Entrée caisse",
-  CASH_OUT: "Sortie caisse",
-  SAFE_DEPOSIT: "Dépôt coffre",
-  TRANSFER_IN: "Transfert entrant",
-  TRANSFER_OUT: "Transfert sortant",
-  ADJUSTMENT: "Ajustement",
-  OPENING_FLOAT: "Fond de caisse",
-  CLOSING_COUNT: "Comptage clôture",
-};
-
-const MANUAL_TYPES = [
-  "CASH_IN",
-  "CASH_OUT",
-  "SAFE_DEPOSIT",
-  "TRANSFER_IN",
-  "TRANSFER_OUT",
-  "ADJUSTMENT",
-] as const;
-
-const REASON_REQUIRED = [
-  "REFUND",
-  "CASH_OUT",
-  "SAFE_DEPOSIT",
-  "TRANSFER_OUT",
-  "ADJUSTMENT",
-] as const;
-
-const isPositive = (type: string) =>
-  ["PAYMENT", "CASH_IN", "TRANSFER_IN", "OPENING_FLOAT"].includes(type) ||
-  type === "ADJUSTMENT";
+import { brandVars } from "../../components/layout/adminTheme";
+import {
+  ActionButton,
+  DataCard,
+  Detail,
+  EmptyState,
+  ErrorBlock,
+  Field,
+  FilterButton,
+  FilterPanel,
+  HeadRow,
+  IconButton,
+  ListHeader,
+  PanelForm,
+  Pagination,
+  SearchField,
+  StatusChip,
+} from "../../components/subscription/kit";
+import { FIELD_SOFT, FOCUS, ROW_HOVER, apiMessage, formatDateTime, formatMoney } from "../../components/subscription/kitUtils";
+import { statusOf } from "../../components/subscription/labels";
+import { Dots } from "../../components/ui/Toaster";
+import { toast } from "../../components/ui/toastStore";
+import { ListSkeleton } from "../../components/ui/Skeleton";
+import {
+  MANUAL_MOVEMENT_TYPES,
+  MOVEMENT_STATUS,
+  MOVEMENT_TYPES,
+  REASON_REQUIRED_TYPES,
+} from "../../components/payment/paymentLabels";
 
 type ManualCashMovementType = CreateCashMovementPayload["movementType"];
+type Channel = NonNullable<CreateCashMovementPayload["channel"]>;
 
 interface CashMovementsListProps {
+  /** Si renseigné, la liste est limitée à cette session (affichage intégré, sans filtres) */
   sessionNumber?: string;
 }
 
-const buildDefaultFormData = (): {
-  movementType: ManualCashMovementType;
-  amount: number;
-  reason: string;
-  documentType: string;
-  documentNumber: string;
-  flowCategory: string;
-  referenceType: string;
-  referenceCode: string;
-  counterpartyType: string;
-  counterpartyCode: string;
-  counterpartyName: string;
-  subCategory: string;
-  tags: string;
-  deviceCode: string;
-  deviceIp: string;
-  channel: "MANUAL" | "AUTO_PAYMENT" | "IMPORT" | "API" | "POS";
-  metadataJson: string;
-} => ({
-  movementType: "CASH_IN",
+const COLS = "lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_minmax(0,1fr)_9rem_9rem]";
+
+const buildDefaultFormData = () => ({
+  movementType: "CASH_IN" as ManualCashMovementType,
   amount: 0,
   reason: "",
   documentType: "",
@@ -94,19 +61,13 @@ const buildDefaultFormData = (): {
   tags: "",
   deviceCode: "",
   deviceIp: "",
-  channel: "MANUAL",
+  channel: "MANUAL" as Channel,
   metadataJson: "",
 });
 
-const formatAmount = (amount?: number | null) =>
-  `${(amount ?? 0).toLocaleString("fr-FR")} FCFA`;
+const typeLabel = (t: string) => MOVEMENT_TYPES[t]?.label ?? t;
 
-const formatDateTime = (value?: string | null) =>
-  value ? new Date(value).toLocaleString("fr-FR") : "—";
-
-export const CashMovementsList: React.FC<CashMovementsListProps> = ({
-  sessionNumber,
-}) => {
+export const CashMovementsList: React.FC<CashMovementsListProps> = ({ sessionNumber }) => {
   const { admin } = useAuth();
   const queryClient = useQueryClient();
   const isEmbedded = !!sessionNumber;
@@ -117,42 +78,22 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [page, setPage] = useState(0);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState(buildDefaultFormData);
-
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [selectedMovement, setSelectedMovement] = useState<CashMovement | null>(
-    null,
-  );
-
-  useEffect(() => {
-    if (isModalOpen) {
-      setFormData(buildDefaultFormData());
-      setErrorMessage(null);
-    }
-  }, [isModalOpen]);
+  const [selectedMovement, setSelectedMovement] = useState<CashMovement | null>(null);
 
   const { data: sessionsData } = useQuery({
     queryKey: ["cash-sessions-open"],
     queryFn: () => paymentService.getCashSessions({ status: "OPEN", size: 100 }),
     enabled: !isEmbedded,
   });
+  const openSessions = sessionsData?.content || [];
 
-  const openSessions: CashSession[] = sessionsData?.content || [];
-
-  const { data: movementsData, isLoading, isFetching } = useQuery({
-    queryKey: [
-      "cash-movements",
-      sessionFilter,
-      typeFilter,
-      searchText,
-      fromDate,
-      toDate,
-      page,
-      sessionNumber,
-    ],
+  const { data: movementsData, isLoading, isFetching, isError, refetch } = useQuery({
+    queryKey: ["cash-movements", sessionFilter, typeFilter, searchText, fromDate, toDate, page, sessionNumber],
     queryFn: () =>
       paymentService.getCashMovements({
         sessionNumber: sessionFilter || sessionNumber || undefined,
@@ -165,14 +106,11 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({
         sort: "createdAt,desc",
       }),
   });
-
   const movements: CashMovement[] = movementsData?.content || [];
   const totalPages = movementsData?.totalPages ?? 0;
   const totalElements = movementsData?.totalElements ?? 0;
 
-  const reasonRequired = (REASON_REQUIRED as readonly string[]).includes(
-    formData.movementType,
-  );
+  const reasonRequired = REASON_REQUIRED_TYPES.includes(formData.movementType);
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -200,34 +138,27 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cash-movements"] });
       queryClient.invalidateQueries({ queryKey: ["cash-metrics-overview"] });
-      setIsModalOpen(false);
+      setIsFormOpen(false);
+      toast.success("Mouvement enregistré");
     },
-    onError: (error: any) => {
-      setErrorMessage(
-        error?.response?.data?.message ||
-          "Erreur lors de la création du mouvement.",
-      );
-    },
+    onError: (e: unknown) => setErrorMessage(apiMessage(e, "Erreur lors de la création du mouvement.")),
   });
 
-  const handleSubmit = () => {
-    if (formData.amount <= 0) {
-      setErrorMessage("Le montant doit être supérieur à 0.");
-      return;
-    }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (formData.amount <= 0) return setErrorMessage("Le montant doit être supérieur à 0.");
     if (reasonRequired && !formData.reason.trim()) {
-      setErrorMessage(
-        `Le motif est obligatoire pour un mouvement de type "${movementTypeLabels[formData.movementType]}".`,
-      );
-      return;
+      return setErrorMessage(`Le motif est obligatoire pour un mouvement de type « ${typeLabel(formData.movementType)} ».`);
     }
-    const targetSession = sessionFilter || sessionNumber;
-    if (!targetSession) {
-      setErrorMessage("Veuillez sélectionner une session ouverte.");
-      return;
-    }
+    if (!(sessionFilter || sessionNumber)) return setErrorMessage("Veuillez sélectionner une session ouverte.");
     setErrorMessage(null);
     createMutation.mutate();
+  };
+
+  const openForm = () => {
+    setFormData(buildDefaultFormData());
+    setErrorMessage(null);
+    setIsFormOpen(true);
   };
 
   const resetFilters = () => {
@@ -239,557 +170,295 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({
     setPage(0);
   };
 
-  return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h2 className={isEmbedded ? "font-semibold" : "text-xl font-semibold text-gray-900"}>
-            Mouvements de caisse
-          </h2>
-          {!isEmbedded && (
-            <p className="mt-1 text-sm text-gray-500">
-              Entrées, sorties, paiements, ajustements et justificatifs associés.
-            </p>
-          )}
-        </div>
+  const hasFilters = !!((!isEmbedded && sessionFilter) || typeFilter || fromDate || toDate);
+  const set = <K extends keyof ReturnType<typeof buildDefaultFormData>>(k: K, v: ReturnType<typeof buildDefaultFormData>[K]) =>
+    setFormData((f) => ({ ...f, [k]: v }));
 
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700"
+  return (
+    <div className="space-y-5">
+      <ListHeader
+        title="Mouvements de caisse"
+        subtitle={isEmbedded ? undefined : "Entrées, sorties, paiements, ajustements et justificatifs associés."}
+        action={
+          <ActionButton icon={Plus} onClick={openForm} className="w-full sm:w-auto">
+            Nouveau mouvement
+          </ActionButton>
+        }
+      />
+
+      {isFormOpen && (
+        <PanelForm
+          title="Nouveau mouvement manuel"
+          onSubmit={handleSubmit}
+          onCancel={() => setIsFormOpen(false)}
+          pending={createMutation.isPending}
+          submitLabel="Enregistrer"
+          error={errorMessage}
         >
-          <Plus size={17} />
-          Nouveau mouvement
-        </button>
-      </div>
+          <p className="-mt-2 text-sm text-gray-500">Les paiements et les comptages sont créés automatiquement.</p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {!isEmbedded && (
+              <Field label="Session ouverte" required>
+                <select value={sessionFilter} onChange={(e) => setSessionFilter(e.target.value)} className={FIELD_SOFT}>
+                  <option value="">Choisir</option>
+                  {openSessions.map((s) => (
+                    <option key={s.sessionNumber} value={s.sessionNumber}>
+                      {s.sessionNumber} · {s.registerCode}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+            <Field label="Type de mouvement" required>
+              <select
+                value={formData.movementType}
+                onChange={(e) => setFormData({ ...formData, movementType: e.target.value as ManualCashMovementType, reason: "" })}
+                className={FIELD_SOFT}
+              >
+                {MANUAL_MOVEMENT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {typeLabel(t)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Montant (FCFA)" required>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={formData.amount === 0 ? "" : formData.amount}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, "");
+                  set("amount", v === "" ? 0 : parseInt(v, 10));
+                }}
+                placeholder="25000"
+                className={FIELD_SOFT}
+              />
+            </Field>
+            <Field label="Canal">
+              <select value={formData.channel} onChange={(e) => set("channel", e.target.value as Channel)} className={FIELD_SOFT}>
+                <option value="MANUAL">Manuel</option>
+                <option value="POS">Point de vente</option>
+                <option value="IMPORT">Import</option>
+                <option value="API">API</option>
+              </select>
+            </Field>
+          </div>
+          <Field label="Motif" required={reasonRequired} hint={reasonRequired ? "Obligatoire pour ce type de mouvement" : "Facultatif"}>
+            <textarea rows={2} value={formData.reason} onChange={(e) => set("reason", e.target.value)} className={FIELD_SOFT} />
+          </Field>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Field label="Type de document">
+              <input value={formData.documentType} onChange={(e) => set("documentType", e.target.value)} placeholder="INVOICE, RECEIPT" className={FIELD_SOFT} />
+            </Field>
+            <Field label="N° de document">
+              <input value={formData.documentNumber} onChange={(e) => set("documentNumber", e.target.value)} placeholder="FAC-…" className={`${FIELD_SOFT} font-mono`} />
+            </Field>
+            <Field label="Catégorie de flux">
+              <input value={formData.flowCategory} onChange={(e) => set("flowCategory", e.target.value)} placeholder="EXPENSE, TRANSFER" className={FIELD_SOFT} />
+            </Field>
+            <Field label="Sous-catégorie">
+              <input value={formData.subCategory} onChange={(e) => set("subCategory", e.target.value)} placeholder="Frais de transport" className={FIELD_SOFT} />
+            </Field>
+            <Field label="Type de référence">
+              <input value={formData.referenceType} onChange={(e) => set("referenceType", e.target.value)} placeholder="ORDER, TICKET" className={FIELD_SOFT} />
+            </Field>
+            <Field label="Code de référence">
+              <input value={formData.referenceCode} onChange={(e) => set("referenceCode", e.target.value)} placeholder="REF-…" className={`${FIELD_SOFT} font-mono`} />
+            </Field>
+            <Field label="Type de contrepartie">
+              <input value={formData.counterpartyType} onChange={(e) => set("counterpartyType", e.target.value)} placeholder="SUPPLIER, MEMBER" className={FIELD_SOFT} />
+            </Field>
+            <Field label="Nom de la contrepartie">
+              <input value={formData.counterpartyName} onChange={(e) => set("counterpartyName", e.target.value)} placeholder="Bénéficiaire" className={FIELD_SOFT} />
+            </Field>
+          </div>
+        </PanelForm>
+      )}
 
       {!isEmbedded && (
-        <section className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-gray-100">
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.3fr_1fr_1fr_1fr_1fr_auto]">
-            <div className="relative">
-              <Search
-                size={17}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-              <input
-                value={searchText}
-                onChange={(e) => {
-                  setSearchText(e.target.value);
-                  setPage(0);
-                }}
-                placeholder="Rechercher mouvement, client, référence, reçu..."
-                className="h-11 w-full rounded-2xl border border-gray-200 bg-gray-50 pl-10 pr-3 text-sm outline-none focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-50"
-              />
-            </div>
-
-            <select
-              value={sessionFilter}
-              onChange={(e) => {
-                setSessionFilter(e.target.value);
+        <div className="space-y-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <SearchField
+              className="flex-1"
+              value={searchText}
+              onChange={(v) => {
+                setSearchText(v);
                 setPage(0);
               }}
-              className="h-11 rounded-2xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
-            >
-              <option value="">Toutes les sessions</option>
-              {openSessions.map((s) => (
-                <option key={s.sessionNumber} value={s.sessionNumber}>
-                  {s.sessionNumber} — {s.registerCode}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={typeFilter}
-              onChange={(e) => {
-                setTypeFilter(e.target.value);
-                setPage(0);
-              }}
-              className="h-11 rounded-2xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
-            >
-              <option value="">Tous les types</option>
-              {Object.entries(movementTypeLabels).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => {
-                setFromDate(e.target.value);
-                setPage(0);
-              }}
-              className="h-11 rounded-2xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+              placeholder="Mouvement, client, référence, reçu"
             />
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => {
-                setToDate(e.target.value);
-                setPage(0);
-              }}
-              className="h-11 rounded-2xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
-            />
-
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-            >
-              <Filter size={16} />
-              Réinitialiser
-            </button>
+            <FilterButton open={filtersOpen} active={hasFilters} onClick={() => setFiltersOpen((o) => !o)} />
           </div>
-        </section>
-      )}
-
-      <section className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-gray-100">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-gray-900">
-              {totalElements} mouvement(s)
-            </p>
-            <p className="text-xs text-gray-500">
-              {isFetching ? "Mise à jour..." : "Classés du plus récent au plus ancien"}
-            </p>
-          </div>
-          {isFetching && <Loader2 size={18} className="animate-spin text-gray-400" />}
-        </div>
-
-        {isLoading ? (
-          <div className="py-10 text-center text-sm text-gray-500">
-            <Loader2 className="mx-auto mb-2 animate-spin" />
-            Chargement des mouvements...
-          </div>
-        ) : movements.length === 0 ? (
-          <div className="rounded-2xl bg-gray-50 py-10 text-center text-sm text-gray-500">
-            Aucun mouvement trouvé.
-          </div>
-        ) : (
-          <div className="grid gap-3">
-            {movements.map((movement) => (
-              <MovementCard
-                key={movement.movementNumber}
-                movement={movement}
-                onOpen={() => {
-                  setSelectedMovement(movement);
-                  setIsDetailOpen(true);
-                }}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {!isEmbedded && totalPages > 1 && (
-        <div className="flex items-center justify-end gap-2">
-          <button
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={page === 0}
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm disabled:opacity-50"
-          >
-            Précédent
-          </button>
-          <span className="rounded-xl bg-white px-3 py-2 text-sm text-gray-600 ring-1 ring-gray-100">
-            {page + 1}/{Math.max(totalPages, 1)}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-            disabled={page >= totalPages - 1}
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm disabled:opacity-50"
-          >
-            Suivant
-          </button>
-        </div>
-      )}
-
-      {isModalOpen && (
-        <ModalPortal onClose={() => setIsModalOpen(false)} size="3xl">
-          <div className="sticky top-0 z-10 flex items-start justify-between border-b bg-white px-6 py-5 rounded-t-2xl">
-            <div>
-              <h3 className="text-xl font-bold text-gray-900">
-                Nouveau mouvement de caisse
-              </h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Créez uniquement les mouvements manuels. Les paiements et comptages sont automatisés.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(false)}
-              className="rounded-xl p-2 text-gray-400 transition hover:bg-gray-50 hover:text-gray-700"
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          <div className="space-y-5 p-6">
-            {errorMessage && (
-              <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {errorMessage}
-              </div>
-            )}
-
-            <section className="rounded-2xl bg-gray-50 p-4">
-              <h4 className="mb-4 text-sm font-semibold text-gray-900">
-                Informations principales
-              </h4>
-              <div className="grid gap-4 md:grid-cols-2">
-                {!isEmbedded && (
-                  <Field label="Session ouverte *">
-                    <select
-                      value={sessionFilter}
-                      onChange={(e) => setSessionFilter(e.target.value)}
-                      className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
-                    >
-                      <option value="">Sélectionner une session ouverte</option>
-                      {openSessions.map((s) => (
-                        <option key={s.sessionNumber} value={s.sessionNumber}>
-                          {s.sessionNumber} — {s.registerCode}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
-
-                <Field label="Type de mouvement *">
-                  <select
-                    value={formData.movementType}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        movementType: e.target.value as ManualCashMovementType,
-                        reason: "",
-                      })
-                    }
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
-                  >
-                    {MANUAL_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {movementTypeLabels[type]}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label="Montant (FCFA) *">
+          {filtersOpen && (
+            <FilterPanel canReset={hasFilters || !!searchText} onReset={resetFilters}>
+              <Field label="Session">
+                <select
+                  value={sessionFilter}
+                  onChange={(e) => {
+                    setSessionFilter(e.target.value);
+                    setPage(0);
+                  }}
+                  className={FIELD_SOFT}
+                >
+                  <option value="">Toutes les sessions</option>
+                  {openSessions.map((s) => (
+                    <option key={s.sessionNumber} value={s.sessionNumber}>
+                      {s.sessionNumber} · {s.registerCode}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Type">
+                <select
+                  value={typeFilter}
+                  onChange={(e) => {
+                    setTypeFilter(e.target.value);
+                    setPage(0);
+                  }}
+                  className={FIELD_SOFT}
+                >
+                  <option value="">Tous les types</option>
+                  {Object.entries(MOVEMENT_TYPES).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Du">
                   <input
-                    type="text"
-                    inputMode="numeric"
-                    value={formData.amount === 0 ? "" : formData.amount}
+                    type="date"
+                    value={fromDate}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, "");
-                      setFormData({
-                        ...formData,
-                        amount: val === "" ? 0 : parseInt(val, 10),
-                      });
+                      setFromDate(e.target.value);
+                      setPage(0);
                     }}
-                    placeholder="25000"
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
+                    className={FIELD_SOFT}
                   />
                 </Field>
-
-                <Field label="Canal">
-                  <select
-                    value={formData.channel}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        channel: e.target.value as typeof formData.channel,
-                      })
-                    }
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
-                  >
-                    <option value="MANUAL">Manuel</option>
-                    <option value="POS">Point de vente</option>
-                    <option value="IMPORT">Import</option>
-                    <option value="API">API</option>
-                  </select>
-                </Field>
-              </div>
-
-              <div className="mt-4">
-                <Field label={`Motif ${reasonRequired ? "*" : "(optionnel)"}`}>
-                  <textarea
-                    value={formData.reason}
-                    onChange={(e) =>
-                      setFormData({ ...formData, reason: e.target.value })
-                    }
-                    rows={3}
-                    required={reasonRequired}
-                    placeholder={
-                      reasonRequired
-                        ? "Motif obligatoire pour ce type de mouvement"
-                        : "Motif ou observation..."
-                    }
-                    className="min-h-[96px] w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50 resize-none"
+                <Field label="Au">
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => {
+                      setToDate(e.target.value);
+                      setPage(0);
+                    }}
+                    className={FIELD_SOFT}
                   />
                 </Field>
               </div>
-            </section>
-
-            <section className="rounded-2xl bg-gray-50 p-4">
-              <h4 className="mb-4 text-sm font-semibold text-gray-900">
-                Références et contrepartie
-              </h4>
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Type document">
-                  <input
-                    value={formData.documentType}
-                    onChange={(e) =>
-                      setFormData({ ...formData, documentType: e.target.value })
-                    }
-                    placeholder="INVOICE, RECEIPT..."
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
-                  />
-                </Field>
-                <Field label="N° document">
-                  <input
-                    value={formData.documentNumber}
-                    onChange={(e) =>
-                      setFormData({ ...formData, documentNumber: e.target.value })
-                    }
-                    placeholder="FAC-..."
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
-                  />
-                </Field>
-                <Field label="Catégorie de flux">
-                  <input
-                    value={formData.flowCategory}
-                    onChange={(e) =>
-                      setFormData({ ...formData, flowCategory: e.target.value })
-                    }
-                    placeholder="EXPENSE, TRANSFER..."
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
-                  />
-                </Field>
-                <Field label="Sous-catégorie">
-                  <input
-                    value={formData.subCategory}
-                    onChange={(e) =>
-                      setFormData({ ...formData, subCategory: e.target.value })
-                    }
-                    placeholder="Frais transport, achat..."
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
-                  />
-                </Field>
-                <Field label="Type référence">
-                  <input
-                    value={formData.referenceType}
-                    onChange={(e) =>
-                      setFormData({ ...formData, referenceType: e.target.value })
-                    }
-                    placeholder="ORDER, TICKET..."
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
-                  />
-                </Field>
-                <Field label="Code référence">
-                  <input
-                    value={formData.referenceCode}
-                    onChange={(e) =>
-                      setFormData({ ...formData, referenceCode: e.target.value })
-                    }
-                    placeholder="REF-..."
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
-                  />
-                </Field>
-                <Field label="Type contrepartie">
-                  <input
-                    value={formData.counterpartyType}
-                    onChange={(e) =>
-                      setFormData({ ...formData, counterpartyType: e.target.value })
-                    }
-                    placeholder="SUPPLIER, MEMBER..."
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
-                  />
-                </Field>
-                <Field label="Nom contrepartie">
-                  <input
-                    value={formData.counterpartyName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, counterpartyName: e.target.value })
-                    }
-                    placeholder="Nom du bénéficiaire"
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-50"
-                  />
-                </Field>
-              </div>
-            </section>
-
-            <div className="flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="rounded-2xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={createMutation.isPending}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50"
-              >
-                {createMutation.isPending && (
-                  <Loader2 size={16} className="animate-spin" />
-                )}
-                Enregistrer
-              </button>
-            </div>
-          </div>
-        </ModalPortal>
+            </FilterPanel>
+          )}
+        </div>
       )}
 
-      {isDetailOpen && selectedMovement && (
-        <ModalPortal onClose={() => setIsDetailOpen(false)} size="2xl">
-          <div className="flex items-start justify-between border-b bg-white px-6 py-5 rounded-t-2xl">
-            <div>
-              <h3 className="text-xl font-bold text-gray-900">
-                Détail mouvement
-              </h3>
-              <p className="mt-1 font-mono text-sm text-gray-500">
-                {selectedMovement.movementNumber}
-              </p>
-            </div>
-            <button
-              onClick={() => setIsDetailOpen(false)}
-              className="rounded-xl p-2 text-gray-400 transition hover:bg-gray-50 hover:text-gray-700"
-            >
-              <X size={20} />
-            </button>
+      {isLoading ? (
+        <ListSkeleton rows={6} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les mouvements." onRetry={() => refetch()} />
+      ) : movements.length === 0 ? (
+        <EmptyState icon={Banknote} title="Aucun mouvement" hint="Ajustez les filtres ou créez un mouvement." />
+      ) : (
+        <>
+          <div className="flex items-center gap-3 text-sm text-gray-500">
+            <span>
+              <b className="text-gray-950">{totalElements}</b> mouvement{totalElements > 1 ? "s" : ""}, du plus récent au plus ancien
+            </span>
+            {isFetching && <Dots />}
           </div>
-          <div className="space-y-4 p-6">
-            <MovementCard movement={selectedMovement} onOpen={() => undefined} detail />
-            <div className="grid gap-3 md:grid-cols-2">
-              <Info label="Session" value={selectedMovement.sessionNumber} />
-              <Info label="Caisse" value={selectedMovement.registerCode} />
-              <Info label="Créé par" value={selectedMovement.createdBy} />
-              <Info label="Créé le" value={formatDateTime(selectedMovement.createdAt)} />
-              <Info label="Document" value={selectedMovement.documentNumber || "—"} />
-              <Info label="Référence" value={selectedMovement.referenceCode || "—"} />
-              <Info label="Client lié" value={selectedMovement.relatedCustomerName || "—"} />
-              <Info label="Reçu lié" value={selectedMovement.relatedReceiptNumber || "—"} />
+          <HeadRow cols={COLS}>
+            <span>Mouvement</span>
+            <span>Session</span>
+            <span>Lié à</span>
+            <span>Date</span>
+            <span className="text-right">Montant</span>
+          </HeadRow>
+          <DataCard>
+            {movements.map((m) => {
+              const inflow = MOVEMENT_TYPES[m.movementType]?.inflow ?? true;
+              const Icon = inflow ? ArrowDownLeft : ArrowUpRight;
+              const st = m.status && m.status !== "CONFIRMED" ? statusOf(MOVEMENT_STATUS, m.status) : null;
+              return (
+                <button
+                  key={m.movementNumber}
+                  type="button"
+                  onClick={() => setSelectedMovement(m)}
+                  className={`grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 rounded-2xl p-4 text-left transition max-lg:mb-2 max-lg:bg-gray-50 ${COLS} ${ROW_HOVER} ${FOCUS}`}
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                        inflow ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
+                      }`}
+                    >
+                      <Icon size={17} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 truncate font-semibold text-gray-950">
+                        {typeLabel(m.movementType)}
+                        {st && <StatusChip tone={st.tone}>{st.label}</StatusChip>}
+                      </p>
+                      <p className="truncate font-mono text-xs text-gray-400">{m.movementNumber}</p>
+                      {m.reason && <p className="truncate text-xs text-gray-500">{m.reason}</p>}
+                    </div>
+                  </div>
+                  <p className={`whitespace-nowrap text-right text-base font-bold tabular-nums lg:order-last ${inflow ? "text-emerald-600" : "text-red-600"}`}>
+                    {inflow ? "+" : "−"} {formatMoney(m.amount)}
+                  </p>
+                  <div className="col-span-2 min-w-0 lg:col-span-1">
+                    <p className="truncate font-mono text-xs text-gray-600">{m.sessionNumber}</p>
+                    <p className="truncate text-xs text-gray-400">{m.registerName || m.registerCode}</p>
+                  </div>
+                  <p className="min-w-0 truncate text-sm text-gray-600 max-lg:hidden">
+                    {m.relatedCustomerName || m.relatedReceiptNumber || m.referenceCode || ""}
+                  </p>
+                  <p className="text-xs text-gray-500">{formatDateTime(m.createdAt)}</p>
+                </button>
+              );
+            })}
+          </DataCard>
+          {!isEmbedded && totalPages > 1 && (
+            <Pagination page={page} totalPages={totalPages} total={totalElements} noun="mouvement" onChange={setPage} />
+          )}
+        </>
+      )}
+
+      {selectedMovement && (
+        <ModalPortal onClose={() => setSelectedMovement(null)} size="2xl">
+          <div style={brandVars} className="rounded-[1.75rem] bg-white p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-lg font-bold text-gray-950">{typeLabel(selectedMovement.movementType)}</h3>
+                <p className="font-mono text-xs text-gray-400">{selectedMovement.movementNumber}</p>
+              </div>
+              <IconButton icon={X} label="Fermer" onClick={() => setSelectedMovement(null)} />
             </div>
+            <p
+              className={`mt-4 text-3xl font-bold tracking-tight ${
+                (MOVEMENT_TYPES[selectedMovement.movementType]?.inflow ?? true) ? "text-emerald-600" : "text-red-600"
+              }`}
+            >
+              {(MOVEMENT_TYPES[selectedMovement.movementType]?.inflow ?? true) ? "+" : "−"} {formatMoney(selectedMovement.amount)}
+            </p>
+            {selectedMovement.reason && <p className="mt-2 text-sm text-gray-600">{selectedMovement.reason}</p>}
+            <dl className="mt-5 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+              <Detail label="Session" mono>{selectedMovement.sessionNumber}</Detail>
+              <Detail label="Caisse">{selectedMovement.registerName || selectedMovement.registerCode}</Detail>
+              <Detail label="Créé par">{selectedMovement.createdBy}</Detail>
+              <Detail label="Créé le">{formatDateTime(selectedMovement.createdAt)}</Detail>
+              <Detail label="Document" mono>{selectedMovement.documentNumber}</Detail>
+              <Detail label="Référence" mono>{selectedMovement.referenceCode}</Detail>
+              <Detail label="Client lié">{selectedMovement.relatedCustomerName}</Detail>
+              <Detail label="Reçu lié" mono>{selectedMovement.relatedReceiptNumber}</Detail>
+              <Detail label="Transaction liée" mono>{selectedMovement.relatedTransactionNumber}</Detail>
+              <Detail label="Contrepartie">{selectedMovement.counterpartyName}</Detail>
+            </dl>
           </div>
         </ModalPortal>
       )}
     </div>
   );
 };
-
-function MovementCard({
-  movement,
-  onOpen,
-  detail = false,
-}: {
-  movement: CashMovement;
-  onOpen: () => void;
-  detail?: boolean;
-}) {
-  const positive = isPositive(movement.movementType);
-  const Icon = positive ? TrendingUp : TrendingDown;
-
-  return (
-    <article className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:shadow-md">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="flex min-w-0 gap-3">
-          <div
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
-              positive ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-            }`}
-          >
-            <Icon size={20} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="font-semibold text-gray-900">
-                {movementTypeLabels[movement.movementType] || movement.movementType}
-              </p>
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                {movement.status || "CONFIRMED"}
-              </span>
-            </div>
-            <p className="mt-1 font-mono text-xs text-gray-400">
-              {movement.movementNumber}
-            </p>
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
-              <span className="font-mono">{movement.sessionNumber}</span>
-              <span>{movement.registerName || movement.registerCode}</span>
-              <span className="inline-flex items-center gap-1">
-                <CalendarDays size={12} />
-                {formatDateTime(movement.createdAt)}
-              </span>
-            </div>
-            {movement.reason && (
-              <p className="mt-2 text-sm text-gray-600">{movement.reason}</p>
-            )}
-            <div className="mt-2 flex flex-wrap gap-2">
-              {movement.relatedCustomerName && <Tag text={movement.relatedCustomerName} />}
-              {movement.relatedTransactionNumber && <Tag text={movement.relatedTransactionNumber} mono />}
-              {movement.relatedReceiptNumber && <Tag text={movement.relatedReceiptNumber} tone="green" mono />}
-              {movement.referenceCode && <Tag text={movement.referenceCode} mono />}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between gap-4 md:flex-col md:items-end">
-          <p
-            className={`text-lg font-bold ${
-              positive ? "text-emerald-700" : "text-rose-700"
-            }`}
-          >
-            {positive ? "+" : "-"}
-            {formatAmount(movement.amount)}
-          </p>
-          {!detail && (
-            <button
-              type="button"
-              onClick={onOpen}
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 hover:text-primary-700"
-            >
-              <Eye size={15} />
-              Détail
-            </button>
-          )}
-        </div>
-      </div>
-    </article>
-  );
-}
-
-const Tag: React.FC<{ text: string; mono?: boolean; tone?: "green" }> = ({
-  text,
-  mono,
-  tone,
-}) => (
-  <span
-    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-      tone === "green" ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"
-    } ${mono ? "font-mono" : ""}`}
-  >
-    {text}
-  </span>
-);
-
-const Field: React.FC<{ label: string; children: React.ReactNode }> = ({
-  label,
-  children,
-}) => (
-  <label className="block">
-    <span className="mb-1.5 block text-xs font-semibold text-gray-600">
-      {label}
-    </span>
-    {children}
-  </label>
-);
-
-const Info: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="rounded-2xl bg-gray-50 p-3">
-    <p className="text-xs font-medium text-gray-500">{label}</p>
-    <p className="mt-1 break-words text-sm font-semibold text-gray-900">
-      {value}
-    </p>
-  </div>
-);

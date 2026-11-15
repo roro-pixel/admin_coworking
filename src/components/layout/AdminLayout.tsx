@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { AdminHeader } from "./AdminHeader";
 import { AdminSidebar } from "./AdminSidebar";
 import { AdminBottomNav } from "./AdminBottomNav";
@@ -8,31 +8,20 @@ interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
-export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
-  const [sidebarExpanded, setSidebarExpanded] = useState(false);
+export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => (
+  <div className="flex h-screen bg-gray-50">
+    <AdminSidebar />
 
-  return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex min-w-0 flex-1 flex-col">
       <AdminHeader />
-
-      <AdminSidebar
-        expanded={sidebarExpanded}
-        onExpandedChange={setSidebarExpanded}
-      />
 
       <AdminRealtimeBridge />
 
-      <main
-        className={`
-          px-4 pb-32 pt-24 transition-all duration-300
-          md:pr-6 md:pb-8 lg:pr-8
-          ${sidebarExpanded ? "lg:pl-72" : "lg:pl-24"}
-        `}
-      >
+      <main className="flex-1 overflow-y-auto px-4 pb-28 pt-4 lg:px-6 lg:pb-6">
         {children}
       </main>
-
-      <AdminBottomNav />
     </div>
-  );
-};
+
+    <AdminBottomNav />
+  </div>
+);

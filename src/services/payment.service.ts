@@ -226,6 +226,7 @@ export interface CashSession {
   registerCode: string;
   status: CashSessionStatus;
   openedBy: string;
+  /** "SYSTEM" pour une clôture automatique (fin de mois, seuil d'une caisse automatique). */
   closedBy?: string;
   openingAmount: number;
   totalPayments: number | null;
@@ -234,6 +235,7 @@ export interface CashSession {
   totalCashOut: number | null;
   totalAdjustments: number;
   expectedClosingAmount: number | null;
+  /** Vides pour une clôture par le système d'une caisse tenue à la main. */
   countedClosingAmount?: number | null;
   varianceAmount?: number | null;
   varianceReason?: string;
@@ -696,6 +698,7 @@ export const paymentService = {
     return response.data;
   },
 
+  /** PDF d'administration : l'original puis son duplicata « DUPLICATA » dans un même fichier. */
   getReceiptPdf: async (transactionNumber: string): Promise<Blob> => {
     const response = await apiClient.get(
       `/sni/api/v1/payments/transactions/${transactionNumber}/receipt/pdf`,
@@ -715,6 +718,7 @@ export const paymentService = {
     return response.data;
   },
 
+  /** Même contenu que getReceiptPdf : original puis duplicata. */
   getReceiptPdfByNumber: async (receiptNumber: string): Promise<Blob> => {
     const response = await apiClient.get(
       `/sni/api/v1/payments/receipts/${receiptNumber}/pdf`,
@@ -798,11 +802,7 @@ export const paymentService = {
     return response.data;
   },
 
-  // ATTENTION: la doc precise explicitement qu'aucun endpoint de mise a jour
-  // de caisse n'existe actuellement ("managerEmail se renseigne uniquement a
-  // la creation. Si le besoin de modification apparait cote UI, il faudra
-  // demander l'ajout d'un endpoint PATCH/PUT dedie."). Cet appel retournera
-  // 404 tant que le backend n'expose pas cette route.
+  // Pas d'endpoint backend de modification de caisse : cet appel lève une erreur.
   updateCashRegister: async (
     _registerCode: string,
     _data: UpdateCashRegisterPayload,
@@ -843,10 +843,7 @@ export const paymentService = {
     return normalizePaginated<CashSession>(response.data);
   },
 
-  // NON DOCUMENTE : la doc ne liste qu'un endpoint de resume
-  // (GET .../summary, voir getCashSessionSummary ci-dessous), pas de detail
-  // brut separe. A confirmer aupres du backend ; en cas de 404, utiliser
-  // getCashSessionSummary a la place.
+  // Détail brut d'une session (si 404, utiliser getCashSessionSummary).
   getCashSession: async (sessionNumber: string): Promise<CashSession> => {
     const response = await apiClient.get(
       `/sni/api/v1/cash-registers/sessions/${sessionNumber}`,
@@ -1194,8 +1191,7 @@ export const paymentService = {
     return response.data;
   },
 
-  // Cross-module helper documented in payment/billing/wallet phases.
-  // This endpoint belongs to Booking but is useful from Payment/Booking UI.
+  // Politique d'annulation des réservations (module réservation).
   getBookingCancellationPolicy: async (): Promise<CancellationPolicyRule[]> => {
     const response = await apiClient.get(
       "/sni/api/v1/bookings/cancellation-policy",

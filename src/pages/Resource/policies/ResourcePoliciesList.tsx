@@ -1,268 +1,151 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Plus,
-  Trash2,
-  Search,
-  Shield,
-  ToggleLeft,
-  ToggleRight,
-} from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Ban, ChevronRight, Plus, Power, ShieldCheck, Trash2 } from "lucide-react";
 import { resourceService } from "../../../services/resource.service";
 import type { ResourcePolicyResponse } from "../../../services/resource.service";
-import { ResourcePolicyFormModal } from "./ResourcePolicyFormModal";
+import { ActionButton, DataCard, EmptyState, ErrorBlock, HeadRow, IconButton, ListHeader, PanelForm, Pagination, SearchField, StatusChip } from "../../../components/subscription/kit";
+import { ROW_HOVER, apiMessage } from "../../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../../components/ui/Skeleton";
+import { toast } from "../../../components/ui/toastStore";
+import { Cell, formatDuration, useDebounced } from "../../../components/resources/resKit";
+import { POLICY_DEFAULTS, PolicyFields, policyError, policyPayload } from "../../../components/resources/PolicyFields";
+import type { PolicyForm } from "../../../components/resources/PolicyFields";
 
-const formatDuration = (minutes: number): string => {
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return mins > 0 ? `${hours}h${mins}` : `${hours}h`;
-};
+const COLS = "lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1.2fr)_8rem_7rem_auto]";
+const SIZE = 15;
 
 export const ResourcePoliciesList: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [page, setPage] = useState(0);
+  const [creating, setCreating] = useState<PolicyForm | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const q = useDebounced(search.trim());
 
-  const { data: policiesData, isLoading } = useQuery({
-    queryKey: ["resource-policies"],
-    queryFn: () => resourceService.getResourcePolicies({ size: 500 }),
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["resource-policies", page, q],
+    queryFn: () => (q ? resourceService.searchResourcePolicies(q, { page, size: SIZE }) : resourceService.getResourcePolicies({ page, size: SIZE })),
   });
+  const policies = data?.content ?? [];
+  const total = data?.totalElements ?? 0;
 
-  const deleteMutation = useMutation({
-    mutationFn: (code: string) => resourceService.deleteResourcePolicy(code),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resource-policies"] });
-      queryClient.invalidateQueries({ queryKey: ["resource-policies-list"] });
+  const invalidate = () => Promise.all([queryClient.invalidateQueries({ queryKey: ["resource-policies"] }), queryClient.invalidateQueries({ queryKey: ["resource-policies-list"] })]);
+  const create = useMutation({
+    mutationFn: () => resourceService.createResourcePolicy(policyPayload(creating!)),
+    onSuccess: async () => {
+      toast.success("Politique créée");
+      await invalidate();
+      setCreating(null);
+      setError(null);
     },
-    onError: () =>
-      alert(
-        "Erreur lors de la suppression. Cette politique est peut-être utilisée.",
-      ),
+    onError: (e) => setError(apiMessage(e, "Création impossible")),
   });
-
-  const toggleStatusMutation = useMutation({
-    mutationFn: ({ code, active }: { code: string; active: boolean }) =>
-      resourceService.updateResourcePolicyStatus(code, active),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resource-policies"] });
-      queryClient.invalidateQueries({ queryKey: ["resource-policies-list"] });
-    },
-    onError: () => alert("Erreur lors de la mise à jour du statut."),
+  const toggleStatus = useMutation({
+    mutationFn: (p: ResourcePolicyResponse) => resourceService.updateResourcePolicyStatus(p.code, !p.active),
+    onSuccess: invalidate,
+    onError: (e) => toast.error(apiMessage(e, "Changement d'état impossible")),
   });
-
-  const toggleCancellationMutation = useMutation({
-    mutationFn: ({
-      code,
-      allowCancellation,
-    }: {
-      code: string;
-      allowCancellation: boolean;
-    }) =>
-      resourceService.updateResourcePolicyAllowCancellation(
-        code,
-        allowCancellation,
-      ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resource-policies"] });
-      queryClient.invalidateQueries({ queryKey: ["resource-policies-list"] });
-    },
-    onError: () =>
-      alert("Erreur lors de la mise à jour de l'autorisation d'annulation."),
+  const toggleCancel = useMutation({
+    mutationFn: (p: ResourcePolicyResponse) => resourceService.updateResourcePolicyAllowCancellation(p.code, !p.allowCancellation),
+    onSuccess: invalidate,
+    onError: (e) => toast.error(apiMessage(e, "Modification de l'annulation impossible")),
   });
-
-  const policies: ResourcePolicyResponse[] = policiesData?.content || [];
-  const filteredPolicies = search
-    ? policies.filter(
-        (p) =>
-          p.name.toLowerCase().includes(search.toLowerCase()) ||
-          p.code.toLowerCase().includes(search.toLowerCase()),
-      )
-    : policies;
-
-  const handleDelete = (code: string) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer cette politique ?"))
-      deleteMutation.mutate(code);
-  };
-
-  if (isLoading) return <div className="text-center py-8">Chargement...</div>;
+  const remove = useMutation({ mutationFn: (code: string) => resourceService.deleteResourcePolicy(code), onSuccess: invalidate });
 
   return (
-    <div>
-      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">
-            Politiques de réservation
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Définissez les durées, préavis et règles d’annulation des
-            ressources.
-          </p>
-        </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-700"
+    <div className="space-y-5">
+      <ListHeader
+        title="Politiques de réservation"
+        subtitle={isLoading ? undefined : `${total} politique${total > 1 ? "s" : ""}: durées, préavis et règles d'annulation`}
+        action={<ActionButton icon={Plus} onClick={() => { setError(null); setCreating({ ...POLICY_DEFAULTS }); }}>Nouvelle politique</ActionButton>}
+      />
+
+      {creating && (
+        <PanelForm
+          title="Nouvelle politique de réservation"
+          onCancel={() => setCreating(null)}
+          pending={create.isPending}
+          submitLabel="Créer"
+          submitDisabled={!creating.name.trim()}
+          error={error}
+          onSubmit={(e) => {
+            e.preventDefault();
+            const msg = policyError(creating);
+            if (msg) return setError(msg);
+            setError(null);
+            create.mutate();
+          }}
         >
-          <Plus size={18} /> Nouvelle politique
-        </button>
-      </div>
-
-      <div className="mb-6 grid gap-3 md:grid-cols-3">
-        <Metric label="Politiques" value={policies.length} />
-        <Metric
-          label="Actives"
-          value={policies.filter((p) => p.active).length}
-        />
-        <Metric
-          label="Annulation autorisée"
-          value={policies.filter((p) => p.allowCancellation).length}
-        />
-      </div>
-
-      <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-        <div className="relative">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Rechercher par nom ou code..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-          />
-        </div>
-      </div>
-
-      <div className="overflow-x-auto">
-        <table className="w-full border-separate border-spacing-y-2">
-          <thead>
-            <tr className="text-xs uppercase tracking-wide text-gray-400">
-              <th className="px-4 py-2 text-left font-semibold">Politique</th>
-              <th className="px-4 py-2 text-center font-semibold">Durée min</th>
-              <th className="px-4 py-2 text-center font-semibold">Durée max</th>
-              <th className="px-4 py-2 text-center font-semibold">Préavis</th>
-              <th className="px-4 py-2 text-center font-semibold">
-                Annulation
-              </th>
-              <th className="px-4 py-2 text-center font-semibold">Statut</th>
-              <th className="px-4 py-2 text-right font-semibold">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredPolicies.map((policy) => (
-              <tr
-                key={policy.code}
-                onClick={() => navigate(`/resources/policies/${policy.code}`)}
-                className={`cursor-pointer bg-white shadow-sm ring-1 ring-gray-100 transition hover:-translate-y-0.5 hover:shadow-md ${!policy.active ? "opacity-60" : ""}`}
-              >
-                <td className="rounded-l-2xl px-4 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-xl bg-primary-50 p-2 text-primary-600">
-                      <Shield size={18} />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{policy.name}</p>
-                      <p className="font-mono text-xs text-gray-400">
-                        {policy.code}
-                      </p>
-                      {policy.description && (
-                        <p className="mt-1 line-clamp-1 text-xs text-gray-500">
-                          {policy.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-4 text-center text-sm font-medium text-gray-700">
-                  {formatDuration(policy.minBookingDurationMinutes)}
-                </td>
-                <td className="px-4 py-4 text-center text-sm font-medium text-gray-700">
-                  {formatDuration(policy.maxBookingDurationMinutes)}
-                </td>
-                <td className="px-4 py-4 text-center text-sm text-gray-600">
-                  {formatDuration(policy.minBookingNoticeMinutes)}
-                </td>
-                <td className="px-4 py-4 text-center">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleCancellationMutation.mutate({
-                        code: policy.code,
-                        allowCancellation: !policy.allowCancellation,
-                      });
-                    }}
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${policy.allowCancellation ? "bg-green-50 text-green-700" : "bg-gray-50 text-gray-500"}`}
-                  >
-                    {policy.allowCancellation ? "Autorisée" : "Bloquée"}
-                  </button>
-                </td>
-                <td className="px-4 py-4 text-center">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleStatusMutation.mutate({
-                        code: policy.code,
-                        active: !policy.active,
-                      });
-                    }}
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${policy.active ? "bg-green-50 text-green-700" : "bg-gray-50 text-gray-500"}`}
-                  >
-                    {policy.active ? (
-                      <ToggleRight size={14} />
-                    ) : (
-                      <ToggleLeft size={14} />
-                    )}
-                    {policy.active ? "Active" : "Inactive"}
-                  </button>
-                </td>
-                <td className="rounded-r-2xl px-4 py-4 text-right">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(policy.code);
-                    }}
-                    className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {filteredPolicies.length === 0 && (
-        <div className="rounded-2xl bg-white p-12 text-center shadow-sm ring-1 ring-gray-100">
-          <Shield size={42} className="mx-auto mb-3 text-gray-300" />
-          <p className="font-medium text-gray-700">Aucune politique trouvée</p>
-        </div>
+          <PolicyFields value={creating} onChange={(patch) => setCreating((p) => (p ? { ...p, ...patch } : p))} />
+        </PanelForm>
       )}
 
-      <ResourcePolicyFormModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        editingPolicy={null}
-        onSuccess={() => setIsModalOpen(false)}
-      />
+      <SearchField value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Nom ou code de la politique" />
+
+      {isLoading ? (
+        <ListSkeleton rows={6} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les politiques." onRetry={() => refetch()} />
+      ) : policies.length === 0 ? (
+        <EmptyState icon={ShieldCheck} title="Aucune politique" hint={q ? "Aucun résultat pour cette recherche." : "Créez la première politique de réservation."} />
+      ) : (
+        <>
+          <HeadRow cols={COLS}>
+            <span>Politique</span>
+            <span>Durée de réservation</span>
+            <span>Préavis</span>
+            <span>État</span>
+            <span className="text-right">Actions</span>
+          </HeadRow>
+          <DataCard>
+            {policies.map((p) => (
+              <div key={p.code} className={`rounded-2xl max-lg:mb-2 max-lg:bg-gray-50 ${ROW_HOVER}`}>
+                <div onClick={() => navigate(`/resources/policies/${p.code}`)} className={`grid cursor-pointer grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 p-4 ${COLS}`}>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-gray-900">{p.name}</p>
+                    <p className="font-mono text-xs text-gray-400">{p.code}</p>
+                  </div>
+                  <Cell title="Durée" className="max-lg:order-3 max-lg:col-span-2">
+                    <span className="text-sm text-gray-700">
+                      {formatDuration(p.minBookingDurationMinutes)} à {formatDuration(p.maxBookingDurationMinutes)}
+                    </span>
+                  </Cell>
+                  <Cell title="Préavis" className="max-lg:order-4 max-lg:col-span-2">
+                    <span className="text-sm text-gray-700">{formatDuration(p.minBookingNoticeMinutes) || "Aucun"}</span>
+                  </Cell>
+                  <div className="flex flex-wrap gap-1.5 max-lg:order-2 max-lg:justify-self-end">
+                    <StatusChip tone={p.active ? "success" : "neutral"}>{p.active ? "Active" : "Inactive"}</StatusChip>
+                  </div>
+                  <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 max-lg:order-5 max-lg:col-span-2 lg:justify-end">
+                    <IconButton icon={Ban} label={p.allowCancellation ? "Bloquer l'annulation" : "Autoriser l'annulation"} tone={p.allowCancellation ? "success" : "neutral"} pending={toggleCancel.isPending && toggleCancel.variables?.code === p.code} onClick={() => toggleCancel.mutate(p)} />
+                    <IconButton icon={Power} label={p.active ? "Désactiver" : "Activer"} tone={p.active ? "success" : "neutral"} pending={toggleStatus.isPending && toggleStatus.variables?.code === p.code} onClick={() => toggleStatus.mutate(p)} />
+                    <IconButton
+                      icon={Trash2}
+                      label="Supprimer"
+                      tone="danger"
+                      onClick={() =>
+                        toast.confirm({
+                          message: `Supprimer la politique « ${p.name} » ?`,
+                          detail: "La suppression échoue si des ressources l'utilisent.",
+                          confirmLabel: "Supprimer",
+                          pendingLabel: "Suppression",
+                          successMessage: "Politique supprimée",
+                          errorMessage: "Suppression impossible : la politique est probablement utilisée",
+                          onConfirm: () => remove.mutateAsync(p.code),
+                        })
+                      }
+                    />
+                    <ChevronRight size={16} className="ml-1 hidden text-gray-300 lg:block" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </DataCard>
+          <Pagination page={page} totalPages={data?.totalPages ?? 1} total={total} noun="politique" onChange={setPage} />
+        </>
+      )}
     </div>
   );
 };
-
-const Metric: React.FC<{ label: string; value: number }> = ({
-  label,
-  value,
-}) => (
-  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-    <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-      {label}
-    </p>
-    <p className="mt-1 text-2xl font-bold text-gray-900">
-      {value.toLocaleString("fr-FR")}
-    </p>
-  </div>
-);

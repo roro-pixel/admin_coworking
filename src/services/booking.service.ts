@@ -1,6 +1,10 @@
 import { apiClient } from "./api";
 
-export type BookingPaymentMode = "DIRECT" | "SUBSCRIPTION" | "PASS";
+/**
+ * WALLET : prépayé. Pour une organisation (billingCompanyCode), puise dans son
+ * portefeuille si le membre y a une autorisation couvrant BOOKING.
+ */
+export type BookingPaymentMode = "DIRECT" | "SUBSCRIPTION" | "PASS" | "WALLET";
 export type BookingStatus =
   | "DRAFT"
   | "PENDING_APPROVAL"
@@ -91,6 +95,10 @@ export interface BookingResponse {
   checkInToken?: string;
   checkInQrValue?: string;
   virtualMeetingUrl?: string;
+  /** Membre de l'équipe qui a dérogé au préavis de la ressource. */
+  policyOverrideBy?: string | null;
+  /** Organisation qui paie, quand la réservation est faite pour son compte. */
+  billingCompanyCode?: string | null;
 }
 
 export interface BookingHistory {
@@ -121,6 +129,8 @@ export interface CheckAvailabilityRequest {
   contactEmail?: string;
   contactPhone?: string;
   paymentMode: BookingPaymentMode;
+  /** Organisation qui paie : code client, "NONE" pour le membre seul. */
+  billingCompanyCode?: string;
   startedAt: string;
   endedAt: string;
   quantity: number;
@@ -139,6 +149,7 @@ export interface CheckAvailabilityResponse {
   unitPrice: number;
   estimatedAmount: number;
   currency: string;
+  /** Message du serveur ; l'équipe peut réserver hors préavis. */
   message?: string;
 }
 
@@ -167,6 +178,8 @@ export interface CreateBookingRequest {
   endedAt: string;
   quantity: number;
   paymentMode: BookingPaymentMode;
+  /** Organisation qui paie : code client, "NONE" pour le membre seul. */
+  billingCompanyCode?: string;
   confirmImmediately?: boolean;
   sendEmail?: boolean;
   notes?: string;

@@ -67,6 +67,45 @@ export interface PageResponse<T> {
   number: number;
 }
 
+// ─── Sécurité et intégrité (ADMIN / SUPER_ADMIN) ─────────────────────────────
+
+/** Plafonds du portefeuille selon son niveau KYC. */
+export interface LimitSnapshot {
+  policyCode: string;
+  policyName: string;
+  kycLevel: number;
+  currency: string;
+  maxSingleTransfer: number;
+  dailyTransferUsed: number;
+  maxDailyTransfer: number;
+  remainingDailyTransfer: number;
+  monthlyTransferUsed: number;
+  maxMonthlyTransfer: number;
+  remainingMonthlyTransfer: number;
+  dailyTopUpUsed: number;
+  maxDailyTopUp: number;
+  remainingDailyTopUp: number;
+  maxBalance: number;
+  maxDailyOperations: number;
+  dailyOperationsUsed: number;
+  /** Phrase à afficher quand un plafond bloque. */
+  upgradePath?: string | null;
+}
+
+/**
+ * Un portefeuille est intact si brokenLinks est vide et balanceDrift vaut 0 :
+ * badge vert/rouge.
+ */
+export interface WalletIntegrityReport {
+  walletNumber: string;
+  entriesChecked: number;
+  brokenLinks: unknown[];
+  unchained: number;
+  expectedBalance: number;
+  actualBalance: number;
+  balanceDrift: number;
+}
+
 // Fonctions utilitaires de formatage
 export const formatAmount = (
   value: number | undefined | null,
@@ -112,7 +151,7 @@ export const walletService = {
     return response.data;
   },
 
-  // Get wallets list - Supporte structure { data: [], pageable: {} }
+  // Liste des portefeuilles
   getWallets: async (params?: {
     ownerType?: string;
     ownerCode?: string;
@@ -313,5 +352,32 @@ export const walletService = {
       null,
       { params: { createdBy } },
     );
+  },
+
+  // ── Sécurité et intégrité (ADMIN / SUPER_ADMIN) ─────────────────────────────
+
+  /**
+   * Réinitialise le code secret : 204, le titulaire devra le redéfinir.
+   * Pour passer par le circuit à deux visas, utiliser plutôt
+   * walletControlService.createAction({ type: "RESET_PIN" }).
+   */
+  resetPin: async (walletNumber: string): Promise<void> => {
+    await apiClient.post(
+      `/sni/api/v1/wallets/${walletNumber}/security/pin/reset`,
+    );
+  },
+
+  getLimits: async (walletNumber: string): Promise<LimitSnapshot> => {
+    const response = await apiClient.get(
+      `/sni/api/v1/wallets/${walletNumber}/limits`,
+    );
+    return response.data;
+  },
+
+  getIntegrity: async (walletNumber: string): Promise<WalletIntegrityReport> => {
+    const response = await apiClient.get(
+      `/sni/api/v1/wallets/${walletNumber}/integrity`,
+    );
+    return response.data;
   },
 };

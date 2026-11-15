@@ -2,103 +2,162 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "../components/layout/AdminLayout";
-import { Search, Eye, User, Plus, Trash2 } from "lucide-react";
+import { Search, Eye, Plus, Trash2, Users, UserCheck, UserX, X } from "lucide-react";
 import { customerService } from "../services/customer.service";
-import type {
-  CustomerSummaryResponse,
-  CustomerResponse,
-} from "../services/customer.service";
+import type { CustomerSummaryResponse } from "../services/customer.service";
 import { useDebounce } from "../hooks/useDebounce";
+import { customerPath } from "../components/companies/companyLabels";
+import { Skeleton, ListSkeleton } from "../components/ui/Skeleton";
+import { brandVars } from "../components/layout/adminTheme";
+import { Toaster } from "../components/ui/Toaster";
+import { toast } from "../components/ui/toastStore";
 
+const PINK_SOFT = "bg-[color:color-mix(in_srgb,var(--logo-pink)_16%,white)]";
+const FOCUS =
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--logo-pink)]";
+const FIELD = `w-full rounded-2xl border border-transparent bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-[color:var(--logo-pink)] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--logo-pink)_20%,white)]`;
 
-const customerStatusLabel = (status: string) =>
-  status === "ACTIVE"
-    ? "Actif"
-    : status === "INACTIVE"
-      ? "Inactif"
-      : "Suspendu";
+const statusLabel = (status: string) =>
+  status === "ACTIVE" ? "Actif" : status === "INACTIVE" ? "Inactif" : "Suspendu";
 
-const CustomerStatusBadge: React.FC<{ status: string }> = ({ status }) => (
+const initials = (name: string) =>
+  (name || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("") || "?";
+
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => (
   <span
-    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
+    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
       status === "ACTIVE"
-        ? "bg-green-100 text-green-700"
+        ? "bg-emerald-50 text-emerald-700"
         : status === "INACTIVE"
-          ? "bg-gray-100 text-gray-700"
-          : "bg-red-100 text-red-700"
+          ? "bg-gray-100 text-gray-600"
+          : "bg-red-50 text-red-600"
     }`}
   >
-    {customerStatusLabel(status)}
+    <span
+      className={`h-1.5 w-1.5 rounded-full ${
+        status === "ACTIVE" ? "bg-emerald-500" : status === "INACTIVE" ? "bg-gray-400" : "bg-red-500"
+      }`}
+    />
+    {statusLabel(status)}
   </span>
 );
 
-const CustomerMobileCard: React.FC<{
-  customer: CustomerSummaryResponse;
-  onOpen: (customerId: string) => void;
-  onDelete: (e: React.MouseEvent, customerId: string) => void;
-  deletePending: boolean;
-}> = ({ customer, onOpen, onDelete, deletePending }) => (
-  <button
-    type="button"
-    onClick={() => onOpen(customer.customerId)}
-    className="w-full rounded-2xl bg-gray-50 p-3 text-left ring-1 ring-gray-100 transition hover:bg-primary-50/40"
+const Avatar: React.FC<{ name: string; size?: string }> = ({ name, size = "h-10 w-10" }) => (
+  <span
+    className={`flex ${size} shrink-0 items-center justify-center rounded-full text-xs font-bold text-[color:var(--logo-pink-dark)] ${PINK_SOFT}`}
   >
-    <div className="flex items-start gap-3">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-100 text-primary-600">
-        <User size={19} />
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-black text-gray-950">
-          {customer.displayName || "Customer sans nom"}
-        </p>
-        <p className="mt-0.5 truncate font-mono text-[11px] font-medium text-gray-400">
-          {customer.customerId}
-        </p>
-      </div>
-
-      <CustomerStatusBadge status={customer.status} />
-    </div>
-
-    <div className="mt-3 space-y-2 rounded-xl bg-white px-3 py-2 ring-1 ring-gray-100">
-      <div className="flex items-start justify-between gap-3">
-        <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-gray-400">
-          Email
-        </span>
-        <span className="min-w-0 break-all text-right text-xs font-semibold text-gray-700">
-          {customer.email || "—"}
-        </span>
-      </div>
-
-      <div className="flex items-center justify-between gap-3">
-        <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-gray-400">
-          Téléphone
-        </span>
-        <span className="min-w-0 text-right text-xs font-semibold text-gray-700">
-          {customer.phone || "—"}
-        </span>
-      </div>
-    </div>
-
-    <div className="mt-3 flex items-center justify-end gap-2">
-      <span className="inline-flex items-center gap-1 rounded-xl bg-white px-3 py-2 text-xs font-bold text-primary-600 ring-1 ring-primary-100">
-        <Eye size={15} />
-        Voir
-      </span>
-
-      <button
-        type="button"
-        onClick={(e) => onDelete(e, customer.customerId)}
-        disabled={deletePending}
-        className="inline-flex items-center gap-1 rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-600 ring-1 ring-red-100 disabled:opacity-50"
-      >
-        <Trash2 size={15} />
-        Supprimer
-      </button>
-    </div>
-  </button>
+    {initials(name)}
+  </span>
 );
 
+const StatCard: React.FC<{
+  icon: React.ElementType;
+  label: string;
+  value: number;
+  sub: string;
+}> = ({ icon: Icon, label, value, sub }) => (
+  <div className="flex flex-col gap-3 rounded-[1.75rem] border border-gray-100 bg-white p-3 shadow-sm">
+    <div className="flex items-center gap-2.5 px-2 pt-1.5">
+      <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-100 bg-white text-gray-600 shadow-sm">
+        <Icon size={17} />
+      </span>
+      <span className="text-sm font-semibold text-gray-700">{label}</span>
+    </div>
+    <div className="rounded-2xl bg-gray-50 px-4 py-4">
+      <p className="text-3xl font-bold leading-none tracking-tight tabular-nums text-gray-950">
+        {value.toLocaleString("fr-FR")}
+      </p>
+      <p className="mt-2 text-xs text-gray-500">{sub}</p>
+    </div>
+  </div>
+);
+
+interface RowProps {
+  customer: CustomerSummaryResponse;
+  onOpen: (customerId: string) => void;
+  onDelete: (e: React.MouseEvent, customer: CustomerSummaryResponse) => void;
+  deletePending: boolean;
+}
+
+const ActionButtons: React.FC<RowProps> = ({ customer, onOpen, onDelete, deletePending }) => (
+  <div className="flex justify-end gap-1.5">
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen(customer.customerId);
+      }}
+      title="Voir le détail"
+      aria-label="Voir le détail"
+      className={`flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-[color:color-mix(in_srgb,var(--logo-pink)_16%,white)] hover:text-[color:var(--logo-pink-dark)] ${FOCUS}`}
+    >
+      <Eye size={17} />
+    </button>
+    <button
+      type="button"
+      onClick={(e) => onDelete(e, customer)}
+      disabled={deletePending}
+      title="Supprimer"
+      aria-label="Supprimer"
+      className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:opacity-50"
+    >
+      <Trash2 size={17} />
+    </button>
+  </div>
+);
+
+const CustomerMobileCard: React.FC<RowProps> = (props) => {
+  const { customer, onOpen } = props;
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(customer.customerId)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen(customer.customerId);
+        }
+      }}
+      className={`cursor-pointer rounded-2xl bg-gray-50 p-3 text-left transition hover:bg-[color:color-mix(in_srgb,var(--logo-pink)_8%,white)] ${FOCUS}`}
+    >
+      <div className="flex items-center gap-3">
+        <Avatar name={customer.displayName} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-gray-950">
+            {customer.displayName || "Sans nom"}
+          </p>
+          <p className="mt-0.5 truncate font-mono text-[11px] text-gray-400">{customer.customerId}</p>
+        </div>
+        <StatusBadge status={customer.status} />
+      </div>
+
+      <div className="mt-3 space-y-1.5 rounded-xl bg-white px-3 py-2.5">
+        <div className="flex items-start justify-between gap-3">
+          <span className="shrink-0 text-xs text-gray-400">Email</span>
+          <span className="min-w-0 break-all text-right text-xs font-medium text-gray-700">
+            {customer.email || "Non renseigné"}
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <span className="shrink-0 text-xs text-gray-400">Téléphone</span>
+          <span className="min-w-0 text-right text-xs font-medium text-gray-700">
+            {customer.phone || "Non renseigné"}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-2">
+        <ActionButtons {...props} />
+      </div>
+    </div>
+  );
+};
 
 export const AdminCustomers: React.FC = () => {
   const navigate = useNavigate();
@@ -119,8 +178,7 @@ export const AdminCustomers: React.FC = () => {
     error: searchError,
   } = useQuery({
     queryKey: ["customers", "search-basic", debouncedSearch, typeFilter],
-    queryFn: () =>
-      customerService.searchCustomers(debouncedSearch, typeFilter || undefined),
+    queryFn: () => customerService.searchCustomers(debouncedSearch, typeFilter || undefined),
     enabled: debouncedSearch.length >= 2,
   });
 
@@ -139,50 +197,45 @@ export const AdminCustomers: React.FC = () => {
     enabled: debouncedSearch.length < 2,
   });
 
-  const filteredSearchResults =
-    searchResults?.filter((customer) => {
-      if (statusFilter && customer.status !== statusFilter) return false;
-      return true;
-    }) || [];
-
   const isSearchMode = debouncedSearch.length >= 2;
 
-  const customers: CustomerSummaryResponse[] = isSearchMode
-    ? filteredSearchResults
+  const baseCustomers: CustomerSummaryResponse[] = isSearchMode
+    ? searchResults || []
     : paginatedResult?.data || [];
 
-  const customerResponses = customers as unknown as CustomerResponse[];
+  // Le statut est filtré côté écran, dans les deux modes (liste et recherche)
+  const customers = statusFilter
+    ? baseCustomers.filter((c) => c.status === statusFilter)
+    : baseCustomers;
 
-  const personCount = customerResponses.filter(
-    (c) => c.type === "PERSON",
-  ).length;
-
-  const companyCount = customerResponses.filter(
-    (c) => c.type === "COMPANY",
-  ).length;
+  const activeCount = customers.filter((c) => c.status === "ACTIVE").length;
+  const inactiveCount = customers.filter((c) => c.status !== "ACTIVE").length;
 
   const pagination = isSearchMode ? null : paginatedResult?.pageable;
   const isLoading = isSearchMode ? isSearchLoading : isListLoading;
   const error = isSearchMode ? searchError : listError;
 
   const deleteMutation = useMutation({
-    mutationFn: (customerId: string) =>
-      customerService.deleteCustomer(customerId),
+    mutationFn: (customerId: string) => customerService.deleteCustomer(customerId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
     },
   });
 
-  const handleDelete = (e: React.MouseEvent, customerId: string) => {
+  const handleDelete = (e: React.MouseEvent, customer: CustomerSummaryResponse) => {
     e.stopPropagation();
-    if (confirm("Êtes-vous sûr de vouloir supprimer ce customer ?")) {
-      deleteMutation.mutate(customerId);
-    }
+    toast.confirm({
+      message: "Supprimer ce customer ?",
+      detail: customer.displayName || customer.customerId,
+      confirmLabel: "Supprimer",
+      pendingLabel: "Suppression en cours",
+      successMessage: "Customer supprimé",
+      errorMessage: "La suppression a échoué",
+      onConfirm: () => deleteMutation.mutateAsync(customer.customerId),
+    });
   };
 
-  const handleRowClick = (customerId: string) => {
-    navigate(`/customers/${customerId}`);
-  };
+  const handleOpen = (customerId: string) => navigate(customerPath(customerId));
 
   const handleClearFilters = () => {
     setSearchTerm("");
@@ -191,11 +244,22 @@ export const AdminCustomers: React.FC = () => {
     setPage(0);
   };
 
+  const hasFilters = !!(searchTerm || typeFilter || statusFilter);
+
   if (isLoading && page === 0 && !isSearchMode) {
     return (
       <AdminLayout>
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
+        <div className="space-y-6" style={brandVars}>
+          <div>
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="mt-3 h-3.5 w-72 max-w-full" />
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-32 rounded-[1.75rem]" />
+            ))}
+          </div>
+          <ListSkeleton rows={6} />
         </div>
       </AdminLayout>
     );
@@ -204,7 +268,7 @@ export const AdminCustomers: React.FC = () => {
   if (error) {
     return (
       <AdminLayout>
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-600">
+        <div className="rounded-2xl bg-red-50 p-4 text-sm font-medium text-red-600">
           Erreur lors du chargement des customers : {(error as Error).message}
         </div>
       </AdminLayout>
@@ -213,70 +277,59 @@ export const AdminCustomers: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="mb-5 opacity-0 animate-[fadeUp_0.6s_ease-out_forwards]">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="space-y-5" style={brandVars}>
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-gray-900">Customers</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Gérez tous vos customers (personnes et compagnies)
+            <h1 className="text-2xl font-bold tracking-tight text-gray-950 sm:text-3xl">Clients</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Gérez tous vos clients, personnes et compagnies.
             </p>
           </div>
 
-          <button
-            onClick={() => navigate("/customers/create")}
-            className="inline-flex w-full items-center justify-center rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-primary-700 md:w-auto"
-          >
-            <Plus size={18} className="mr-2" />
-            Créer un customer
-          </button>
-        </div>
-      </div>
-
-      <div
-        className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 opacity-0 animate-[fadeUp_0.6s_ease-out_forwards]"
-        style={{ animationDelay: "0.05s" }}
-      >
-        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total affiché</p>
-          <p className="mt-1 text-2xl font-black text-gray-900">
-            {customers.length}
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Personnes</p>
-          <p className="mt-1 text-2xl font-black text-gray-900">{personCount}</p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => navigate("/companies/create")}
+              className={`inline-flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-gray-100 transition hover:bg-gray-50 md:w-auto ${FOCUS}`}
+            >
+              <Plus size={17} />
+              Créer une entreprise
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/customers/create")}
+              className={`inline-flex w-full items-center justify-center gap-2 rounded-full bg-[color:var(--logo-pink-dark)] px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 md:w-auto ${FOCUS}`}
+            >
+              <Plus size={17} />
+              Créer un client
+            </button>
+          </div>
         </div>
 
-        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Compagnies</p>
-          <p className="mt-1 text-2xl font-black text-gray-900">
-            {companyCount}
-          </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+          <StatCard
+            icon={Users}
+            label="Clients"
+            value={pagination ? pagination.totalElements : customers.length}
+            sub={pagination ? "au total" : "dans cette recherche"}
+          />
+          <StatCard icon={UserCheck} label="Actifs" value={activeCount} sub="sur la liste affichée" />
+          <StatCard icon={UserX} label="Inactifs ou suspendus" value={inactiveCount} sub="sur la liste affichée" />
         </div>
-      </div>
 
-      <div
-        className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 opacity-0 animate-[fadeUp_0.6s_ease-out_forwards] sm:p-5"
-        style={{ animationDelay: "0.1s" }}
-      >
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-3 md:flex-row md:gap-4">
-            <div className="flex-1 relative">
-              <Search
-                size={18}
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-              />
-
+        <div className="rounded-[1.75rem] border border-gray-100 bg-white p-3 shadow-sm sm:p-4">
+          <div className="flex flex-col gap-3 md:flex-row">
+            <div className="relative flex-1">
+              <Search size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Rechercher par nom, email ou téléphone..."
+                placeholder="Rechercher par nom, email ou téléphone"
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
                   setPage(0);
                 }}
-                className="w-full pl-10 pr-4 py-2 ring-1 ring-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className={`${FIELD} pl-11`}
               />
             </div>
 
@@ -286,7 +339,7 @@ export const AdminCustomers: React.FC = () => {
                 setTypeFilter(e.target.value as "PERSON" | "COMPANY" | "");
                 setPage(0);
               }}
-              className="w-full rounded-2xl bg-white px-4 py-2.5 text-sm ring-1 ring-gray-100 md:w-auto"
+              className={`${FIELD} md:w-auto`}
             >
               <option value="">Tous les types</option>
               <option value="PERSON">Personnes</option>
@@ -299,7 +352,7 @@ export const AdminCustomers: React.FC = () => {
                 setStatusFilter(e.target.value);
                 setPage(0);
               }}
-              className="w-full rounded-2xl bg-white px-4 py-2.5 text-sm ring-1 ring-gray-100 md:w-auto"
+              className={`${FIELD} md:w-auto`}
             >
               <option value="">Tous les statuts</option>
               <option value="ACTIVE">Actif</option>
@@ -307,181 +360,138 @@ export const AdminCustomers: React.FC = () => {
               <option value="SUSPENDED">Suspendu</option>
             </select>
 
-            {(searchTerm || typeFilter || statusFilter) && (
+            {hasFilters && (
               <button
+                type="button"
                 onClick={handleClearFilters}
-                className="w-full whitespace-nowrap rounded-2xl px-4 py-2.5 text-sm font-semibold text-gray-600 ring-1 ring-gray-100 hover:text-gray-800 md:w-auto"
+                className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 ${FOCUS}`}
               >
-                Effacer les filtres
+                <X size={15} />
+                Effacer
               </button>
             )}
           </div>
 
-          {searchTerm && searchTerm !== debouncedSearch && (
-            <div className="text-sm text-gray-500 italic">
-              Recherche en cours...
-            </div>
-          )}
-
-          {isSearchMode && searchResults && (
-            <div className="text-sm text-gray-500">
-              {searchResults.length} résultat(s) trouvé(s)
-            </div>
-          )}
+          {(searchTerm && searchTerm !== debouncedSearch) ||
+          (isSearchMode && searchResults) ||
+          (typeFilter && !isSearchMode) ? (
+            <p className="mt-3 px-1 text-xs text-gray-500">
+              {searchTerm && searchTerm !== debouncedSearch
+                ? "Recherche en cours..."
+                : isSearchMode && searchResults
+                  ? `${searchResults.length} résultat(s) trouvé(s)`
+                  : "Le filtre par type s'applique lorsque vous lancez une recherche (2 caractères minimum)."}
+            </p>
+          ) : null}
         </div>
-      </div>
 
-      <div
-        className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 opacity-0 animate-[fadeUp_0.6s_ease-out_forwards]"
-        style={{ animationDelay: "0.2s" }}
-      >
-        <div className="hidden overflow-x-auto lg:block">
-          <table className="w-full border-separate border-spacing-y-1">
-            <thead className="bg-gray-50/70 text-gray-500">
-              <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                  Customer
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                  Contact
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                  Statut
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                  ID
-                </th>
-                <th className="px-6 py-4 text-right text-sm font-semibold text-gray-600">
-                  Actions
-                </th>
-              </tr>
-            </thead>
+        <div className="rounded-[1.75rem] border border-gray-100 bg-white p-2 shadow-sm sm:p-3">
+          <div className="hidden lg:block">
+            <div className="grid grid-cols-[minmax(0,2.2fr)_minmax(0,2fr)_9rem_6rem] gap-4 rounded-2xl bg-gray-50 px-4 py-3 text-xs font-semibold text-gray-500">
+              <span>Client</span>
+              <span>Contact</span>
+              <span>Statut</span>
+              <span className="text-right">Actions</span>
+            </div>
 
-            <tbody>
+            <div className="mt-1.5 space-y-0.5">
               {customers.map((customer) => (
-                <tr
+                <div
                   key={customer.customerId}
-                  onClick={() => handleRowClick(customer.customerId)}
-                  className="cursor-pointer transition-colors hover:bg-gray-50/70"
+                  onClick={() => handleOpen(customer.customerId)}
+                  className="grid cursor-pointer grid-cols-[minmax(0,2.2fr)_minmax(0,2fr)_9rem_6rem] items-center gap-4 rounded-2xl px-4 py-3 transition-colors hover:bg-gray-50"
                 >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100">
-                        <User size={20} className="text-primary-600" />
-                      </div>
-
-                      <div className="min-w-0">
-                        <p className="max-w-[220px] truncate font-medium text-gray-900">
-                          {customer.displayName}
-                        </p>
-                        <p className="truncate text-xs text-gray-500">
-                          {customer.customerId}
-                        </p>
-                      </div>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Avatar name={customer.displayName} />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-gray-900">
+                        {customer.displayName || "Sans nom"}
+                      </p>
+                      <p className="truncate font-mono text-xs text-gray-400">{customer.customerId}</p>
                     </div>
-                  </td>
+                  </div>
 
-                  <td className="px-6 py-4">
-                    <p className="max-w-[240px] truncate text-sm text-gray-900">
-                      {customer.email}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {customer.phone || "-"}
-                    </p>
-                  </td>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-gray-800">{customer.email}</p>
+                    <p className="truncate text-xs text-gray-500">{customer.phone || "Sans numéro"}</p>
+                  </div>
 
-                  <td className="px-6 py-4">
-                    <CustomerStatusBadge status={customer.status} />
-                  </td>
+                  <div>
+                    <StatusBadge status={customer.status} />
+                  </div>
 
-                  <td className="px-6 py-4 font-mono text-sm text-gray-500">
-                    {customer.customerId}
-                  </td>
-
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/customers/${customer.customerId}`);
-                        }}
-                        className="p-1 text-primary-600 hover:text-primary-700"
-                        title="Voir le détail"
-                      >
-                        <Eye size={18} />
-                      </button>
-
-                      <button
-                        onClick={(e) => handleDelete(e, customer.customerId)}
-                        className="p-1 text-red-600 hover:text-red-700"
-                        title="Supprimer"
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                  <ActionButtons
+                    customer={customer}
+                    onOpen={handleOpen}
+                    onDelete={handleDelete}
+                    deletePending={deleteMutation.isPending}
+                  />
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="space-y-3 p-3 lg:hidden">
-          {customers.map((customer) => (
-            <CustomerMobileCard
-              key={customer.customerId}
-              customer={customer}
-              onOpen={handleRowClick}
-              onDelete={handleDelete}
-              deletePending={deleteMutation.isPending}
-            />
-          ))}
-        </div>
-
-        {customers.length === 0 && !isLoading && (
-          <div className="px-4 py-12 text-center">
-            <User size={48} className="mx-auto mb-4 text-gray-300" />
-            <p className="text-gray-500">Aucun customer trouvé</p>
-
-            {(searchTerm || typeFilter || statusFilter) && (
-              <button
-                onClick={handleClearFilters}
-                className="mt-2 text-primary-600 hover:underline"
-              >
-                Effacer les filtres
-              </button>
-            )}
-          </div>
-        )}
-
-        {!isSearchMode && pagination && pagination.totalPages > 1 && (
-          <div className="flex flex-col gap-3 border-t border-gray-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <div className="text-center text-xs font-medium text-gray-500 sm:text-left sm:text-sm">
-              Affichage de {page * pageSize + 1} à{" "}
-              {Math.min((page + 1) * pageSize, pagination.totalElements)} sur{" "}
-              {pagination.totalElements} customers
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 sm:flex">
-              <button
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                disabled={page === 0}
-                className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 hover:bg-gray-50"
-              >
-                Précédent
-              </button>
-
-              <button
-                onClick={() => setPage((p) => p + 1)}
-                disabled={!pagination.hasNext}
-                className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 hover:bg-gray-50"
-              >
-                Suivant
-              </button>
             </div>
           </div>
-        )}
+
+          <div className="space-y-2 lg:hidden">
+            {customers.map((customer) => (
+              <CustomerMobileCard
+                key={customer.customerId}
+                customer={customer}
+                onOpen={handleOpen}
+                onDelete={handleDelete}
+                deletePending={deleteMutation.isPending}
+              />
+            ))}
+          </div>
+
+          {isLoading && customers.length === 0 && <ListSkeleton rows={6} />}
+
+          {customers.length === 0 && !isLoading && (
+            <div className="px-4 py-14 text-center">
+              <span className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full text-[color:var(--logo-pink-dark)] ${PINK_SOFT}`}>
+                <Users size={24} />
+              </span>
+              <p className="mt-4 text-sm font-semibold text-gray-800">Aucun client trouvé</p>
+              {hasFilters && (
+                <button
+                  type="button"
+                  onClick={handleClearFilters}
+                  className={`mt-3 rounded-full px-4 py-2 text-sm font-semibold text-[color:var(--logo-pink-dark)] transition hover:bg-[color:color-mix(in_srgb,var(--logo-pink)_16%,white)] ${FOCUS}`}
+                >
+                  Effacer les filtres
+                </button>
+              )}
+            </div>
+          )}
+
+          {!isSearchMode && pagination && pagination.totalPages > 1 && (
+            <div className="mt-2 flex flex-col gap-3 rounded-2xl bg-gray-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-center text-xs text-gray-500 sm:text-left sm:text-sm">
+                Affichage de {page * pageSize + 1} à{" "}
+                {Math.min((page + 1) * pageSize, pagination.totalElements)} sur {pagination.totalElements} clients
+              </p>
+
+              <div className="grid grid-cols-2 gap-2 sm:flex">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className={`rounded-full bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 ${FOCUS}`}
+                >
+                  Précédent
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={!pagination.hasNext}
+                  className={`rounded-full bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 ${FOCUS}`}
+                >
+                  Suivant
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        <Toaster />
       </div>
     </AdminLayout>
   );

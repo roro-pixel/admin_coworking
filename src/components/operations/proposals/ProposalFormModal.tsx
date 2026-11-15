@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, X } from "lucide-react";
-import { ModalPortal } from "../..//ui/ModalPortal";
+import { X } from "lucide-react";
+import { brandVars } from "../../layout/adminTheme";
+import { ModalPortal } from "../../ui/ModalPortal";
 import { operationsService } from "../../../services/operations.service";
-import type {
-  ProposalRecipientType,
-  ProposalResponse,
-} from "../../../services/operations.service";
+import type { ProposalRecipientType, ProposalResponse } from "../../../services/operations.service";
+import { ActionButton, Field, IconButton } from "../../subscription/kit";
+import { FIELD, apiMessage } from "../../subscription/kitUtils";
+import { toast } from "../../ui/toastStore";
+import { PillChoice } from "../opsKit";
+import { PROPOSAL_RECIPIENT_TYPES } from "../opsLabels";
 
 interface Props {
   isOpen: boolean;
@@ -15,11 +18,7 @@ interface Props {
   onSuccess: (proposal: ProposalResponse) => void;
   leadId?: number | null;
 }
-const recipientTypes: { value: ProposalRecipientType; label: string }[] = [
-  { value: "CUSTOMER", label: "Customer" },
-  { value: "MEMBER", label: "Membre" },
-  { value: "BUSINESS_ENTITY", label: "Entreprise" },
-];
+
 const buildForm = (p: ProposalResponse | null, leadId?: number | null) => ({
   title: p?.title || "",
   opportunityId: p?.opportunityId?.toString() || "",
@@ -34,22 +33,15 @@ const buildForm = (p: ProposalResponse | null, leadId?: number | null) => ({
   internalNotes: p?.internalNotes || "",
   assignedTo: p?.assignedTo?.toString() || "",
 });
-export const ProposalFormModal: React.FC<Props> = ({
-  isOpen,
-  onClose,
-  editingProposal,
-  onSuccess,
-  leadId,
-}) => {
+
+export const ProposalFormModal: React.FC<Props> = ({ isOpen, onClose, editingProposal, onSuccess, leadId }) => {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(() => buildForm(editingProposal, leadId));
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   useEffect(() => {
-    if (isOpen) {
-      setForm(buildForm(editingProposal, leadId));
-      setErrorMessage(null);
-    }
+    if (isOpen) setForm(buildForm(editingProposal, leadId));
   }, [editingProposal, isOpen, leadId]);
+
   const payload = () => ({
     title: form.title,
     opportunityId: form.opportunityId ? Number(form.opportunityId) : null,
@@ -64,233 +56,104 @@ export const ProposalFormModal: React.FC<Props> = ({
     internalNotes: form.internalNotes || null,
     assignedTo: form.assignedTo ? Number(form.assignedTo) : null,
   });
+
   const createMutation = useMutation({
     mutationFn: () => operationsService.createProposal(payload()),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["crm-proposals"] });
+      toast.success("Proposition créée");
       onSuccess(data);
     },
-    onError: (e: any) =>
-      setErrorMessage(
-        e?.response?.data?.message || "Erreur création proposition.",
-      ),
+    onError: (e) => toast.error(apiMessage(e, "Création de la proposition impossible.")),
   });
   const updateMutation = useMutation({
-    mutationFn: () =>
-      operationsService.updateProposal(editingProposal!.id, payload()),
+    mutationFn: () => operationsService.updateProposal(editingProposal!.id, payload()),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["crm-proposals"] });
-      queryClient.invalidateQueries({
-        queryKey: ["crm-proposal", editingProposal?.id],
-      });
+      queryClient.invalidateQueries({ queryKey: ["crm-proposal", editingProposal?.id] });
+      toast.success("Proposition mise à jour");
       onSuccess(data);
     },
-    onError: (e: any) =>
-      setErrorMessage(
-        e?.response?.data?.message || "Erreur modification proposition.",
-      ),
+    onError: (e) => toast.error(apiMessage(e, "Modification de la proposition impossible.")),
   });
+
   if (!isOpen) return null;
   const isPending = createMutation.isPending || updateMutation.isPending;
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+
   return (
     <ModalPortal onClose={onClose} size="2xl">
-      <div className="sticky top-0 z-10 flex justify-between rounded-t-2xl border-b bg-white px-6 py-4">
-        <div>
-          <h3 className="text-xl font-bold">
-            {editingProposal
-              ? "Modifier la proposition"
-              : "Nouvelle proposition"}
-          </h3>
-          <p className="text-sm text-gray-500">
-            Informations destinataire et validité commerciale.
-          </p>
-        </div>
-        <button onClick={onClose} className="rounded-xl p-2 hover:bg-gray-100">
-          <X size={20} />
-        </button>
-      </div>
+      <div style={brandVars}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          setErrorMessage(null);
-          editingProposal ? updateMutation.mutate() : createMutation.mutate();
+          if (editingProposal) updateMutation.mutate();
+          else createMutation.mutate();
         }}
-        className="space-y-4 p-6"
+        className="p-5 sm:p-7"
       >
-        {errorMessage && (
-          <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {errorMessage}
+        <div className="flex items-start gap-4">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-xl font-bold tracking-tight text-gray-950">
+              {editingProposal ? "Modifier la proposition" : "Nouvelle proposition"}
+            </h3>
+            <p className="mt-0.5 text-sm text-gray-500">Destinataire et validité commerciale</p>
           </div>
-        )}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <label className="md:col-span-2">
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Titre *
-            </span>
-            <input
-              required
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Lead ID
-            </span>
-            <input
-              value={form.leadId}
-              onChange={(e) => setForm({ ...form, leadId: e.target.value })}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Opportunité ID
-            </span>
-            <input
-              value={form.opportunityId}
-              onChange={(e) =>
-                setForm({ ...form, opportunityId: e.target.value })
-              }
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Type destinataire
-            </span>
-            <select
-              value={form.recipientType}
-              onChange={(e) =>
-                setForm({ ...form, recipientType: e.target.value })
-              }
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            >
-              {recipientTypes.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Code destinataire
-            </span>
-            <input
-              value={form.recipientCode}
-              onChange={(e) =>
-                setForm({ ...form, recipientCode: e.target.value })
-              }
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Nom destinataire
-            </span>
-            <input
-              value={form.recipientName}
-              onChange={(e) =>
-                setForm({ ...form, recipientName: e.target.value })
-              }
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Email destinataire
-            </span>
-            <input
-              value={form.recipientEmail}
-              onChange={(e) =>
-                setForm({ ...form, recipientEmail: e.target.value })
-              }
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Valide jusqu'au
-            </span>
-            <input
-              type="date"
-              value={form.validUntil}
-              onChange={(e) => setForm({ ...form, validUntil: e.target.value })}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Devise
-            </span>
-            <input
-              value={form.currency}
-              onChange={(e) =>
-                setForm({ ...form, currency: e.target.value.toUpperCase() })
-              }
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Assigné à
-            </span>
-            <input
-              value={form.assignedTo}
-              onChange={(e) => setForm({ ...form, assignedTo: e.target.value })}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label className="md:col-span-2">
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Notes client
-            </span>
-            <textarea
-              rows={3}
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
-          <label className="md:col-span-2">
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">
-              Notes internes
-            </span>
-            <textarea
-              rows={3}
-              value={form.internalNotes}
-              onChange={(e) =>
-                setForm({ ...form, internalNotes: e.target.value })
-              }
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5"
-            />
-          </label>
+          <IconButton icon={X} label="Fermer" tone="neutral" onClick={onClose} />
         </div>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 rounded-xl border px-4 py-2.5"
-          >
-            Annuler
-          </button>
-          <button
-            type="submit"
-            disabled={isPending}
-            className="flex-1 rounded-xl bg-primary-600 px-4 py-2.5 text-white"
-          >
-            {isPending ? (
-              <Loader2 className="mx-auto animate-spin" size={16} />
-            ) : editingProposal ? (
-              "Mettre à jour"
-            ) : (
-              "Créer"
-            )}
-          </button>
+
+        <div className="mt-5 grid grid-cols-1 gap-4 rounded-2xl bg-gray-50 p-4 sm:p-5 md:grid-cols-2">
+          <Field label="Titre" required className="md:col-span-2">
+            <input required value={form.title} onChange={set("title")} className={FIELD} />
+          </Field>
+          <div className="md:col-span-2">
+            <span className="mb-1.5 block text-xs font-semibold text-gray-600">Type de destinataire</span>
+            <PillChoice
+              label="Type de destinataire"
+              options={PROPOSAL_RECIPIENT_TYPES}
+              value={form.recipientType}
+              onChange={(v) => setForm((f) => ({ ...f, recipientType: v }))}
+            />
+          </div>
+          <Field label="Code destinataire">
+            <input value={form.recipientCode} onChange={set("recipientCode")} className={FIELD} />
+          </Field>
+          <Field label="Nom destinataire">
+            <input value={form.recipientName} onChange={set("recipientName")} className={FIELD} />
+          </Field>
+          <Field label="Email destinataire">
+            <input type="email" value={form.recipientEmail} onChange={set("recipientEmail")} className={FIELD} />
+          </Field>
+          <Field label="Valide jusqu'au">
+            <input type="date" value={form.validUntil} onChange={set("validUntil")} className={FIELD} />
+          </Field>
+          <Field label="Lead (ID)">
+            <input value={form.leadId} onChange={set("leadId")} className={FIELD} />
+          </Field>
+          <Field label="Opportunité (ID)">
+            <input value={form.opportunityId} onChange={set("opportunityId")} className={FIELD} />
+          </Field>
+          <Field label="Devise">
+            <input value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value.toUpperCase() }))} className={FIELD} />
+          </Field>
+          <Field label="Assignée à">
+            <input value={form.assignedTo} onChange={set("assignedTo")} className={FIELD} />
+          </Field>
+          <Field label="Notes client" className="md:col-span-2">
+            <textarea rows={3} value={form.notes} onChange={set("notes")} className={FIELD} />
+          </Field>
+          <Field label="Notes internes" className="md:col-span-2">
+            <textarea rows={3} value={form.internalNotes} onChange={set("internalNotes")} className={FIELD} />
+          </Field>
+        </div>
+
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <ActionButton variant="ghost" onClick={onClose} disabled={isPending}>Annuler</ActionButton>
+          <ActionButton type="submit" pending={isPending}>{editingProposal ? "Mettre à jour" : "Créer"}</ActionButton>
         </div>
       </form>
+    </div>
     </ModalPortal>
   );
 };

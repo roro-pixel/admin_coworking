@@ -1,96 +1,73 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Calendar, Eye, RefreshCw } from "lucide-react";
-import { kycService, kycStatusLabels } from "../../services/document.service";
+import { CalendarCheck, Eye } from "lucide-react";
+import { kycService } from "../../services/document.service";
+import { EmptyState, ErrorBlock, Field, IconButton, ListHeader, Pagination } from "../../components/subscription/kit";
+import { FIELD } from "../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../components/ui/Skeleton";
+import { CaseCard, CaseHead, CaseRow } from "../../components/documents/CaseList";
+
+const PAGE_SIZE = 15;
 
 export const KycExpiringSoonPage: React.FC = () => {
   const navigate = useNavigate();
   const [days, setDays] = useState(30);
+  const [page, setPage] = useState(0);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["kyc-expiring-soon", days],
-    queryFn: () => kycService.getExpiringSoon(days),
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["kyc-expiring-soon", days, page],
+    queryFn: () => kycService.getExpiringSoon(days, { page, size: PAGE_SIZE }),
   });
 
-  const cases = data?.content || [];
+  const cases = data?.content ?? [];
+  const total = data?.totalElements ?? 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">
-            Expirations à venir
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Dossiers avec documents qui expirent bientôt
-          </p>
-        </div>
-        <select
-          value={days}
-          onChange={(e) => setDays(Number(e.target.value))}
-          className="px-4 py-2 border border-gray-200 rounded-xl bg-white text-sm"
-        >
-          <option value={7}>7 jours</option>
-          <option value={30}>30 jours</option>
-          <option value={60}>60 jours</option>
-        </select>
-      </div>
+    <div className="space-y-5">
+      <ListHeader
+        title="Expirations à venir"
+        subtitle={isLoading ? undefined : `${total} dossier${total > 1 ? "s" : ""} avec un document qui expire sous ${days} jours`}
+        action={
+          <Field label="Horizon">
+            <select
+              value={days}
+              onChange={(e) => {
+                setDays(Number(e.target.value));
+                setPage(0);
+              }}
+              className={`${FIELD} min-w-[9rem]`}
+            >
+              <option value={7}>7 jours</option>
+              <option value={30}>30 jours</option>
+              <option value={60}>60 jours</option>
+            </select>
+          </Field>
+        }
+      />
 
       {isLoading ? (
-        <div className="text-center py-12">
-          <RefreshCw className="animate-spin mx-auto mb-4" size={32} />
-          <p className="text-gray-500">Chargement...</p>
-        </div>
+        <ListSkeleton rows={6} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les expirations." onRetry={() => refetch()} />
       ) : cases.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl">
-          <Calendar size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500">
-            Aucun document n'expire dans les {days} prochains jours
-          </p>
-        </div>
+        <EmptyState icon={CalendarCheck} title={`Aucune expiration sous ${days} jours`} hint="Tous les documents sont à jour sur cet horizon." />
       ) : (
-        <div className="space-y-3">
-          {cases.map((kycCase) => (
-            <div
-              key={kycCase.code}
-              className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100"
-            >
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Calendar size={18} className="text-amber-500" />
-                    <span className="font-mono font-medium">
-                      {kycCase.code}
-                    </span>
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700`}
-                    >
-                      Expiration proche
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-500">
-                    {kycCase.ownerType} ·{" "}
-                    {kycCase.ownerCode || `ID: ${kycCase.ownerId}`}
-                  </p>
-                  <div className="flex gap-4 mt-2 text-xs text-gray-400">
-                    <span>Documents : {kycCase.documents?.length || 0}</span>
-                    <span>
-                      Statut :{" "}
-                      {kycStatusLabels[kycCase.status] || kycCase.status}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  onClick={() => navigate(`/documents/kyc/cases/${kycCase.code}`)}
-                  className="px-4 py-2 border border-amber-200 text-amber-700 rounded-lg hover:bg-amber-50 flex items-center gap-2 text-sm"
-                >
-                  <Eye size={14} /> Voir dossier
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <>
+          <CaseHead dateTitle="Soumis le" />
+          <CaseCard>
+            {cases.map((c) => (
+              <CaseRow
+                key={c.code}
+                kycCase={c}
+                date={c.submittedAt} alert={false}
+                onOpen={() => navigate(`/documents/kyc/cases/${c.code}`)}
+                actions={<IconButton icon={Eye} label="Voir le dossier" onClick={() => navigate(`/documents/kyc/cases/${c.code}`)} />}
+              />
+            ))}
+          </CaseCard>
+          <Pagination page={page} totalPages={data?.totalPages ?? 0} total={total} noun="dossier" onChange={setPage} />
+        </>
       )}
     </div>
   );

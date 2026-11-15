@@ -1,148 +1,127 @@
 import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Download, BarChart3, RefreshCw } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Download } from "lucide-react";
 import { documentService } from "../../services/document.service";
-
-const spaces = [
-  "",
-  "KYC_SPACE",
-  "CONTRACT_SPACE",
-  "FINANCIAL_SPACE",
-  "ASSET_SPACE",
-  "ADMINISTRATIVE",
-  "GENERIC",
-];
-
-const downloadBlob = (blob: Blob, filename: string) => {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-};
+import { ActionButton, ErrorBlock, Field, ListHeader } from "../../components/subscription/kit";
+import { FIELD, apiMessage } from "../../components/subscription/kitUtils";
+import { toast } from "../../components/ui/toastStore";
+import { ChartCard, ChartSkeleton, KpiRow, KpiRowSkeleton, NoData } from "../../components/operations/OpsCharts";
+import { RankBars, ValueDonut } from "../../components/reporting/ReportCharts";
+import { RefreshButton } from "../../components/reporting/reportKit";
+import { saveBlob } from "../../components/payment/paymentUtils";
+import { CATEGORY_LABEL, DOC_STATUS_LABEL, SPACES, SPACE_LABEL, STATUS_COLOR, fmtHours, fmtInt, toRank } from "../../components/documents/docUtils";
 
 export const DocumentAnalyticsExportPage: React.FC = () => {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [space, setSpace] = useState("");
-  const params = {
-    from: from || undefined,
-    to: to || undefined,
-    space: space || undefined,
-  };
-  const { data, isLoading, refetch } = useQuery({
+  const params = { from: from || undefined, to: to || undefined, space: space || undefined };
+
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ["document-analytics", params],
     queryFn: () => documentService.getDocumentAnalytics(params),
   });
 
-  const exportCsv = async () => {
-    const blob = await documentService.exportDocumentsCsv(params);
-    downloadBlob(blob, "documents_export.csv");
-  };
+  const exportCsv = useMutation({
+    mutationFn: async () => saveBlob(await documentService.exportDocumentsCsv(params), "documents_export.csv"),
+    onError: (e) => toast.error(apiMessage(e, "Export impossible")),
+  });
+
+  const header = (
+    <>
+      <ListHeader
+        title="Analytics et export"
+        subtitle="Activité documentaire sur la période, export CSV de la sélection"
+        action={
+          <div className="flex items-center gap-2">
+            <RefreshButton fetching={isFetching} onClick={() => refetch()} />
+            <ActionButton icon={Download} pending={exportCsv.isPending} onClick={() => exportCsv.mutate()}>
+              Export CSV
+            </ActionButton>
+          </div>
+        }
+      />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field label="Du">
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={FIELD} />
+        </Field>
+        <Field label="Au">
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={FIELD} />
+        </Field>
+        <Field label="Espace">
+          <select value={space} onChange={(e) => setSpace(e.target.value)} className={FIELD}>
+            <option value="">Tous les espaces</option>
+            {SPACES.map((s) => (
+              <option key={s} value={s}>
+                {SPACE_LABEL[s] ?? s}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+    </>
+  );
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <KpiRowSkeleton count={5} columns={5} />
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ChartSkeleton />
+          <ChartSkeleton />
+        </div>
+      </div>
+    );
+  }
+  if (isError || !data) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <ErrorBlock message="Les statistiques n'ont pas pu être chargées." onRetry={() => refetch()} />
+      </div>
+    );
+  }
+
+  const uploaded = data.totalUploaded ?? 0;
+  const reviewed = data.totalReviewed ?? 0;
+  const approved = data.totalApproved ?? 0;
+  const rejected = data.totalRejected ?? 0;
+  const byStatus = toRank(data.byStatus, DOC_STATUS_LABEL, STATUS_COLOR);
+  const bySpace = toRank(data.bySpace, SPACE_LABEL);
+  const byCategory = toRank(data.byCategory, CATEGORY_LABEL);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">
-            Analytics & exports GED
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Analyse documentaire et export CSV.
-          </p>
-        </div>
-        <button
-          onClick={exportCsv}
-          className="px-4 py-2 bg-primary-600 text-white rounded-lg flex items-center gap-2"
-        >
-          <Download size={16} /> Export CSV
-        </button>
+      {header}
+      <KpiRow
+        columns={5}
+        items={[
+          { label: "Envoyés", value: fmtInt(uploaded) },
+          { label: "Revus", value: fmtInt(reviewed), tone: "pink" },
+          { label: "Approuvés", value: fmtInt(approved), tone: "success" },
+          { label: "Rejetés", value: fmtInt(rejected), tone: rejected > 0 ? "danger" : "default" },
+          { label: "Délai moyen de revue", value: fmtHours(data.avgReviewHours ?? 0) },
+        ]}
+      />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ChartCard title="Parcours des documents" subtitle="De l'envoi à la décision">
+          <RankBars
+            format={fmtInt}
+            items={[
+              { key: "up", label: "Envoyés", value: uploaded, color: "#5B8DEF" },
+              { key: "rev", label: "Revus", value: reviewed, color: "#E0529C" },
+              { key: "ok", label: "Approuvés", value: approved, color: "#2E9E6B" },
+              { key: "ko", label: "Rejetés", value: rejected, color: "#D6455D" },
+            ]}
+          />
+        </ChartCard>
+        <ChartCard title="Par statut" subtitle="Répartition sur la période">
+          {byStatus.length === 0 ? <NoData /> : <ValueDonut data={byStatus} centerLabel="documents" format={fmtInt} />}
+        </ChartCard>
+        <ChartCard title="Par espace">{bySpace.length === 0 ? <NoData /> : <RankBars items={bySpace} format={fmtInt} />}</ChartCard>
+        <ChartCard title="Par catégorie">{byCategory.length === 0 ? <NoData /> : <RankBars items={byCategory} format={fmtInt} />}</ChartCard>
       </div>
-      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-        <input
-          type="date"
-          value={from}
-          onChange={(e) => setFrom(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-xl"
-        />
-        <input
-          type="date"
-          value={to}
-          onChange={(e) => setTo(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-xl"
-        />
-        <select
-          value={space}
-          onChange={(e) => setSpace(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
-        >
-          <option value="">Tous espaces</option>
-          {spaces.filter(Boolean).map((s) => (
-            <option key={s}>{s}</option>
-          ))}
-        </select>
-        <button
-          onClick={() => refetch()}
-          className="px-4 py-2 border border-gray-200 rounded-xl flex items-center justify-center gap-2"
-        >
-          <RefreshCw size={16} /> Actualiser
-        </button>
-      </div>
-      {isLoading && (
-        <div className="text-center py-10">
-          <RefreshCw className="animate-spin mx-auto" />
-        </div>
-      )}
-      {data && (
-        <div className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <Metric label="Uploadés" value={data.totalUploaded ?? 0} />
-            <Metric label="Revus" value={data.totalReviewed ?? 0} />
-            <Metric label="Approuvés" value={data.totalApproved ?? 0} />
-            <Metric label="Rejetés" value={data.totalRejected ?? 0} />
-            <Metric
-              label="Délai moyen"
-              value={`${data.avgReviewHours ?? 0} h`}
-            />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Breakdown title="Par statut" data={data.byStatus} />
-            <Breakdown title="Par espace" data={data.bySpace} />
-            <Breakdown title="Par catégorie" data={data.byCategory} />
-          </div>
-        </div>
-      )}
     </div>
   );
 };
-
-const Metric: React.FC<{ label: string; value: number | string }> = ({
-  label,
-  value,
-}) => (
-  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-    <div className="flex items-center gap-2 text-sm text-gray-500">
-      <BarChart3 size={16} /> {label}
-    </div>
-    <p className="text-2xl font-bold mt-2">
-      {typeof value === "number" ? value.toLocaleString("fr-FR") : value}
-    </p>
-  </div>
-);
-const Breakdown: React.FC<{ title: string; data?: Record<string, number> }> = ({
-  title,
-  data,
-}) => (
-  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-    <h3 className="font-semibold mb-3">{title}</h3>
-    <div className="space-y-2">
-      {Object.entries(data || {}).map(([k, v]) => (
-        <div key={k} className="flex justify-between text-sm border-b pb-2">
-          <span>{k}</span>
-          <strong>{Number(v).toLocaleString("fr-FR")}</strong>
-        </div>
-      ))}
-    </div>
-  </div>
-);

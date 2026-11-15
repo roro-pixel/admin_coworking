@@ -1,504 +1,157 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Plus,
-  Edit,
-  Trash2,
-  Search,
-  X,
-  Package,
-  TrendingUp,
-} from "lucide-react";
-import { ModalPortal } from "../../../components/ui/ModalPortal";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Lightbulb, PackageSearch, Pencil, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { inventoryService } from "../../../services/inventory.service";
-import { useAuth } from "../../../contexts/AuthContext";
-import type {
-  ReorderRule,
-  InventoryItem,
-} from "../../../services/inventory.service";
+import type { InventoryItem, ReorderRule, ReorderSuggestion } from "../../../services/inventory.service";
+import { ActionButton, DataCard, EmptyState, ErrorBlock, Field, HeadRow, IconButton, ListHeader, PanelForm, Pagination, SearchField, StatusChip, Switch } from "../../../components/subscription/kit";
+import { FIELD, ROW_HOVER, apiMessage, formatDate, formatMoney } from "../../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../../components/ui/Skeleton";
+import { toast } from "../../../components/ui/toastStore";
+import { Cell, Fact, ItemPicker, LocationSelect, SEVERITY_LABEL, SEVERITY_TONE, label, qty, useActor, useServerPaged } from "../../../components/inventory/invKit";
+
+const COLS = "lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1.2fr)_7rem_7rem_6rem_auto]";
+const SIZE = 15;
+const EMPTY = { locationCode: "", minimumQuantity: 10, reorderQuantity: 50, active: true };
+const TREND: Record<string, string> = { UP: "En hausse", DOWN: "En baisse", STABLE: "Stable" };
 
 export const ReorderRulesList: React.FC = () => {
-  const { admin } = useAuth();
   const queryClient = useQueryClient();
+  const actor = useActor();
   const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingRule, setEditingRule] = useState<ReorderRule | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [formData, setFormData] = useState({
-    itemCode: "",
-    locationCode: "",
-    minimumQuantity: 10,
-    reorderQuantity: 50,
-    active: true,
+  const [editing, setEditing] = useState<{ rule: ReorderRule | null; form: typeof EMPTY } | null>(null);
+  const [item, setItem] = useState<InventoryItem | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  // GET /inventory/reorder-rules : aucun filtre documenté, recherche côté client
+  const list = useServerPaged<ReorderRule>({
+    key: ["reorder-rules"],
+    size: SIZE,
+    search,
+    match: (r, q) => (r.itemName ?? "").toLowerCase().includes(q) || r.itemCode.toLowerCase().includes(q) || (r.locationName ?? "").toLowerCase().includes(q),
+    fetch: (p) => inventoryService.getReorderRules(p),
   });
-  const [itemSearch, setItemSearch] = useState("");
-  const [showItemResults, setShowItemResults] = useState(false);
+  const suggestions = useQuery({ queryKey: ["reorder-suggestions"], queryFn: () => inventoryService.getReorderSuggestions(), enabled: showSuggestions });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["reorder-rules"] });
 
-  const { data: rulesData, isLoading } = useQuery({
-    queryKey: ["reorder-rules"],
-    queryFn: () => inventoryService.getReorderRules(),
-  });
-
-  const { data: suggestionsData } = useQuery({
-    queryKey: ["reorder-suggestions"],
-    queryFn: () => inventoryService.getReorderSuggestions(),
-    enabled: showSuggestions,
-  });
-
-  const { data: itemsData } = useQuery({
-    queryKey: ["inventory-items-search", itemSearch],
-    queryFn: () =>
-      inventoryService.getItems({ query: itemSearch || undefined, size: 20 }),
-    enabled: itemSearch.length > 1,
-  });
-
-  const { data: locations = [] } = useQuery({
-    queryKey: ["inventory-locations"],
-    queryFn: () => inventoryService.getLocations(true),
-  });
-
-  const rules = rulesData?.content || [];
-  const items = itemsData?.content || [];
-  const suggestions = suggestionsData || [];
-
-  const createMutation = useMutation({
-    mutationFn: () => inventoryService.createReorderRule(formData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["reorder-rules"] });
-      handleCloseModal();
+  const save = useMutation({
+    mutationFn: async () => {
+      const f = editing!.form;
+      const data = { itemCode: editing!.rule ? editing!.rule.itemCode : item!.itemCode, locationCode: f.locationCode, minimumQuantity: f.minimumQuantity, reorderQuantity: f.reorderQuantity, active: f.active };
+      // PUT/DELETE par ruleCode ne sont pas documentés côté backend (seul le POST upsert l'est) : appels conservés tels quels
+      if (editing!.rule) await inventoryService.updateReorderRule(editing!.rule.ruleCode, data);
+      else await inventoryService.createReorderRule(data);
     },
+    onSuccess: async () => { toast.success(editing?.rule ? "Règle modifiée" : "Règle créée"); await refresh(); setEditing(null); setError(null); },
+    onError: (e) => setError(apiMessage(e, "Enregistrement impossible")),
   });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ code, data }: { code: string; data: any }) =>
-      inventoryService.updateReorderRule(code, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["reorder-rules"] });
-      handleCloseModal();
+  const remove = useMutation({ mutationFn: (code: string) => inventoryService.deleteReorderRule(code), onSuccess: refresh });
+  const fromSuggestion = useMutation({
+    mutationFn: (s: ReorderSuggestion) => inventoryService.createPurchaseRequestFromReorderSuggestions({ locationCode: s.locationCode, supplierCode: s.bestSupplierCode || undefined, requestedBy: actor }),
+    onMutate: (s) => setBusy(`${s.itemCode}-${s.locationCode}`),
+    onSuccess: async () => {
+      toast.success("Demande d'achat créée");
+      await queryClient.invalidateQueries({ queryKey: ["purchase-requests"] });
+      await queryClient.invalidateQueries({ queryKey: ["reorder-suggestions"] });
     },
+    onError: (e) => toast.error(apiMessage(e, "Création impossible")),
+    onSettled: () => setBusy(null),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (code: string) => inventoryService.deleteReorderRule(code),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["reorder-rules"] });
-    },
-  });
-
-  const createRequestFromSuggestionMutation = useMutation({
-    mutationFn: (suggestion: any) =>
-      inventoryService.createPurchaseRequestFromReorderSuggestions({
-        locationCode: suggestion.locationCode,
-        supplierCode: suggestion.bestSupplierCode || undefined,
-        requestedBy: admin?.email || "admin",
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["purchase-requests"] });
-      queryClient.invalidateQueries({ queryKey: ["reorder-suggestions"] });
-    },
-  });
-
-  const filteredRules = rules.filter(
-    (rule: ReorderRule) =>
-      (rule.itemName || "").toLowerCase().includes(search.toLowerCase()) ||
-      rule.itemCode.toLowerCase().includes(search.toLowerCase()) ||
-      (rule.locationName || "").toLowerCase().includes(search.toLowerCase()),
-  );
-
-  const handleOpenModal = (rule?: ReorderRule) => {
-    if (rule) {
-      setEditingRule(rule);
-      setFormData({
-        itemCode: rule.itemCode,
-        locationCode: rule.locationCode,
-        minimumQuantity: rule.minimumQuantity,
-        reorderQuantity: rule.reorderQuantity,
-        active: rule.active,
-      });
-      setItemSearch(rule.itemName ?? rule.itemCode ?? "");
-    } else {
-      setEditingRule(null);
-      setFormData({
-        itemCode: "",
-        locationCode: "",
-        minimumQuantity: 10,
-        reorderQuantity: 50,
-        active: true,
-      });
-      setItemSearch("");
-    }
-    setIsModalOpen(true);
+  const f = editing?.form;
+  const set = (p: Partial<typeof EMPTY>) => setEditing((s) => (s ? { ...s, form: { ...s.form, ...p } } : s));
+  const open = (r?: ReorderRule) => {
+    setError(null);
+    setItem(null);
+    setEditing({ rule: r ?? null, form: r ? { locationCode: r.locationCode, minimumQuantity: r.minimumQuantity, reorderQuantity: r.reorderQuantity, active: r.active } : { ...EMPTY } });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingRule(null);
-    setItemSearch("");
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingRule) {
-      updateMutation.mutate({ code: editingRule.ruleCode, data: formData });
-    } else {
-      createMutation.mutate();
-    }
-  };
-
-  const handleDelete = (code: string) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer cette règle ?")) {
-      deleteMutation.mutate(code);
-    }
-  };
-
-  const selectItem = (item: InventoryItem) => {
-    setFormData({ ...formData, itemCode: item.itemCode });
-    setItemSearch(item.name);
-    setShowItemResults(false);
-  };
-
-  if (isLoading) {
-    return <div className="text-center py-8">Chargement...</div>;
-  }
 
   return (
-    <div className="p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
-        <h2 className="text-lg sm:text-xl sm:text-2xl font-semibold text-gray-900">
-          Règles de réapprovisionnement
-        </h2>
-        <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
-          <button
-            onClick={() => setShowSuggestions(!showSuggestions)}
-            className="bg-blue-600 text-white px-4 py-2.5 sm:px-5 rounded-2xl hover:bg-blue-700 flex items-center gap-2 text-sm sm:text-base font-medium"
-          >
-            <TrendingUp size={20} />
-            Suggestions
-          </button>
-          <button
-            onClick={() => handleOpenModal()}
-            className="bg-primary-600 text-white px-4 py-2.5 sm:px-5 rounded-2xl hover:bg-primary-700 flex items-center gap-2 text-sm sm:text-base font-medium w-full sm:w-auto justify-center"
-          >
-            <Plus size={20} />
-            Nouvelle règle
-          </button>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <ListHeader
+        title="Règles de réapprovisionnement"
+        subtitle={list.isLoading ? undefined : `${list.total} règle${list.total > 1 ? "s" : ""}`}
+        action={
+          <div className="flex flex-wrap gap-2">
+            <ActionButton variant="ghost" icon={Lightbulb} onClick={() => setShowSuggestions(!showSuggestions)}>{showSuggestions ? "Masquer les suggestions" : "Suggestions"}</ActionButton>
+            <ActionButton icon={Plus} onClick={() => open()}>Nouvelle règle</ActionButton>
+          </div>
+        }
+      />
 
-      {/* Recherche - AGRANDIE */}
-      <div className="relative mb-8">
-        <Search
-          size={20}
-          className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
-        />
-        <input
-          type="text"
-          placeholder="Rechercher une règle..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-12 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm sm:text-base"
-        />
-      </div>
-
-      {/* Suggestions de réapprovisionnement - AGRANDIES */}
       {showSuggestions && (
-        <div className="mb-8">
-          <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-5">
-            Suggestions de réapprovisionnement
-          </h3>
-          <div className="space-y-4">
-            {suggestions.map((suggestion: any) => (
-              <div
-                key={`${suggestion.itemCode}-${suggestion.locationCode}`}
-                className="bg-yellow-50 ring-1 border-yellow-200 rounded-2xl p-4 sm:p-5"
-              >
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <p className="font-semibold text-sm sm:text-base">
-                        {suggestion.itemName}
-                      </p>
-                      {suggestion.severity && (
-                        <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-700">
-                          {suggestion.severity}
-                        </span>
-                      )}
-                      {suggestion.priorityScore !== undefined && (
-                        <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700">
-                          Score {suggestion.priorityScore}
-                        </span>
-                      )}
+        <section className="space-y-3 rounded-3xl bg-white p-5 shadow-sm">
+          <div><h3 className="text-base font-semibold text-gray-900">Suggestions de réapprovisionnement</h3><p className="text-sm text-gray-500">Articles sous leur seuil, classés par priorité.</p></div>
+          {suggestions.isLoading ? <ListSkeleton rows={3} /> : suggestions.isError ? <ErrorBlock message="Impossible de charger les suggestions." onRetry={() => suggestions.refetch()} /> : !suggestions.data?.length ? (
+            <EmptyState icon={PackageSearch} title="Aucune suggestion" hint="Tous les stocks sont au-dessus de leur seuil." />
+          ) : (
+            <div className="space-y-2">
+              {suggestions.data.map((s) => (
+                <div key={`${s.itemCode}-${s.locationCode}`} className="rounded-2xl bg-gray-50 p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-gray-900">{s.itemName || s.itemCode}</p>
+                        {s.severity && <StatusChip tone={SEVERITY_TONE[s.severity] ?? "neutral"}>{label(SEVERITY_LABEL, s.severity)}</StatusChip>}
+                      </div>
+                      <p className="mt-1 text-sm text-gray-600">Stock {qty(s.currentQuantity)} pour un seuil de {qty(s.minQuantity ?? 0)}. Commande suggérée : <b className="text-gray-900">{qty(s.reorderQuantity)}</b> pour environ {formatMoney(s.estimatedOrderCost ?? 0, "FCFA")}.</p>
+                      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+                        <Fact title="Déjà en commande">{qty(s.quantityOnOrder ?? 0)}</Fact>
+                        <Fact title="Jours de stock">{s.daysOfStockRemaining ?? "Non estimé"}</Fact>
+                        <Fact title="Tendance">{s.consumptionTrend ? `${label(TREND, String(s.consumptionTrend))}${s.consumptionTrendPercent !== undefined ? ` (${s.consumptionTrendPercent}%)` : ""}` : "Non estimée"}</Fact>
+                        <Fact title="Commander avant">{s.recommendedOrderByDate ? formatDate(s.recommendedOrderByDate) : "Non estimé"}</Fact>
+                        <Fact title="Fournisseur conseillé">{s.bestSupplierCode || "Aucun"}</Fact>
+                        <Fact title="Prix fournisseur">{s.bestSupplierPrice ? formatMoney(s.bestSupplierPrice, "FCFA") : "Non renseigné"}</Fact>
+                        <Fact title="Délai fournisseur">{s.bestSupplierLeadTimeDays !== undefined ? `${s.bestSupplierLeadTimeDays} j` : "Non renseigné"}</Fact>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3 text-sm text-gray-600">
-                      <p>
-                        Stock actuel : {suggestion.currentQuantity} / seuil{" "}
-                        {suggestion.minQuantity}
-                      </p>
-                      <p>Qté suggérée : {suggestion.reorderQuantity}</p>
-                      <p>En commande : {suggestion.quantityOnOrder ?? 0}</p>
-                      <p>
-                        Jours restants :{" "}
-                        {suggestion.daysOfStockRemaining ?? "—"}
-                      </p>
-                      <p>
-                        Tendance : {suggestion.consumptionTrend ?? "—"}{" "}
-                        {suggestion.consumptionTrendPercent !== undefined
-                          ? `(${suggestion.consumptionTrendPercent}%)`
-                          : ""}
-                      </p>
-                      <p>
-                        Commander avant :{" "}
-                        {suggestion.recommendedOrderByDate || "—"}
-                      </p>
-                      <p>
-                        Fournisseur conseillé :{" "}
-                        {suggestion.bestSupplierCode || "—"}
-                      </p>
-                      <p>
-                        Prix fournisseur :{" "}
-                        {(suggestion.bestSupplierPrice ?? 0).toLocaleString()}{" "}
-                        FCFA
-                      </p>
-                      <p>
-                        Délai fournisseur :{" "}
-                        {suggestion.bestSupplierLeadTimeDays ?? "—"} j
-                      </p>
-                    </div>
-                    <p className="text-base font-semibold text-primary-600 mt-2">
-                      Coût estimé :{" "}
-                      {(suggestion.estimatedOrderCost ?? 0).toLocaleString()}{" "}
-                      FCFA
-                    </p>
+                    <ActionButton icon={ShoppingCart} pending={busy === `${s.itemCode}-${s.locationCode}`} onClick={() => fromSuggestion.mutate(s)}>Créer la demande</ActionButton>
                   </div>
-                  <button
-                    onClick={() =>
-                      createRequestFromSuggestionMutation.mutate(suggestion)
-                    }
-                    disabled={createRequestFromSuggestionMutation.isPending}
-                    className="px-5 py-2.5 bg-primary-600 text-white rounded-2xl hover:bg-primary-700 disabled:opacity-50 text-sm sm:text-base font-medium w-full sm:w-auto justify-center"
-                  >
-                    Créer une demande d'achat
-                  </button>
                 </div>
-              </div>
-            ))}
-            {suggestions.length === 0 && (
-              <div className="text-center py-12 bg-gray-50 rounded-2xl">
-                <Package size={64} className="mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-500 text-sm sm:text-base">
-                  Aucune suggestion de réapprovisionnement
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Liste des règles - AGRANDIE */}
-      <div className="bg-white rounded-3xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-        <table className="w-full text-sm sm:text-base block md:table">
-          <thead className="bg-gray-50 ring-1 ring-gray-100 hidden md:table-header-group">
-            <tr>
-              <th className="px-6 py-4 text-left font-semibold hidden md:table-cell">Article</th>
-              <th className="px-6 py-4 text-left font-semibold hidden md:table-cell">Emplacement</th>
-              <th className="px-6 py-4 text-right font-semibold hidden md:table-cell">Seuil min</th>
-              <th className="px-6 py-4 text-right font-semibold hidden md:table-cell">
-                Qté réappro
-              </th>
-              <th className="px-6 py-4 text-center font-semibold hidden md:table-cell">Actif</th>
-              <th className="px-6 py-4 text-right font-semibold hidden md:table-cell">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="space-y-2 md:space-y-0 block md:table-row-group">
-            {filteredRules.map((rule: ReorderRule) => (
-              <tr key={rule.ruleCode} className="hover:bg-gray-50 block md:table-row rounded-3xl bg-white p-4 mb-3 shadow-sm ring-1 ring-gray-100">
-                <td className="px-6 py-4 font-medium flex justify-between gap-4 md:table-cell text-sm">
-                  {rule.itemName} ({rule.itemCode})
-                </td>
-                <td className="px-6 py-4 flex justify-between gap-4 md:table-cell text-sm">{rule.locationName}</td>
-                <td className="px-6 py-4 text-right font-medium flex justify-between gap-4 md:table-cell text-sm">
-                  {rule.minimumQuantity}
-                </td>
-                <td className="px-6 py-4 text-right flex justify-between gap-4 md:table-cell text-sm">{rule.reorderQuantity}</td>
-                <td className="px-6 py-4 text-center flex justify-between gap-4 md:table-cell text-sm">
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-xs ${rule.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
-                  >
-                    {rule.active ? "Actif" : "Inactif"}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right flex justify-between gap-4 md:table-cell text-sm">
-                  <button
-                    onClick={() => handleOpenModal(rule)}
-                    className="p-1.5 text-blue-600 hover:text-blue-800 mr-2"
-                  >
-                    <Edit size={18} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(rule.ruleCode)}
-                    className="p-1.5 text-red-600 hover:text-red-800"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {filteredRules.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-3xl">
-          <Package size={64} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500 text-sm sm:text-base">
-            Aucune règle de réapprovisionnement configurée
-          </p>
-        </div>
-      )}
-
-      {/* Modal de création/édition - AGRANDI */}
-      {isModalOpen && (
-        <ModalPortal onClose={handleCloseModal} size="2xl">
-          <div className="relative bg-white rounded-3xl w-full max-w-lg">
-            <div className="sticky top-0 bg-white ring-1 ring-gray-100 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
-              <h3 className="text-lg sm:text-xl sm:text-2xl font-bold">
-                {editingRule ? "Modifier" : "Nouvelle"} règle
-              </h3>
-              <button
-                onClick={handleCloseModal}
-                className="p-2 hover:bg-gray-100 rounded-2xl"
-              >
-                <X size={24} />
-              </button>
+              ))}
             </div>
-            <form onSubmit={handleSubmit} className="p-8 space-y-6">
-              <div>
-                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                  Article *
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={itemSearch}
-                    onChange={(e) => {
-                      setItemSearch(e.target.value);
-                      setShowItemResults(true);
-                    }}
-                    placeholder="Rechercher un article..."
-                    className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-                  />
-                  {showItemResults && items.length > 0 && (
-                    <div className="absolute z-10 mt-1 w-full bg-white ring-1 rounded-2xl shadow-lg max-h-60 overflow-y-auto">
-                      {items.map((item: InventoryItem) => (
-                        <button
-                          key={item.itemCode}
-                          type="button"
-                          onClick={() => selectItem(item)}
-                          className="w-full px-4 py-3 text-left hover:bg-gray-50 ring-1 ring-gray-100 text-sm sm:text-base"
-                        >
-                          <p className="font-medium">{item.name}</p>
-                          <p className="text-sm text-gray-500">
-                            {item.itemCode}
-                          </p>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                  Emplacement *
-                </label>
-                <select
-                  value={formData.locationCode}
-                  onChange={(e) =>
-                    setFormData({ ...formData, locationCode: e.target.value })
-                  }
-                  required
-                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-                >
-                  <option value="">Sélectionner</option>
-                  {locations.map((loc: any) => (
-                    <option key={loc.locationCode} value={loc.locationCode}>
-                      {loc.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                    Seuil minimum *
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.minimumQuantity}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        minimumQuantity: Number(e.target.value) || 0,
-                      })
-                    }
-                    required
-                    min="0"
-                    className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                    Quantité de réappro *
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.reorderQuantity}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        reorderQuantity: Number(e.target.value) || 0,
-                      })
-                    }
-                    required
-                    min="0"
-                    className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-                  />
-                </div>
-              </div>
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={formData.active}
-                  onChange={(e) =>
-                    setFormData({ ...formData, active: e.target.checked })
-                  }
-                  className="rounded w-5 h-5"
-                />
-                <span className="text-base">Actif</span>
-              </label>
-              <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 pt-6">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="flex-1 px-4 py-3 sm:px-5 ring-1 rounded-2xl text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={
-                    !formData.itemCode ||
-                    !formData.locationCode ||
-                    createMutation.isPending ||
-                    updateMutation.isPending
-                  }
-                  className="flex-1 bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 text-sm sm:text-base font-medium w-full sm:w-auto justify-center"
-                >
-                  {editingRule ? "Mettre à jour" : "Créer"}
-                </button>
-              </div>
-            </form>
+          )}
+        </section>
+      )}
+
+      {editing && f && (
+        <PanelForm title={editing.rule ? "Modifier la règle" : "Nouvelle règle"} onCancel={() => setEditing(null)} pending={save.isPending} submitLabel={editing.rule ? "Enregistrer" : "Créer la règle"} submitDisabled={(!editing.rule && !item) || !f.locationCode} error={error} onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+          <Field label="Article" required>{editing.rule ? <Fact title={editing.rule.itemCode}>{editing.rule.itemName || editing.rule.itemCode}</Fact> : <ItemPicker value={item} onChange={setItem} />}</Field>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Emplacement" required><LocationSelect value={f.locationCode} onChange={(v) => set({ locationCode: v })} /></Field>
+            <Field label="Seuil minimum" required><input type="number" min={0} value={f.minimumQuantity} onChange={(e) => set({ minimumQuantity: Number(e.target.value) || 0 })} className={FIELD} /></Field>
+            <Field label="Quantité à commander" required><input type="number" min={0} value={f.reorderQuantity} onChange={(e) => set({ reorderQuantity: Number(e.target.value) || 0 })} className={FIELD} /></Field>
           </div>
-        </ModalPortal>
+          <Switch checked={f.active} onChange={(v) => set({ active: v })} label="Règle active" hint="Une règle inactive ne génère plus de suggestion" />
+        </PanelForm>
+      )}
+
+      <SearchField value={search} onChange={setSearch} placeholder="Article ou emplacement" className="max-w-md" />
+
+      {list.isLoading ? <ListSkeleton rows={6} /> : list.isError ? <ErrorBlock message="Impossible de charger les règles." onRetry={() => list.refetch()} /> : list.rows.length === 0 ? (
+        <EmptyState icon={PackageSearch} title="Aucune règle" hint={search ? "Aucun résultat pour cette recherche." : "Une règle déclenche une suggestion de commande quand un stock passe sous son seuil."} />
+      ) : (
+        <>
+          <HeadRow cols={COLS}><span>Article</span><span>Emplacement</span><span className="text-right">Seuil</span><span className="text-right">À commander</span><span>Statut</span><span className="text-right">Actions</span></HeadRow>
+          <DataCard>
+            {list.rows.map((r) => (
+              <div key={r.ruleCode} className={`grid grid-cols-2 items-center gap-x-4 gap-y-2 rounded-2xl p-4 max-lg:mb-2 max-lg:bg-gray-50 ${COLS} ${ROW_HOVER}`}>
+                <div className="min-w-0 max-lg:col-span-2"><p className="truncate text-sm font-semibold text-gray-900">{r.itemName || r.itemCode}</p><p className="font-mono text-xs text-gray-400">{r.itemCode}</p></div>
+                <Cell title="Emplacement"><span className="text-sm text-gray-600">{r.locationName || r.locationCode}</span></Cell>
+                <Cell title="Seuil" className="lg:text-right"><span className="text-sm text-gray-600">{qty(r.minimumQuantity)}</span></Cell>
+                <Cell title="À commander" className="lg:text-right"><span className="text-sm text-gray-600">{qty(r.reorderQuantity)}</span></Cell>
+                <div><StatusChip tone={r.active ? "success" : "neutral"}>{r.active ? "Active" : "Inactive"}</StatusChip></div>
+                <div className="flex items-center gap-1 max-lg:col-span-2 lg:justify-end">
+                  <IconButton icon={Pencil} label="Modifier" onClick={() => open(r)} />
+                  <IconButton icon={Trash2} label="Supprimer" tone="danger" onClick={() => toast.confirm({ message: "Supprimer cette règle ?", detail: `${r.itemName || r.itemCode} : plus aucune suggestion ne sera générée.`, confirmLabel: "Supprimer", pendingLabel: "Suppression", successMessage: "Règle supprimée", errorMessage: "Suppression impossible", onConfirm: () => remove.mutateAsync(r.ruleCode) })} />
+                </div>
+              </div>
+            ))}
+          </DataCard>
+          <Pagination page={list.page} totalPages={list.totalPages} total={list.total} noun="règle" onChange={list.setPage} />
+        </>
       )}
     </div>
   );

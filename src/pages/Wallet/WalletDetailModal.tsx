@@ -1,72 +1,37 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowLeft,
-  TrendingUp,
-  TrendingDown,
-  Clock,
-  Wallet as WalletIcon,
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  RefreshCw,
-  Lock,
-  Layers,
-  X,
-} from "lucide-react";
-import {
-  walletService,
-  formatAmount,
-  formatAmountOnly,
-  safeNumber,
-} from "../../services/wallet.service";
+import React, { useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CheckCircle, Clock, Plus, RefreshCw, TrendingDown, TrendingUp, Wallet as WalletIcon, XCircle } from "lucide-react";
+import { walletService, safeNumber } from "../../services/wallet.service";
 import type { LedgerEntry, WalletHold } from "../../services/wallet.service";
 import { useAuth } from "../../contexts/AuthContext";
 import { AdminLayout } from "../../components/layout/AdminLayout";
+import { brandVars } from "../../components/layout/adminTheme";
+import { ActionButton, DataCard, EmptyState, Field, ItemRow, PageHeader, PanelForm, Pagination, StatusChip, Tabs } from "../../components/subscription/kit";
+import type { TabItem } from "../../components/subscription/kit";
+import { FIELD_SOFT, ROW_HOVER, apiMessage, formatDateTime, formatMoney } from "../../components/subscription/kitUtils";
+import { DetailsSkeleton, ListSkeleton } from "../../components/ui/Skeleton";
+import { Toaster } from "../../components/ui/Toaster";
+import { toast } from "../../components/ui/toastStore";
+import { KpiRow } from "../../components/operations/OpsCharts";
+import { WalletSecurityPanel } from "../../components/wallet/control/WalletSecurityPanel";
+import { WalletActionsPanel } from "../../components/wallet/control/WalletActionsPanel";
+import { WalletCompliancePanel } from "../../components/wallet/control/WalletCompliancePanel";
+import { CaseDetail } from "./compliance/CaseDetail";
+import { currencyLabel } from "../../components/payment/paymentUtils";
+import { ENTRY_TYPE_LABEL, HOLD_STATUS_LABEL, HOLD_STATUS_TONE, OWNER_TYPE_LABEL, WALLET_STATUS_LABEL, WALLET_STATUS_TONE } from "../../components/wallet/walletLabels";
 
 const PAGE_SIZE = 20;
+const GREEN = "#7FB08A";
+const PINK = "var(--logo-pink)";
 
-const entryTypeLabels: Record<string, string> = {
-  ADMIN_TOPUP: "Top-up admin",
-  ADMIN_DEBIT: "Débit admin",
-  PAYMENT: "Paiement",
-  REFUND: "Remboursement",
-  REVERSAL: "Inversion",
-  HOLD: "Réservation",
-  HOLD_RELEASE: "Libération réservation",
-  ADJUSTMENT: "Ajustement",
-  CASHBACK: "Cashback",
-  PROMOTIONAL_CREDIT: "Crédit promotionnel",
-  OVERPAYMENT_CREDIT: "Trop-perçu",
+type Tab = "ledger" | "holds" | "security" | "actions" | "compliance";
+
+const buildDefaultHoldForm = () => {
+  const d = new Date();
+  d.setHours(d.getHours() + 24);
+  return { amount: 0, sourceType: "BOOKING", sourceCode: "", expiresAt: d.toISOString().slice(0, 16) };
 };
-
-const holdStatusConfig: Record<string, { label: string; color: string }> = {
-  ACTIVE: { label: "Actif", color: "bg-blue-50 text-blue-700 ring-blue-100" },
-  CAPTURED: {
-    label: "Capturé",
-    color: "bg-green-50 text-green-700 ring-green-100",
-  },
-  RELEASED: {
-    label: "Libéré",
-    color: "bg-gray-50 text-gray-500 ring-gray-100",
-  },
-  EXPIRED: { label: "Expiré", color: "bg-red-50 text-red-700 ring-red-100" },
-};
-
-const buildDefaultHoldForm = () => ({
-  amount: 0,
-  sourceType: "BOOKING",
-  sourceCode: "",
-  expiresAt: (() => {
-    const d = new Date();
-    d.setHours(d.getHours() + 24);
-    return d.toISOString().slice(0, 16);
-  })(),
-});
 
 export const WalletDetailModal: React.FC = () => {
   const { walletNumber } = useParams<{ walletNumber: string }>();
@@ -74,56 +39,39 @@ export const WalletDetailModal: React.FC = () => {
   const { admin } = useAuth();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<"ledger" | "holds">("ledger");
+  const [activeTab, setActiveTab] = useState<Tab>("ledger");
   const [ledgerPage, setLedgerPage] = useState(0);
   const [isCreateHoldOpen, setIsCreateHoldOpen] = useState(false);
   const [holdForm, setHoldForm] = useState(buildDefaultHoldForm);
   const [holdError, setHoldError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [openCase, setOpenCase] = useState<string | null>(null);
 
-  const {
-    data: wallet,
-    isLoading: walletLoading,
-    error: walletError,
-    refetch: refetchWallet,
-  } = useQuery({
+  const { data: wallet, isLoading: walletLoading, isError: walletError, isFetching: walletFetching, refetch: refetchWallet } = useQuery({
     queryKey: ["wallet", walletNumber],
     queryFn: () => walletService.getWallet(walletNumber!),
     enabled: !!walletNumber,
   });
 
+  // Les deux listes sont chargées d'emblée : leur effectif s'affiche dans les onglets, il restait à 0 tant que l'onglet n'était pas ouvert.
   const { data: ledgerData, isLoading: ledgerLoading } = useQuery({
     queryKey: ["wallet-ledger", walletNumber, ledgerPage],
-    queryFn: () =>
-      walletService.getLedgerEntries(walletNumber!, {
-        page: ledgerPage,
-        size: PAGE_SIZE,
-        sort: "createdAt,desc",
-      }),
-    enabled: !!walletNumber && activeTab === "ledger",
+    queryFn: () => walletService.getLedgerEntries(walletNumber!, { page: ledgerPage, size: PAGE_SIZE, sort: "createdAt,desc" }),
+    enabled: !!walletNumber,
   });
-
   const { data: holdsData, isLoading: holdsLoading } = useQuery({
     queryKey: ["wallet-holds", walletNumber],
     queryFn: () => walletService.getWalletHolds(walletNumber!, { size: 100 }),
-    enabled: !!walletNumber && activeTab === "holds",
+    enabled: !!walletNumber,
   });
 
-  const ledgerEntries: LedgerEntry[] = ledgerData?.content || [];
+  const ledgerEntries: LedgerEntry[] = ledgerData?.content ?? [];
   const totalElements = ledgerData?.totalElements ?? 0;
-  const totalPages =
-    ledgerData?.totalPages ?? Math.ceil(totalElements / PAGE_SIZE);
-  const holds: WalletHold[] = holdsData?.content || [];
+  const totalPages = ledgerData?.totalPages ?? Math.ceil(totalElements / PAGE_SIZE);
+  const holds: WalletHold[] = holdsData?.content ?? [];
 
-  useEffect(() => {
-    setLedgerPage(0);
-  }, [activeTab]);
-
-  const invalidateQueries = () => {
+  const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["wallet", walletNumber] });
-    queryClient.invalidateQueries({
-      queryKey: ["wallet-ledger", walletNumber],
-    });
+    queryClient.invalidateQueries({ queryKey: ["wallet-ledger", walletNumber] });
     queryClient.invalidateQueries({ queryKey: ["wallet-holds", walletNumber] });
     queryClient.invalidateQueries({ queryKey: ["wallets"] });
   };
@@ -139,493 +87,224 @@ export const WalletDetailModal: React.FC = () => {
         createdBy: admin?.email || "admin",
       }),
     onSuccess: () => {
-      invalidateQueries();
+      invalidate();
       setIsCreateHoldOpen(false);
       setHoldForm(buildDefaultHoldForm());
       setHoldError(null);
+      toast.success("Réservation créée.");
     },
-    onError: (error: any) => {
-      setHoldError(
-        error?.response?.data?.message || "Erreur lors de la création du hold.",
-      );
-    },
+    onError: (e: unknown) => setHoldError(apiMessage(e, "Erreur lors de la création de la réservation.")),
   });
 
-  const captureMutation = useMutation({
-    mutationFn: (holdNumber: string) =>
-      walletService.captureHold(holdNumber, admin?.email || "admin"),
-    onSuccess: () => {
-      invalidateQueries();
-      setActionError(null);
-    },
-    onError: (error: any) => {
-      setActionError(
-        error?.response?.data?.message || "Erreur lors de la capture du hold.",
-      );
-    },
-  });
-
-  const releaseMutation = useMutation({
-    mutationFn: (holdNumber: string) =>
-      walletService.releaseHold(holdNumber, admin?.email || "admin"),
-    onSuccess: () => {
-      invalidateQueries();
-      setActionError(null);
-    },
-    onError: (error: any) => {
-      setActionError(
-        error?.response?.data?.message ||
-          "Erreur lors de la libération du hold.",
-      );
-    },
-  });
-
-  const anyPending = captureMutation.isPending || releaseMutation.isPending;
-  const availableBalance = safeNumber(wallet?.availableBalance);
-  const heldBalance = safeNumber(wallet?.heldBalance);
-  const ledgerBalance = safeNumber(wallet?.ledgerBalance);
-  const totalForBars = Math.max(
-    availableBalance + heldBalance,
-    ledgerBalance,
-    1,
-  );
-  const availablePct = Math.max(
-    0,
-    Math.min(100, (availableBalance / totalForBars) * 100),
-  );
-  const heldPct = Math.max(
-    0,
-    Math.min(100, (heldBalance / totalForBars) * 100),
-  );
-
-  const ledgerStats = useMemo(() => {
-    return ledgerEntries.reduce(
-      (acc, entry) => {
-        if (entry.direction === "CREDIT")
-          acc.credit += safeNumber(entry.amount);
-        else acc.debit += safeNumber(entry.amount);
-        return acc;
+  const createdBy = admin?.email || "admin";
+  const confirmCapture = (hold: WalletHold, cur: string) =>
+    toast.confirm({
+      message: `Capturer ${hold.holdNumber} ?`,
+      detail: `Débit définitif de ${formatMoney(hold.amount, cur)} sur le portefeuille.`,
+      confirmLabel: "Capturer",
+      pendingLabel: "Capture",
+      successMessage: "Réservation capturée.",
+      errorMessage: "Erreur lors de la capture de la réservation.",
+      onConfirm: async () => {
+        await walletService.captureHold(hold.holdNumber, createdBy);
+        invalidate();
       },
-      { credit: 0, debit: 0 },
-    );
-  }, [ledgerEntries]);
+    });
+  const confirmRelease = (hold: WalletHold, cur: string) =>
+    toast.confirm({
+      message: `Libérer ${hold.holdNumber} ?`,
+      detail: `${formatMoney(hold.amount, cur)} retournent dans le solde disponible.`,
+      confirmLabel: "Libérer",
+      pendingLabel: "Libération",
+      successMessage: "Réservation libérée.",
+      errorMessage: "Erreur lors de la libération de la réservation.",
+      onConfirm: async () => {
+        await walletService.releaseHold(hold.holdNumber, createdBy);
+        invalidate();
+      },
+    });
 
-  if (walletLoading) {
-    return (
-      <AdminLayout>
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 size={32} className="animate-spin text-primary-600" />
-        </div>
-      </AdminLayout>
-    );
-  }
+  const ledgerStats = useMemo(
+    () =>
+      ledgerEntries.reduce(
+        (acc, e) => {
+          if (e.direction === "CREDIT") acc.credit += safeNumber(e.amount);
+          else acc.debit += safeNumber(e.amount);
+          return acc;
+        },
+        { credit: 0, debit: 0 },
+      ),
+    [ledgerEntries],
+  );
 
-  if (walletError || !wallet) {
-    return (
-      <AdminLayout>
-        <div className="rounded-2xl bg-white py-14 text-center shadow-sm ring-1 ring-gray-100">
-          <WalletIcon size={48} className="mx-auto mb-4 text-gray-300" />
-          <p className="text-gray-500">Portefeuille introuvable</p>
-          <button
-            onClick={() => navigate("/wallets")}
-            className="mt-4 text-primary-600 hover:underline"
-          >
-            Retour à la liste
-          </button>
-        </div>
-      </AdminLayout>
-    );
-  }
-
-  return (
+  const shell = (children: React.ReactNode) => (
     <AdminLayout>
-      <div className="mb-6">
-        <button
-          onClick={() => navigate("/wallets")}
-          className="mb-4 flex items-center gap-2 text-sm font-medium text-gray-500 transition-colors hover:text-gray-900"
-        >
-          <ArrowLeft size={17} />
-          Retour aux portefeuilles
-        </button>
+      <div style={brandVars}>
+        <Toaster />
+        <div className="mx-auto w-full max-w-4xl">{children}</div>
+      </div>
+    </AdminLayout>
+  );
 
-        <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className="mb-2 inline-flex rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
-                Portefeuille
-              </p>
-              <h1 className="font-mono text-2xl font-bold text-gray-900">
-                {wallet.walletNumber}
-              </h1>
-              <p className="mt-1 text-sm text-gray-500">
-                {wallet.ownerType} · {wallet.ownerCode}
-              </p>
-            </div>
-            <button
-              onClick={() => refetchWallet()}
-              className="inline-flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100"
-              title="Actualiser"
-            >
-              <RefreshCw size={17} />
-              Actualiser
-            </button>
-          </div>
+  if (walletLoading) return shell(<DetailsSkeleton />);
+  if (walletError || !wallet) {
+    return shell(
+      <EmptyState
+        icon={WalletIcon}
+        title="Portefeuille introuvable"
+        hint="Il a peut-être été supprimé, ou le numéro est incorrect."
+        action={<ActionButton onClick={() => navigate("/wallets")}>Retour aux portefeuilles</ActionButton>}
+      />,
+    );
+  }
 
-          <div className="mt-6 h-3 overflow-hidden rounded-full bg-gray-100">
-            <div className="flex h-full">
-              <div
-                className="bg-green-500"
-                style={{ width: `${availablePct}%` }}
-              />
-              <div className="bg-orange-400" style={{ width: `${heldPct}%` }} />
-            </div>
+  const cur = currencyLabel(wallet.currency);
+  const available = safeNumber(wallet.availableBalance);
+  const held = safeNumber(wallet.heldBalance);
+  const ledger = safeNumber(wallet.ledgerBalance);
+  const base = Math.max(available + held, ledger, 1);
+  const tabs: TabItem<Tab>[] = [
+    { id: "ledger", label: "Historique", count: totalElements },
+    { id: "holds", label: "Réservations", count: holds.length },
+    { id: "security", label: "Sécurité" },
+    { id: "actions", label: "Actions" },
+    { id: "compliance", label: "Conformité" },
+  ];
+
+  return shell(
+    <div className="space-y-5">
+      <PageHeader
+        title={wallet.walletNumber}
+        subtitle={`${OWNER_TYPE_LABEL[wallet.ownerType] ?? wallet.ownerType} · ${wallet.ownerCode}`}
+        onBack={() => navigate("/wallets")}
+        backLabel="Retour aux portefeuilles"
+        badge={<StatusChip tone={WALLET_STATUS_TONE[wallet.status] ?? "neutral"}>{WALLET_STATUS_LABEL[wallet.status] ?? wallet.status}</StatusChip>}
+        actions={
+          <ActionButton variant="ghost" icon={RefreshCw} pending={walletFetching} onClick={() => refetchWallet()}>
+            Actualiser
+          </ActionButton>
+        }
+      />
+
+      <div className="space-y-3">
+        <KpiRow
+          columns={3}
+          items={[
+            { label: "Disponible", value: formatMoney(available, cur), tone: "success" },
+            { label: "Bloqué", value: formatMoney(held, cur), tone: "pink" },
+            { label: "Solde ledger", value: formatMoney(ledger, cur) },
+          ]}
+        />
+        <div className="px-2">
+          <div className="flex h-3 overflow-hidden rounded-full bg-gray-100" role="img" aria-label="Répartition du solde entre disponible et bloqué">
+            <div style={{ width: `${(available / base) * 100}%`, backgroundColor: GREEN }} />
+            <div style={{ width: `${(held / base) * 100}%`, backgroundColor: PINK }} />
           </div>
-          <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-500">
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
-              Disponible
+          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: GREEN }} /> Disponible
             </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-orange-400" />
-              Bloqué
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: PINK }} /> Bloqué
             </span>
           </div>
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <BalanceCard
-          label="Solde disponible"
-          value={formatAmount(wallet.availableBalance, wallet.currency)}
-          tone="green"
-          icon={TrendingUp}
-        />
-        <BalanceCard
-          label="Solde bloqué"
-          value={formatAmount(wallet.heldBalance, wallet.currency)}
-          tone="orange"
-          icon={Lock}
-        />
-        <BalanceCard
-          label="Solde ledger"
-          value={formatAmount(wallet.ledgerBalance, wallet.currency)}
-          tone="gray"
-          icon={Layers}
-        />
-      </div>
-
-      {actionError && (
-        <div className="mb-6 flex items-center justify-between rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100">
-          <span>{actionError}</span>
-          <button
-            onClick={() => setActionError(null)}
-            className="text-red-500 hover:text-red-700"
-          >
-            <XCircle size={16} />
-          </button>
-        </div>
-      )}
-
-      <div className="mb-6 overflow-x-auto rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex min-w-max gap-1">
-        <button
-          onClick={() => setActiveTab("ledger")}
-          className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-            activeTab === "ledger"
-              ? "bg-primary-600 text-white shadow-sm"
-              : "text-gray-600 hover:bg-gray-50"
-          }`}
-        >
-          Historique ({totalElements})
-        </button>
-        <button
-          onClick={() => setActiveTab("holds")}
-          className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-            activeTab === "holds"
-              ? "bg-primary-600 text-white shadow-sm"
-              : "text-gray-600 hover:bg-gray-50"
-          }`}
-        >
-          Holds ({holds.length})
-        </button>
-        </div>
-      </div>
+      <Tabs variant="soft" items={tabs} active={activeTab} onChange={setActiveTab} />
 
       {activeTab === "ledger" && (
-        <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-gray-100 sm:p-4">
-          <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <MiniStat
-              label="Crédits affichés"
-              value={`${formatAmountOnly(ledgerStats.credit)} ${wallet.currency}`}
-              tone="green"
+        <div className="space-y-4">
+          {ledgerEntries.length > 0 && (
+            <KpiRow
+              columns={3}
+              items={[
+                { label: "Crédits de la page", value: formatMoney(ledgerStats.credit, cur), tone: "success" },
+                { label: "Débits de la page", value: formatMoney(ledgerStats.debit, cur), tone: "danger" },
+                { label: "Mouvements", value: totalElements.toLocaleString("fr-FR") },
+              ]}
             />
-            <MiniStat
-              label="Débits affichés"
-              value={`${formatAmountOnly(ledgerStats.debit)} ${wallet.currency}`}
-              tone="red"
-            />
-          </div>
-
+          )}
           {ledgerLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 size={24} className="animate-spin text-gray-400" />
-            </div>
+            <ListSkeleton rows={6} />
           ) : ledgerEntries.length === 0 ? (
-            <div className="py-12 text-center">
-              <WalletIcon size={48} className="mx-auto mb-4 text-gray-300" />
-              <p className="text-gray-500">Aucune transaction</p>
-            </div>
+            <EmptyState icon={WalletIcon} title="Aucune transaction" hint="Les mouvements du portefeuille apparaîtront ici." />
           ) : (
             <>
-              <div className="space-y-2">
-                {ledgerEntries.map((entry) => (
-                  <div
-                    key={entry.entryNumber}
-                    className="flex flex-col gap-3 rounded-2xl bg-gray-50 p-3 transition hover:bg-gray-100 sm:flex-row sm:items-center sm:justify-between sm:p-4"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div
-                        className={`rounded-xl p-2 ${
-                          entry.direction === "CREDIT"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {entry.direction === "CREDIT" ? (
-                          <TrendingUp size={18} />
-                        ) : (
-                          <TrendingDown size={18} />
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-gray-900">
-                          {entryTypeLabels[entry.entryType] || entry.entryType}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {entry.sourceCode && (
-                            <span className="font-mono">
-                              {entry.sourceCode} ·{" "}
-                            </span>
-                          )}
-                          {new Date(entry.createdAt).toLocaleString("fr-FR")}
-                        </p>
-                        {entry.reference && (
-                          <p className="mt-0.5 text-xs text-gray-400">
-                            Réf: {entry.reference}
+              <DataCard>
+                {ledgerEntries.map((e) => {
+                  const credit = e.direction === "CREDIT";
+                  return (
+                    <div key={e.entryNumber} className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4 transition ${ROW_HOVER}`}>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${credit ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>
+                          {credit ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-gray-900">{ENTRY_TYPE_LABEL[e.entryType] ?? e.entryType}</p>
+                          <p className="text-xs text-gray-500">
+                            {e.sourceCode && <span className="font-mono">{e.sourceCode} · </span>}
+                            {formatDateTime(e.createdAt)}
                           </p>
-                        )}
+                          {e.reference && <p className="text-xs text-gray-400">Réf. {e.reference}</p>}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-sm font-bold tabular-nums ${credit ? "text-emerald-700" : "text-red-600"}`}>
+                          {credit ? "+" : "-"}
+                          {formatMoney(e.amount, currencyLabel(e.currency))}
+                        </p>
+                        <p className="text-xs tabular-nums text-gray-400">Solde {formatMoney(e.balanceAfter, currencyLabel(e.currency))}</p>
                       </div>
                     </div>
-                    <div className="flex-shrink-0 text-left sm:text-right">
-                      <p
-                        className={`text-sm font-bold ${
-                          entry.direction === "CREDIT"
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {entry.direction === "CREDIT" ? "+" : "-"}
-                        {formatAmountOnly(entry.amount)} {entry.currency}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        Solde: {formatAmountOnly(entry.balanceAfter)}{" "}
-                        {entry.currency}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {totalPages > 1 && (
-                <div className="mt-4 flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-3">
-                  <p className="text-sm text-gray-500">
-                    Page {ledgerPage + 1} / {totalPages}
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setLedgerPage((p) => Math.max(0, p - 1))}
-                      disabled={ledgerPage === 0}
-                      className="rounded-xl bg-white p-2 shadow-sm ring-1 ring-gray-100 disabled:opacity-50"
-                    >
-                      <ChevronLeft size={16} />
-                    </button>
-                    <button
-                      onClick={() =>
-                        setLedgerPage((p) => Math.min(totalPages - 1, p + 1))
-                      }
-                      disabled={ledgerPage >= totalPages - 1}
-                      className="rounded-xl bg-white p-2 shadow-sm ring-1 ring-gray-100 disabled:opacity-50"
-                    >
-                      <ChevronRight size={16} />
-                    </button>
-                  </div>
-                </div>
-              )}
+                  );
+                })}
+              </DataCard>
+              <Pagination page={ledgerPage} totalPages={totalPages} total={totalElements} noun="mouvement" onChange={setLedgerPage} />
             </>
           )}
         </div>
       )}
 
       {activeTab === "holds" && (
-        <div>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-gray-600">
-              Réservations de fonds sur ce portefeuille
-            </p>
-            <button
-              onClick={() => setIsCreateHoldOpen(true)}
-              className="inline-flex w-full items-center justify-center gap-1 rounded-xl bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 sm:w-auto"
-            >
-              <Plus size={14} /> Nouveau hold
-            </button>
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-gray-500">Réservations de fonds sur ce portefeuille</p>
+            <ActionButton icon={Plus} onClick={() => setIsCreateHoldOpen(!isCreateHoldOpen)}>
+              Nouvelle réservation
+            </ActionButton>
           </div>
 
-          {holdsLoading ? (
-            <div className="flex justify-center rounded-2xl bg-white py-12 shadow-sm ring-1 ring-gray-100">
-              <Loader2 size={24} className="animate-spin text-gray-400" />
-            </div>
-          ) : holds.length === 0 ? (
-            <div className="rounded-2xl bg-white py-12 text-center shadow-sm ring-1 ring-gray-100">
-              <Clock size={48} className="mx-auto mb-4 text-gray-300" />
-              <p className="text-gray-500">Aucun hold actif</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-              {holds.map((hold) => {
-                const hs = holdStatusConfig[hold.status] || {
-                  label: hold.status,
-                  color: "bg-gray-50 text-gray-500 ring-gray-100",
-                };
-                const isActive = hold.status === "ACTIVE";
-                const isExpired = new Date(hold.expiresAt) < new Date();
-                return (
-                  <div
-                    key={hold.holdNumber}
-                    className={`rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 ${!isActive ? "opacity-60" : ""}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-mono text-sm font-semibold text-gray-900">
-                          {hold.holdNumber}
-                        </p>
-                        <p className="mt-0.5 text-xs text-gray-500">
-                          {hold.sourceType} · {hold.sourceCode}
-                        </p>
-                        <p
-                          className={`mt-0.5 text-xs ${isExpired && isActive ? "text-red-500" : "text-gray-400"}`}
-                        >
-                          Expire le :{" "}
-                          {new Date(hold.expiresAt).toLocaleString("fr-FR")}
-                          {isExpired && isActive && " (expiré)"}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-orange-600">
-                          {formatAmountOnly(hold.amount)} {wallet.currency}
-                        </p>
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${hs.color}`}
-                        >
-                          {hs.label}
-                        </span>
-                      </div>
-                    </div>
-
-                    {isActive && (
-                      <div className="mt-4 grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => {
-                            if (
-                              confirm(
-                                `Capturer le hold ${hold.holdNumber} (débit définitif de ${formatAmountOnly(hold.amount)} ${wallet.currency}) ?`,
-                              )
-                            ) {
-                              captureMutation.mutate(hold.holdNumber);
-                            }
-                          }}
-                          disabled={anyPending}
-                          className="inline-flex items-center justify-center gap-1 rounded-xl bg-green-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-green-700 disabled:opacity-50"
-                        >
-                          {captureMutation.isPending &&
-                          captureMutation.variables === hold.holdNumber ? (
-                            <Loader2 size={12} className="animate-spin" />
-                          ) : (
-                            <CheckCircle size={12} />
-                          )}
-                          Capturer
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (
-                              confirm(
-                                `Libérer le hold ${hold.holdNumber} (remettre ${formatAmountOnly(hold.amount)} ${wallet.currency} dans le solde disponible) ?`,
-                              )
-                            ) {
-                              releaseMutation.mutate(hold.holdNumber);
-                            }
-                          }}
-                          disabled={anyPending}
-                          className="inline-flex items-center justify-center gap-1 rounded-xl bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-200 disabled:opacity-50"
-                        >
-                          {releaseMutation.isPending &&
-                          releaseMutation.variables === hold.holdNumber ? (
-                            <Loader2 size={12} className="animate-spin" />
-                          ) : (
-                            <XCircle size={12} />
-                          )}
-                          Libérer
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
           {isCreateHoldOpen && (
-            <div className="mt-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-blue-100">
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm font-semibold text-gray-900">
-                  Nouveau hold
-                </p>
-                <button
-                  onClick={() => setIsCreateHoldOpen(false)}
-                  className="rounded-lg p-1 text-gray-400 hover:bg-gray-100"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              {holdError && (
-                <div className="mb-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-100">
-                  {holdError}
-                </div>
-              )}
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <Field label="Montant (FCFA) *">
+            <PanelForm
+              title="Nouvelle réservation"
+              submitLabel="Créer la réservation"
+              pending={createHoldMutation.isPending}
+              error={holdError}
+              onCancel={() => setIsCreateHoldOpen(false)}
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (holdForm.amount <= 0 || !holdForm.sourceCode) return setHoldError("Le montant et le code source sont obligatoires.");
+                if (holdForm.amount > available) return setHoldError(`Montant supérieur au solde disponible (${formatMoney(available, cur)}).`);
+                setHoldError(null);
+                createHoldMutation.mutate();
+              }}
+            >
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Field label={`Montant (${cur})`} required>
                   <input
-                    type="text"
                     inputMode="decimal"
                     value={holdForm.amount === 0 ? "" : holdForm.amount}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/[^\d.]/g, "");
-                      setHoldForm({
-                        ...holdForm,
-                        amount: val === "" ? 0 : parseFloat(val),
-                      });
+                      const v = e.target.value.replace(/[^\d.]/g, "");
+                      setHoldForm({ ...holdForm, amount: v === "" ? 0 : parseFloat(v) });
                     }}
                     placeholder="0"
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
+                    className={FIELD_SOFT}
                   />
                 </Field>
                 <Field label="Type de source">
-                  <select
-                    value={holdForm.sourceType}
-                    onChange={(e) =>
-                      setHoldForm({ ...holdForm, sourceType: e.target.value })
-                    }
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
-                  >
+                  <select value={holdForm.sourceType} onChange={(e) => setHoldForm({ ...holdForm, sourceType: e.target.value })} className={FIELD_SOFT}>
                     <option value="BOOKING">Réservation</option>
                     <option value="PAYMENT">Paiement</option>
                     <option value="CAUTION">Caution</option>
@@ -633,118 +312,69 @@ export const WalletDetailModal: React.FC = () => {
                     <option value="OTHER">Autre</option>
                   </select>
                 </Field>
-                <Field label="Code source *">
-                  <input
-                    type="text"
-                    value={holdForm.sourceCode}
-                    placeholder="BKG-000001"
-                    onChange={(e) =>
-                      setHoldForm({ ...holdForm, sourceCode: e.target.value })
-                    }
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
-                  />
+                <Field label="Code source" required>
+                  <input value={holdForm.sourceCode} onChange={(e) => setHoldForm({ ...holdForm, sourceCode: e.target.value })} placeholder="BKG-000001" className={`${FIELD_SOFT} font-mono`} />
                 </Field>
-                <Field label="Expiration *">
-                  <input
-                    type="datetime-local"
-                    value={holdForm.expiresAt}
-                    onChange={(e) =>
-                      setHoldForm({ ...holdForm, expiresAt: e.target.value })
-                    }
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
-                  />
+                <Field label="Expiration" required>
+                  <input type="datetime-local" value={holdForm.expiresAt} onChange={(e) => setHoldForm({ ...holdForm, expiresAt: e.target.value })} className={FIELD_SOFT} />
                 </Field>
               </div>
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                <button
-                  onClick={() => setIsCreateHoldOpen(false)}
-                  disabled={createHoldMutation.isPending}
-                  className="flex-1 rounded-xl bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 disabled:opacity-50"
-                >
-                  Annuler
-                </button>
-                <button
-                  onClick={() => {
-                    if (holdForm.amount <= 0 || !holdForm.sourceCode) {
-                      setHoldError("Montant et code source obligatoires.");
-                      return;
-                    }
-                    if (holdForm.amount > availableBalance) {
-                      setHoldError(
-                        `Montant supérieur au solde disponible (${formatAmountOnly(availableBalance)} FCFA).`,
-                      );
-                      return;
-                    }
-                    createHoldMutation.mutate();
-                  }}
-                  disabled={createHoldMutation.isPending}
-                  className="flex-1 rounded-xl bg-primary-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50"
-                >
-                  {createHoldMutation.isPending ? (
-                    <Loader2 size={14} className="mx-auto animate-spin" />
-                  ) : (
-                    "Créer le hold"
-                  )}
-                </button>
-              </div>
+            </PanelForm>
+          )}
+
+          {holdsLoading ? (
+            <ListSkeleton rows={3} />
+          ) : holds.length === 0 ? (
+            <EmptyState icon={Clock} title="Aucune réservation" hint="Les fonds réservés sur ce portefeuille apparaîtront ici." />
+          ) : (
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+              {holds.map((hold) => {
+                const isActive = hold.status === "ACTIVE";
+                const isExpired = new Date(hold.expiresAt) < new Date();
+                return (
+                  <ItemRow key={hold.holdNumber} className={!isActive ? "opacity-70" : ""}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-mono text-sm font-semibold text-gray-900">{hold.holdNumber}</p>
+                        <p className="mt-0.5 text-xs text-gray-500">
+                          {hold.sourceType} · {hold.sourceCode}
+                        </p>
+                        <p className={`mt-0.5 text-xs ${isExpired && isActive ? "font-semibold text-red-600" : "text-gray-400"}`}>
+                          Expire le {formatDateTime(hold.expiresAt)}
+                          {isExpired && isActive && " (dépassé)"}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <p className="text-base font-bold tabular-nums text-[color:var(--logo-pink-dark)]">{formatMoney(hold.amount, cur)}</p>
+                        <StatusChip tone={HOLD_STATUS_TONE[hold.status] ?? "neutral"}>{HOLD_STATUS_LABEL[hold.status] ?? hold.status}</StatusChip>
+                      </div>
+                    </div>
+                    {isActive && (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <ActionButton icon={CheckCircle} className="!px-4 !py-2" onClick={() => confirmCapture(hold, cur)}>
+                          Capturer
+                        </ActionButton>
+                        <ActionButton variant="ghost" icon={XCircle} className="!px-4 !py-2" onClick={() => confirmRelease(hold, cur)}>
+                          Libérer
+                        </ActionButton>
+                      </div>
+                    )}
+                  </ItemRow>
+                );
+              })}
             </div>
           )}
         </div>
       )}
-    </AdminLayout>
+
+      {activeTab === "security" && <WalletSecurityPanel walletNumber={wallet.walletNumber} />}
+      {activeTab === "actions" && <WalletActionsPanel walletNumber={wallet.walletNumber} currency={cur} />}
+      {activeTab === "compliance" &&
+        (openCase ? (
+          <CaseDetail caseNumber={openCase} onBack={() => setOpenCase(null)} />
+        ) : (
+          <WalletCompliancePanel walletNumber={wallet.walletNumber} onOpenCase={setOpenCase} />
+        ))}
+    </div>,
   );
 };
-
-const BalanceCard: React.FC<{
-  label: string;
-  value: string;
-  tone: "green" | "orange" | "gray";
-  icon: React.ElementType;
-}> = ({ label, value, tone, icon: Icon }) => {
-  const cls =
-    tone === "green"
-      ? "bg-green-50 text-green-700"
-      : tone === "orange"
-        ? "bg-orange-50 text-orange-700"
-        : "bg-gray-50 text-gray-700";
-  return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm text-gray-500">{label}</p>
-        <span className={`rounded-xl p-2 ${cls}`}>
-          <Icon size={17} />
-        </span>
-      </div>
-      <p className="text-xl font-bold text-gray-900">{value}</p>
-    </div>
-  );
-};
-
-const MiniStat: React.FC<{
-  label: string;
-  value: string;
-  tone: "green" | "red";
-}> = ({ label, value, tone }) => (
-  <div
-    className={`rounded-2xl px-4 py-3 ${tone === "green" ? "bg-green-50" : "bg-red-50"}`}
-  >
-    <p className="text-xs text-gray-500">{label}</p>
-    <p
-      className={`mt-1 font-semibold ${tone === "green" ? "text-green-700" : "text-red-700"}`}
-    >
-      {value}
-    </p>
-  </div>
-);
-
-const Field: React.FC<{ label: string; children: React.ReactNode }> = ({
-  label,
-  children,
-}) => (
-  <label className="block">
-    <span className="mb-1 block text-xs font-medium text-gray-600">
-      {label}
-    </span>
-    {children}
-  </label>
-);

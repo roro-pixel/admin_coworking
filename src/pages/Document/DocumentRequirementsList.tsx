@@ -1,371 +1,197 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, Search, Plus, Power, Trash2, X } from "lucide-react";
+import { ListChecks, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { documentService } from "../../services/document.service";
-import type {
-  DocumentOwnerType,
-  DocumentRequirement,
-  DocumentType,
-} from "../../services/document.service";
-import { DocumentRequirementDetailModal } from "./DocumentRequirementDetailModal";
-import { ModalPortal } from "../../components/ui/ModalPortal";
+import type { DocumentRequirement } from "../../services/document.service";
+import { ActionButton, CheckField, DataCard, EmptyState, ErrorBlock, Field, HeadRow, IconButton, ListHeader, PanelForm, Pagination, SearchField, StatusChip } from "../../components/subscription/kit";
+import { FIELD, ROW_HOVER, apiMessage } from "../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../components/ui/Skeleton";
+import { toast } from "../../components/ui/toastStore";
+import { Cell } from "../../components/documents/docKit";
+import { OWNER_LABEL, OWNER_TYPES, label, usePaged } from "../../components/documents/docUtils";
 
-const ownerTypes: DocumentOwnerType[] = [
-  "CUSTOMER",
-  "MEMBER",
-  "BUSINESS",
-  "CONTRACT",
-  "INVOICE",
-  "PAYMENT",
-  "PROPOSAL",
-  "ASSET",
-];
+const COLS = "lg:grid-cols-[minmax(0,1.4fr)_9rem_7rem_7rem_auto]";
+interface Form {
+  ownerType: string;
+  documentTypeCode: string;
+  required: boolean;
+  active: boolean;
+}
 
 export const DocumentRequirementsList: React.FC = () => {
   const queryClient = useQueryClient();
-  const [ownerType, setOwnerType] = useState<DocumentOwnerType>("MEMBER");
+  const [ownerType, setOwnerType] = useState("MEMBER");
   const [search, setSearch] = useState("");
-  const [requiredFilter, setRequiredFilter] = useState("all");
-  const [selectedReq, setSelectedReq] = useState<DocumentRequirement | null>(
-    null,
-  );
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editing, setEditing] = useState<DocumentRequirement | null>(null);
-  const [form, setForm] = useState({
-    ownerType: "MEMBER" as DocumentOwnerType,
-    documentTypeCode: "",
-    required: true,
-    active: true,
-  });
+  const [requiredFilter, setRequiredFilter] = useState("");
+  const [editing, setEditing] = useState<{ id: number | null; form: Form } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: requirements, isLoading } = useQuery({
+  const { data = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["documentRequirements", ownerType],
     queryFn: () => documentService.getDocumentRequirements(ownerType),
   });
-  const { data: documentTypes = [] } = useQuery({
-    queryKey: ["documentTypes", ownerType],
-    queryFn: () => documentService.getDocumentTypes(ownerType, true),
+  // Types actifs du propriétaire choisi dans le formulaire (et non plus celui de la liste).
+  // La clé porte « active » : elle ne doit pas se confondre avec la liste complète des types.
+  const formOwner = editing?.form.ownerType ?? ownerType;
+  const { data: types = [] } = useQuery({
+    queryKey: ["documentTypes", formOwner, "active"],
+    queryFn: () => documentService.getDocumentTypes(formOwner, true),
+    enabled: editing !== null,
   });
 
-  useEffect(() => {
-    if (!isFormOpen) return;
-    if (editing)
-      setForm({
-        ownerType: editing.ownerType as DocumentOwnerType,
-        documentTypeCode: editing.documentTypeCode,
-        required: editing.required,
-        active: editing.active,
-      });
-    else
-      setForm({
-        ownerType,
-        documentTypeCode: "",
-        required: true,
-        active: true,
-      });
-    setError(null);
-  }, [isFormOpen, editing, ownerType]);
+  const q = search.trim().toLowerCase();
+  const reqs = data.filter((r) => (q === "" || r.documentTypeName.toLowerCase().includes(q) || r.documentTypeCode.toLowerCase().includes(q)) && (requiredFilter === "" || (requiredFilter === "required") === r.required));
+  const { page, setPage, slice, totalPages, total } = usePaged(reqs, 15);
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["documentRequirements"] });
-  const getRequirementPayload = () => ({
-    ...form,
-    documentTypeName:
-      documentTypes.find((dt) => dt.code === form.documentTypeCode)?.name ||
-      form.documentTypeCode,
-  });
-
-  const createMutation = useMutation({
-    mutationFn: () =>
-      documentService.createDocumentRequirement(getRequirementPayload() as any),
-    onSuccess: () => {
-      invalidate();
-      setIsFormOpen(false);
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["documentRequirements"] });
+  const save = useMutation({
+    mutationFn: () => {
+      const f = editing!.form;
+      const body = { ...f, documentTypeName: types.find((t) => t.code === f.documentTypeCode)?.name || f.documentTypeCode };
+      return editing!.id === null ? documentService.createDocumentRequirement(body) : documentService.updateDocumentRequirement(editing!.id, body);
     },
-    onError: (e: any) =>
-      setError(e?.response?.data?.message || "Erreur création exigence"),
-  });
-  const updateMutation = useMutation({
-    mutationFn: () =>
-      documentService.updateDocumentRequirement(
-        editing!.id,
-        getRequirementPayload() as any,
-      ),
     onSuccess: () => {
+      toast.success(editing?.id === null ? "Exigence créée" : "Exigence modifiée");
       invalidate();
-      setIsFormOpen(false);
       setEditing(null);
+      setError(null);
     },
-    onError: (e: any) =>
-      setError(e?.response?.data?.message || "Erreur modification exigence"),
+    onError: (e) => setError(apiMessage(e, "Enregistrement impossible")),
   });
-  const activateMutation = useMutation({
-    mutationFn: (id: number) => documentService.activateDocumentRequirement(id),
+  const toggle = useMutation({
+    mutationFn: (r: DocumentRequirement) => (r.active ? documentService.deactivateDocumentRequirement(r.id) : documentService.activateDocumentRequirement(r.id)),
     onSuccess: invalidate,
+    onError: (e) => toast.error(apiMessage(e, "Changement d'état impossible")),
   });
-  const deactivateMutation = useMutation({
-    mutationFn: (id: number) =>
-      documentService.deactivateDocumentRequirement(id),
-    onSuccess: invalidate,
-  });
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => documentService.deleteDocumentRequirement(id),
-    onSuccess: invalidate,
-  });
+  const remove = useMutation({ mutationFn: (id: number) => documentService.deleteDocumentRequirement(id), onSuccess: invalidate });
 
-  const filteredRequirements = (requirements || []).filter((req) => {
-    if (
-      search &&
-      !req.documentTypeName.toLowerCase().includes(search.toLowerCase()) &&
-      !req.documentTypeCode.toLowerCase().includes(search.toLowerCase())
-    )
-      return false;
-    if (requiredFilter === "required" && !req.required) return false;
-    if (requiredFilter === "optional" && req.required) return false;
-    return true;
-  });
-
-  const submit = () =>
-    editing ? updateMutation.mutate() : createMutation.mutate();
+  const f = editing?.form;
+  const set = (patch: Partial<Form>) => setEditing((p) => (p ? { ...p, form: { ...p.form, ...patch } } : p));
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">
-          Exigences documentaires
-        </h2>
-        <div className="flex gap-3">
-          <select
-            value={ownerType}
-            onChange={(e) => setOwnerType(e.target.value as DocumentOwnerType)}
-            className="px-4 py-2 border border-gray-200 rounded-xl text-sm bg-white"
-          >
-            {ownerTypes.map((t) => (
-              <option key={t}>{t}</option>
-            ))}
-          </select>
-          <button
-            onClick={() => {
-              setEditing(null);
-              setIsFormOpen(true);
-            }}
-            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2 text-sm"
-          >
-            <Plus size={18} /> Nouvelle exigence
-          </button>
-        </div>
-      </div>
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            placeholder="Rechercher une exigence..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl"
-          />
-        </div>
-        <select
-          value={requiredFilter}
-          onChange={(e) => setRequiredFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-200 rounded-xl bg-white text-sm"
+    <div className="space-y-5">
+      <ListHeader
+        title="Exigences documentaires"
+        subtitle={isLoading ? undefined : `${total} exigence${total > 1 ? "s" : ""} pour ${label(OWNER_LABEL, ownerType).toLowerCase()}`}
+        action={
+          <ActionButton icon={Plus} onClick={() => { setError(null); setEditing({ id: null, form: { ownerType, documentTypeCode: "", required: true, active: true } }); }}>
+            Nouvelle exigence
+          </ActionButton>
+        }
+      />
+
+      {editing && f && (
+        <PanelForm
+          title={editing.id === null ? "Nouvelle exigence" : "Modifier l'exigence"}
+          onCancel={() => setEditing(null)}
+          pending={save.isPending}
+          submitLabel={editing.id === null ? "Créer" : "Enregistrer"}
+          submitDisabled={!f.documentTypeCode}
+          error={error}
+          onSubmit={(e) => {
+            e.preventDefault();
+            save.mutate();
+          }}
         >
-          <option value="all">Toutes</option>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Propriétaire">
+              <select value={f.ownerType} onChange={(e) => set({ ownerType: e.target.value, documentTypeCode: "" })} className={FIELD}>
+                {OWNER_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {label(OWNER_LABEL, t)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Type de document" required>
+              <select value={f.documentTypeCode} onChange={(e) => set({ documentTypeCode: e.target.value })} className={FIELD}>
+                <option value="">Choisir un type</option>
+                {types.map((t) => (
+                  <option key={t.code} value={t.code}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <CheckField checked={f.required} onChange={(v) => set({ required: v })} label="Obligatoire" />
+            <CheckField checked={f.active} onChange={(v) => set({ active: v })} label="Active" />
+          </div>
+        </PanelForm>
+      )}
+
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <select value={ownerType} onChange={(e) => { setOwnerType(e.target.value); setPage(0); }} aria-label="Propriétaire" className="rounded-2xl bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-[color:var(--logo-pink)] sm:w-56">
+          {OWNER_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {label(OWNER_LABEL, t)}
+            </option>
+          ))}
+        </select>
+        <SearchField className="flex-1" value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Nom ou code du type" />
+        <select value={requiredFilter} onChange={(e) => { setRequiredFilter(e.target.value); setPage(0); }} aria-label="Caractère obligatoire" className="rounded-2xl bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-[color:var(--logo-pink)] sm:w-48">
+          <option value="">Toutes</option>
           <option value="required">Obligatoires</option>
           <option value="optional">Optionnelles</option>
         </select>
       </div>
+
       {isLoading ? (
-        <div className="text-center py-8">Chargement...</div>
+        <ListSkeleton rows={6} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les exigences." onRetry={() => refetch()} />
+      ) : reqs.length === 0 ? (
+        <EmptyState icon={ListChecks} title="Aucune exigence" hint={search || requiredFilter ? "Ajustez les filtres." : "Créez la première exigence pour ce propriétaire."} />
       ) : (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50/70">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold">
-                  Document
-                </th>
-                <th className="px-6 py-3 text-left text-sm font-semibold">
-                  Propriétaire
-                </th>
-                <th className="px-6 py-3 text-center text-sm font-semibold">
-                  Obligatoire
-                </th>
-                <th className="px-6 py-3 text-center text-sm font-semibold">
-                  Actif
-                </th>
-                <th className="px-6 py-3 text-right text-sm font-semibold">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredRequirements.map((req) => (
-                <tr key={req.id} className="hover:bg-gray-100">
-                  <td className="px-6 py-4">
-                    <p className="font-medium">{req.documentTypeName}</p>
-                    <p className="text-xs text-gray-500 font-mono">
-                      {req.documentTypeCode}
-                    </p>
-                  </td>
-                  <td className="px-6 py-4 text-sm">{req.ownerType}</td>
-                  <td className="px-6 py-4 text-center">
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full ${req.required ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"}`}
-                    >
-                      {req.required ? "Oui" : "Non"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <button
-                      onClick={() =>
-                        req.active
-                          ? deactivateMutation.mutate(req.id)
-                          : activateMutation.mutate(req.id)
-                      }
-                      className={
-                        req.active ? "text-green-600" : "text-gray-400"
-                      }
-                    >
-                      <Power size={16} />
-                    </button>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => {
-                          setSelectedReq(req);
-                          setIsDetailOpen(true);
-                        }}
-                        className="p-1 text-blue-600"
-                      >
-                        <Eye size={16} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditing(req);
-                          setIsFormOpen(true);
-                        }}
-                        className="px-2 py-1 text-xs border rounded"
-                      >
-                        Modifier
-                      </button>
-                      <button
-                        onClick={() =>
-                          confirm("Supprimer cette exigence ?") &&
-                          deleteMutation.mutate(req.id)
-                        }
-                        className="p-1 text-red-600"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {selectedReq && (
-        <DocumentRequirementDetailModal
-          isOpen={isDetailOpen}
-          onClose={() => setIsDetailOpen(false)}
-          requirement={selectedReq}
-        />
-      )}
-      {isFormOpen && (
-        <ModalPortal onClose={() => setIsFormOpen(false)} size="lg">
-          <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-xl font-bold">
-              {editing ? "Modifier" : "Créer"} une exigence
-            </h3>
-            <button onClick={() => setIsFormOpen(false)}>
-              <X size={22} />
-            </button>
-          </div>
-          <div className="p-6 space-y-4">
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
-                {error}
+        <>
+          <HeadRow cols={COLS}>
+            <span>Type de document</span>
+            <span>Propriétaire</span>
+            <span>Caractère</span>
+            <span>État</span>
+            <span className="text-right">Actions</span>
+          </HeadRow>
+          <DataCard>
+            {slice.map((r) => (
+              <div key={r.id} className={`grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl p-4 max-lg:mb-2 max-lg:bg-gray-50 ${COLS} ${ROW_HOVER}`}>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-gray-900">{r.documentTypeName}</p>
+                  <p className="font-mono text-xs text-gray-400">{r.documentTypeCode}</p>
+                </div>
+                <Cell title="Propriétaire" className="max-lg:order-3 max-lg:col-span-2">
+                  <span className="text-sm text-gray-700">{label(OWNER_LABEL, String(r.ownerType))}</span>
+                </Cell>
+                <div className="max-lg:order-4 max-lg:col-span-2">
+                  <StatusChip tone={r.required ? "warn" : "neutral"}>{r.required ? "Obligatoire" : "Optionnelle"}</StatusChip>
+                </div>
+                <div className="max-lg:order-2 max-lg:justify-self-end">
+                  <StatusChip tone={r.active ? "success" : "neutral"}>{r.active ? "Active" : "Inactive"}</StatusChip>
+                </div>
+                <div className="flex items-center gap-1 max-lg:order-5 max-lg:col-span-2 lg:justify-end">
+                  <IconButton icon={Power} label={r.active ? "Désactiver" : "Activer"} tone={r.active ? "success" : "neutral"} pending={toggle.isPending && toggle.variables?.id === r.id} onClick={() => toggle.mutate(r)} />
+                  <IconButton icon={Pencil} label="Modifier" onClick={() => { setError(null); setEditing({ id: r.id, form: { ownerType: String(r.ownerType), documentTypeCode: r.documentTypeCode, required: r.required, active: r.active } }); }} />
+                  <IconButton
+                    icon={Trash2}
+                    label="Supprimer"
+                    tone="danger"
+                    onClick={() =>
+                      toast.confirm({
+                        message: `Supprimer l'exigence « ${r.documentTypeName} » ?`,
+                        confirmLabel: "Supprimer",
+                        pendingLabel: "Suppression",
+                        successMessage: "Exigence supprimée",
+                        errorMessage: "Suppression impossible",
+                        onConfirm: () => remove.mutateAsync(r.id),
+                      })
+                    }
+                  />
+                </div>
               </div>
-            )}
-            <select
-              value={form.ownerType}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  ownerType: e.target.value as DocumentOwnerType,
-                })
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white"
-            >
-              {ownerTypes.map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
-            <select
-              value={form.documentTypeCode}
-              onChange={(e) =>
-                setForm({ ...form, documentTypeCode: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white"
-            >
-              <option value="">Type de document</option>
-              {(documentTypes as DocumentType[]).map((dt) => (
-                <option key={dt.code} value={dt.code}>
-                  {dt.name} · {dt.code}
-                </option>
-              ))}
-            </select>
-            <div className="flex gap-6 text-sm">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.required}
-                  onChange={(e) =>
-                    setForm({ ...form, required: e.target.checked })
-                  }
-                />{" "}
-                Obligatoire
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.active}
-                  onChange={(e) =>
-                    setForm({ ...form, active: e.target.checked })
-                  }
-                />{" "}
-                Actif
-              </label>
-            </div>
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <button
-                onClick={() => setIsFormOpen(false)}
-                className="px-4 py-2 border border-gray-200 rounded-xl"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={submit}
-                disabled={
-                  !form.documentTypeCode ||
-                  createMutation.isPending ||
-                  updateMutation.isPending
-                }
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
-              >
-                Enregistrer
-              </button>
-            </div>
-          </div>
-        </ModalPortal>
+            ))}
+          </DataCard>
+          <Pagination page={page} totalPages={totalPages} total={total} noun="exigence" onChange={setPage} />
+        </>
       )}
     </div>
   );

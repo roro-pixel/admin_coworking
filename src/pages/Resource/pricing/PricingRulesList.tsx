@@ -1,473 +1,227 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, DollarSign, Power, Calculator, X } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Calculator, DollarSign, Layers, Plus, Power, Trash2 } from "lucide-react";
 import { resourceService } from "../../../services/resource.service";
-import type {
-  ResourcePricingRuleResponse,
-  ResourceBookingUnit,
-  ResourceSummaryResponse,
-} from "../../../services/resource.service";
-import { ModalPortal } from "../../../components/ui/ModalPortal";
+import type { PricingRuleQuote, ResourceBookingUnit, ResourcePricingRuleResponse, ResourceSummaryResponse } from "../../../services/resource.service";
+import { ActionButton, DataCard, Detail, EmptyState, ErrorBlock, Field, FilterButton, FilterPanel, HeadRow, IconButton, ListHeader, PanelForm, Pagination, StatusChip, Tag } from "../../../components/subscription/kit";
+import { FIELD, ROW_HOVER, apiMessage, formatDate, formatMoney } from "../../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../../components/ui/Skeleton";
+import { toast } from "../../../components/ui/toastStore";
+import { Cell, UNITS, UNIT_LABEL, dayLabel, hhmm } from "../../../components/resources/resKit";
 import { ResourceAutocomplete } from "../../../components/resources/ResourceAutocomplete";
+import { BulkPricingRuleModal } from "../../../components/resources/Bulkpricingrulemodal";
 
-const bookingUnitLabels: Record<string, string> = {
-  HOUR: "Heure",
-  HALF_DAY: "Demi-journée",
-  DAY: "Jour",
-  WEEK: "Semaine",
-  MONTH: "Mois",
-};
+const COLS = "lg:grid-cols-[minmax(0,1.1fr)_7rem_9rem_minmax(0,1.3fr)_6rem_auto]";
+const SIZE = 15;
 
-const formatMoney = (value: number) => `${value.toLocaleString("fr-FR")} FCFA`;
+const adjust = (r: ResourcePricingRuleResponse) =>
+  !r.adjustmentType ? "" : r.adjustmentType === "PERCENT_DELTA" ? `${r.adjustmentValue}%` : r.adjustmentType === "AMOUNT_DELTA" ? formatMoney(r.adjustmentValue ?? 0) : "Prix fixe";
 
-const formatPeriod = (rule: ResourcePricingRuleResponse) => {
+const period = (r: ResourcePricingRuleResponse) => {
   const parts: string[] = [];
-  if (rule.validFrom)
-    parts.push(`Du ${new Date(rule.validFrom).toLocaleDateString("fr-FR")}`);
-  if (rule.validUntil)
-    parts.push(`au ${new Date(rule.validUntil).toLocaleDateString("fr-FR")}`);
-  if (rule.startsAt || rule.endsAt)
-    parts.push(
-      `${rule.startsAt?.slice(0, 5) ?? "--:--"}–${rule.endsAt?.slice(0, 5) ?? "--:--"}`,
-    );
-  return parts.length ? parts.join(" · ") : "Toujours applicable";
+  if (r.dayOfWeek) parts.push(dayLabel(r.dayOfWeek));
+  if (r.startsAt || r.endsAt) parts.push(`${hhmm(r.startsAt) || "00:00"} à ${hhmm(r.endsAt) || "24:00"}`);
+  if (r.validFrom || r.validUntil) parts.push(`${r.validFrom ? formatDate(r.validFrom) : "dès maintenant"} au ${r.validUntil ? formatDate(r.validUntil) : "sans fin"}`);
+  return parts.length ? parts.join(", ") : "Toujours applicable";
 };
 
 export const PricingRulesList: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-
-  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
   const [resourceFilter, setResourceFilter] = useState("");
-  const [selectedResourceSummary, setSelectedResourceSummary] =
-    useState<ResourceSummaryResponse | null>(null);
-
-  const [isQuoteOpen, setIsQuoteOpen] = useState(false);
-  const [quoteForm, setQuoteForm] = useState<{
-    resourceCode: string;
-    bookingUnit: ResourceBookingUnit;
-    startedAt: string;
-    endedAt: string;
-  }>({ resourceCode: "", bookingUnit: "HOUR", startedAt: "", endedAt: "" });
-  const [quoteResult, setQuoteResult] = useState<any>(null);
-  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [selectedResource, setSelectedResource] = useState<ResourceSummaryResponse | null>(null);
+  const [unitFilter, setUnitFilter] = useState("");
+  const [activeFilter, setActiveFilter] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [bulk, setBulk] = useState(false);
+  const [quoting, setQuoting] = useState<{ resourceCode: string; bookingUnit: ResourceBookingUnit; startedAt: string; endedAt: string } | null>(null);
+  const [quote, setQuote] = useState<PricingRuleQuote | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
 
-  const { data: rulesData, isLoading } = useQuery({
-    queryKey: ["resource-pricing-rules", resourceFilter],
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["resource-pricing-rules", resourceFilter, page, unitFilter, activeFilter],
     queryFn: () =>
       resourceService.getPricingRules({
         resourceCode: resourceFilter || undefined,
-        size: 200,
+        bookingUnit: (unitFilter || undefined) as ResourceBookingUnit | undefined,
+        active: activeFilter === "" ? undefined : activeFilter === "true",
+        page,
+        size: SIZE,
       }),
   });
+  const rules = data?.content ?? [];
+  const total = data?.totalElements ?? 0;
 
-  const rules: ResourcePricingRuleResponse[] = rulesData?.content || [];
-
-  const filteredRules = search
-    ? rules.filter(
-        (r) =>
-          r.resourceCode.toLowerCase().includes(search.toLowerCase()) ||
-          (r.label ?? "").toLowerCase().includes(search.toLowerCase()) ||
-          r.bookingUnit.toLowerCase().includes(search.toLowerCase()),
-      )
-    : rules;
-
-  const stats = useMemo(() => {
-    const active = rules.filter((r) => r.active).length;
-    const dynamic = rules.filter((r) => r.adjustmentType).length;
-    const avg = rules.length
-      ? Math.round(rules.reduce((sum, r) => sum + r.price, 0) / rules.length)
-      : 0;
-    return { total: rules.length, active, dynamic, avg };
-  }, [rules]);
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => resourceService.deletePricingRule(id),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["resource-pricing-rules"] }),
-    onError: () => alert("Erreur lors de la suppression de la règle."),
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["resource-pricing-rules"] });
+  const toggle = useMutation({
+    mutationFn: (r: ResourcePricingRuleResponse) => resourceService.updatePricingRuleActive(r.id, !r.active),
+    onSuccess: refresh,
+    onError: (e) => toast.error(apiMessage(e, "Changement d'état impossible")),
+  });
+  const remove = useMutation({ mutationFn: (id: number) => resourceService.deletePricingRule(id), onSuccess: refresh });
+  const quoteMutation = useMutation({
+    mutationFn: () => resourceService.quotePrice(quoting!),
+    onSuccess: (d) => {
+      setQuote(d);
+      setQuoteError(null);
+    },
+    onError: (e) => {
+      setQuote(null);
+      setQuoteError(apiMessage(e, "Impossible de calculer le tarif."));
+    },
   });
 
-  const toggleActiveMutation = useMutation({
-    mutationFn: ({ id, active }: { id: number; active: boolean }) =>
-      resourceService.updatePricingRuleActive(id, active),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["resource-pricing-rules"] }),
-    onError: () => alert("Erreur lors de la mise à jour du statut."),
-  });
-
-  const handleDelete = (id: number) => {
-    if (
-      confirm(
-        "Êtes-vous sûr de vouloir supprimer cette règle de tarification ?",
-      )
-    ) {
-      deleteMutation.mutate(id);
-    }
-  };
-
-  const resetFilters = () => {
-    setSearch("");
-    setResourceFilter("");
-    setSelectedResourceSummary(null);
-  };
-
-  if (isLoading) {
-    return <div className="text-center py-10 text-gray-500">Chargement...</div>;
-  }
+  const hasFilters = !!(resourceFilter || unitFilter || activeFilter);
+  const change = (fn: () => void) => { fn(); setPage(0); };
+  const quoteReady = quoting && quoting.resourceCode && quoting.startedAt && quoting.endedAt && quoting.endedAt > quoting.startedAt;
 
   return (
-    <div>
-      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">
-            Règles de tarification
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Gérez les prix par ressource, unité, période et règle dynamique.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => {
-              setIsQuoteOpen(true);
-              setQuoteResult(null);
-              setQuoteError(null);
-            }}
-            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
-          >
-            <Calculator size={16} />
-            Simulateur
-          </button>
-          <button
-            onClick={() => navigate("/resources/pricing/create")}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-primary-700"
-          >
-            <Plus size={16} />
-            Nouvelle règle
-          </button>
-        </div>
-      </div>
-
-      <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-4">
-        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-          <p className="text-xs font-medium text-gray-400">Total règles</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900">{stats.total}</p>
-        </div>
-        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-          <p className="text-xs font-medium text-gray-400">Actives</p>
-          <p className="mt-2 text-2xl font-bold text-green-700">
-            {stats.active}
-          </p>
-        </div>
-        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-          <p className="text-xs font-medium text-gray-400">Dynamiques</p>
-          <p className="mt-2 text-2xl font-bold text-primary-700">
-            {stats.dynamic}
-          </p>
-        </div>
-        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-          <p className="text-xs font-medium text-gray-400">Prix moyen</p>
-          <p className="mt-2 text-xl font-bold text-gray-900">
-            {formatMoney(stats.avg)}
-          </p>
-        </div>
-      </div>
-
-      <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-        <div className="flex flex-col gap-3 md:flex-row">
-          <div className="w-full md:w-80">
-            <ResourceAutocomplete
-              selectedResource={selectedResourceSummary}
-              selectedCode={resourceFilter}
-              onSelect={(resource) => {
-                setSelectedResourceSummary(resource);
-                setResourceFilter(resource?.code || "");
-              }}
-              placeholder="Filtrer par ressource..."
-            />
+    <div className="space-y-5">
+      <ListHeader
+        title="Règles de prix"
+        subtitle={isLoading ? undefined : `${total} règle${total > 1 ? "s" : ""} de tarification`}
+        action={
+          <div className="flex flex-wrap gap-2">
+            <ActionButton variant="ghost" icon={Calculator} onClick={() => { setQuote(null); setQuoteError(null); setQuoting({ resourceCode: "", bookingUnit: "HOUR", startedAt: "", endedAt: "" }); }}>Simulateur</ActionButton>
+            <ActionButton variant="ghost" icon={Layers} onClick={() => setBulk(true)}>Plusieurs ressources</ActionButton>
+            <ActionButton icon={Plus} onClick={() => navigate("/resources/pricing/create")}>Nouvelle règle</ActionButton>
           </div>
-          <div className="relative flex-1">
-            <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              type="text"
-              placeholder="Rechercher par code, label ou unité..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-primary-300 focus:ring-2 focus:ring-primary-100"
-            />
+        }
+      />
+
+      <BulkPricingRuleModal isOpen={bulk} onClose={() => setBulk(false)} />
+
+      {quoting && (
+        <PanelForm
+          title="Simulateur de prix"
+          onCancel={() => setQuoting(null)}
+          pending={quoteMutation.isPending}
+          submitLabel="Calculer le prix"
+          submitDisabled={!quoteReady}
+          error={quoteError}
+          onSubmit={(e) => { e.preventDefault(); quoteMutation.mutate(); }}
+        >
+          <Field label="Ressource" required>
+            <ResourceAutocomplete selectedCode={quoting.resourceCode} onSelect={(r) => setQuoting({ ...quoting, resourceCode: r?.code || "" })} required />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Unité">
+              <select value={quoting.bookingUnit} onChange={(e) => setQuoting({ ...quoting, bookingUnit: e.target.value as ResourceBookingUnit })} className={FIELD}>
+                {UNITS.map((u) => <option key={u} value={u}>{UNIT_LABEL[u]}</option>)}
+              </select>
+            </Field>
+            <Field label="Début" required>
+              <input type="datetime-local" value={quoting.startedAt} onChange={(e) => setQuoting({ ...quoting, startedAt: e.target.value })} className={FIELD} />
+            </Field>
+            <Field label="Fin" required error={quoting.startedAt && quoting.endedAt && quoting.endedAt <= quoting.startedAt ? "La fin doit être après le début." : undefined}>
+              <input type="datetime-local" value={quoting.endedAt} onChange={(e) => setQuoting({ ...quoting, endedAt: e.target.value })} className={FIELD} />
+            </Field>
           </div>
-          {(resourceFilter || search) && (
-            <button
-              onClick={resetFilters}
-              className="rounded-xl border border-gray-200 px-4 py-2 text-sm text-gray-600 transition hover:bg-gray-50"
-            >
-              Réinitialiser
-            </button>
+          {quote && (
+            <div className="grid gap-3 rounded-2xl bg-white p-4 shadow-sm sm:grid-cols-3">
+              <Detail label="Prix de base">{formatMoney(quote.basePrice)}</Detail>
+              <Detail label="Prix final">{formatMoney(quote.finalPrice)}</Detail>
+              <Detail label="Règle appliquée">{quote.appliedRuleLabel || (quote.appliedRuleId ? `Règle n° ${quote.appliedRuleId}` : "Tarif de base")}</Detail>
+            </div>
           )}
-        </div>
-      </div>
-
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
-        <div className="overflow-x-auto">
-          <table className="w-full border-separate border-spacing-0">
-            <thead>
-              <tr className="bg-gray-50/70 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <th className="px-6 py-4">Ressource</th>
-                <th className="px-6 py-4">Unité</th>
-                <th className="px-6 py-4 text-right">Prix</th>
-                <th className="px-6 py-4">Règle</th>
-                <th className="px-6 py-4">Période</th>
-                <th className="px-6 py-4 text-center">Statut</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRules.map((rule) => (
-                <tr
-                  key={rule.id}
-                  onClick={() => navigate(`/resources/pricing/${rule.id}`)}
-                  className={`group cursor-pointer transition hover:bg-primary-50/40 ${!rule.active ? "opacity-60" : ""}`}
-                >
-                  <td className="px-6 py-4 align-top">
-                    <p className="font-mono text-sm font-medium text-gray-900">
-                      {rule.resourceCode}
-                    </p>
-                    {rule.dayOfWeek && (
-                      <p className="mt-1 text-xs text-gray-400">
-                        Jour {rule.dayOfWeek}
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 align-top text-sm text-gray-700">
-                    {bookingUnitLabels[rule.bookingUnit] || rule.bookingUnit}
-                  </td>
-                  <td className="px-6 py-4 align-top text-right font-semibold text-gray-900">
-                    {formatMoney(rule.price)}
-                  </td>
-                  <td className="px-6 py-4 align-top text-sm">
-                    {rule.label && (
-                      <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
-                        {rule.label}
-                      </span>
-                    )}
-                    {rule.adjustmentType && (
-                      <p className="mt-1 text-xs text-gray-500">
-                        {rule.adjustmentType === "PERCENT_DELTA"
-                          ? `${rule.adjustmentValue}%`
-                          : rule.adjustmentType === "AMOUNT_DELTA"
-                            ? `${rule.adjustmentValue?.toLocaleString("fr-FR")} FCFA`
-                            : "Prix fixe"}
-                      </p>
-                    )}
-                    {!rule.label && !rule.adjustmentType && (
-                      <span className="text-gray-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 align-top text-xs text-gray-500">
-                    {formatPeriod(rule)}
-                    {rule.lastMinuteMinutes && (
-                      <p className="mt-1 font-medium text-orange-600">
-                        Last minute {rule.lastMinuteMinutes} min
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 align-top text-center">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                        rule.active
-                          ? "bg-green-50 text-green-700"
-                          : "bg-gray-100 text-gray-500"
-                      }`}
-                    >
-                      {rule.active ? "Actif" : "Inactif"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 align-top text-right">
-                    <div
-                      className="flex justify-end gap-2"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        onClick={() =>
-                          toggleActiveMutation.mutate({
-                            id: rule.id,
-                            active: !rule.active,
-                          })
-                        }
-                        disabled={toggleActiveMutation.isPending}
-                        className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-800 disabled:opacity-40"
-                        title={rule.active ? "Désactiver" : "Activer"}
-                      >
-                        <Power size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(rule.id)}
-                        disabled={deleteMutation.isPending}
-                        className="rounded-lg p-2 text-red-500 transition hover:bg-red-50 hover:text-red-700 disabled:opacity-40"
-                        title="Supprimer"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {filteredRules.length === 0 && (
-        <div className="mt-4 rounded-2xl bg-white py-12 text-center shadow-sm ring-1 ring-gray-100">
-          <DollarSign size={44} className="mx-auto mb-3 text-gray-300" />
-          <p className="text-gray-500">Aucune règle de tarification trouvée</p>
-        </div>
+        </PanelForm>
       )}
 
-      {isQuoteOpen && (
-        <ModalPortal onClose={() => setIsQuoteOpen(false)} size="lg">
-          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4 rounded-t-2xl">
-            <div>
-              <h3 className="text-xl font-bold text-gray-900">
-                Simulateur de prix
-              </h3>
-              <p className="mt-0.5 text-sm text-gray-500">
-                Calculez le prix appliqué pour une ressource.
-              </p>
-            </div>
-            <button
-              onClick={() => setIsQuoteOpen(false)}
-              className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100"
-            >
-              <X size={20} />
-            </button>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex-1">
+          <ResourceAutocomplete
+            selectedResource={selectedResource}
+            selectedCode={resourceFilter}
+            onSelect={(r) => change(() => { setSelectedResource(r); setResourceFilter(r?.code || ""); })}
+            placeholder="Filtrer par ressource"
+          />
+        </div>
+        <FilterButton open={showFilters} active={!!(unitFilter || activeFilter)} onClick={() => setShowFilters(!showFilters)} />
+      </div>
+      {showFilters && (
+        <FilterPanel canReset={hasFilters} onReset={() => change(() => { setResourceFilter(""); setSelectedResource(null); setUnitFilter(""); setActiveFilter(""); })}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Unité">
+              <select value={unitFilter} onChange={(e) => change(() => setUnitFilter(e.target.value))} className={FIELD}>
+                <option value="">Toutes les unités</option>
+                {UNITS.map((u) => <option key={u} value={u}>{UNIT_LABEL[u]}</option>)}
+              </select>
+            </Field>
+            <Field label="État">
+              <select value={activeFilter} onChange={(e) => change(() => setActiveFilter(e.target.value))} className={FIELD}>
+                <option value="">Toutes</option>
+                <option value="true">Actives</option>
+                <option value="false">Inactives</option>
+              </select>
+            </Field>
           </div>
-          <div className="space-y-5 p-6">
-            {quoteError && (
-              <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {quoteError}
-              </div>
-            )}
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Ressource *
-              </label>
-              <ResourceAutocomplete
-                selectedCode={quoteForm.resourceCode}
-                onSelect={(resource) =>
-                  setQuoteForm({
-                    ...quoteForm,
-                    resourceCode: resource?.code || "",
-                  })
-                }
-                placeholder="Rechercher une ressource..."
-                required
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Unité *
-                </label>
-                <select
-                  value={quoteForm.bookingUnit}
-                  onChange={(e) =>
-                    setQuoteForm((f) => ({
-                      ...f,
-                      bookingUnit: e.target.value as ResourceBookingUnit,
-                    }))
-                  }
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-                >
-                  {Object.entries(bookingUnitLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div />
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Début *
-                </label>
-                <input
-                  type="datetime-local"
-                  value={quoteForm.startedAt}
-                  onChange={(e) =>
-                    setQuoteForm((f) => ({ ...f, startedAt: e.target.value }))
-                  }
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Fin *
-                </label>
-                <input
-                  type="datetime-local"
-                  value={quoteForm.endedAt}
-                  onChange={(e) =>
-                    setQuoteForm((f) => ({ ...f, endedAt: e.target.value }))
-                  }
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
-                />
-              </div>
-            </div>
-            <button
-              disabled={
-                !quoteForm.resourceCode ||
-                !quoteForm.startedAt ||
-                !quoteForm.endedAt ||
-                quoteLoading
-              }
-              onClick={async () => {
-                setQuoteLoading(true);
-                setQuoteError(null);
-                setQuoteResult(null);
-                try {
-                  const result = await resourceService.quotePrice(quoteForm);
-                  setQuoteResult(result);
-                } catch (e: any) {
-                  setQuoteError(e?.response?.data?.message || "Erreur");
-                }
-                setQuoteLoading(false);
-              }}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 py-2.5 text-sm font-medium text-white transition hover:bg-primary-700 disabled:opacity-50"
-            >
-              <Calculator size={16} />
-              {quoteLoading ? "Calcul..." : "Calculer le prix"}
-            </button>
-            {quoteResult && (
-              <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>Prix de base</span>
-                  <span className="font-medium">
-                    {formatMoney(quoteResult.basePrice ?? 0)}
-                  </span>
+        </FilterPanel>
+      )}
+
+      {isLoading ? (
+        <ListSkeleton rows={6} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les règles de prix." onRetry={() => refetch()} />
+      ) : rules.length === 0 ? (
+        <EmptyState icon={DollarSign} title="Aucune règle de prix" hint={hasFilters ? "Ajustez les filtres." : "Créez la première règle pour pouvoir facturer une ressource."} />
+      ) : (
+        <>
+          <HeadRow cols={COLS}>
+            <span>Ressource</span>
+            <span>Unité</span>
+            <span>Prix</span>
+            <span>Conditions</span>
+            <span>État</span>
+            <span className="text-right">Actions</span>
+          </HeadRow>
+          <DataCard>
+            {rules.map((r) => (
+              <div key={r.id} className={`rounded-2xl max-lg:mb-2 max-lg:bg-gray-50 ${ROW_HOVER}`}>
+                <div onClick={() => navigate(`/resources/pricing/${r.id}`)} className={`grid cursor-pointer grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 p-4 ${COLS}`}>
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-sm font-semibold text-gray-900">{r.resourceCode}</p>
+                    {r.label && <p className="truncate text-xs text-gray-500">{r.label}</p>}
+                  </div>
+                  <Cell title="Unité" className="max-lg:order-3">
+                    <Tag tone="gray">{UNIT_LABEL[r.bookingUnit] ?? r.bookingUnit}</Tag>
+                  </Cell>
+                  <Cell title="Prix" className="max-lg:order-4">
+                    <span className="text-sm font-bold text-gray-950">{formatMoney(r.price)}</span>
+                    {adjust(r) && <span className="block text-xs text-gray-500">{adjust(r)}</span>}
+                  </Cell>
+                  <Cell title="Conditions" className="max-lg:order-5 max-lg:col-span-2">
+                    <span className="text-xs text-gray-600">{period(r)}</span>
+                    {r.lastMinuteMinutes ? <span className="block text-xs font-semibold text-amber-700">Dernière minute: {r.lastMinuteMinutes} min</span> : null}
+                  </Cell>
+                  <div className="max-lg:order-2 max-lg:justify-self-end">
+                    <StatusChip tone={r.active ? "success" : "neutral"}>{r.active ? "Active" : "Inactive"}</StatusChip>
+                  </div>
+                  <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 max-lg:order-6 max-lg:col-span-2 lg:justify-end">
+                    <IconButton icon={Power} label={r.active ? "Désactiver" : "Activer"} tone={r.active ? "success" : "neutral"} pending={toggle.isPending && toggle.variables?.id === r.id} onClick={() => toggle.mutate(r)} />
+                    <IconButton
+                      icon={Trash2}
+                      label="Supprimer"
+                      tone="danger"
+                      onClick={() =>
+                        toast.confirm({
+                          message: `Supprimer la règle ${r.label ? `« ${r.label} »` : `n° ${r.id}`} ?`,
+                          confirmLabel: "Supprimer",
+                          pendingLabel: "Suppression",
+                          successMessage: "Règle supprimée",
+                          errorMessage: "Suppression impossible",
+                          onConfirm: () => remove.mutateAsync(r.id),
+                        })
+                      }
+                    />
+                  </div>
                 </div>
-                <div className="mt-2 flex justify-between text-lg font-bold text-green-700">
-                  <span>Prix final</span>
-                  <span>{formatMoney(quoteResult.finalPrice ?? 0)}</span>
-                </div>
-                {quoteResult.appliedRuleLabel && (
-                  <p className="mt-2 text-xs text-gray-500">
-                    Règle appliquée :{" "}
-                    <span className="font-medium">
-                      {quoteResult.appliedRuleLabel}
-                    </span>
-                  </p>
-                )}
               </div>
-            )}
-          </div>
-        </ModalPortal>
+            ))}
+          </DataCard>
+          <Pagination page={page} totalPages={data?.totalPages ?? 1} total={total} noun="règle" onChange={setPage} />
+        </>
       )}
     </div>
   );

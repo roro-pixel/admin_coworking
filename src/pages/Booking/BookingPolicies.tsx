@@ -1,22 +1,34 @@
-import React, { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, Search, Shield, Loader2, X } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Pencil, Plus, Shield } from "lucide-react";
 import { bookingService } from "../../services/booking.service";
 import type { BookingAudiencePolicy } from "../../services/booking.service";
-import { ModalPortal } from "../../components/ui/ModalPortal";
+import { toast } from "../../components/ui/toastStore";
+import { TableSkeleton } from "../../components/ui/Skeleton";
+import {
+  ActionButton,
+  DataCard,
+  EmptyState,
+  Field,
+  HeadRow,
+  IconButton,
+  ListHeader,
+  PanelForm,
+  SearchField,
+  StatusChip,
+  Switch,
+} from "../../components/subscription/kit";
+import { FIELD_SOFT, ROW_HOVER, apiMessage } from "../../components/subscription/kitUtils";
+import { formatDuration } from "../../components/bookings/bookingUtils";
 
-const audienceTypes = [
-  { value: "MEMBER", label: "Membre" },
-  { value: "CUSTOMER", label: "Customer" },
-  { value: "BUSINESS_ENTITY", label: "Entreprise" },
-];
-
-const formatDuration = (minutes: number): string => {
-  if (minutes < 60) return `${minutes} min`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m > 0 ? `${h}h${m}` : `${h}h`;
+const AUDIENCE_LABELS: Record<string, string> = {
+  MEMBER: "Membre",
+  CUSTOMER: "Customer",
+  BUSINESS_ENTITY: "Entreprise",
 };
+
+const COLS =
+  "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_6.5rem_5.5rem_5.5rem_6rem_6rem_6rem_3rem]";
 
 const buildDefaultFormData = (policy: BookingAudiencePolicy | null) => ({
   audienceType: policy?.audienceType || "MEMBER",
@@ -33,29 +45,50 @@ const buildDefaultFormData = (policy: BookingAudiencePolicy | null) => ({
   active: policy?.active ?? true,
 });
 
+type NumericKey =
+  | "maxActiveBookings"
+  | "maxBookingsPerDay"
+  | "maxBookingsPerWeek"
+  | "maxBookingsPerMonth"
+  | "maxNoShowsPerMonth"
+  | "minBookingNoticeMinutes"
+  | "maxBookingDurationMinutes";
+
+const NUMBER_FIELDS: { key: NumericKey; label: string; duration?: boolean }[] = [
+  { key: "maxActiveBookings", label: "Actives max" },
+  { key: "maxBookingsPerDay", label: "Par jour" },
+  { key: "maxBookingsPerWeek", label: "Par semaine" },
+  { key: "maxBookingsPerMonth", label: "Par mois" },
+  { key: "maxNoShowsPerMonth", label: "No-show max par mois" },
+  { key: "minBookingNoticeMinutes", label: "Délai mini (min)", duration: true },
+  { key: "maxBookingDurationMinutes", label: "Durée max (min)", duration: true },
+];
+
 export const BookingPolicies: React.FC = () => {
   const queryClient = useQueryClient();
+  const panelRef = useRef<HTMLDivElement>(null);
+
   const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingPolicy, setEditingPolicy] =
-    useState<BookingAudiencePolicy | null>(null);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [editingPolicy, setEditingPolicy] = useState<BookingAudiencePolicy | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState(() => buildDefaultFormData(null));
 
-  // CORRECTION : resynchronisation à chaque ouverture du modal
+  // Resynchronisation du formulaire à chaque ouverture
   useEffect(() => {
-    if (isModalOpen) {
+    if (isPanelOpen) {
       setFormData(buildDefaultFormData(editingPolicy));
       setErrorMessage(null);
+      setTimeout(() => panelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
     }
-  }, [isModalOpen, editingPolicy]);
+  }, [isPanelOpen, editingPolicy]);
 
   const { data: policiesRaw = [], isLoading } = useQuery({
     queryKey: ["booking-policies"],
     queryFn: () => bookingService.getPolicies(),
   });
 
-  // Wrapper défensif — getPolicies peut retourner tableau ou { data: [] }
+  // Wrapper défensif : getPolicies peut retourner un tableau ou { data: [] }
   const policies: BookingAudiencePolicy[] = Array.isArray(policiesRaw)
     ? policiesRaw
     : (policiesRaw as any)?.data || (policiesRaw as any)?.content || [];
@@ -69,13 +102,10 @@ export const BookingPolicies: React.FC = () => {
       } as BookingAudiencePolicy),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["booking-policies"] });
-      setIsModalOpen(false);
+      setIsPanelOpen(false);
+      toast.success("Politique créée");
     },
-    onError: (error: any) => {
-      setErrorMessage(
-        error?.response?.data?.message || "Erreur lors de la création.",
-      );
-    },
+    onError: (error: unknown) => setErrorMessage(apiMessage(error, "Erreur lors de la création.")),
   });
 
   const updateMutation = useMutation({
@@ -89,468 +119,213 @@ export const BookingPolicies: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["booking-policies"] });
-      setIsModalOpen(false);
+      setIsPanelOpen(false);
+      toast.success("Politique mise à jour");
     },
-    onError: (error: any) => {
-      setErrorMessage(
-        error?.response?.data?.message || "Erreur lors de la mise à jour.",
-      );
-    },
+    onError: (error: unknown) => setErrorMessage(apiMessage(error, "Erreur lors de la mise à jour.")),
   });
 
-  const handleOpenModal = (policy?: BookingAudiencePolicy) => {
+  const handleOpen = (policy?: BookingAudiencePolicy) => {
     setEditingPolicy(policy || null);
-    setIsModalOpen(true);
+    setIsPanelOpen(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    if (editingPolicy) {
-      updateMutation.mutate();
-    } else {
-      createMutation.mutate();
-    }
+    if (editingPolicy) updateMutation.mutate();
+    else createMutation.mutate();
   };
 
+  const needle = search.toLowerCase();
   const filteredPolicies = search
     ? policies.filter(
         (p) =>
-          p.audienceType.toLowerCase().includes(search.toLowerCase()) ||
-          (p.resourceTypeCode &&
-            p.resourceTypeCode.toLowerCase().includes(search.toLowerCase())) ||
-          (p.resourceGroupCode &&
-            p.resourceGroupCode.toLowerCase().includes(search.toLowerCase())),
+          p.audienceType.toLowerCase().includes(needle) ||
+          (p.resourceTypeCode && p.resourceTypeCode.toLowerCase().includes(needle)) ||
+          (p.resourceGroupCode && p.resourceGroupCode.toLowerCase().includes(needle)),
       )
     : policies;
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
-  if (isLoading) {
-    return <div className="text-center py-8">Chargement...</div>;
-  }
-
   return (
-    <div>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl font-semibold text-gray-900">
-          Politiques de réservation
-        </h2>
-        <button
-          onClick={() => handleOpenModal()}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-white hover:bg-primary-700 sm:w-auto"
-        >
-          <Plus size={18} />
-          Nouvelle politique
-        </button>
-      </div>
+    <div className="space-y-5">
+      <ListHeader
+        title="Politiques de réservation"
+        action={
+          <ActionButton icon={Plus} className="w-full sm:w-auto" onClick={() => handleOpen()}>
+            Nouvelle politique
+          </ActionButton>
+        }
+      />
 
-      <div className="relative mb-6">
-        <Search
-          size={18}
-          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-        />
-        <input
-          type="text"
-          placeholder="Rechercher par audience ou type/groupe de ressource..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-xl border border-gray-200 py-2 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary-500"
-        />
-      </div>
+      <SearchField
+        value={search}
+        onChange={setSearch}
+        placeholder="Rechercher par audience ou type/groupe de ressource..."
+      />
 
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
-        <div className="hidden overflow-x-auto md:block">
-        <table className="w-full border-separate border-spacing-y-1">
-          <thead className="bg-gray-50/80">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                Audience
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                Type / Groupe ressource
-              </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
-                Approbation
-              </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
-                Actives max
-              </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
-                Par jour
-              </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
-                No-show/mois
-              </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
-                Durée max
-              </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
-                Actif
-              </th>
-              <th className="px-6 py-3 text-right text-sm font-semibold">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredPolicies.map((policy) => (
-              <tr
-                key={policy.id}
-                className={`hover:bg-primary-50/40 ${!policy.active ? "opacity-60" : ""}`}
-              >
-                <td className="px-6 py-4 text-sm font-medium">
-                  {audienceTypes.find((a) => a.value === policy.audienceType)
-                    ?.label || policy.audienceType}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600">
-                  {[policy.resourceTypeCode, policy.resourceGroupCode]
-                    .filter(Boolean)
-                    .join(" / ") || "Toutes"}
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <span
-                    className={`text-xs px-2 py-1 rounded-full ${
-                      policy.approvalRequired
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-green-100 text-green-700"
-                    }`}
-                  >
-                    {policy.approvalRequired ? "Requis" : "Non"}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-center text-sm">
-                  {policy.maxActiveBookings}
-                </td>
-                <td className="px-6 py-4 text-center text-sm">
-                  {policy.maxBookingsPerDay}
-                </td>
-                <td className="px-6 py-4 text-center text-sm">
-                  {policy.maxNoShowsPerMonth}
-                </td>
-                <td className="px-6 py-4 text-center text-sm">
-                  {formatDuration(policy.maxBookingDurationMinutes)}
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs ${
-                      policy.active
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {policy.active ? "Actif" : "Inactif"}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <button
-                    onClick={() => handleOpenModal(policy)}
-                    className="p-1 text-blue-600 hover:text-blue-800"
-                    title="Modifier"
-                  >
-                    <Edit size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
-        <div className="space-y-3 p-3 md:hidden">
-          {filteredPolicies.map((policy) => (
-            <article key={policy.id} className={`rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-100 ${!policy.active ? "opacity-60" : ""}`}>
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-black text-gray-950">{audienceTypes.find((a) => a.value === policy.audienceType)?.label || policy.audienceType}</p>
-                  <p className="mt-1 truncate text-xs font-semibold text-gray-500">{[policy.resourceTypeCode, policy.resourceGroupCode].filter(Boolean).join(" / ") || "Toutes les ressources"}</p>
-                </div>
-                <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold ${policy.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>{policy.active ? "Actif" : "Inactif"}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-xl bg-white p-2"><p className="text-gray-400">Approbation</p><p className="font-black text-gray-800">{policy.approvalRequired ? "Requise" : "Non"}</p></div>
-                <div className="rounded-xl bg-white p-2"><p className="text-gray-400">Actives max</p><p className="font-black text-gray-800">{policy.maxActiveBookings}</p></div>
-                <div className="rounded-xl bg-white p-2"><p className="text-gray-400">Par jour</p><p className="font-black text-gray-800">{policy.maxBookingsPerDay}</p></div>
-                <div className="rounded-xl bg-white p-2"><p className="text-gray-400">Durée max</p><p className="font-black text-gray-800">{formatDuration(policy.maxBookingDurationMinutes)}</p></div>
-              </div>
-              <button type="button" onClick={() => handleOpenModal(policy)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700"><Edit size={14} /> Modifier</button>
-            </article>
-          ))}
-        </div>
-      </div>
-
-      {filteredPolicies.length === 0 && !isLoading && (
-        <div className="text-center py-12 bg-white rounded-2xl">
-          <Shield size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500">Aucune politique trouvée</p>
-        </div>
-      )}
-
-      {/* CORRECTION : ModalPortal au lieu du double overlay */}
-      {isModalOpen && (
-        <ModalPortal onClose={() => setIsModalOpen(false)}>
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl z-10">
-            <h3 className="text-xl font-bold">
-              {editingPolicy ? "Modifier la politique" : "Nouvelle politique"}
-            </h3>
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="p-1 hover:bg-gray-100 rounded-xl"
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          <div className="overflow-y-auto max-h-[75vh]">
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              {errorMessage && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm">
-                  {errorMessage}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Audience *
-                </label>
+      {isPanelOpen && (
+        <div ref={panelRef}>
+          <PanelForm
+            title={editingPolicy ? "Modifier la politique" : "Nouvelle politique"}
+            onSubmit={handleSubmit}
+            onCancel={() => setIsPanelOpen(false)}
+            pending={isPending}
+            submitLabel={editingPolicy ? "Mettre à jour" : "Créer"}
+            error={errorMessage}
+          >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Field label="Audience" required>
                 <select
                   value={formData.audienceType}
-                  onChange={(e) =>
-                    setFormData({ ...formData, audienceType: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl"
+                  onChange={(e) => setFormData({ ...formData, audienceType: e.target.value })}
+                  className={FIELD_SOFT}
                 >
-                  {audienceTypes.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
+                  {Object.entries(AUDIENCE_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
                     </option>
                   ))}
                 </select>
-              </div>
+              </Field>
+              <Field label="Type de ressource">
+                <input
+                  value={formData.resourceTypeCode}
+                  onChange={(e) => setFormData({ ...formData, resourceTypeCode: e.target.value })}
+                  placeholder="ex: MEETING_ROOM"
+                  className={FIELD_SOFT}
+                />
+              </Field>
+              <Field label="Groupe de ressource">
+                <input
+                  value={formData.resourceGroupCode}
+                  onChange={(e) => setFormData({ ...formData, resourceGroupCode: e.target.value })}
+                  placeholder="ex: ROOMS"
+                  className={FIELD_SOFT}
+                />
+              </Field>
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Type de ressource
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.resourceTypeCode}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        resourceTypeCode: e.target.value,
-                      })
-                    }
-                    placeholder="ex: MEETING_ROOM"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Groupe de ressource
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.resourceGroupCode}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        resourceGroupCode: e.target.value,
-                      })
-                    }
-                    placeholder="ex: ROOMS"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Actives max
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.maxActiveBookings}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        maxActiveBookings: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Par jour
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.maxBookingsPerDay}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        maxBookingsPerDay: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Par semaine
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.maxBookingsPerWeek}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        maxBookingsPerWeek: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Par mois
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.maxBookingsPerMonth}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        maxBookingsPerMonth: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    No-show max/mois
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.maxNoShowsPerMonth}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        maxNoShowsPerMonth: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Délai mini (min)
-                    {formData.minBookingNoticeMinutes > 0 && (
-                      <span className="ml-1 text-xs text-gray-400">
-                        = {formatDuration(formData.minBookingNoticeMinutes)}
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.minBookingNoticeMinutes}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        minBookingNoticeMinutes: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Durée max (min)
-                    {formData.maxBookingDurationMinutes > 0 && (
-                      <span className="ml-1 text-xs text-gray-400">
-                        = {formatDuration(formData.maxBookingDurationMinutes)}
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.maxBookingDurationMinutes}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        maxBookingDurationMinutes:
-                          parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-6">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.approvalRequired}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        approvalRequired: e.target.checked,
-                      })
-                    }
-                    className="rounded"
-                  />
-                  <span className="text-sm">Approbation requise</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.active}
-                    onChange={(e) =>
-                      setFormData({ ...formData, active: e.target.checked })
-                    }
-                    className="rounded"
-                  />
-                  <span className="text-sm">Actif</span>
-                </label>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  disabled={isPending}
-                  className="flex-1 px-4 py-2 border rounded-xl text-gray-700 hover:bg-primary-50/40 disabled:opacity-50"
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {NUMBER_FIELDS.map((f) => (
+                <Field
+                  key={f.key}
+                  label={f.label}
+                  hint={f.duration && formData[f.key] > 0 ? `= ${formatDuration(formData[f.key])}` : undefined}
                 >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="flex-1 bg-primary-600 text-white py-2 rounded-xl hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData[f.key]}
+                    onChange={(e) => setFormData({ ...formData, [f.key]: parseInt(e.target.value) || 0 })}
+                    className={FIELD_SOFT}
+                  />
+                </Field>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Switch
+                checked={formData.approvalRequired}
+                onChange={(v) => setFormData({ ...formData, approvalRequired: v })}
+                label="Approbation requise"
+              />
+              <Switch
+                checked={formData.active}
+                onChange={(v) => setFormData({ ...formData, active: v })}
+                label="Actif"
+              />
+            </div>
+          </PanelForm>
+        </div>
+      )}
+
+      {isLoading ? (
+        <TableSkeleton rows={5} cols={6} />
+      ) : filteredPolicies.length === 0 ? (
+        <EmptyState icon={Shield} title="Aucune politique trouvée" />
+      ) : (
+        <DataCard>
+          <HeadRow cols={COLS}>
+            <span>Audience</span>
+            <span>Type / Groupe</span>
+            <span>Approbation</span>
+            <span>Actives max</span>
+            <span>Par jour</span>
+            <span>No-show/mois</span>
+            <span>Durée max</span>
+            <span>Statut</span>
+            <span />
+          </HeadRow>
+
+          <div className="space-y-2">
+            {filteredPolicies.map((policy) => {
+              const audience = AUDIENCE_LABELS[policy.audienceType] ?? policy.audienceType;
+              const scope =
+                [policy.resourceTypeCode, policy.resourceGroupCode].filter(Boolean).join(" / ") || "Toutes";
+              return (
+                <div
+                  key={policy.id}
+                  className={`rounded-2xl bg-gray-50 p-3 ${ROW_HOVER} ${!policy.active ? "opacity-60" : ""}`}
                 >
-                  {isPending ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : editingPolicy ? (
-                    "Mettre à jour"
-                  ) : (
-                    "Créer"
-                  )}
-                </button>
-              </div>
-            </form>
+                  {/* Desktop */}
+                  <div className={`hidden items-center gap-4 px-1 lg:grid ${COLS}`}>
+                    <span className="truncate text-sm font-semibold text-gray-900">{audience}</span>
+                    <span className="truncate text-sm text-gray-600">{scope}</span>
+                    <span>
+                      <StatusChip tone={policy.approvalRequired ? "warn" : "success"}>
+                        {policy.approvalRequired ? "Requise" : "Non"}
+                      </StatusChip>
+                    </span>
+                    <span className="text-sm text-gray-700">{policy.maxActiveBookings}</span>
+                    <span className="text-sm text-gray-700">{policy.maxBookingsPerDay}</span>
+                    <span className="text-sm text-gray-700">{policy.maxNoShowsPerMonth}</span>
+                    <span className="text-sm text-gray-700">{formatDuration(policy.maxBookingDurationMinutes)}</span>
+                    <span>
+                      <StatusChip tone={policy.active ? "success" : "neutral"}>
+                        {policy.active ? "Actif" : "Inactif"}
+                      </StatusChip>
+                    </span>
+                    <div className="flex justify-end">
+                      <IconButton icon={Pencil} label="Modifier" onClick={() => handleOpen(policy)} />
+                    </div>
+                  </div>
+
+                  {/* Mobile et tablette */}
+                  <div className="lg:hidden">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900">{audience}</p>
+                        <p className="mt-0.5 truncate text-xs text-gray-500">{scope}</p>
+                      </div>
+                      <StatusChip tone={policy.active ? "success" : "neutral"}>
+                        {policy.active ? "Actif" : "Inactif"}
+                      </StatusChip>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                      {[
+                        ["Approbation", policy.approvalRequired ? "Requise" : "Non"],
+                        ["Actives max", String(policy.maxActiveBookings)],
+                        ["Par jour", String(policy.maxBookingsPerDay)],
+                        ["Durée max", formatDuration(policy.maxBookingDurationMinutes)],
+                      ].map(([label, value]) => (
+                        <div key={label} className="rounded-xl bg-white p-2">
+                          <p className="text-gray-400">{label}</p>
+                          <p className="font-bold text-gray-800">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex justify-end">
+                      <IconButton icon={Pencil} label="Modifier" onClick={() => handleOpen(policy)} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </ModalPortal>
+        </DataCard>
       )}
     </div>
   );

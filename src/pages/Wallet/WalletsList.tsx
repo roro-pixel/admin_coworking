@@ -1,25 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  Loader2,
-  Plus,
-  Search,
-  Wallet as WalletIcon,
-  Filter,
-  TrendingUp,
-  Lock,
-  Layers,
-} from "lucide-react";
-import {
-  walletService,
-  formatAmountOnly,
-  safeNumber,
-} from "../../services/wallet.service";
+import { Plus, Search, Wallet as WalletIcon } from "lucide-react";
+import { walletService, safeNumber } from "../../services/wallet.service";
 import type { Wallet } from "../../services/wallet.service";
+import { ActionButton, DataCard, EmptyState, ErrorBlock, Field, FilterButton, FilterPanel, HeadRow, ListHeader, Pagination, SearchField, StatusChip } from "../../components/subscription/kit";
+import { FIELD, ROW_HOVER, formatDate, formatMoney } from "../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../components/ui/Skeleton";
+import { ChartCard, DonutBreakdown, KpiRow, KpiRowSkeleton } from "../../components/operations/OpsCharts";
+import { CHART_COLORS } from "../../components/operations/opsChartData";
+import type { Slice } from "../../components/operations/opsChartData";
+import { currencyLabel } from "../../components/payment/paymentUtils";
+import { OWNER_TYPE_LABEL, OWNER_TYPE_OPTIONS, WALLET_STATUS_LABEL, WALLET_STATUS_TONE } from "../../components/wallet/walletLabels";
+import type { WalletStatus } from "../../services/wallet.service";
 
 interface WalletsListProps {
   onOpenLookup?: () => void;
@@ -27,89 +20,85 @@ interface WalletsListProps {
 }
 
 const PAGE_SIZE = 20;
+const COLS = "lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_9rem_9rem_9rem_8rem]";
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  ACTIVE: {
-    label: "Actif",
-    color: "bg-green-50 text-green-700 ring-green-100",
-  },
-  SUSPENDED: {
-    label: "Suspendu",
-    color: "bg-yellow-50 text-yellow-700 ring-yellow-100",
-  },
-  LOCKED: { label: "Verrouillé", color: "bg-red-50 text-red-700 ring-red-100" },
-  CLOSED: { label: "Fermé", color: "bg-gray-50 text-gray-500 ring-gray-100" },
-  UNDER_REVIEW: {
-    label: "En révision",
-    color: "bg-orange-50 text-orange-700 ring-orange-100",
-  },
+/**
+ * Totaux dans la devise la plus présente sur la page : additionner XAF et EUR n'aurait aucun sens.
+ * Les autres devises sont signalées en sous-titre.
+ */
+const pageTotals = (wallets: Wallet[]) => {
+  const counts = new Map<string, number>();
+  wallets.forEach((w) => counts.set(w.currency, (counts.get(w.currency) ?? 0) + 1));
+  const main = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "XAF";
+  const sum = (pick: (w: Wallet) => number | undefined | null) => wallets.filter((w) => w.currency === main).reduce((t, w) => t + safeNumber(pick(w)), 0);
+  const others = Array.from(counts.keys()).filter((c) => c !== main);
+  return {
+    cur: currencyLabel(main),
+    available: sum((w) => w.availableBalance),
+    held: sum((w) => w.heldBalance),
+    ledger: sum((w) => w.ledgerBalance),
+    hint: others.length > 0 ? `Hors ${others.join(", ")}` : undefined,
+  };
 };
 
-export const WalletsList: React.FC<WalletsListProps> = ({
-  onOpenLookup,
-  onOpenTopUp,
-}) => {
+export const WalletsList: React.FC<WalletsListProps> = ({ onOpenLookup, onOpenTopUp }) => {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [ownerTypeFilter, setOwnerTypeFilter] = useState("");
   const [currencyFilter, setCurrencyFilter] = useState("");
+  const [debouncedCurrency, setDebouncedCurrency] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(0);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const t = setTimeout(() => {
       setDebouncedSearch(search);
       setPage(0);
     }, 350);
-    return () => clearTimeout(timer);
+    return () => clearTimeout(t);
   }, [search]);
 
-  const { data, isLoading, isFetching } = useQuery({
-    queryKey: [
-      "wallets",
-      page,
-      debouncedSearch,
-      statusFilter,
-      ownerTypeFilter,
-      currencyFilter,
-    ],
+  // La devise se tape lettre par lettre : sans délai, chaque frappe lançait une requête.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedCurrency(currencyFilter);
+      setPage(0);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [currencyFilter]);
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["wallets", page, debouncedSearch, statusFilter, ownerTypeFilter, debouncedCurrency],
     queryFn: () =>
       walletService.getWallets({
         searchText: debouncedSearch || undefined,
         status: statusFilter || undefined,
         ownerType: ownerTypeFilter || undefined,
-        currency: currencyFilter || undefined,
+        currency: debouncedCurrency || undefined,
         page,
         size: PAGE_SIZE,
         sort: "openedAt,desc",
       }),
   });
 
-  const wallets: Wallet[] = data?.content || [];
+  const wallets: Wallet[] = data?.content ?? [];
   const totalElements = data?.totalElements ?? 0;
   const totalPages = data?.totalPages ?? 0;
+  const totals = useMemo(() => pageTotals(wallets), [wallets]);
+  const hasActiveFilters = !!(search || statusFilter || ownerTypeFilter || currencyFilter);
 
-  const totals = useMemo(() => {
-    return wallets.reduce(
-      (acc, wallet) => {
-        acc.available += safeNumber(wallet.availableBalance);
-        acc.held += safeNumber(wallet.heldBalance);
-        acc.ledger += safeNumber(wallet.ledgerBalance);
-        return acc;
-      },
-      { available: 0, held: 0, ledger: 0 },
-    );
+  // Répartition des statuts sur la page affichée (le backend ne fournit pas de total global).
+  const statusSlices: Slice[] = useMemo(() => {
+    const counts = wallets.reduce<Record<string, number>>((acc, w) => ({ ...acc, [w.status]: (acc[w.status] ?? 0) + 1 }), {});
+    return Object.entries(counts).map(([status, value], i) => ({
+      key: status,
+      label: WALLET_STATUS_LABEL[status as WalletStatus] ?? status,
+      value,
+      color: CHART_COLORS[i % CHART_COLORS.length],
+    }));
   }, [wallets]);
-
-  const statusCount = useMemo(() => {
-    return wallets.reduce<Record<string, number>>((acc, wallet) => {
-      acc[wallet.status] = (acc[wallet.status] || 0) + 1;
-      return acc;
-    }, {});
-  }, [wallets]);
-
-  const maxStatusCount = Math.max(1, ...Object.values(statusCount));
 
   const resetFilters = () => {
     setSearch("");
@@ -117,400 +106,167 @@ export const WalletsList: React.FC<WalletsListProps> = ({
     setStatusFilter("");
     setOwnerTypeFilter("");
     setCurrencyFilter("");
+    setDebouncedCurrency("");
     setPage(0);
   };
 
-  if (isLoading && wallets.length === 0) {
-    return (
-      <div className="flex items-center justify-center rounded-2xl bg-white py-16 text-gray-500 shadow-sm ring-1 ring-gray-100">
-        <Loader2 size={20} className="mr-2 animate-spin text-primary-600" />
-        Chargement des portefeuilles...
-      </div>
-    );
-  }
+  const open = (n: string) => navigate(`/wallets/${n}`);
 
   return (
-    <div>
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">
-            Liste des portefeuilles
-          </h2>
-          <p className="mt-0.5 text-sm text-gray-500">
-            {totalElements} portefeuille{totalElements > 1 ? "s" : ""} trouvé
-            {totalElements > 1 ? "s" : ""}
-          </p>
-        </div>
-        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-          <button
-            onClick={onOpenLookup}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-primary-700 shadow-sm ring-1 ring-primary-100 transition hover:bg-primary-50 sm:w-auto"
-          >
-            <Search size={17} /> Rechercher / créer
-          </button>
-          <button
-            onClick={onOpenTopUp}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 sm:w-auto"
-          >
-            <Plus size={17} /> Top-up
-          </button>
-        </div>
+    <div className="space-y-5">
+      <ListHeader
+        title="Liste des portefeuilles"
+        subtitle={isLoading ? undefined : `${totalElements} portefeuille${totalElements > 1 ? "s" : ""}`}
+        action={
+          <div className="flex flex-wrap gap-2">
+            <ActionButton variant="ghost" icon={Search} onClick={onOpenLookup}>
+              Rechercher ou créer
+            </ActionButton>
+            <ActionButton icon={Plus} onClick={onOpenTopUp}>
+              Top-up
+            </ActionButton>
+          </div>
+        }
+      />
+
+      {isLoading ? (
+        <KpiRowSkeleton count={3} columns={3} />
+      ) : (
+        wallets.length > 0 && (
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+            <div className="xl:col-span-2">
+              <KpiRow
+                columns={3}
+                items={[
+                  { label: "Disponible, page affichée", value: formatMoney(totals.available, totals.cur), tone: "success", hint: totals.hint },
+                  { label: "Bloqué", value: formatMoney(totals.held, totals.cur), tone: "pink", hint: totals.hint },
+                  { label: "Solde ledger", value: formatMoney(totals.ledger, totals.cur), hint: totals.hint },
+                ]}
+              />
+            </div>
+            <ChartCard title="Statuts" subtitle="Page affichée">
+              <DonutBreakdown data={statusSlices} centerLabel="portefeuilles" />
+            </ChartCard>
+          </div>
+        )
+      )}
+
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <SearchField className="flex-1" value={search} onChange={setSearch} placeholder="Propriétaire, e-mail, nom, portefeuille" />
+        <FilterButton open={showFilters} active={!!(statusFilter || ownerTypeFilter || currencyFilter)} onClick={() => setShowFilters(!showFilters)} />
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard
-          label="Disponible sur la page"
-          value={`${formatAmountOnly(totals.available)} XAF`}
-          tone="green"
-          icon={TrendingUp}
+      {showFilters && (
+        <FilterPanel canReset={hasActiveFilters} onReset={resetFilters}>
+          <Field label="Propriétaire">
+            <select
+              value={ownerTypeFilter}
+              onChange={(e) => {
+                setOwnerTypeFilter(e.target.value);
+                setPage(0);
+              }}
+              className={FIELD}
+            >
+              <option value="">Tous les propriétaires</option>
+              {OWNER_TYPE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Statut">
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(0);
+              }}
+              className={FIELD}
+            >
+              <option value="">Tous les statuts</option>
+              {Object.entries(WALLET_STATUS_LABEL).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Devise">
+            <input value={currencyFilter} onChange={(e) => setCurrencyFilter(e.target.value.toUpperCase())} placeholder="XAF" className={`${FIELD} font-mono`} />
+          </Field>
+        </FilterPanel>
+      )}
+
+      {isLoading ? (
+        <ListSkeleton rows={8} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les portefeuilles." onRetry={() => refetch()} />
+      ) : wallets.length === 0 ? (
+        <EmptyState
+          icon={WalletIcon}
+          title="Aucun portefeuille trouvé"
+          hint={hasActiveFilters ? "Ajustez ou réinitialisez les filtres." : "Créez-en un depuis l'onglet Recherche et création."}
+          action={
+            <ActionButton variant="ghost" onClick={hasActiveFilters ? resetFilters : onOpenLookup}>
+              {hasActiveFilters ? "Réinitialiser les filtres" : "Rechercher ou créer"}
+            </ActionButton>
+          }
         />
-        <SummaryCard
-          label="Montant bloqué"
-          value={`${formatAmountOnly(totals.held)} XAF`}
-          tone="orange"
-          icon={Lock}
-        />
-        <SummaryCard
-          label="Ledger total"
-          value={`${formatAmountOnly(totals.ledger)} XAF`}
-          tone="gray"
-          icon={Layers}
-        />
-        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm font-medium text-gray-700">
-              Répartition statut
-            </p>
-            <Filter size={16} className="text-gray-400" />
-          </div>
-          <div className="space-y-2">
-            {Object.entries(statusConfig).map(([status, cfg]) => {
-              const count = statusCount[status] || 0;
+      ) : (
+        <>
+          <HeadRow cols={COLS}>
+            <span>Portefeuille</span>
+            <span>Propriétaire</span>
+            <span className="text-right">Disponible</span>
+            <span className="text-right">Bloqué</span>
+            <span className="text-right">Ledger</span>
+            <span>Statut</span>
+          </HeadRow>
+          <DataCard>
+            {wallets.map((w) => {
+              const cur = currencyLabel(w.currency);
               return (
-                <div key={status} className="flex items-center gap-2">
-                  <span className="w-20 text-xs text-gray-500">
-                    {cfg.label}
-                  </span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
-                    <div
-                      className="h-full rounded-full bg-primary-500"
-                      style={{ width: `${(count / maxStatusCount) * 100}%` }}
-                    />
+                <div
+                  key={w.walletNumber}
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => open(w.walletNumber)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") open(w.walletNumber);
+                  }}
+                  className={`grid cursor-pointer grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl p-4 transition max-lg:mb-2 max-lg:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--logo-pink)] ${COLS} ${ROW_HOVER}`}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-xs font-semibold text-[color:var(--logo-pink-dark)]">{w.walletNumber}</p>
+                    <p className="text-xs text-gray-400">{w.openedAt ? `Ouvert le ${formatDate(w.openedAt)}` : ""}</p>
                   </div>
-                  <span className="w-5 text-right text-xs font-semibold text-gray-700">
-                    {count}
-                  </span>
+                  <div className="max-lg:order-3 max-lg:col-span-2 min-w-0">
+                    <p className="truncate text-sm font-semibold text-gray-900">{w.ownerCode}</p>
+                    <p className="text-xs text-gray-400">{OWNER_TYPE_LABEL[w.ownerType] ?? w.ownerType}</p>
+                  </div>
+                  <p className="text-sm font-bold tabular-nums text-emerald-700 max-lg:order-4 lg:text-right">
+                    <span className="mr-2 text-xs font-semibold text-gray-400 lg:hidden">Disponible</span>
+                    {formatMoney(w.availableBalance, cur)}
+                  </p>
+                  <p className="text-sm font-semibold tabular-nums text-[color:var(--logo-pink-dark)] max-lg:order-5 lg:text-right">
+                    <span className="mr-2 text-xs font-semibold text-gray-400 lg:hidden">Bloqué</span>
+                    {formatMoney(w.heldBalance, cur)}
+                  </p>
+                  <p className="text-sm font-semibold tabular-nums text-gray-900 max-lg:order-6 lg:text-right">
+                    <span className="mr-2 text-xs font-semibold text-gray-400 lg:hidden">Ledger</span>
+                    {formatMoney(w.ledgerBalance, cur)}
+                  </p>
+                  <div className="max-lg:order-2 max-lg:justify-self-end">
+                    <StatusChip tone={WALLET_STATUS_TONE[w.status] ?? "neutral"}>{WALLET_STATUS_LABEL[w.status] ?? w.status}</StatusChip>
+                  </div>
                 </div>
               );
             })}
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
-          <div className="relative md:col-span-2">
-            <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher par propriétaire, email, nom, wallet..."
-              className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-9 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
-            />
-            {isFetching && (
-              <Loader2
-                size={14}
-                className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400"
-              />
-            )}
-          </div>
-          <select
-            value={ownerTypeFilter}
-            onChange={(e) => {
-              setOwnerTypeFilter(e.target.value);
-              setPage(0);
-            }}
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
-          >
-            <option value="">Tous les propriétaires</option>
-            <option value="CUSTOMER">Customer</option>
-            <option value="MEMBER">Membre</option>
-            <option value="BUSINESS_ENTITY">Entreprise</option>
-          </select>
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPage(0);
-            }}
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
-          >
-            <option value="">Tous les statuts</option>
-            {Object.entries(statusConfig).map(([key, value]) => (
-              <option key={key} value={key}>
-                {value.label}
-              </option>
-            ))}
-          </select>
-          <div className="flex gap-2">
-            <input
-              value={currencyFilter}
-              onChange={(e) => {
-                setCurrencyFilter(e.target.value.toUpperCase());
-                setPage(0);
-              }}
-              placeholder="XAF"
-              className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 font-mono text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
-            />
-            {(search || statusFilter || ownerTypeFilter || currencyFilter) && (
-              <button
-                onClick={resetFilters}
-                className="rounded-xl bg-gray-100 px-3 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-200"
-              >
-                Reset
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {wallets.length === 0 ? (
-        <div className="rounded-2xl bg-white py-14 text-center shadow-sm ring-1 ring-gray-100">
-          <WalletIcon size={48} className="mx-auto mb-4 text-gray-300" />
-          <p className="text-gray-500">Aucun portefeuille trouvé</p>
-          <button
-            onClick={onOpenLookup}
-            className="mt-3 text-sm font-medium text-primary-600 hover:underline"
-          >
-            Rechercher ou créer automatiquement
-          </button>
-        </div>
-      ) : (
-        <>
-          <div className="space-y-3 md:hidden">
-            {wallets.map((wallet) => (
-              <MobileWalletCard
-                key={wallet.walletNumber}
-                wallet={wallet}
-                status={statusConfig[wallet.status] || {
-                  label: wallet.status,
-                  color: "bg-gray-50 text-gray-500 ring-gray-100",
-                }}
-                onOpen={() => navigate(`/wallets/${wallet.walletNumber}`)}
-              />
-            ))}
-          </div>
-
-          <div className="hidden overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 md:block">
-            <div className="overflow-x-auto">
-            <table className="w-full border-separate border-spacing-y-2 px-3 pb-3">
-              <thead>
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    Wallet
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    Propriétaire
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    Disponible
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    Bloqué
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    Ledger
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    Statut
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {wallets.map((wallet) => {
-                  const status = statusConfig[wallet.status] || {
-                    label: wallet.status,
-                    color: "bg-gray-50 text-gray-500 ring-gray-100",
-                  };
-                  return (
-                    <tr
-                      key={wallet.walletNumber}
-                      className="group cursor-pointer rounded-xl bg-white shadow-sm ring-1 ring-gray-100 transition hover:bg-gray-50 hover:shadow-md"
-                      onClick={() =>
-                        navigate(`/wallets/${wallet.walletNumber}`)
-                      }
-                    >
-                      <td className="rounded-l-xl px-4 py-4">
-                        <p className="font-mono text-sm font-semibold text-gray-900">
-                          {wallet.walletNumber}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          Ouvert le{" "}
-                          {wallet.openedAt
-                            ? new Date(wallet.openedAt).toLocaleDateString(
-                                "fr-FR",
-                              )
-                            : "—"}
-                        </p>
-                      </td>
-                      <td className="px-4 py-4">
-                        <p className="text-sm font-medium text-gray-900">
-                          {wallet.ownerCode}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {wallet.ownerType}
-                        </p>
-                      </td>
-                      <td className="px-4 py-4 text-right font-semibold text-green-600">
-                        {formatAmountOnly(wallet.availableBalance)}{" "}
-                        {wallet.currency}
-                      </td>
-                      <td className="px-4 py-4 text-right font-semibold text-orange-600">
-                        {formatAmountOnly(wallet.heldBalance)} {wallet.currency}
-                      </td>
-                      <td className="px-4 py-4 text-right font-semibold text-gray-900">
-                        {formatAmountOnly(wallet.ledgerBalance)}{" "}
-                        {wallet.currency}
-                      </td>
-                      <td className="px-4 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${status.color}`}
-                        >
-                          {status.label}
-                        </span>
-                      </td>
-                      <td className="rounded-r-xl px-4 py-4 text-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/wallets/${wallet.walletNumber}`);
-                          }}
-                          className="rounded-lg p-2 text-gray-500 transition hover:bg-primary-50 hover:text-primary-600"
-                          title="Voir détail"
-                        >
-                          <Eye size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            </div>
-          </div>
+          </DataCard>
+          <Pagination page={page} totalPages={totalPages} total={totalElements} noun="portefeuille" onChange={setPage} />
         </>
       )}
-
-      {totalPages > 1 && (
-        <div className="mt-6 flex flex-col gap-3 px-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-gray-500">
-            Page {page + 1} / {totalPages}
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="rounded-xl bg-white p-2 text-gray-600 shadow-sm ring-1 ring-gray-100 transition hover:bg-gray-50 disabled:opacity-50"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
-              className="rounded-xl bg-white p-2 text-gray-600 shadow-sm ring-1 ring-gray-100 transition hover:bg-gray-50 disabled:opacity-50"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const MobileWalletCard: React.FC<{
-  wallet: Wallet;
-  status: { label: string; color: string };
-  onOpen: () => void;
-}> = ({ wallet, status, onOpen }) => (
-  <button
-    type="button"
-    onClick={onOpen}
-    className="w-full rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-gray-100 transition active:scale-[0.99]"
-  >
-    <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <p className="truncate font-mono text-sm font-black text-gray-950">
-          {wallet.walletNumber}
-        </p>
-        <p className="mt-1 truncate text-xs font-semibold text-gray-400">
-          {wallet.ownerType} · {wallet.ownerCode}
-        </p>
-      </div>
-      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${status.color}`}>
-        {status.label}
-      </span>
-    </div>
-
-    <div className="mt-4 grid grid-cols-1 gap-2 min-[430px]:grid-cols-3">
-      <div className="rounded-xl bg-green-50 p-3">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-green-700/70">Disponible</p>
-        <p className="mt-1 break-words text-sm font-black text-green-700">
-          {formatAmountOnly(wallet.availableBalance)} {wallet.currency}
-        </p>
-      </div>
-      <div className="rounded-xl bg-orange-50 p-3">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-orange-700/70">Bloqué</p>
-        <p className="mt-1 break-words text-sm font-black text-orange-700">
-          {formatAmountOnly(wallet.heldBalance)} {wallet.currency}
-        </p>
-      </div>
-      <div className="rounded-xl bg-gray-50 p-3">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Ledger</p>
-        <p className="mt-1 break-words text-sm font-black text-gray-950">
-          {formatAmountOnly(wallet.ledgerBalance)} {wallet.currency}
-        </p>
-      </div>
-    </div>
-
-    <div className="mt-4 flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
-      <span className="text-xs text-gray-400">
-        Ouvert le {wallet.openedAt ? new Date(wallet.openedAt).toLocaleDateString("fr-FR") : "—"}
-      </span>
-      <span className="inline-flex items-center gap-1 text-xs font-black text-primary-600">
-        Voir <Eye size={14} />
-      </span>
-    </div>
-  </button>
-);
-
-const SummaryCard: React.FC<{
-  label: string;
-  value: string;
-  tone: "green" | "orange" | "gray";
-  icon: React.ElementType;
-}> = ({ label, value, tone, icon: Icon }) => {
-  const toneClass =
-    tone === "green"
-      ? "bg-green-50 text-green-700"
-      : tone === "orange"
-        ? "bg-orange-50 text-orange-700"
-        : "bg-gray-50 text-gray-700";
-  return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm text-gray-500">{label}</p>
-        <div className={`rounded-xl p-2 ${toneClass}`}>
-          <Icon size={17} />
-        </div>
-      </div>
-      <p className="text-xl font-bold text-gray-900">{value}</p>
     </div>
   );
 };

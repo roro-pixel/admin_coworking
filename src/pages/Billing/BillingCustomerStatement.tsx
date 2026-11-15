@@ -1,458 +1,228 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Eye,
-  FileText,
-  Download,
-  ChevronLeft,
-  ChevronRight,
-  User,
-  X,
-} from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { ChevronLeft, ChevronRight, Download, FileText, User, X } from "lucide-react";
 import { billingService } from "../../services/billing.service";
 import type { BillingDocument } from "../../services/billing.service";
 import { CustomerAutocomplete } from "../../components/customers/CustomerAutocomplete";
 import { MemberAutocomplete } from "../../components/members/MemberAutocomplete";
 import type { CustomerSummaryResponse } from "../../services/customer.service";
 import type { MemberSummaryResponse } from "../../services/member.service";
+import { DataCard, EmptyState, HeadRow, IconButton, ListHeader, StatusChip, Tag } from "../../components/subscription/kit";
+import { FOCUS, PINK_SOFT, ROW_HOVER, formatDate, formatMoney } from "../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../components/ui/Skeleton";
+import { Dots } from "../../components/ui/Toaster";
+import { toast } from "../../components/ui/toastStore";
+import { saveBlob } from "../../components/payment/paymentUtils";
+import { ChartCard, KpiRow, KpiRowSkeleton, RatioBar } from "../../components/operations/OpsCharts";
+import { PillChoice } from "../../components/operations/opsKit";
+import { NoticeTimeline } from "../../components/billing/dunning/NoticeTimeline";
+import { DOC_TYPE_LABEL, STATUS_LABEL, STATUS_TONE } from "../../components/billing/billingLabels";
 
-const documentTypeLabels: Record<string, string> = {
-  QUOTE: "Devis",
-  PROFORMA_INVOICE: "Proforma",
-  INVOICE: "Facture",
-  CREDIT_NOTE: "Avoir",
-  DEBIT_NOTE: "Note de débit",
-};
-
-const statusConfig: Record<string, { label: string; color: string }> = {
-  DRAFT: { label: "Brouillon", color: "bg-gray-100 text-gray-700" },
-  ISSUED: { label: "Émis(e)", color: "bg-blue-100 text-blue-700" },
-  SENT: { label: "Envoyé(e)", color: "bg-purple-100 text-purple-700" },
-  ACCEPTED: { label: "Accepté(e)", color: "bg-green-100 text-green-700" },
-  REJECTED: { label: "Rejeté(e)", color: "bg-red-100 text-red-700" },
-  EXPIRED: { label: "Expiré(e)", color: "bg-gray-100 text-gray-500" },
-  CONVERTED: { label: "Converti(e)", color: "bg-blue-100 text-blue-700" },
-  PARTIALLY_PAID: {
-    label: "Partiellement payé(e)",
-    color: "bg-yellow-100 text-yellow-700",
-  },
-  PAID: { label: "Payé(e)", color: "bg-green-100 text-green-700" },
-  OVERDUE: { label: "En retard", color: "bg-red-100 text-red-700" },
-  CANCELLED: { label: "Annulé(e)", color: "bg-gray-100 text-gray-500" },
-  VOIDED: { label: "Annulé(e)", color: "bg-gray-100 text-gray-500" },
-  REFUNDED: { label: "Remboursé(e)", color: "bg-orange-100 text-orange-700" },
-  WRITTEN_OFF: {
-    label: "Passé(e) en perte",
-    color: "bg-gray-100 text-gray-500",
-  },
-  VIEWED: { label: "Vu", color: "bg-teal-100 text-teal-700" },
-  NEGOTIATION: { label: "Négociation", color: "bg-amber-100 text-amber-700" },
-  DEPOSIT_REQUESTED: {
-    label: "Acompte demandé",
-    color: "bg-violet-100 text-violet-700",
-  },
-  DEPOSIT_PAID: { label: "Acompte reçu", color: "bg-green-100 text-green-600" },
-};
+type CustomerKind = "CUSTOMER" | "MEMBER" | "BUSINESS_ENTITY";
+const KIND_OPTIONS: { value: CustomerKind; label: string }[] = [
+  { value: "MEMBER", label: "Membre" },
+  { value: "CUSTOMER", label: "Client" },
+  { value: "BUSINESS_ENTITY", label: "Entreprise" },
+];
+const PAGE_SIZE = 20;
+const COLS = "lg:grid-cols-[minmax(0,1.2fr)_7rem_6.5rem_9rem_9rem_6.5rem_9.5rem_3.5rem]";
 
 export const BillingCustomerStatement: React.FC = () => {
   const navigate = useNavigate();
-
-  // Type de souscripteur
-  const [customerType, setCustomerType] = useState<
-    "CUSTOMER" | "MEMBER" | "BUSINESS_ENTITY"
-  >("MEMBER");
-
-  // Sélection via autocomplete
-  const [selectedCustomer, setSelectedCustomer] =
-    useState<CustomerSummaryResponse | null>(null);
-  const [selectedMember, setSelectedMember] =
-    useState<MemberSummaryResponse | null>(null);
-
-  // Pagination
+  const [customerType, setCustomerType] = useState<CustomerKind>("MEMBER");
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerSummaryResponse | null>(null);
+  const [selectedMember, setSelectedMember] = useState<MemberSummaryResponse | null>(null);
   const [page, setPage] = useState(0);
+  const [pdfFor, setPdfFor] = useState<string | null>(null);
 
-  // Code résolu depuis l'objet sélectionné
-  const resolvedCode: string = (() => {
-    if (customerType === "MEMBER") return selectedMember?.memberId ?? "";
-    if (customerType === "CUSTOMER") return selectedCustomer?.customerId ?? "";
-    return selectedCustomer?.customerId ?? "";
-  })();
+  const resolvedCode: string = customerType === "MEMBER" ? (selectedMember?.memberId ?? "") : (selectedCustomer?.customerId ?? "");
 
-  // Changement de type → reset sélection + page
-  const handleTypeChange = (type: typeof customerType) => {
+  const handleTypeChange = (type: CustomerKind) => {
     setCustomerType(type);
     setSelectedCustomer(null);
     setSelectedMember(null);
     setPage(0);
   };
 
-  // Appel API
   const { data: statementData, isLoading } = useQuery({
     queryKey: ["customer-statement", customerType, resolvedCode, page],
-    queryFn: () =>
-      billingService.getCustomerStatement(customerType, resolvedCode, {
-        page,
-        size: 20,
-        sort: "createdAt,desc",
-      }),
+    queryFn: () => billingService.getCustomerStatement(customerType, resolvedCode, { page, size: PAGE_SIZE, sort: "createdAt,desc" }),
     enabled: resolvedCode.length > 0,
   });
 
-  // CORRECTION : extraire les données directement de la réponse
   const documents: BillingDocument[] = statementData?.documents ?? [];
   const totalInvoiced = statementData?.totalInvoiced ?? 0;
   const totalPaid = statementData?.totalPaid ?? 0;
   const totalBalanceDue = statementData?.totalBalanceDue ?? 0;
-  const totalElements = documents.length;
-  const totalPages = Math.ceil(totalElements / 20);
+  // Le relevé ne renvoie ni totalElements ni totalPages : une page pleine laisse supposer une suite.
+  const hasNext = documents.length >= PAGE_SIZE;
 
-  const handleViewDetail = (documentNumber: string) => {
-    navigate(`/billing/documents/${documentNumber}`);
-  };
-
-  const handleDownloadPdf = async (
-    doc: BillingDocument,
-    e: React.MouseEvent,
-  ) => {
-    e.stopPropagation();
+  const handleDownloadPdf = async (doc: BillingDocument) => {
+    setPdfFor(doc.documentNumber);
     try {
       const blob = await billingService.getPdf(doc.documentNumber);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${doc.documentType}_${doc.documentNumber}.pdf`;
-      a.click();
-      window.URL.revokeObjectURL(url);
+      saveBlob(blob, `${doc.documentType}_${doc.documentNumber}.pdf`);
     } catch {
-      alert("Erreur lors du téléchargement du PDF.");
+      toast.error("Erreur lors du téléchargement du PDF.");
+    } finally {
+      setPdfFor(null);
     }
   };
 
-  // Nom affiché dans le résumé
-  const selectedLabel = (() => {
-    if (customerType === "MEMBER" && selectedMember)
-      return (
-        `${selectedMember.fullName ?? ""}`.trim() || selectedMember.memberId
-      );
-    if (selectedCustomer)
-      return selectedCustomer.displayName ?? selectedCustomer.customerId;
-    return resolvedCode;
-  })();
+  const selectedLabel =
+    customerType === "MEMBER" && selectedMember
+      ? `${selectedMember.fullName ?? ""}`.trim() || selectedMember.memberId
+      : selectedCustomer
+        ? (selectedCustomer.displayName ?? selectedCustomer.customerId)
+        : resolvedCode;
 
   const hasSelection = resolvedCode.length > 0;
-
-  // Formatage des dates
-  const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return "-";
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "-";
-    return date.toLocaleDateString("fr-FR");
+  const clearSelection = () => {
+    setSelectedCustomer(null);
+    setSelectedMember(null);
+    setPage(0);
   };
+  const btn = `flex h-9 w-9 items-center justify-center rounded-full bg-white text-gray-700 shadow-sm transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 ${FOCUS}`;
 
   return (
-    <div>
-      <h2 className="text-xl font-semibold text-gray-900 mb-1">
-        Relevé client
-      </h2>
-      <p className="text-gray-500 text-sm mb-6">
-        Historique des factures, devis et avoirs d&apos;un client
-      </p>
+    <div className="space-y-5">
+      <ListHeader title="Relevé client" subtitle="Historique des factures, devis et avoirs d'un client" />
 
-      {/* Sélecteur de type + autocomplete */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-6">
-        <p className="text-sm font-medium text-gray-700 mb-3">
-          Rechercher un client
-        </p>
+      <div className="space-y-4 rounded-[1.75rem] border border-gray-100 bg-white p-5 shadow-sm">
+        <PillChoice label="Type de client" options={KIND_OPTIONS} value={customerType} onChange={handleTypeChange} />
+        {customerType === "MEMBER" ? (
+          <MemberAutocomplete
+            selectedMember={selectedMember}
+            onSelect={(m) => {
+              setSelectedMember(m);
+              setPage(0);
+            }}
+            placeholder="Rechercher un membre par nom ou e-mail"
+          />
+        ) : (
+          <CustomerAutocomplete
+            selectedCustomer={selectedCustomer}
+            onSelect={(c) => {
+              setSelectedCustomer(c);
+              setPage(0);
+            }}
+            typeFilter={customerType === "BUSINESS_ENTITY" ? "COMPANY" : undefined}
+            placeholder={customerType === "BUSINESS_ENTITY" ? "Rechercher une entreprise" : "Rechercher un client par nom ou e-mail"}
+          />
+        )}
 
-        {/* Type */}
-        <div className="flex gap-3 mb-4">
-          {(["MEMBER", "CUSTOMER", "BUSINESS_ENTITY"] as const).map((type) => (
-            <label
-              key={type}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 cursor-pointer transition-all ${
-                customerType === type
-                  ? "border-primary-500 bg-primary-50 text-primary-700"
-                  : "border-gray-200 text-gray-600 hover:border-gray-300"
-              }`}
-            >
-              <input
-                type="radio"
-                checked={customerType === type}
-                onChange={() => handleTypeChange(type)}
-                className="sr-only"
-              />
-              <div
-                className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                  customerType === type
-                    ? "border-primary-600"
-                    : "border-gray-300"
-                }`}
-              >
-                {customerType === type && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
-                )}
-              </div>
-              <span className="text-sm font-medium">
-                {type === "MEMBER"
-                  ? "Membre"
-                  : type === "CUSTOMER"
-                    ? "Customer"
-                    : "Entreprise"}
-              </span>
-            </label>
-          ))}
-        </div>
-
-        {/* Autocomplete selon le type */}
-        <div className="relative">
-          {customerType === "MEMBER" ? (
-            <MemberAutocomplete
-              selectedMember={selectedMember}
-              onSelect={(m) => {
-                setSelectedMember(m);
-                setPage(0);
-              }}
-              placeholder="Rechercher un membre par nom, email..."
-            />
-          ) : (
-            <CustomerAutocomplete
-              selectedCustomer={selectedCustomer}
-              onSelect={(c) => {
-                setSelectedCustomer(c);
-                setPage(0);
-              }}
-              typeFilter={
-                customerType === "BUSINESS_ENTITY" ? "COMPANY" : undefined
-              }
-              placeholder={
-                customerType === "BUSINESS_ENTITY"
-                  ? "Rechercher une entreprise..."
-                  : "Rechercher un customer par nom, email..."
-              }
-            />
-          )}
-        </div>
-
-        {/* Résumé du client sélectionné */}
         {hasSelection && (
-          <div className="mt-3 flex items-center justify-between p-3 bg-primary-50 border border-primary-100 rounded-xl">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <User size={14} className="text-primary-600" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-primary-800">
-                  {selectedLabel}
-                </p>
-                <p className="text-xs text-primary-500 font-mono">
-                  {customerType} · {resolvedCode}
-                </p>
+          <div className={`flex items-center justify-between gap-3 rounded-2xl p-3 ${PINK_SOFT}`}>
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[color:var(--logo-pink-dark)]">
+                <User size={16} />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-gray-950">{selectedLabel}</p>
+                <p className="truncate font-mono text-xs text-gray-500">{resolvedCode}</p>
               </div>
             </div>
-            <button
-              onClick={() => {
-                setSelectedCustomer(null);
-                setSelectedMember(null);
-                setPage(0);
-              }}
-              className="p-1 text-primary-400 hover:text-primary-700 hover:bg-primary-100 rounded-lg"
-              title="Effacer la sélection"
-            >
-              <X size={14} />
-            </button>
+            <IconButton icon={X} label="Effacer la sélection" onClick={clearSelection} />
           </div>
         )}
       </div>
 
-      {/* Résultats */}
-      {hasSelection && isLoading && (
-        <div className="text-center py-8 text-gray-400">
-          Chargement du relevé...
+      {!hasSelection ? (
+        <EmptyState icon={User} title="Aucun client sélectionné" hint="Recherchez un client par nom ou e-mail pour afficher son relevé." />
+      ) : isLoading ? (
+        <div className="space-y-5">
+          <KpiRowSkeleton count={3} columns={3} />
+          <ListSkeleton rows={6} />
         </div>
-      )}
-
-      {hasSelection && !isLoading && (
+      ) : (
         <>
-          {/* Résumé financier */}
           {totalInvoiced > 0 && (
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm text-center">
-                <p className="text-xs text-gray-500">Total facturé</p>
-                <p className="text-xl font-bold text-gray-900">
-                  {totalInvoiced.toLocaleString("fr-FR")} FCFA
-                </p>
+            <ChartCard title="Situation du compte" subtitle="Part réglée du total facturé">
+              <KpiRow
+                columns={3}
+                items={[
+                  { label: "Total facturé", value: formatMoney(totalInvoiced) },
+                  { label: "Total payé", value: formatMoney(totalPaid), tone: "success" },
+                  { label: "Solde restant", value: formatMoney(totalBalanceDue), tone: totalBalanceDue > 0 ? "danger" : "default" },
+                ]}
+              />
+              <div className="mt-5">
+                <RatioBar value={totalPaid} total={totalInvoiced} />
+                <p className="mt-2 text-xs text-gray-500">{Math.round((totalPaid / totalInvoiced) * 100)} % encaissé</p>
               </div>
-              <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm text-center">
-                <p className="text-xs text-gray-500">Total payé</p>
-                <p className="text-xl font-bold text-green-600">
-                  {totalPaid.toLocaleString("fr-FR")} FCFA
-                </p>
-              </div>
-              <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm text-center">
-                <p className="text-xs text-gray-500">Solde restant</p>
-                <p
-                  className={`text-xl font-bold ${totalBalanceDue > 0 ? "text-red-600" : "text-gray-500"}`}
-                >
-                  {totalBalanceDue.toLocaleString("fr-FR")} FCFA
-                </p>
-              </div>
-            </div>
+            </ChartCard>
           )}
 
-          {totalElements > 0 && (
-            <p className="text-sm text-gray-500 mb-3">
-              {totalElements} document{totalElements > 1 ? "s" : ""} -{" "}
-              {selectedLabel}
-            </p>
-          )}
-
-          <div className="bg-white rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50/80">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold">
-                      N° Document
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold">
-                      Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold">
-                      Date
-                    </th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold">
-                      Total
-                    </th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold">
-                      Solde dû
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold">
-                      Statut
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold">
-                      Échéance
-                    </th>
-                    <th className="px-6 py-3 text-center text-sm font-semibold">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {documents.map((doc) => (
-                    <tr
-                      key={doc.documentNumber}
-                      className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => handleViewDetail(doc.documentNumber)}
-                    >
-                      <td className="px-6 py-4 text-sm font-mono">
-                        {doc.documentNumber}
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        {documentTypeLabels[doc.documentType] ??
-                          doc.documentType}
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        {doc.issueDate ? formatDate(doc.issueDate) : "-"}
-                      </td>
-                      <td className="px-6 py-4 text-right font-semibold text-sm">
-                        {doc.totalAmount.toLocaleString("fr-FR")} FCFA
-                      </td>
-                      <td className="px-6 py-4 text-right text-sm">
-                        {doc.balanceDue > 0 ? (
-                          <span className="text-red-600 font-medium">
-                            {doc.balanceDue.toLocaleString("fr-FR")} FCFA
-                          </span>
-                        ) : (
-                          <span className="text-green-600">Payé</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs ${statusConfig[doc.status]?.color ?? "bg-gray-100 text-gray-600"}`}
-                        >
-                          {statusConfig[doc.status]?.label ?? doc.status}
+          {documents.length === 0 ? (
+            <EmptyState icon={FileText} title="Aucun document pour ce client" />
+          ) : (
+            <>
+              <HeadRow cols={COLS}>
+                <span>N° document</span>
+                <span>Type</span>
+                <span>Date</span>
+                <span className="text-right">Total</span>
+                <span className="text-right">Solde dû</span>
+                <span>Échéance</span>
+                <span>Statut</span>
+                <span />
+              </HeadRow>
+              <DataCard>
+                {documents.map((doc) => (
+                  <div
+                    key={doc.documentNumber}
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => navigate(`/billing/documents/${doc.documentNumber}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") navigate(`/billing/documents/${doc.documentNumber}`);
+                    }}
+                    className={`grid cursor-pointer grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 rounded-2xl p-4 transition max-lg:mb-2 max-lg:bg-gray-50 ${FOCUS} ${COLS} ${ROW_HOVER}`}
+                  >
+                    <p className="truncate font-mono text-xs font-semibold text-[color:var(--logo-pink-dark)]">{doc.documentNumber}</p>
+                    <div className="max-lg:text-right">
+                      <Tag>{DOC_TYPE_LABEL[doc.documentType] ?? doc.documentType}</Tag>
+                    </div>
+                    <p className="text-sm text-gray-500">{formatDate(doc.issueDate)}</p>
+                    <p className="text-sm font-bold tabular-nums text-gray-950 max-lg:text-right lg:text-right">{formatMoney(doc.totalAmount)}</p>
+                    <p className={`text-sm font-semibold tabular-nums max-lg:text-right lg:text-right ${doc.balanceDue > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                      {doc.balanceDue > 0 ? formatMoney(doc.balanceDue) : "Soldé"}
+                    </p>
+                    <p className="text-sm text-gray-500">{formatDate(doc.dueDate)}</p>
+                    <div className="max-lg:text-right">
+                      <StatusChip tone={STATUS_TONE[doc.status] ?? "neutral"}>{STATUS_LABEL[doc.status] ?? doc.status}</StatusChip>
+                    </div>
+                    <div className="col-span-2 flex justify-end lg:col-span-1" onClick={(e) => e.stopPropagation()}>
+                      {pdfFor === doc.documentNumber ? (
+                        <span className="flex h-9 w-9 items-center justify-center">
+                          <Dots />
                         </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {doc.dueDate ? formatDate(doc.dueDate) : "-"}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div
-                          className="flex justify-center gap-2"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            onClick={() => handleViewDetail(doc.documentNumber)}
-                            className="p-1 text-gray-600 hover:text-primary-600"
-                            title="Voir détail"
-                          >
-                            <Eye size={15} />
-                          </button>
-                          <button
-                            onClick={(e) => handleDownloadPdf(doc, e)}
-                            className="p-1 text-gray-600 hover:text-primary-600"
-                            title="Télécharger PDF"
-                          >
-                            <Download size={15} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {documents.length === 0 && (
-              <div className="text-center py-12">
-                <FileText size={48} className="mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-500">Aucun document pour ce client</p>
-              </div>
-            )}
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4 px-2">
-              <p className="text-sm text-gray-500">
-                {totalElements} document{totalElements > 1 ? "s" : ""} - Page{" "}
-                {page + 1} / {totalPages}
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="p-1.5 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button
-                  onClick={() =>
-                    setPage((p) => Math.min(totalPages - 1, p + 1))
-                  }
-                  disabled={page >= totalPages - 1}
-                  className="p-1.5 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            </div>
+                      ) : (
+                        <IconButton icon={Download} label="Télécharger le PDF" onClick={() => handleDownloadPdf(doc)} />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </DataCard>
+              {(page > 0 || hasNext) && (
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-sm text-gray-500">Page {page + 1}</p>
+                  <div className="flex items-center gap-2">
+                    <button type="button" aria-label="Page précédente" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className={btn}>
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button type="button" aria-label="Page suivante" onClick={() => setPage((p) => p + 1)} disabled={!hasNext} className={btn}>
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
-        </>
-      )}
 
-      {/* État initial - rien sélectionné */}
-      {!hasSelection && !isLoading && (
-        <div className="text-center py-16 bg-white rounded-xl border border-gray-100">
-          <User size={48} className="mx-auto text-gray-200 mb-4" />
-          <p className="text-gray-500 font-medium">
-            Sélectionnez un client pour afficher son relevé
-          </p>
-          <p className="text-xs text-gray-400 mt-1">
-            Recherchez par nom ou email dans le champ ci-dessus
-          </p>
-        </div>
+          <NoticeTimeline customer={{ type: customerType, code: resolvedCode }} />
+        </>
       )}
     </div>
   );

@@ -1,41 +1,43 @@
 import React, { useState, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Plus,
-  Search,
-  Eye,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
-  Ticket,
-} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, ArrowUpRight, Ticket } from "lucide-react";
 import { subscriptionService } from "../../../services/subscription.service";
 import type { Pass } from "../../../services/subscription.service";
-import { CreatePassModal } from "./CreatePassModal";
-import { PassDetailModal } from "./PassDetailModal";
-
-const passTypeLabels: Record<string, string> = {
-  DAY_PASS: "Pass journée",
-  TIME_PACK: "Pack heures",
-  VISITOR_PASS: "Pass visiteur",
-  MEETING_ROOM_PACK: "Pack salle de réunion",
-  PROMOTIONAL_PASS: "Pass promotionnel",
-  SUBSCRIPTION_PASS: "Pass souscription",
-  COMPANY_SHARED_PASS: "Pass entreprise partagé",
-  CUSTOM: "Personnalisé",
-};
-
-const statusConfig: Record<string, { label: string; color: string }> = {
-  ACTIVE: { label: "Actif", color: "bg-green-100 text-green-700" },
-  CANCELLED: { label: "Annulé", color: "bg-red-100 text-red-700" },
-  EXPIRED: { label: "Expiré", color: "bg-gray-100 text-gray-500" },
-  PENDING: { label: "En attente", color: "bg-yellow-100 text-yellow-700" },
-};
+import { TableSkeleton } from "../../../components/ui/Skeleton";
+import {
+  ActionButton,
+  DataCard,
+  EmptyState,
+  Field,
+  FilterButton,
+  FilterPanel,
+  HeadRow,
+  IconButton,
+  ListHeader,
+  Pagination,
+  SearchField,
+  StatusChip,
+  Tag,
+} from "../../../components/subscription/kit";
+import { FIELD_SOFT, ROW_HOVER, formatDate } from "../../../components/subscription/kitUtils";
+import {
+  PASS_STATUS,
+  PASS_TYPE_LABELS,
+  SUBSCRIBER_TYPE_LABELS,
+  statusOf,
+} from "../../../components/subscription/labels";
 
 const PAGE_SIZE = 20;
 
+const COLS =
+  "lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.5fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_9rem_3rem]";
+
+// Statuts proposés par le filtre (comme avant)
+const FILTER_STATUSES = ["ACTIVE", "CANCELLED", "EXPIRED"];
+
 export const PassesList: React.FC = () => {
-  const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -45,10 +47,6 @@ export const PassesList: React.FC = () => {
   const [expiringBefore, setExpiringBefore] = useState("");
   const [page, setPage] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
-
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [selectedPass, setSelectedPass] = useState<Pass | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -64,14 +62,7 @@ export const PassesList: React.FC = () => {
   };
 
   const { data: passesData, isLoading } = useQuery({
-    queryKey: [
-      "passes",
-      statusFilter,
-      passTypeFilter,
-      ownerTypeFilter,
-      expiringBefore,
-      page,
-    ],
+    queryKey: ["passes", statusFilter, passTypeFilter, ownerTypeFilter, expiringBefore, page],
     queryFn: () =>
       subscriptionService.getPasses({
         status: statusFilter || undefined,
@@ -87,22 +78,18 @@ export const PassesList: React.FC = () => {
   const totalPages = passesData?.totalPages ?? 1;
   const totalElements = passesData?.totalElements ?? 0;
 
-  // Filtre local sur ownerCode / passNumber
+  // Filtre local sur n°, propriétaire et nom
+  const needle = debouncedSearch.toLowerCase();
   const filtered = debouncedSearch
     ? passes.filter(
         (p) =>
-          p.passNumber.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-          p.ownerCode.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-          p.name.toLowerCase().includes(debouncedSearch.toLowerCase()),
+          p.passNumber.toLowerCase().includes(needle) ||
+          p.ownerCode.toLowerCase().includes(needle) ||
+          p.name.toLowerCase().includes(needle),
       )
     : passes;
 
-  const hasActiveFilters =
-    statusFilter ||
-    passTypeFilter ||
-    ownerTypeFilter ||
-    expiringBefore ||
-    search;
+  const hasActiveFilters = !!(statusFilter || passTypeFilter || ownerTypeFilter || expiringBefore || search);
 
   const handleReset = () => {
     setSearch("");
@@ -114,273 +101,176 @@ export const PassesList: React.FC = () => {
     setPage(0);
   };
 
-  if (isLoading) return <div className="text-center py-8">Chargement...</div>;
+  const openPass = (pass: Pass) => navigate(`/subscriptions/passes/${pass.passNumber}`);
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Passes</h2>
-        <button
-          onClick={() => setIsCreateOpen(true)}
-          className="bg-primary-600 text-white px-4 py-2 rounded-xl shadow-sm hover:bg-primary-700 hover:shadow transition-all flex items-center gap-2"
-        >
-          <Plus size={18} /> Nouveau pass
-        </button>
-      </div>
+    <div className="space-y-5">
+      <ListHeader
+        title="Pass"
+        action={
+          <ActionButton
+            icon={Plus}
+            className="w-full sm:w-auto"
+            onClick={() => navigate("/subscriptions/passes/create")}
+          >
+            Nouveau pass
+          </ActionButton>
+        }
+      />
 
-      {/* Recherche + filtres */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Rechercher par n°, propriétaire ou nom..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
-          />
-        </div>
-        <button
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <SearchField
+          className="flex-1"
+          value={search}
+          onChange={setSearch}
+          placeholder="Rechercher par n°, propriétaire ou nom..."
+        />
+        <FilterButton
+          open={showFilters}
+          active={hasActiveFilters}
           onClick={() => setShowFilters(!showFilters)}
-          className={`px-4 py-2 border rounded-xl flex items-center gap-2 ${
-            showFilters || hasActiveFilters
-              ? "bg-primary-50 border-primary-300 text-primary-700"
-              : "bg-white border-gray-200 text-gray-600"
-          }`}
-        >
-          <Filter size={16} /> Filtres
-          {hasActiveFilters && (
-            <span className="w-2 h-2 bg-primary-600 rounded-full" />
-          )}
-        </button>
+        />
       </div>
 
       {showFilters && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-4 mb-6 shadow-sm shadow-gray-100/70 grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Statut
-            </label>
+        <FilterPanel canReset={hasActiveFilters} onReset={handleReset}>
+          <Field label="Statut">
             <select
               value={statusFilter}
-              onChange={(e) =>
-                handleFilterChange(setStatusFilter, e.target.value)
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
+              onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)}
+              className={FIELD_SOFT}
             >
               <option value="">Tous</option>
-              <option value="ACTIVE">Actif</option>
-              <option value="CANCELLED">Annulé</option>
-              <option value="EXPIRED">Expiré</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Type
-            </label>
-            <select
-              value={passTypeFilter}
-              onChange={(e) =>
-                handleFilterChange(setPassTypeFilter, e.target.value)
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
-            >
-              <option value="">Tous les types</option>
-              {Object.entries(passTypeLabels).map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
+              {FILTER_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {PASS_STATUS[s].label}
                 </option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Type propriétaire
-            </label>
+          </Field>
+          <Field label="Type">
+            <select
+              value={passTypeFilter}
+              onChange={(e) => handleFilterChange(setPassTypeFilter, e.target.value)}
+              className={FIELD_SOFT}
+            >
+              <option value="">Tous les types</option>
+              {Object.entries(PASS_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Type propriétaire">
             <select
               value={ownerTypeFilter}
-              onChange={(e) =>
-                handleFilterChange(setOwnerTypeFilter, e.target.value)
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
+              onChange={(e) => handleFilterChange(setOwnerTypeFilter, e.target.value)}
+              className={FIELD_SOFT}
             >
               <option value="">Tous</option>
               <option value="MEMBER">Membre</option>
               <option value="CUSTOMER">Customer</option>
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Expire avant
-            </label>
+          </Field>
+          <Field label="Expire avant">
             <input
               type="date"
               value={expiringBefore}
-              onChange={(e) =>
-                handleFilterChange(setExpiringBefore, e.target.value)
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
+              onChange={(e) => handleFilterChange(setExpiringBefore, e.target.value)}
+              className={FIELD_SOFT}
             />
-          </div>
-          {hasActiveFilters && (
-            <div className="md:col-span-4 flex justify-end">
-              <button
-                onClick={handleReset}
-                className="text-sm text-primary-600 hover:text-primary-700"
-              >
-                Réinitialiser
-              </button>
-            </div>
-          )}
-        </div>
+          </Field>
+        </FilterPanel>
       )}
 
-      {/* Tableau */}
-      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm shadow-gray-100/70 overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50/60 text-gray-500">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                N° Pass
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Nom
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Type
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Propriétaire
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Validité
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Statut
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {filtered.map((pass) => (
-              <tr
-                key={pass.passNumber}
-                className="hover:bg-primary-50/40 cursor-pointer transition-colors"
-                onClick={() => {
-                  setSelectedPass(pass);
-                  setIsDetailOpen(true);
-                }}
-              >
-                <td className="px-6 py-4 text-sm font-mono">
-                  {pass.passNumber}
-                </td>
-                <td className="px-6 py-4 text-sm font-medium">{pass.name}</td>
-                <td className="px-6 py-4 text-sm">
-                  {passTypeLabels[pass.passType] ?? pass.passType}
-                </td>
-                <td className="px-6 py-4 text-sm">
-                  <p className="font-mono">{pass.ownerCode}</p>
-                  <p className="text-xs text-gray-400">{pass.ownerType}</p>
-                </td>
-                <td className="px-6 py-4 text-sm">
-                  <p>{new Date(pass.validFrom).toLocaleDateString("fr-FR")}</p>
-                  {pass.validUntil && (
-                    <p className="text-xs text-gray-500">
-                      → {new Date(pass.validUntil).toLocaleDateString("fr-FR")}
-                    </p>
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[pass.status]?.color ?? "bg-gray-100 text-gray-600"}`}
-                  >
-                    {statusConfig[pass.status]?.label ?? pass.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedPass(pass);
-                      setIsDetailOpen(true);
-                    }}
-                    className="p-1 text-gray-600 hover:text-primary-600"
-                    title="Voir détail"
-                  >
-                    <Eye size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {filtered.length === 0 && (
-        <div className="text-center py-12 rounded-2xl border border-dashed border-gray-200 bg-white">
-          <Ticket size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500">Aucun pass trouvé</p>
-          {hasActiveFilters && (
-            <button
-              onClick={handleReset}
-              className="mt-2 text-primary-600 hover:underline text-sm"
-            >
-              Réinitialiser les filtres
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 px-2">
-          <p className="text-sm text-gray-500">{totalElements} pass au total</p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-primary-50/40 transition-colors"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="text-sm text-gray-600">
-              Page {page + 1} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-primary-50/40 transition-colors"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      <CreatePassModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["passes"] });
-          setIsCreateOpen(false);
-        }}
-      />
-
-      {selectedPass && (
-        <PassDetailModal
-          isOpen={isDetailOpen}
-          onClose={() => {
-            setIsDetailOpen(false);
-            setSelectedPass(null);
-          }}
-          pass={selectedPass}
+      {isLoading ? (
+        <TableSkeleton rows={6} cols={6} />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={Ticket}
+          title="Aucun pass trouvé"
+          action={
+            hasActiveFilters ? (
+              <ActionButton variant="ghost" onClick={handleReset}>
+                Réinitialiser les filtres
+              </ActionButton>
+            ) : undefined
+          }
         />
+      ) : (
+        <DataCard>
+          <HeadRow cols={COLS}>
+            <span>N° pass</span>
+            <span>Nom</span>
+            <span>Type</span>
+            <span>Propriétaire</span>
+            <span>Validité</span>
+            <span>Statut</span>
+            <span />
+          </HeadRow>
+
+          <div className="space-y-2">
+            {filtered.map((pass) => {
+              const st = statusOf(PASS_STATUS, pass.status);
+              const typeLabel = PASS_TYPE_LABELS[pass.passType] ?? pass.passType;
+              const ownerType = SUBSCRIBER_TYPE_LABELS[pass.ownerType] ?? pass.ownerType;
+              return (
+                <div
+                  key={pass.passNumber}
+                  onClick={() => openPass(pass)}
+                  className={`cursor-pointer rounded-2xl bg-gray-50 p-3 ${ROW_HOVER}`}
+                >
+                  {/* Desktop */}
+                  <div className={`hidden items-center gap-4 px-1 lg:grid ${COLS}`}>
+                    <span className="truncate font-mono text-xs font-semibold text-gray-700">
+                      {pass.passNumber}
+                    </span>
+                    <span className="truncate font-semibold text-gray-900">{pass.name}</span>
+                    <span className="truncate text-sm text-gray-700">{typeLabel}</span>
+                    <div className="min-w-0">
+                      <p className="truncate font-mono text-xs text-gray-800">{pass.ownerCode}</p>
+                      <p className="mt-0.5 text-xs text-gray-400">{ownerType}</p>
+                    </div>
+                    <div className="text-sm text-gray-700">
+                      <p>{formatDate(pass.validFrom)}</p>
+                      {pass.validUntil && <p className="text-xs text-gray-400">→ {formatDate(pass.validUntil)}</p>}
+                    </div>
+                    <span>
+                      <StatusChip tone={st.tone}>{st.label}</StatusChip>
+                    </span>
+                    <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+                      <IconButton icon={ArrowUpRight} label="Voir le pass" onClick={() => openPass(pass)} />
+                    </div>
+                  </div>
+
+                  {/* Mobile et tablette */}
+                  <div className="lg:hidden">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-gray-900">{pass.name}</p>
+                        <p className="mt-0.5 font-mono text-xs text-gray-500">{pass.passNumber}</p>
+                      </div>
+                      <StatusChip tone={st.tone}>{st.label}</StatusChip>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Tag>{typeLabel}</Tag>
+                      <Tag>{ownerType}</Tag>
+                      <span className="font-mono text-xs text-gray-500">{pass.ownerCode}</span>
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">
+                      {formatDate(pass.validFrom)}
+                      {pass.validUntil && ` → ${formatDate(pass.validUntil)}`}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </DataCard>
       )}
+
+      <Pagination page={page} totalPages={totalPages} total={totalElements} noun="pass" onChange={setPage} />
     </div>
   );
 };

@@ -1,12 +1,19 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Loader2, TrendingDown, TrendingUp } from "lucide-react";
+import { CheckCircle2, Download } from "lucide-react";
 import { paymentService } from "../../services/payment.service";
-import type { CashSession } from "../../services/payment.service";
+import type { CashMovement } from "../../services/payment.service";
 import { useAuth } from "../../contexts/AuthContext";
+import { ActionButton, ErrorBanner, Field, ListHeader, Section } from "../../components/subscription/kit";
+import { FIELD, apiMessage, formatMoney } from "../../components/subscription/kitUtils";
+import { toast } from "../../components/ui/toastStore";
+import { PillChoice } from "../../components/operations/opsKit";
+import { saveBlob } from "../../components/payment/paymentUtils";
+
+type Kind = "ENTRY" | "EXIT";
 
 const initial = {
-  kind: "ENTRY" as "ENTRY" | "EXIT",
+  kind: "ENTRY" as Kind,
   sessionNumber: "",
   amount: 0,
   reason: "",
@@ -24,14 +31,17 @@ export const CashVouchersPanel: React.FC = () => {
   const { admin } = useAuth();
   const queryClient = useQueryClient();
   const [form, setForm] = useState(initial);
-  const [createdMovement, setCreatedMovement] = useState<any>(null);
+  const [createdMovement, setCreatedMovement] = useState<CashMovement | null>(null);
+  const [createdKind, setCreatedKind] = useState<Kind>("ENTRY");
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+
   const { data: sessionsData } = useQuery({
     queryKey: ["cash-sessions-open-select"],
-    queryFn: () =>
-      paymentService.getCashSessions({ status: "OPEN", size: 100 }),
+    queryFn: () => paymentService.getCashSessions({ status: "OPEN", size: 100 }),
   });
-  const sessions: CashSession[] = sessionsData?.content || [];
+  const sessions = sessionsData?.content || [];
+
   const mutation = useMutation({
     mutationFn: () => {
       const payload = {
@@ -53,194 +63,131 @@ export const CashVouchersPanel: React.FC = () => {
     },
     onSuccess: (movement) => {
       setCreatedMovement(movement);
+      setCreatedKind(form.kind);
       setError(null);
       queryClient.invalidateQueries({ queryKey: ["cash-movements"] });
+      toast.success(form.kind === "ENTRY" ? "Bon d'entrée créé" : "Bon de sortie créé");
     },
-    onError: (e: any) =>
-      setError(
-        e?.response?.data?.message || "Erreur lors de la création du bon.",
-      ),
+    onError: (e: unknown) => setError(apiMessage(e, "Erreur lors de la création du bon.")),
   });
 
-  const submit = () => {
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
     if (!form.sessionNumber) return setError("La session est obligatoire.");
-    if (form.amount <= 0)
-      return setError("Le montant doit être supérieur à 0.");
+    if (form.amount <= 0) return setError("Le montant doit être supérieur à 0.");
     if (!form.reason.trim()) return setError("Le motif est obligatoire.");
+    setError(null);
     mutation.mutate();
   };
 
   const download = async () => {
     if (!createdMovement?.movementNumber) return;
-    const blob = await paymentService.getCashMovementDocumentPdf(
-      createdMovement.movementNumber,
-    );
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${form.kind === "ENTRY" ? "bon_entree" : "bon_sortie"}_${createdMovement.movementNumber}.pdf`;
-    a.click();
-    URL.revokeObjectURL(url);
+    setDownloading(true);
+    try {
+      const blob = await paymentService.getCashMovementDocumentPdf(createdMovement.movementNumber);
+      saveBlob(blob, `${createdKind === "ENTRY" ? "bon_entree" : "bon_sortie"}_${createdMovement.movementNumber}.pdf`);
+    } catch {
+      toast.error("Téléchargement impossible");
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900">Bons de caisse</h2>
-        <p className="text-sm text-gray-500 mt-1">
-          Création de bons d’entrée et de bons de sortie à partir des APIs
-          dédiées.
-        </p>
-      </div>
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-          {error}
-        </div>
-      )}
-      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-6 space-y-5">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="text-sm font-medium">Type de bon</label>
-            <select
+    <div className="mx-auto w-full max-w-4xl space-y-5">
+      <ListHeader title="Bons de caisse" subtitle="Créez un bon d'entrée ou un bon de sortie sur une session ouverte." />
+
+      <form onSubmit={submit} className="space-y-5">
+        <ErrorBanner message={error} />
+
+        {createdMovement && (
+          <div className="flex flex-col gap-3 rounded-[1.75rem] bg-emerald-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="shrink-0 text-emerald-600" size={22} />
+              <div>
+                <p className="font-bold text-emerald-900">
+                  Bon créé : <span className="font-mono">{createdMovement.movementNumber}</span>
+                </p>
+                <p className="text-sm text-emerald-800">{formatMoney(createdMovement.amount ?? form.amount)}</p>
+              </div>
+            </div>
+            <ActionButton variant="ghost" icon={Download} pending={downloading} onClick={download}>
+              PDF
+            </ActionButton>
+          </div>
+        )}
+
+        <Section title="Bon" description="Le type et la session concernée.">
+          <div className="space-y-4">
+            <PillChoice
+              label="Type de bon"
               value={form.kind}
-              onChange={(e) =>
-                setForm({ ...form, kind: e.target.value as any })
-              }
-              className="w-full mt-1 px-3 py-2 border rounded-lg bg-white"
-            >
-              <option value="ENTRY">Bon d’entrée</option>
-              <option value="EXIT">Bon de sortie</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-sm font-medium">Session *</label>
-            <select
-              value={form.sessionNumber}
-              onChange={(e) =>
-                setForm({ ...form, sessionNumber: e.target.value })
-              }
-              className="w-full mt-1 px-3 py-2 border rounded-lg bg-white"
-            >
-              <option value="">Sélectionner</option>
-              {sessions.map((s) => (
-                <option key={s.sessionNumber} value={s.sessionNumber}>
-                  {s.sessionNumber} — {s.registerCode}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-sm font-medium">Montant *</label>
-            <input
-              type="number"
-              min={1}
-              value={form.amount}
-              onChange={(e) =>
-                setForm({ ...form, amount: Number(e.target.value) || 0 })
-              }
-              className="w-full mt-1 px-3 py-2 border rounded-lg"
+              onChange={(v) => setForm({ ...form, kind: v })}
+              options={[
+                { value: "ENTRY", label: "Bon d'entrée" },
+                { value: "EXIT", label: "Bon de sortie" },
+              ]}
             />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Field label="Session" required>
+                <select value={form.sessionNumber} onChange={(e) => setForm({ ...form, sessionNumber: e.target.value })} className={FIELD}>
+                  <option value="">Choisir une session ouverte</option>
+                  {sessions.map((s) => (
+                    <option key={s.sessionNumber} value={s.sessionNumber}>
+                      {s.sessionNumber} · {s.registerCode}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Montant (FCFA)" required>
+                <input
+                  type="number"
+                  min={1}
+                  value={form.amount || ""}
+                  onChange={(e) => setForm({ ...form, amount: Number(e.target.value) || 0 })}
+                  placeholder="25000"
+                  className={FIELD}
+                />
+              </Field>
+            </div>
+            <Field label="Motif" required>
+              <textarea rows={3} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} className={FIELD} />
+            </Field>
           </div>
-        </div>
-        <div>
-          <label className="text-sm font-medium">Motif *</label>
-          <textarea
-            rows={3}
-            value={form.reason}
-            onChange={(e) => setForm({ ...form, reason: e.target.value })}
-            className="w-full mt-1 px-3 py-2 border rounded-lg"
-          />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input
-            placeholder="N° document"
-            value={form.documentNumber}
-            onChange={(e) =>
-              setForm({ ...form, documentNumber: e.target.value })
-            }
-            className="px-3 py-2 border border-gray-200 rounded-xl"
-          />
-          <input
-            placeholder="Catégorie flux"
-            value={form.flowCategory}
-            onChange={(e) => setForm({ ...form, flowCategory: e.target.value })}
-            className="px-3 py-2 border border-gray-200 rounded-xl"
-          />
-          <input
-            placeholder="Type référence"
-            value={form.referenceType}
-            onChange={(e) =>
-              setForm({ ...form, referenceType: e.target.value })
-            }
-            className="px-3 py-2 border border-gray-200 rounded-xl"
-          />
-          <input
-            placeholder="Code référence"
-            value={form.referenceCode}
-            onChange={(e) =>
-              setForm({ ...form, referenceCode: e.target.value })
-            }
-            className="px-3 py-2 border border-gray-200 rounded-xl"
-          />
-          <input
-            placeholder="Type contrepartie"
-            value={form.counterpartyType}
-            onChange={(e) =>
-              setForm({ ...form, counterpartyType: e.target.value })
-            }
-            className="px-3 py-2 border border-gray-200 rounded-xl"
-          />
-          <input
-            placeholder="Nom contrepartie"
-            value={form.counterpartyName}
-            onChange={(e) =>
-              setForm({ ...form, counterpartyName: e.target.value })
-            }
-            className="px-3 py-2 border border-gray-200 rounded-xl"
-          />
-        </div>
-        <textarea
-          placeholder="Métadonnées JSON"
-          rows={3}
-          value={form.metadataJson}
-          onChange={(e) => setForm({ ...form, metadataJson: e.target.value })}
-          className="w-full px-3 py-2 border rounded-lg font-mono text-sm"
-        />
-        <button
-          onClick={submit}
-          disabled={mutation.isPending}
-          className={`px-4 py-2 text-white rounded-lg flex items-center gap-2 ${form.kind === "ENTRY" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"} disabled:opacity-50`}
-        >
-          {mutation.isPending ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : form.kind === "ENTRY" ? (
-            <TrendingUp size={16} />
-          ) : (
-            <TrendingDown size={16} />
-          )}{" "}
-          Créer le bon
-        </button>
-      </div>
-      {createdMovement && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex justify-between items-center">
-          <div>
-            <p className="font-semibold text-green-800">
-              Bon créé : {createdMovement.movementNumber}
-            </p>
-            <p className="text-sm text-green-700">
-              Montant :{" "}
-              {(createdMovement.amount ?? form.amount).toLocaleString("fr-FR")}{" "}
-              FCFA
-            </p>
+        </Section>
+
+        <Section title="Références" description="Tout est facultatif.">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Field label="N° de document">
+              <input value={form.documentNumber} onChange={(e) => setForm({ ...form, documentNumber: e.target.value })} className={`${FIELD} font-mono`} />
+            </Field>
+            <Field label="Catégorie de flux">
+              <input value={form.flowCategory} onChange={(e) => setForm({ ...form, flowCategory: e.target.value })} className={FIELD} />
+            </Field>
+            <Field label="Type de référence">
+              <input value={form.referenceType} onChange={(e) => setForm({ ...form, referenceType: e.target.value })} className={FIELD} />
+            </Field>
+            <Field label="Code de référence">
+              <input value={form.referenceCode} onChange={(e) => setForm({ ...form, referenceCode: e.target.value })} className={`${FIELD} font-mono`} />
+            </Field>
+            <Field label="Type de contrepartie">
+              <input value={form.counterpartyType} onChange={(e) => setForm({ ...form, counterpartyType: e.target.value })} className={FIELD} />
+            </Field>
+            <Field label="Nom de la contrepartie">
+              <input value={form.counterpartyName} onChange={(e) => setForm({ ...form, counterpartyName: e.target.value })} className={FIELD} />
+            </Field>
+            <Field label="Métadonnées JSON" className="md:col-span-2 lg:col-span-3">
+              <textarea rows={3} value={form.metadataJson} onChange={(e) => setForm({ ...form, metadataJson: e.target.value })} className={`${FIELD} font-mono`} />
+            </Field>
           </div>
-          <button
-            onClick={download}
-            className="px-3 py-2 bg-white border rounded-lg flex items-center gap-2 text-sm"
-          >
-            <Download size={15} /> PDF
-          </button>
+        </Section>
+
+        <div className="flex justify-end">
+          <ActionButton type="submit" pending={mutation.isPending}>
+            {form.kind === "ENTRY" ? "Créer le bon d'entrée" : "Créer le bon de sortie"}
+          </ActionButton>
         </div>
-      )}
+      </form>
     </div>
   );
 };

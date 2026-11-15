@@ -1,14 +1,12 @@
 import React, { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import {
-  Upload,
-  Download,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  AlertTriangle,
-} from "lucide-react";
+import { CheckCircle2, Download, FileUp, Upload, X } from "lucide-react";
 import { inventoryService } from "../../../services/inventory.service";
+import { ActionButton, ErrorBanner, Field, IconButton, Section, StatusChip } from "../../../components/subscription/kit";
+import { FIELD, FOCUS, apiMessage } from "../../../components/subscription/kitUtils";
+import { saveBlob } from "../../../components/payment/paymentUtils";
+import { RatioBar } from "../../../components/operations/OpsCharts";
+import { qty } from "../../../components/inventory/invKit";
 
 const importTypes = [
   { value: "ITEMS", label: "Articles" },
@@ -17,10 +15,6 @@ const importTypes = [
   { value: "SUPPLIERS", label: "Fournisseurs" },
 ];
 
-// La doc backend precise qu'aucun endpoint de template n'est expose par le
-// controleur d'import ("garder les templates CSV cote frontend si
-// necessaire") — on genere donc les templates directement dans le
-// navigateur, a partir des champs documentes pour chaque creation.
 const templateHeaders: Record<string, string[]> = {
   ITEMS: [
     "itemCode",
@@ -120,214 +114,99 @@ export const ImportPage: React.FC = () => {
   const [importType, setImportType] = useState("ITEMS");
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [drag, setDrag] = useState(false);
 
-  const importMutation = useMutation({
+  const pick = (f?: File | null) => {
+    if (!f) return;
+    setFile(f);
+    setResult(null);
+    setError(null);
+  };
+
+  const run = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error("Veuillez sélectionner un fichier");
-
       return inventoryService.importInventory(importType, file);
     },
-    onSuccess: (data) => {
-      setResult(data);
-      setError("");
-    },
-    onError: (err: any) => {
-      setError(err.response?.data?.message || "Erreur lors de l'import");
-      setResult(null);
-    },
+    onSuccess: (d) => { setResult(d); setError(null); },
+    onError: (e) => { setError(apiMessage(e, "Erreur lors de l'import")); setResult(null); },
   });
 
-  const downloadTemplate = () => {
-    const csv = buildTemplateCsv(importType);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `template_${importType.toLowerCase()}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      setResult(null);
-      setError("");
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
-      setResult(null);
-      setError("");
-    }
-  };
+  const downloadTemplate = () => saveBlob(new Blob([buildTemplateCsv(importType)], { type: "text/csv;charset=utf-8;" }), `template_${importType.toLowerCase()}.csv`);
+  const errors: any[] = result?.rows ?? [];
 
   return (
-    <div className="p-3 sm:p-4">
-      <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-8">
-        Import massif
-      </h2>
+    <div className="mx-auto w-full max-w-4xl space-y-5">
+      <div>
+        <h2 className="text-xl font-bold tracking-tight text-gray-950 sm:text-2xl">Import massif</h2>
+        <p className="mt-1 text-sm text-gray-500">Chargez un fichier CSV ou Excel pour créer des articles, actifs, stocks ou fournisseurs en une fois.</p>
+      </div>
 
-      <div className="bg-white rounded-3xl p-5 sm:p-5 sm:p-8 shadow-sm ring-1 ring-gray-100 max-w-6xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-          {/* Formulaire d'import - AGRANDI */}
-          <div className="space-y-8">
-            <div className="mb-8">
-              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-3">
-                Type d'import *
-              </label>
-              <select
-                value={importType}
-                onChange={(e) => setImportType(e.target.value)}
-                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-              >
-                {importTypes.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+      <Section title="Fichier à importer">
+        <div className="space-y-5">
+          <Field label="Type d'import" required>
+            <select value={importType} onChange={(e) => setImportType(e.target.value)} className={FIELD}>
+              {importTypes.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </Field>
 
-            <div className="mb-8">
-              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-3">
-                Fichier CSV/Excel
-              </label>
-              <div
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-2xl p-12 text-center transition-colors ${
-                  file
-                    ? "border-green-500 bg-green-50"
-                    : "border-gray-300 hover:border-primary-400"
-                }`}
-              >
-                {file ? (
-                  <div className="flex items-center justify-center gap-4">
-                    <CheckCircle size={40} className="text-green-600" />
-                    <div>
-                      <p className="font-medium text-sm sm:text-base">{file.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {(file.size / 1024).toFixed(0)} KB
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setFile(null)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      <XCircle size={24} />
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <Upload size={64} className="mx-auto text-gray-400 mb-6" />
-                    <p className="text-gray-600 mb-3 text-sm sm:text-base">
-                      Glissez-déposez votre fichier ici ou
-                    </p>
-                    <label className="inline-block px-4 py-3 bg-primary-600 text-white rounded-2xl hover:bg-primary-700 cursor-pointer text-sm sm:text-base">
-                      Parcourir
-                      <input
-                        type="file"
-                        accept=".csv,.xlsx,.xls"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
-                    </label>
-                    <p className="text-xs text-gray-400 mt-6">
-                      CSV, Excel (max 10MB)
-                    </p>
-                  </>
-                )}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={(e) => { e.preventDefault(); setDrag(false); pick(e.dataTransfer.files?.[0]); }}
+            className={`rounded-3xl p-8 text-center transition ${drag ? "bg-pink-50 ring-2 ring-[color:var(--logo-pink)]" : file ? "bg-emerald-50" : "bg-gray-50"}`}
+          >
+            {file ? (
+              <div className="flex items-center justify-center gap-3">
+                <CheckCircle2 size={28} className="text-emerald-600" />
+                <div className="min-w-0 text-left"><p className="truncate text-sm font-semibold text-gray-900">{file.name}</p><p className="text-xs text-gray-500">{Math.max(1, Math.round(file.size / 1024))} Ko</p></div>
+                <IconButton icon={X} label="Retirer le fichier" tone="neutral" onClick={() => setFile(null)} />
               </div>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                onClick={downloadTemplate}
-                className="flex-1 px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2 text-sm sm:text-base"
-              >
-                <Download size={20} />
-                Télécharger le template
-              </button>
-              <button
-                onClick={() => importMutation.mutate()}
-                disabled={!file || importMutation.isPending}
-                className="flex-1 justify-center bg-primary-600 text-white px-4 py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
-              >
-                {importMutation.isPending ? (
-                  <Loader2 size={20} className="animate-spin" />
-                ) : (
-                  <Upload size={20} />
-                )}
-                Importer
-              </button>
-            </div>
-
-            {error && (
-              <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-2 text-red-700 text-sm sm:text-base">
-                <AlertTriangle size={20} />
-                {error}
-              </div>
+            ) : (
+              <>
+                <FileUp size={32} className="mx-auto mb-3 text-gray-300" />
+                <p className="mb-3 text-sm text-gray-500">Glissez le fichier ici ou</p>
+                <label className={`inline-flex cursor-pointer items-center rounded-full bg-[color:var(--logo-pink)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[color:var(--logo-pink-dark)] ${FOCUS}`}>
+                  Parcourir
+                  <input type="file" accept=".csv,.xlsx,.xls" onChange={(e) => pick(e.target.files?.[0])} className="hidden" />
+                </label>
+                <p className="mt-3 text-xs text-gray-400">CSV ou Excel, 10 Mo maximum</p>
+              </>
             )}
           </div>
 
-          {/* Résultat - AGRANDI */}
-          {result && (
-            <div className="border-l ring-gray-100 pl-12">
-              <h3 className="font-semibold text-gray-900 mb-6 text-xl">
-                Résultat de l'import
-              </h3>
-              <div className="space-y-4">
-                <div className="flex justify-between p-4 bg-gray-50 rounded-2xl text-sm sm:text-base">
-                  <span>Total lignes</span>
-                  <span className="font-medium">{result.totalRows}</span>
-                </div>
-                <div className="flex justify-between p-4 bg-green-50 rounded-2xl text-sm sm:text-base">
-                  <span>Importées avec succès</span>
-                  <span className="font-medium text-green-700">
-                    {result.successCount}
-                  </span>
-                </div>
-                <div className="flex justify-between p-4 bg-red-50 rounded-2xl text-sm sm:text-base">
-                  <span>En erreur</span>
-                  <span className="font-medium text-red-700">
-                    {result.errorCount}
-                  </span>
-                </div>
+          <ErrorBanner message={error} />
 
-                {result.rows && result.rows.length > 0 && (
-                  <div className="mt-6">
-                    <h4 className="font-medium text-gray-900 mb-3 text-sm sm:text-base">
-                      Détail des erreurs
-                    </h4>
-                    <div className="max-h-64 overflow-y-auto space-y-2">
-                      {result.rows.map((row: any, idx: number) => (
-                        <div
-                          key={idx}
-                          className="p-3 bg-red-50 rounded-2xl text-sm"
-                        >
-                          <p className="font-mono text-xs">
-                            Ligne {row.rowNumber}
-                          </p>
-                          <p className="text-red-700 text-sm">{row.message}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <ActionButton variant="ghost" icon={Download} onClick={downloadTemplate}>Télécharger le modèle</ActionButton>
+            <ActionButton icon={Upload} pending={run.isPending} disabled={!file} onClick={() => run.mutate()}>Importer</ActionButton>
+          </div>
         </div>
-      </div>
+      </Section>
+
+      {result && (
+        <Section title="Résultat de l'import">
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-2xl bg-gray-50 p-4"><p className="text-2xl font-bold text-gray-950">{qty(result.totalRows ?? 0)}</p><p className="text-xs text-gray-500">Lignes lues</p></div>
+              <div className="rounded-2xl bg-gray-50 p-4"><p className="text-2xl font-bold text-emerald-600">{qty(result.successCount ?? 0)}</p><p className="text-xs text-gray-500">Importées</p></div>
+              <div className="rounded-2xl bg-gray-50 p-4"><p className={`text-2xl font-bold ${(result.errorCount ?? 0) > 0 ? "text-red-600" : "text-gray-950"}`}>{qty(result.errorCount ?? 0)}</p><p className="text-xs text-gray-500">En erreur</p></div>
+            </div>
+            {(result.totalRows ?? 0) > 0 && <RatioBar value={result.successCount ?? 0} total={result.totalRows} color="#7FB08A" />}
+            {errors.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-semibold text-gray-400">Détail des erreurs</p>
+                <div className="max-h-64 space-y-1.5 overflow-y-auto">
+                  {errors.map((r, i) => (
+                    <div key={i} className="flex items-start gap-3 rounded-2xl bg-red-50 p-3 text-sm"><StatusChip tone="danger">Ligne {r.rowNumber}</StatusChip><p className="text-red-700">{r.message}</p></div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
     </div>
   );
 };

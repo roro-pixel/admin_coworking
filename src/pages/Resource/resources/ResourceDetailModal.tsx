@@ -321,6 +321,12 @@ export const ResourceDetailModal: React.FC<ResourceDetailModalProps> = ({
               </p>
             </div>
             <div className="p-3 bg-gray-50 rounded-lg">
+              <p className="text-xs text-gray-500">Durée de créneau</p>
+              <p className="font-medium">
+                {resource.slotDurationMinutes ?? 30} min
+              </p>
+            </div>
+            <div className="p-3 bg-gray-50 rounded-lg">
               <p className="text-xs text-gray-500">Type</p>
               <p className="font-medium">{resource.typeCode}</p>
             </div>

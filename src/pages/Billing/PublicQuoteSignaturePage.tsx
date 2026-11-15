@@ -1,14 +1,15 @@
 import React, { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { CheckCircle, FileSignature, Loader2, XCircle } from "lucide-react";
+import { CheckCircle2, FileSignature, XCircle } from "lucide-react";
 import { billingService } from "../../services/billing.service";
+import { brandVars } from "../../components/layout/adminTheme";
+import { ActionButton, ErrorBanner, Field } from "../../components/subscription/kit";
+import { FIELD_SOFT, apiMessage } from "../../components/subscription/kitUtils";
+import { Skeleton } from "../../components/ui/Skeleton";
 
 const toBase64SvgSignature = (name: string): string => {
-  const safeName = name.replace(
-    /[<>&]/g,
-    (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c] || c,
-  );
+  const safeName = name.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c] || c);
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="700" height="220" viewBox="0 0 700 220">
       <rect width="700" height="220" fill="white"/>
@@ -19,6 +20,21 @@ const toBase64SvgSignature = (name: string): string => {
   return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
 };
 
+/** Page publique (hors espace d'administration) : le client consulte le devis puis le signe. */
+const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div style={brandVars} className="min-h-screen bg-[#F7F4F2]">
+    <div className="mx-auto w-full max-w-6xl p-4 sm:p-6 lg:p-10">{children}</div>
+  </div>
+);
+
+const Notice: React.FC<{ tone: "ok" | "ko"; title: string; text: string }> = ({ tone, title, text }) => (
+  <div className="mx-auto max-w-lg rounded-[1.75rem] bg-white p-10 text-center shadow-sm">
+    {tone === "ok" ? <CheckCircle2 className="mx-auto text-emerald-500" size={52} /> : <XCircle className="mx-auto text-red-500" size={48} />}
+    <h1 className="mt-4 text-2xl font-bold tracking-tight text-gray-950">{title}</h1>
+    <p className="mt-2 text-sm text-gray-500">{text}</p>
+  </div>
+);
+
 export const PublicQuoteSignaturePage: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const [signerName, setSignerName] = useState("");
@@ -26,29 +42,19 @@ export const PublicQuoteSignaturePage: React.FC = () => {
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const {
-    data: html,
-    isLoading,
-    isError,
-  } = useQuery({
+  const { data: html, isLoading, isError } = useQuery({
     queryKey: ["public-quote-signature", token],
     queryFn: () => billingService.getPublicQuoteSignaturePage(token!),
     enabled: !!token,
   });
 
-  const signaturePreview = useMemo(
-    () => (signerName.trim() ? toBase64SvgSignature(signerName.trim()) : ""),
-    [signerName],
-  );
+  const signaturePreview = useMemo(() => (signerName.trim() ? toBase64SvgSignature(signerName.trim()) : ""), [signerName]);
 
   const confirmMutation = useMutation({
     mutationFn: () => {
-      if (!token) throw new Error("Token de signature manquant.");
-      if (!signerName.trim())
-        throw new Error("Le nom du signataire est obligatoire.");
-      if (!accepted)
-        throw new Error("Vous devez accepter les conditions de signature.");
-
+      if (!token) throw new Error("Jeton de signature manquant.");
+      if (!signerName.trim()) throw new Error("Le nom du signataire est obligatoire.");
+      if (!accepted) throw new Error("Vous devez accepter les conditions de signature.");
       return billingService.confirmPublicQuoteSignature(token, {
         signerName: signerName.trim(),
         signerEmail: signerEmail.trim() || undefined,
@@ -56,173 +62,77 @@ export const PublicQuoteSignaturePage: React.FC = () => {
       });
     },
     onSuccess: () => setError(null),
-    onError: (e: any) =>
-      setError(
-        e?.response?.data?.message ||
-          e?.message ||
-          "Erreur lors de la signature.",
-      ),
+    onError: (e: unknown) => setError(apiMessage(e, (e as Error)?.message || "Erreur lors de la signature.")),
   });
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-        <div className="bg-white rounded-xl shadow-sm p-8 max-w-lg text-center">
-          <XCircle className="mx-auto text-red-500 mb-4" size={44} />
-          <h1 className="text-xl font-bold text-gray-900">Lien invalide</h1>
-          <p className="text-gray-500 mt-2">
-            Le lien de signature ne contient pas de jeton valide.
-          </p>
-        </div>
-      </div>
+      <Shell>
+        <Notice tone="ko" title="Lien invalide" text="Le lien de signature ne contient pas de jeton valide." />
+      </Shell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto p-4 md:p-8">
-        <div className="mb-6 bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center gap-3">
-          <FileSignature className="text-primary-600" size={28} />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Signature électronique du devis
-            </h1>
-            <p className="text-sm text-gray-500">
-              Consultez le document puis confirmez votre signature.
-            </p>
-          </div>
+    <Shell>
+      <header className="mb-6 flex items-center gap-4">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[color:var(--logo-pink-dark)] text-white">
+          <FileSignature size={22} />
+        </span>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight text-gray-950 sm:text-3xl">Signature électronique du devis</h1>
+          <p className="text-sm text-gray-500">Consultez le document, puis confirmez votre signature.</p>
         </div>
+      </header>
 
-        {confirmMutation.isSuccess ? (
-          <div className="bg-white rounded-xl shadow-sm p-10 text-center border border-gray-100">
-            <CheckCircle className="mx-auto text-green-600 mb-4" size={54} />
-            <h2 className="text-2xl font-bold text-gray-900">
-              Devis signé avec succès
-            </h2>
-            <p className="text-gray-500 mt-2">
-              Votre signature a bien été enregistrée.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-5 py-3 border-b bg-gray-50">
-                <h2 className="font-semibold text-gray-900">Document</h2>
+      {confirmMutation.isSuccess ? (
+        <Notice tone="ok" title="Devis signé avec succès" text="Votre signature a bien été enregistrée." />
+      ) : (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
+          <section className="overflow-hidden rounded-[1.75rem] bg-white p-2 shadow-sm">
+            <h2 className="px-4 pb-2 pt-3 text-base font-bold text-gray-950">Document</h2>
+            {isLoading ? (
+              <Skeleton className="h-[40rem] w-full rounded-2xl" />
+            ) : isError ? (
+              <div className="flex h-[40rem] items-center justify-center rounded-2xl bg-gray-50 p-6 text-center">
+                <div>
+                  <XCircle className="mx-auto text-red-500" size={40} />
+                  <p className="mt-3 font-semibold text-gray-900">Impossible de charger le document.</p>
+                  <p className="mt-1 text-sm text-gray-500">Le lien est peut-être expiré ou invalide.</p>
+                </div>
               </div>
-              {isLoading ? (
-                <div className="h-[650px] flex items-center justify-center">
-                  <Loader2
-                    className="animate-spin text-primary-600"
-                    size={32}
-                  />
+            ) : (
+              <iframe title="Devis à signer" srcDoc={html || "<p>Document vide.</p>"} className="h-[40rem] w-full rounded-2xl bg-white" />
+            )}
+          </section>
+
+          <aside className="h-fit rounded-[1.75rem] bg-white p-3 shadow-sm lg:sticky lg:top-6">
+            <h2 className="px-3 pb-3 pt-2 text-base font-bold text-gray-950">Signer le devis</h2>
+            <div className="space-y-4 rounded-2xl bg-gray-50 p-4">
+              <ErrorBanner message={error} />
+              <Field label="Nom du signataire" required>
+                <input value={signerName} onChange={(e) => setSignerName(e.target.value)} className={FIELD_SOFT} placeholder="Nom complet" />
+              </Field>
+              <Field label="E-mail">
+                <input type="email" value={signerEmail} onChange={(e) => setSignerEmail(e.target.value)} className={FIELD_SOFT} placeholder="nom@exemple.com" />
+              </Field>
+              <div>
+                <span className="mb-1.5 block text-xs font-semibold text-gray-600">Aperçu de la signature</span>
+                <div className="flex h-28 items-center justify-center overflow-hidden rounded-2xl bg-white">
+                  {signaturePreview ? <img src={signaturePreview} alt="Signature" className="max-h-24 max-w-full" /> : <span className="text-sm text-gray-400">Votre signature apparaîtra ici</span>}
                 </div>
-              ) : isError ? (
-                <div className="h-[650px] flex items-center justify-center text-center p-6">
-                  <div>
-                    <XCircle className="mx-auto text-red-500 mb-3" size={40} />
-                    <p className="font-medium text-gray-900">
-                      Impossible de charger le document.
-                    </p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Le lien est peut-être expiré ou invalide.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <iframe
-                  title="Devis à signer"
-                  srcDoc={html || "<p>Document vide.</p>"}
-                  className="w-full h-[650px] bg-white"
-                />
-              )}
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 h-fit sticky top-6">
-              <h2 className="font-semibold text-gray-900 mb-4">
-                Signer le devis
-              </h2>
-
-              {error && (
-                <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
-                  {error}
-                </div>
-              )}
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nom du signataire *
-                  </label>
-                  <input
-                    value={signerName}
-                    onChange={(e) => setSignerName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-                    placeholder="Nom complet"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={signerEmail}
-                    onChange={(e) => setSignerEmail(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-                    placeholder="email@example.com"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Aperçu signature
-                  </label>
-                  <div className="border border-gray-200 rounded-lg h-28 flex items-center justify-center bg-gray-50 overflow-hidden">
-                    {signaturePreview ? (
-                      <img
-                        src={signaturePreview}
-                        alt="Signature"
-                        className="max-h-24 max-w-full"
-                      />
-                    ) : (
-                      <span className="text-sm text-gray-400">
-                        Votre signature apparaîtra ici
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <label className="flex items-start gap-2 text-sm text-gray-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={accepted}
-                    onChange={(e) => setAccepted(e.target.checked)}
-                    className="mt-1"
-                  />
-                  <span>
-                    Je confirme avoir lu le document et j’accepte de le signer
-                    électroniquement.
-                  </span>
-                </label>
-
-                <button
-                  onClick={() => confirmMutation.mutate()}
-                  disabled={confirmMutation.isPending || isLoading || isError}
-                  className="w-full bg-primary-600 text-white py-2.5 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {confirmMutation.isPending ? (
-                    <Loader2 className="animate-spin" size={16} />
-                  ) : (
-                    <FileSignature size={16} />
-                  )}
-                  Confirmer la signature
-                </button>
               </div>
+              <label className="flex cursor-pointer items-start gap-3 text-sm text-gray-600">
+                <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} className="mt-1 h-4 w-4 rounded accent-[color:var(--logo-pink-dark)]" />
+                <span>Je confirme avoir lu le document et j'accepte de le signer électroniquement.</span>
+              </label>
+              <ActionButton className="w-full" icon={FileSignature} pending={confirmMutation.isPending} disabled={isLoading || isError} onClick={() => confirmMutation.mutate()}>
+                Confirmer la signature
+              </ActionButton>
             </div>
-          </div>
-        )}
-      </div>
-    </div>
+          </aside>
+        </div>
+      )}
+    </Shell>
   );
 };

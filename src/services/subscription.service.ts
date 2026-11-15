@@ -25,7 +25,7 @@ export interface Plan {
 }
 
 export interface PlanVersion {
-  // FIXME: traiter comme une chaîne opaque — les IDs backend peuvent dépasser Number.MAX_SAFE_INTEGER
+  // Chaîne opaque : les IDs backend peuvent dépasser Number.MAX_SAFE_INTEGER
   id: string;
   versionNumber: number;
   name: string;
@@ -115,6 +115,27 @@ export interface EntitlementDefinition {
   active: boolean;
 }
 
+/**
+ * Statuts d'abonnement.
+ * - PENDING_DOCUMENTS : l'activation attend le niveau KYC exigé (réessayée chaque heure)
+ * - GRACE_PERIOD : échéance impayée, droits maintenus, suspension à venir
+ * - PENDING_TERMINATION : un préavis court, pas de renouvellement
+ * - TRIALING / PAUSED : essai en cours / gel
+ */
+export type SubscriptionStatus =
+  | "DRAFT"
+  | "PENDING_ACTIVATION"
+  | "PENDING_DOCUMENTS"
+  | "TRIALING"
+  | "ACTIVE"
+  | "GRACE_PERIOD"
+  | "PAST_DUE"
+  | "PAUSED"
+  | "SUSPENDED"
+  | "PENDING_TERMINATION"
+  | "CANCELLED"
+  | "EXPIRED";
+
 export interface Subscription {
   subscriptionNumber: string;
   planCode: string;
@@ -125,14 +146,7 @@ export interface Subscription {
   subscriberType: "MEMBER" | "CUSTOMER" | "BUSINESS_ENTITY";
   subscriberCode: string;
   subscriberName?: string;
-  status:
-    | "DRAFT"
-    | "PENDING_ACTIVATION"
-    | "ACTIVE"
-    | "PAST_DUE"
-    | "SUSPENDED"
-    | "CANCELLED"
-    | "EXPIRED";
+  status: SubscriptionStatus;
   startDate: string;
   endDate?: string;
   currentPeriodStart?: string;
@@ -146,6 +160,11 @@ export interface Subscription {
   totalAmount?: number;
   contractCode?: string;
   metadataJson?: string;
+  /** Facture de renouvellement à régler ; vide si rien n'attend. */
+  pendingRenewalInvoice?: string | null;
+  /** Période prévue ; payée en retard, elle repart du jour du paiement. */
+  pendingRenewalStart?: string | null;
+  pendingRenewalEnd?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -230,8 +249,7 @@ export interface PassEntitlement {
   validUntil?: string;
 }
 
-// ==================== PASS PLAN SYSTEM — BACKEND V2 ====================
-// Documentation: /sni/api/v1/pass-plans + /sni/api/v1/passes
+// ==================== PASS PLANS ====================
 
 export type PassType =
   | "DAY_PASS"
@@ -572,15 +590,24 @@ export interface PaginatedResponse<T> {
 
 function normalizePaginated<T>(responseData: any): PaginatedResponse<T> {
   if (Array.isArray(responseData?.data)) {
+    const pageable = responseData.pageable ?? {};
+    const totalElements = pageable.totalElements ?? responseData.data.length;
+    const size = pageable.size || responseData.data.length || 1;
     return {
       content: responseData.data,
-      totalElements:
-        responseData.pageable?.totalElements ?? responseData.data.length,
-      totalPages: responseData.pageable?.totalPages ?? 1,
+      totalElements,
+      totalPages: pageable.totalPages ?? Math.max(1, Math.ceil(totalElements / size)),
     };
   }
   if (Array.isArray(responseData?.content)) {
-    return responseData as PaginatedResponse<T>;
+    // totalPages peut manquer : on le déduit du total et de la taille de page
+    const totalElements = responseData.totalElements ?? responseData.content.length;
+    const size = responseData.size || responseData.content.length || 1;
+    return {
+      ...responseData,
+      totalElements,
+      totalPages: responseData.totalPages ?? Math.max(1, Math.ceil(totalElements / size)),
+    } as PaginatedResponse<T>;
   }
   if (Array.isArray(responseData)) {
     return {
@@ -592,10 +619,7 @@ function normalizePaginated<T>(responseData: any): PaginatedResponse<T> {
   return { content: [], totalElements: 0, totalPages: 0 };
 }
 
-/**
- * Normalise les réponses liste non-paginées.
- * L'API peut retourner : { data: [...] } | T[]
- */
+/** Normalise une liste non paginée ({ data: [...] } ou tableau). */
 function normalizeList<T>(responseData: any): T[] {
   if (responseData?.data && Array.isArray(responseData.data))
     return responseData.data;
@@ -692,7 +716,7 @@ export const subscriptionService = {
     return response.data;
   },
 
-  // versionId est une chaîne opaque — ne pas caster en number JS (peut dépasser MAX_SAFE_INTEGER)
+  // versionId : chaîne opaque, ne pas la convertir en number.
   publishPlanVersion: async (
     planCode: string,
     versionId: string,
@@ -829,8 +853,35 @@ export const subscriptionService = {
     startDate: string;
     autoRenew: boolean;
     metadataJson?: string;
+    /** Coupons consommés à la création : la retenue est capturée. */
+    couponCodes?: string[];
   }): Promise<Subscription> => {
     const response = await apiClient.post("/sni/api/v1/subscriptions", data);
+    return response.data;
+  },
+
+  /**
+   * Gel : respecte l'allowance de la politique (409 sinon). Voir
+   * subscriptionLifecycleService.getFreezeAllowance pour l'afficher avant.
+   */
+  pauseSubscription: async (
+    subscriptionNumber: string,
+    data?: { until?: string | null; reason?: string; changedBy?: string },
+  ): Promise<Subscription> => {
+    const response = await apiClient.post(
+      `/sni/api/v1/subscriptions/${subscriptionNumber}/pause`,
+      data ?? {},
+    );
+    return response.data;
+  },
+
+  /** Reprise d'un gel → ACTIVE. */
+  resumeSubscription: async (
+    subscriptionNumber: string,
+  ): Promise<Subscription> => {
+    const response = await apiClient.post(
+      `/sni/api/v1/subscriptions/${subscriptionNumber}/resume`,
+    );
     return response.data;
   },
 
@@ -876,14 +927,20 @@ export const subscriptionService = {
     );
   },
 
+  /**
+   * Émet la facture de renouvellement (une seule à la fois). L'abonnement reste sur sa
+   * période en cours avec pendingRenewalInvoice renseigné : annoncer « facture à régler »,
+   * jamais « renouvelé » ; le renouvellement n'est acquis que quand ce champ redevient vide.
+   */
   renewSubscription: async (
     subscriptionNumber: string,
     reason?: string,
-  ): Promise<void> => {
-    await apiClient.patch(
+  ): Promise<Subscription> => {
+    const response = await apiClient.patch(
       `/sni/api/v1/subscriptions/${subscriptionNumber}/renew`,
       { reason },
     );
+    return response.data;
   },
 
   // ────────────────────────────────────────────────────────────
@@ -1054,11 +1111,7 @@ export const subscriptionService = {
   },
 
   // ────────────────────────────────────────────────────────────
-  // PASSES
-  // ────────────────────────────────────────────────────────────
-
-  // ────────────────────────────────────────────────────────────
-  // PASS PLANS — nouveau catalogue de plans de pass
+  // PASS PLANS
   // ────────────────────────────────────────────────────────────
 
   createPassPlan: async (data: PassPlanRequest): Promise<PassPlanResponse> => {
@@ -1619,4 +1672,47 @@ export const subscriptionService = {
     );
     return response.data;
   },
+
+  /**
+   * Indicateurs de pilotage (30 derniers jours par défaut). churnRate et occupancyRate
+   * sont en pourcentage ; customerLifetimeValue et averageLifetimeMonths valent null
+   * quand l'attrition est nulle.
+   */
+  getSubscriptionKpis: async (params?: {
+    from?: string;
+    to?: string;
+  }): Promise<SubscriptionKpis> => {
+    const response = await apiClient.get(
+      "/sni/api/v1/subscription-metrics/kpis",
+      { params },
+    );
+    return response.data;
+  },
 };
+
+export interface SubscriptionKpis {
+  from: string;
+  to: string;
+  activeSubscriptions: number;
+  mrr: number;
+  arr: number;
+  mrrByCycle: Record<string, number>;
+  activeAtStart: number;
+  newInPeriod: number;
+  churnedInPeriod: number;
+  churnRate: number;
+  monthlyChurnRate: number;
+  newMrr: number;
+  churnedMrr: number;
+  netMrrMovement: number;
+  arpu: number;
+  customerLifetimeValue: number | null;
+  averageLifetimeMonths: number | null;
+  seatsOccupied: number;
+  workspaceCapacity: number;
+  occupancyRate: number;
+  revenuePerSeat: number;
+  inGracePeriod: number;
+  pendingTermination: number;
+  pendingDocuments: number;
+}

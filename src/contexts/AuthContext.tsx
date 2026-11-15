@@ -80,7 +80,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // Vérifie si l'utilisateur est admin
   const isAdmin = useCallback((): boolean => {
     if (!admin) return false;
 
@@ -95,7 +94,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     );
   }, [admin]);
 
-  // Vérifie une permission
   const hasPermission = useCallback(
     (permission: string): boolean => {
       if (!admin) return false;
@@ -103,7 +101,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const authorities = admin.authorities || [];
 
-      // Vérifier les deux formats (avec : ou _)
       const altPermission = permission.replace(":", "_");
       return (
         authorities.includes(permission) || authorities.includes(altPermission)

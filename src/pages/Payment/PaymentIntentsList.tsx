@@ -1,82 +1,59 @@
-import React, { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import React, { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
-import {
-  Search,
-  Clock,
-  CheckCircle,
-  XCircle,
-  RefreshCw,
-  Ban,
-  Plus,
-  Eye,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  CheckSquare,
-  Square,
-  Wallet,
-  Banknote,
-  X,
-  AlertCircle,
-  Receipt,
-  Download,
-} from "lucide-react";
+import { Banknote, CreditCard, FileText, Plus, Receipt, Search, Wallet, X } from "lucide-react";
 import { paymentService } from "../../services/payment.service";
-import type {
-  PaymentIntent,
-  CashSession,
-} from "../../services/payment.service";
+import type { PaymentIntent, PayableDocument } from "../../services/payment.service";
 import { useAuth } from "../../contexts/AuthContext";
-import { ModalPortal } from "../../components/ui/ModalPortal";
-
-const statusConfig: Record<
-  string,
-  { label: string; color: string; icon: React.ElementType }
-> = {
-  PENDING: {
-    label: "En attente",
-    color: "bg-yellow-100 text-yellow-700",
-    icon: Clock,
-  },
-  PROCESSING: {
-    label: "En cours",
-    color: "bg-blue-100 text-blue-700",
-    icon: RefreshCw,
-  },
-  AUTHORIZED: {
-    label: "Autorisé",
-    color: "bg-purple-100 text-purple-700",
-    icon: CheckCircle,
-  },
-  SUCCEEDED: {
-    label: "Réussi",
-    color: "bg-green-100 text-green-700",
-    icon: CheckCircle,
-  },
-  FAILED: { label: "Échoué", color: "bg-red-100 text-red-700", icon: XCircle },
-  CANCELLED: { label: "Annulé", color: "bg-gray-100 text-gray-500", icon: Ban },
-  EXPIRED: { label: "Expiré", color: "bg-gray-100 text-gray-500", icon: Clock },
-  REFUNDED: {
-    label: "Remboursé",
-    color: "bg-orange-100 text-orange-700",
-    icon: RefreshCw,
-  },
-  PARTIALLY_REFUNDED: {
-    label: "Partiellement remboursé",
-    color: "bg-orange-100 text-orange-700",
-    icon: RefreshCw,
-  },
-  REVERSED: {
-    label: "Inversé",
-    color: "bg-red-100 text-red-700",
-    icon: RefreshCw,
-  },
-};
+import {
+  ActionButton,
+  DataCard,
+  EmptyState,
+  ErrorBlock,
+  Field,
+  HeadRow,
+  IconButton,
+  ListHeader,
+  PanelForm,
+  Pagination,
+  SearchField,
+  StatusChip,
+} from "../../components/subscription/kit";
+import {
+  FIELD_SOFT,
+  FOCUS,
+  ROW_HOVER,
+  apiMessage,
+  formatDateTime,
+  formatMoney,
+} from "../../components/subscription/kitUtils";
+import { statusOf } from "../../components/subscription/labels";
+import { Dots } from "../../components/ui/Toaster";
+import { toast } from "../../components/ui/toastStore";
+import { ListSkeleton } from "../../components/ui/Skeleton";
+import { ReceiptModal } from "../../components/payment/ReceiptModal";
+import {
+  CUSTOMER_TYPES,
+  CUSTOMER_TYPE_LABEL,
+  INTENT_STATUS,
+  PURPOSE_LABEL,
+} from "../../components/payment/paymentLabels";
+import { currencyLabel, saveBlob } from "../../components/payment/paymentUtils";
 
 const PAGE_SIZE = 20;
-const formatDateTime = (value?: string | null) =>
-  value ? new Date(value).toLocaleString("fr-FR") : "—";
+const COLS = "lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_8rem_minmax(0,1fr)_9rem_11rem]";
+
+const STATUS_FILTERS = [
+  { value: "", label: "Toutes" },
+  { value: "PENDING", label: "En attente" },
+  { value: "SUCCEEDED", label: "Payées" },
+  { value: "PROCESSING", label: "En cours" },
+  { value: "FAILED", label: "Échouées" },
+  { value: "PARTIALLY_REFUNDED", label: "Remb. en partie" },
+  { value: "REFUNDED", label: "Remboursées" },
+  { value: "EXPIRED", label: "Expirées" },
+  { value: "CANCELLED", label: "Annulées" },
+];
 
 export const PaymentIntentsList: React.FC = () => {
   const { admin } = useAuth();
@@ -84,7 +61,6 @@ export const PaymentIntentsList: React.FC = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
 
-  // ========== ÉTATS RECHERCHE ET FILTRES ==========
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -92,14 +68,14 @@ export const PaymentIntentsList: React.FC = () => {
   const [redirectMessage, setRedirectMessage] = useState<string | null>(null);
   const [redirectStateHandled, setRedirectStateHandled] = useState(false);
 
-  // ========== ÉTATS MODAL DEPUIS FACTURE ==========
+  // Panneau « depuis facture »
   const [isFromBillingOpen, setIsFromBillingOpen] = useState(false);
   const [billingDocNumber, setBillingDocNumber] = useState("");
   const [fromBillingError, setFromBillingError] = useState<string | null>(null);
 
-  // ========== ÉTATS DETTES CLIENT ==========
+  // Panneau « dettes client »
   const [isDebtsOpen, setIsDebtsOpen] = useState(false);
-  const [debtCustomerType, setDebtCustomerType] = useState<string>("MEMBER");
+  const [debtCustomerType, setDebtCustomerType] = useState("MEMBER");
   const [debtCustomerCode, setDebtCustomerCode] = useState("");
   const [debtSearchText, setDebtSearchText] = useState("");
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
@@ -107,38 +83,25 @@ export const PaymentIntentsList: React.FC = () => {
   const [debtPayMethod, setDebtPayMethod] = useState<"CASH" | "WALLET">("CASH");
   const [debtCashSession, setDebtCashSession] = useState("");
   const [debtWalletNumber, setDebtWalletNumber] = useState("");
-  const [debtPayResult, setDebtPayResult] = useState<any>(null);
-  const [debtPayError, setDebtPayError] = useState<string | null>(null);
 
-  // ========== ÉTATS REÇU ==========
-  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
-  const [receiptData, setReceiptData] = useState<any>(null);
-  const [receiptLoading, setReceiptLoading] = useState(false);
+  // Reçu
+  const [receiptTxn, setReceiptTxn] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
-  // ========== REDIRECTION DEPUIS LE RECOUVREMENT ==========
+  // Arrivée depuis le recouvrement
   useEffect(() => {
     if (redirectStateHandled) return;
-
-    const state = location.state as
-      | { intentNumber?: string; message?: string }
-      | null
-      | undefined;
-
+    const state = location.state as { intentNumber?: string; message?: string } | null | undefined;
     if (!state?.intentNumber) return;
-
     setSearch(state.intentNumber);
     setDebouncedSearch(state.intentNumber);
     setStatusFilter("");
     setPage(0);
-    setRedirectMessage(
-      state.message || "Intention de paiement créée avec succès.",
-    );
+    setRedirectMessage(state.message || "Intention de paiement créée avec succès.");
     setRedirectStateHandled(true);
-
     window.history.replaceState({}, document.title);
   }, [location.state, redirectStateHandled]);
 
-  // ========== DEBOUNCE RECHERCHE ==========
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -147,18 +110,7 @@ export const PaymentIntentsList: React.FC = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // ========== HANDLER CHANGEMENT FILTRE ==========
-  const handleFilterChange = <T,>(setter: (v: T) => void, value: T) => {
-    setter(value);
-    setPage(0);
-  };
-
-  // ========== QUERY INTENTIONS DE PAIEMENT ==========
-  const {
-    data: intentsData,
-    isLoading,
-    isFetching,
-  } = useQuery({
+  const { data: intentsData, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ["payment-intents", page, statusFilter, debouncedSearch],
     queryFn: () =>
       paymentService.getPaymentIntents({
@@ -170,14 +122,8 @@ export const PaymentIntentsList: React.FC = () => {
       }),
   });
 
-  // ========== QUERY DOCUMENTS PAYABLES ==========
   const { data: payableDocuments, isLoading: isLoadingDebts } = useQuery({
-    queryKey: [
-      "payable-documents",
-      debtCustomerType,
-      debtCustomerCode,
-      debtSearchText,
-    ],
+    queryKey: ["payable-documents", debtCustomerType, debtCustomerCode, debtSearchText],
     queryFn: () =>
       paymentService.getPayableDocuments({
         customerType: debtCustomerType || undefined,
@@ -187,15 +133,18 @@ export const PaymentIntentsList: React.FC = () => {
     enabled: isDebtsOpen && (!!debtCustomerCode || !!debtSearchText),
   });
 
-  // ========== QUERY SESSIONS OUVERTES POUR SELECT ==========
   const { data: openSessionsData } = useQuery({
     queryKey: ["cash-sessions-open-select"],
-    queryFn: () =>
-      paymentService.getCashSessions({ status: "OPEN", size: 100 }),
+    queryFn: () => paymentService.getCashSessions({ status: "OPEN", size: 100 }),
   });
-  const openSessions: CashSession[] = openSessionsData?.content || [];
+  const openSessions = openSessionsData?.content || [];
 
-  // ========== MUTATION CRÉATION DEPUIS FACTURE ==========
+  const closeFromBilling = () => {
+    setIsFromBillingOpen(false);
+    setBillingDocNumber("");
+    setFromBillingError(null);
+  };
+
   const fromBillingMutation = useMutation({
     mutationFn: () =>
       paymentService.createPaymentIntentFromBilling({
@@ -204,19 +153,12 @@ export const PaymentIntentsList: React.FC = () => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payment-intents"] });
-      setIsFromBillingOpen(false);
-      setBillingDocNumber("");
-      setFromBillingError(null);
+      closeFromBilling();
+      toast.success("Intention créée depuis la facture");
     },
-    onError: (error: any) => {
-      setFromBillingError(
-        error?.response?.data?.message ||
-          "Erreur lors de la création depuis la facture.",
-      );
-    },
+    onError: (e: unknown) => setFromBillingError(apiMessage(e, "Erreur lors de la création depuis la facture.")),
   });
 
-  // ========== MUTATION CRÉATION DEPUIS PLUSIEURS FACTURES ==========
   const fromBillingsMutation = useMutation({
     mutationFn: (documentNumbers: string[]) =>
       paymentService.createPaymentIntentFromBillings({
@@ -225,19 +167,23 @@ export const PaymentIntentsList: React.FC = () => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payment-intents"] });
-      setIsFromBillingOpen(false);
-      setBillingDocNumber("");
-      setFromBillingError(null);
+      closeFromBilling();
+      toast.success("Intention créée depuis les factures");
     },
-    onError: (error: any) => {
-      setFromBillingError(
-        error?.response?.data?.message ||
-          "Erreur lors de la création depuis les factures.",
-      );
-    },
+    onError: (e: unknown) => setFromBillingError(apiMessage(e, "Erreur lors de la création depuis les factures.")),
   });
 
-  // ========== MUTATION PAIEMENT MULTIPLE DETTES CLIENT ==========
+  const submitFromBilling = (e: React.FormEvent) => {
+    e.preventDefault();
+    const docs = billingDocNumber
+      .split(",")
+      .map((d) => d.trim())
+      .filter(Boolean);
+    if (docs.length === 0) return;
+    if (docs.length === 1) fromBillingMutation.mutate();
+    else fromBillingsMutation.mutate(docs);
+  };
+
   const paySelectedDocumentsMutation = useMutation({
     mutationFn: async () => {
       const intent = await paymentService.createPaymentIntentFromBillings({
@@ -249,84 +195,47 @@ export const PaymentIntentsList: React.FC = () => {
           receivedBy: admin?.email || "admin",
           cashSessionNumber: debtCashSession || undefined,
         });
-      } else {
-        return paymentService.payWallet(intent.intentNumber, {
-          walletNumber: debtWalletNumber,
-          createdBy: admin?.email || "admin",
-        });
       }
+      return paymentService.payWallet(intent.intentNumber, {
+        walletNumber: debtWalletNumber,
+        createdBy: admin?.email || "admin",
+      });
     },
     onSuccess: (data) => {
-      setDebtPayResult(data);
-      setDebtPayError(null);
+      setDebtError(null);
+      setSelectedDocuments([]);
       queryClient.invalidateQueries({ queryKey: ["payable-documents"] });
       queryClient.invalidateQueries({ queryKey: ["payment-intents"] });
-      handleOpenReceipt(data.transactionNumber);
+      toast.success("Paiement enregistré");
+      setReceiptTxn(data.transactionNumber);
     },
-    onError: (error: any) => {
-      setDebtPayError(
-        error?.response?.data?.message || "Erreur lors du paiement multiple.",
-      );
-    },
+    onError: (e: unknown) => setDebtError(apiMessage(e, "Erreur lors du paiement multiple.")),
   });
 
-  // ========== HELPERS REÇU ==========
-  const handleOpenReceipt = async (transactionNumber: string) => {
-    setReceiptLoading(true);
-    setIsReceiptOpen(true);
+  const downloadReceipt = async (transactionNumber: string) => {
+    setDownloading(true);
     try {
-      const data = await paymentService.getReceipt(transactionNumber);
-      setReceiptData(data);
+      saveBlob(await paymentService.getReceiptPdf(transactionNumber), `recu_${transactionNumber}.pdf`);
     } catch {
-      setReceiptData(null);
+      toast.error("Téléchargement impossible");
     } finally {
-      setReceiptLoading(false);
+      setDownloading(false);
     }
   };
 
-  const handleDownloadReceiptPdf = async (transactionNumber: string) => {
-    try {
-      const blob = await paymentService.getReceiptPdf(transactionNumber);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `recu_${transactionNumber}.pdf`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch {
-      // ignore
-    }
-  };
-
-  // ========== HELPERS DETTES CLIENT ==========
-  // Un paiement multi-documents ne peut porter que sur une seule devise —
-  // on la derive de la premiere ligne selectionnee.
-  const selectedCurrency =
-    (payableDocuments || []).find((doc: any) =>
-      selectedDocuments.includes(doc.documentNumber),
-    )?.currency || "XAF";
-  const selectedTotal = (payableDocuments || [])
-    .filter((doc: any) => selectedDocuments.includes(doc.documentNumber))
-    .reduce(
-      (sum: number, doc: any) => sum + (doc.balanceDue || doc.totalAmount || 0),
-      0,
-    );
+  // Un paiement multi-documents ne porte que sur une devise : on la déduit de la première ligne choisie.
+  const docs: PayableDocument[] = payableDocuments || [];
+  const selectedCurrency = docs.find((d) => selectedDocuments.includes(d.documentNumber))?.currency || "XAF";
+  const selectedTotal = docs
+    .filter((d) => selectedDocuments.includes(d.documentNumber))
+    .reduce((sum, d) => sum + (d.balanceDue || d.totalAmount || 0), 0);
 
   const toggleDocument = (docNumber: string, docCurrency?: string) => {
     setSelectedDocuments((prev) => {
-      if (prev.includes(docNumber)) {
-        return prev.filter((d) => d !== docNumber);
-      }
-      // Empeche de melanger des documents de devises differentes dans le
-      // meme paiement (createPaymentIntentFromBillings cree une intention
-      // unique, donc une seule devise).
-      if (
-        prev.length > 0 &&
-        docCurrency &&
-        docCurrency !== selectedCurrency
-      ) {
+      if (prev.includes(docNumber)) return prev.filter((d) => d !== docNumber);
+      if (prev.length > 0 && docCurrency && docCurrency !== selectedCurrency) {
         setDebtError(
-          `Sélection limitée à une devise à la fois (${selectedCurrency}). Désélectionnez d’abord les documents en ${selectedCurrency} pour choisir des documents en ${docCurrency}.`,
+          `Une seule devise à la fois (${currencyLabel(selectedCurrency)}). Décochez d'abord ces documents pour choisir des documents en ${currencyLabel(docCurrency)}.`,
         );
         return prev;
       }
@@ -336,830 +245,346 @@ export const PaymentIntentsList: React.FC = () => {
   };
 
   const selectAll = () => {
-    // "Tout selectionner" ne prend que les documents de la premiere devise
-    // rencontree, pour la meme raison de coherence de devise.
-    const docs = payableDocuments || [];
     const firstCurrency = docs[0]?.currency;
-    const sameCurrencyDocs = docs
-      .filter((d: any) => !firstCurrency || d.currency === firstCurrency)
-      .map((d: any) => d.documentNumber);
-    if (selectedDocuments.length === sameCurrencyDocs.length) {
-      setSelectedDocuments([]);
-    } else {
-      setSelectedDocuments(sameCurrencyDocs);
-    }
+    const same = docs.filter((d) => !firstCurrency || d.currency === firstCurrency).map((d) => d.documentNumber);
+    setSelectedDocuments(selectedDocuments.length === same.length ? [] : same);
   };
 
-  // ========== DONNÉES DU TABLEAU ==========
   const intents: PaymentIntent[] = intentsData?.content || [];
-  const totalPages =
-    (intentsData as any)?.totalPages ??
-    Math.ceil((intentsData?.totalElements || 0) / PAGE_SIZE);
-  const totalElements = intentsData?.totalElements ?? 0;
+  const totalPages = intentsData?.totalPages ?? Math.ceil((intentsData?.totalElements || 0) / PAGE_SIZE);
+  const canPay =
+    selectedDocuments.length > 0 && (debtPayMethod === "CASH" || debtWalletNumber.trim().length > 0);
 
-  if (isLoading) {
-    return <div className="text-center py-8">Chargement...</div>;
-  }
-
-  // ========== RENDU PRINCIPAL ==========
   return (
-    <div>
-      {/* ========== EN-TÊTE ========== */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">
-            Intentions de paiement
-          </h2>
-          {totalElements > 0 && (
-            <p className="text-sm text-gray-500 mt-0.5">
-              {totalElements} intention{totalElements > 1 ? "s" : ""}
-            </p>
-          )}
-        </div>
-        <div className="flex flex-wrap justify-end gap-2">
-          {/* Navigation vers la page de création */}
-          <button
-            onClick={() => navigate("/payments/create")}
-            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2 text-sm"
-          >
-            <Plus size={18} />
-            Nouveau paiement
-          </button>
-          <button
-            onClick={() => {
-              setIsFromBillingOpen(true);
-              setFromBillingError(null);
-              setBillingDocNumber("");
-            }}
-            className="border border-primary-600 text-primary-600 px-4 py-2 rounded-lg hover:bg-primary-50 flex items-center gap-2 text-sm"
-          >
-            <Plus size={18} />
-            Depuis facture
-          </button>
-          <button
-            onClick={() => {
-              setIsDebtsOpen(true);
-              setDebtError(null);
-              setSelectedDocuments([]);
-              setDebtPayResult(null);
-              setDebtPayError(null);
-            }}
-            className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 flex items-center gap-2 text-sm"
-          >
-            <Search size={18} />
-            Dettes client
-          </button>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <ListHeader
+        title="Intentions de paiement"
+        subtitle="Toutes les demandes d'encaissement, leur statut et leur règlement."
+        action={
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <ActionButton icon={Plus} onClick={() => navigate("/payments/create")}>
+              Nouveau paiement
+            </ActionButton>
+            <ActionButton
+              variant="ghost"
+              icon={FileText}
+              onClick={() => {
+                setIsDebtsOpen(false);
+                setIsFromBillingOpen(true);
+                setFromBillingError(null);
+                setBillingDocNumber("");
+              }}
+            >
+              Depuis facture
+            </ActionButton>
+            <ActionButton
+              variant="ghost"
+              icon={Search}
+              onClick={() => {
+                setIsFromBillingOpen(false);
+                setIsDebtsOpen(true);
+                setDebtError(null);
+                setSelectedDocuments([]);
+              }}
+            >
+              Dettes client
+            </ActionButton>
+          </div>
+        }
+      />
 
       {redirectMessage && (
-        <div className="mb-6 flex items-start justify-between gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <div className="flex items-center justify-between gap-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
           <span>{redirectMessage}</span>
-          <button
-            type="button"
-            onClick={() => setRedirectMessage(null)}
-            className="rounded-lg p-1 text-emerald-700 transition hover:bg-emerald-100"
-            aria-label="Fermer le message"
-          >
-            <X size={14} />
-          </button>
+          <IconButton icon={X} label="Fermer le message" tone="success" onClick={() => setRedirectMessage(null)} />
         </div>
       )}
 
-      {/* ========== FILTRES ========== */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Rechercher par client, n° intention..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg"
-          />
-          {isFetching && search && (
-            <Loader2
-              size={14}
-              className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400"
-            />
-          )}
-        </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)}
-          className="px-4 py-2 border border-gray-200 rounded-lg bg-white"
-        >
-          <option value="">Tous les statuts</option>
-          {Object.entries(statusConfig).map(([key, value]) => (
-            <option key={key} value={key}>
-              {value.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* ========== TABLEAU ========== */}
-      <div className="overflow-x-auto rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
-        <table className="min-w-[1120px] w-full border-separate border-spacing-y-2">
-          <thead className="bg-gray-50/70">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                N° Intention
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Client
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Montant
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Source
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Objectif
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Statut
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Expiration
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {intents.map((intent) => {
-              const status = statusConfig[intent.status];
-              const StatusIcon = status?.icon;
-              return (
-                <tr
-                  key={intent.intentNumber}
-                  onClick={() => navigate(`/payments/${intent.intentNumber}`)}
-                  className="cursor-pointer transition hover:bg-gray-50/80"
-                >
-                  <td className="px-6 py-4 text-sm font-mono">
-                    {intent.intentNumber}
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-sm font-medium">
-                      {intent.customerName || intent.customerCode}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {intent.customerType}
-                    </p>
-                    {intent.customerEmail && (
-                      <p className="text-xs text-gray-400">
-                        {intent.customerEmail}
-                      </p>
-                    )}
-                    {intent.customerPhone && (
-                      <p className="text-xs text-gray-400">
-                        {intent.customerPhone}
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-right font-semibold">
-                    {intent.amount.toLocaleString("fr-FR")} {intent.currency}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {intent.resolvedSourceLabel ? (
-                      <>
-                        <p className="font-medium">
-                          {intent.resolvedSourceLabel}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {intent.resolvedSourceType}
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p>{intent.sourceType}</p>
-                        {intent.sourceCode && (
-                          <p className="text-xs text-gray-400 font-mono">
-                            {intent.sourceCode}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm">{intent.purpose}</td>
-                  <td className="px-6 py-4">
-                    {status && (
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${status.color}`}
-                      >
-                        <StatusIcon size={12} />
-                        {status.label}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {formatDateTime(intent.expiresAt)}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/payments/${intent.intentNumber}`);
-                      }}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition hover:bg-primary-50 hover:text-primary-600"
-                      title="Voir détail et transactions"
-                    >
-                      <Eye size={16} />
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* ========== ÉTAT VIDE ========== */}
-      {intents.length === 0 && !isLoading && (
-        <div className="text-center py-12 bg-white rounded-xl">
-          <p className="text-gray-500">Aucune intention de paiement trouvée</p>
-        </div>
-      )}
-
-      {/* ========== PAGINATION ========== */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 px-2">
-          <p className="text-sm text-gray-500">
-            {totalElements} intention{totalElements > 1 ? "s" : ""} — Page{" "}
-            {page + 1} / {totalPages}
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="p-1.5 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
-              className="p-1.5 border rounded-lg disabled:opacity-50 hover:bg-gray-50"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ========== MODAL CRÉATION DEPUIS FACTURE(S) ========== */}
       {isFromBillingOpen && (
-        <ModalPortal onClose={() => setIsFromBillingOpen(false)}>
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-xl font-bold">Paiement depuis une facture</h3>
-            <button
-              onClick={() => setIsFromBillingOpen(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          <div className="p-6 space-y-4">
-            {fromBillingError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex items-start gap-2">
-                <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-                {fromBillingError}
-              </div>
-            )}
-            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-700 flex items-start gap-2">
-              <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-              Le backend déduit automatiquement le client, le montant restant
-              dû, la devise et les sources depuis la facture.
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                N° Document de facturation *
-              </label>
-              <input
-                type="text"
-                value={billingDocNumber}
-                onChange={(e) => setBillingDocNumber(e.target.value)}
-                placeholder="INV-202604-000001"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Une facture unique — ou plusieurs séparées par des virgules
-                (même client, même devise)
-              </p>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setIsFromBillingOpen(false)}
-                disabled={
-                  fromBillingMutation.isPending ||
-                  fromBillingsMutation.isPending
-                }
-                className="flex-1 px-4 py-2 border rounded-lg text-gray-700 disabled:opacity-50"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={() => {
-                  const docs = billingDocNumber
-                    .split(",")
-                    .map((d) => d.trim())
-                    .filter(Boolean);
-                  if (docs.length === 0) return;
-                  if (docs.length === 1) {
-                    fromBillingMutation.mutate();
-                  } else {
-                    fromBillingsMutation.mutate(docs);
-                  }
-                }}
-                disabled={
-                  fromBillingMutation.isPending ||
-                  fromBillingsMutation.isPending ||
-                  !billingDocNumber.trim()
-                }
-                className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {fromBillingMutation.isPending ||
-                fromBillingsMutation.isPending ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <>
-                    <Plus size={14} /> Créer l'intention
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </ModalPortal>
+        <PanelForm
+          title="Créer une intention depuis une facture"
+          onSubmit={submitFromBilling}
+          onCancel={closeFromBilling}
+          pending={fromBillingMutation.isPending || fromBillingsMutation.isPending}
+          submitLabel="Créer l'intention"
+          submitDisabled={!billingDocNumber.trim()}
+          error={fromBillingError}
+        >
+          <Field label="Numéro de facture" required hint="Plusieurs factures : séparez-les par une virgule (une seule devise).">
+            <input
+              value={billingDocNumber}
+              onChange={(e) => setBillingDocNumber(e.target.value)}
+              placeholder="INV-2026-0042, INV-2026-0043"
+              className={`${FIELD_SOFT} font-mono`}
+              autoFocus
+            />
+          </Field>
+        </PanelForm>
       )}
 
-      {/* ========== MODAL DETTES CLIENT ========== */}
       {isDebtsOpen && (
-        <ModalPortal onClose={() => setIsDebtsOpen(false)} size="4xl">
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-xl font-bold">Dettes client</h3>
-            <button
-              onClick={() => setIsDebtsOpen(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          <div className="p-6 space-y-4 overflow-y-auto max-h-[70vh]">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Type de payeur
-                </label>
-                <select
-                  value={debtCustomerType}
-                  onChange={(e) => {
-                    setDebtCustomerType(e.target.value);
-                    setSelectedDocuments([]);
-                  }}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-                >
-                  <option value="MEMBER">Membre</option>
-                  <option value="CUSTOMER">Client</option>
-                  <option value="BUSINESS_ENTITY">Entreprise</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Code payeur
-                </label>
-                <input
-                  type="text"
-                  value={debtCustomerCode}
-                  onChange={(e) => {
-                    setDebtCustomerCode(e.target.value);
-                    setSelectedDocuments([]);
-                  }}
-                  placeholder="MBR-0001"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Recherche texte
-                </label>
-                <input
-                  type="text"
-                  value={debtSearchText}
-                  onChange={(e) => setDebtSearchText(e.target.value)}
-                  placeholder="Nom, source..."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-                />
-              </div>
+        <section className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-2 ring-[color:color-mix(in_srgb,var(--logo-pink)_30%,white)] sm:p-5">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h4 className="text-base font-bold text-gray-950">Dettes d'un client</h4>
+              <p className="text-sm text-gray-500">Cherchez les documents à payer, cochez-les, puis réglez en une fois.</p>
             </div>
+            <IconButton icon={X} label="Fermer" tone="neutral" onClick={() => setIsDebtsOpen(false)} />
+          </div>
 
-            {debtError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex items-start gap-2">
-                <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-                {debtError}
-              </div>
-            )}
-            {debtPayError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex items-start gap-2">
-                <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-                {debtPayError}
-              </div>
-            )}
-            {debtPayResult && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-lg text-sm">
-                <div className="flex items-center gap-2">
-                  <CheckCircle size={16} className="text-green-600" />
-                  <span>
-                    Paiement effectué — Transaction :{" "}
-                    <span className="font-mono">
-                      {debtPayResult.transactionNumber}
-                    </span>
-                  </span>
-                </div>
-                {debtPayResult.advanceAmount > 0 && (
-                  <p className="mt-1 text-xs flex items-center gap-1">
-                    <AlertCircle size={12} />
-                    Une partie a été créditée comme avance :{" "}
-                    {debtPayResult.advanceAmount.toLocaleString("fr-FR")} FCFA
-                  </p>
-                )}
-              </div>
-            )}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <Field label="Type de client">
+              <select
+                value={debtCustomerType}
+                onChange={(e) => {
+                  setDebtCustomerType(e.target.value);
+                  setSelectedDocuments([]);
+                }}
+                className={FIELD_SOFT}
+              >
+                {CUSTOMER_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Code client">
+              <input
+                value={debtCustomerCode}
+                onChange={(e) => {
+                  setDebtCustomerCode(e.target.value);
+                  setSelectedDocuments([]);
+                }}
+                placeholder="MBR-0001"
+                className={`${FIELD_SOFT} font-mono`}
+              />
+            </Field>
+            <Field label="Recherche">
+              <input
+                value={debtSearchText}
+                onChange={(e) => setDebtSearchText(e.target.value)}
+                placeholder="Nom, source…"
+                className={FIELD_SOFT}
+              />
+            </Field>
+          </div>
 
-            {selectedDocuments.length > 0 && (
-              <div className="bg-blue-50 p-3 rounded-lg flex justify-between items-center">
+          {debtError && <p className="mt-3 rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{debtError}</p>}
+
+          <div className="mt-4">
+            {!debtCustomerCode && !debtSearchText ? (
+              <p className="rounded-2xl bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+                Saisissez un code client ou une recherche pour afficher les documents.
+              </p>
+            ) : isLoadingDebts ? (
+              <ListSkeleton rows={3} />
+            ) : docs.length === 0 ? (
+              <p className="rounded-2xl bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">Aucun document à payer.</p>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={selectAll}
+                  className={`mb-2 rounded-full px-3 py-1.5 text-xs font-semibold text-[color:var(--logo-pink-dark)] hover:bg-[color:color-mix(in_srgb,var(--logo-pink)_12%,white)] ${FOCUS}`}
+                >
+                  {selectedDocuments.length === docs.length ? "Tout décocher" : "Tout cocher"}
+                </button>
+                <ul className="space-y-2">
+                  {docs.map((d) => {
+                    const on = selectedDocuments.includes(d.documentNumber);
+                    return (
+                      <li key={d.documentNumber}>
+                        <label
+                          className={`flex cursor-pointer items-center gap-3 rounded-2xl px-4 py-3 transition ${
+                            on ? "bg-[color:color-mix(in_srgb,var(--logo-pink)_12%,white)]" : "bg-gray-50 hover:bg-gray-100"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            onChange={() => toggleDocument(d.documentNumber, d.currency)}
+                            className="h-4 w-4 shrink-0 rounded accent-[color:var(--logo-pink-dark)]"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-mono text-xs font-semibold text-[color:var(--logo-pink-dark)]">
+                              {d.documentNumber}
+                            </span>
+                            <span className="block truncate text-sm text-gray-600">
+                              {d.documentType}
+                              {d.dueDate ? ` · échéance ${formatDateTime(d.dueDate).split(" ")[0]}` : ""}
+                            </span>
+                          </span>
+                          <span className="shrink-0 text-right">
+                            <span className="block text-sm font-bold tabular-nums text-gray-950">
+                              {formatMoney(d.balanceDue, currencyLabel(d.currency))}
+                            </span>
+                            <span className="block text-xs text-gray-400">{d.status}</span>
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+          </div>
+
+          {selectedDocuments.length > 0 && (
+            <div className="mt-5 rounded-2xl bg-gray-50 p-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                  <p className="text-sm font-medium text-blue-800">
-                    {selectedDocuments.length} document
-                    {selectedDocuments.length > 1 ? "s" : ""} sélectionné
-                    {selectedDocuments.length > 1 ? "s" : ""}
+                  <p className="text-sm text-gray-500">
+                    {selectedDocuments.length} document{selectedDocuments.length > 1 ? "s" : ""} à régler
                   </p>
-                  <p className="text-xs text-blue-600">
-                    Total à payer :{" "}
-                    <span className="font-bold">
-                      {selectedTotal.toLocaleString("fr-FR")} {selectedCurrency}
-                    </span>
+                  <p className="text-2xl font-bold tracking-tight text-gray-950">
+                    {formatMoney(selectedTotal, currencyLabel(selectedCurrency))}
                   </p>
-                  <p className="text-xs text-blue-400 mt-0.5">
-                    Le règlement couvre l’intégralité du montant sélectionné
-                    (paiement partiel indisponible en multi-documents).
-                  </p>
+                  <p className="mt-1 text-xs text-gray-400">Le règlement couvre la totalité de la sélection (pas de paiement partiel).</p>
                 </div>
-                <div className="space-y-2">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => setDebtPayMethod("CASH")}
-                      className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 ${
-                        debtPayMethod === "CASH"
-                          ? "bg-green-600 text-white"
-                          : "bg-green-100 text-green-700"
-                      }`}
-                    >
-                      <Banknote size={12} /> Cash
-                    </button>
-                    <button
-                      onClick={() => setDebtPayMethod("WALLET")}
-                      className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 ${
-                        debtPayMethod === "WALLET"
-                          ? "bg-blue-600 text-white"
-                          : "bg-blue-100 text-blue-700"
-                      }`}
-                    >
-                      <Wallet size={12} /> Wallet
-                    </button>
+                    {([
+                      { v: "CASH", label: "Espèces", icon: Banknote },
+                      { v: "WALLET", label: "Portefeuille", icon: Wallet },
+                    ] as const).map(({ v, label, icon: Icon }) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setDebtPayMethod(v)}
+                        className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${FOCUS} ${
+                          debtPayMethod === v
+                            ? "bg-[color:var(--logo-pink-dark)] text-white"
+                            : "bg-white text-gray-600 shadow-sm hover:bg-gray-100"
+                        }`}
+                      >
+                        <Icon size={15} />
+                        {label}
+                      </button>
+                    ))}
                   </div>
-                  {debtPayMethod === "CASH" && (
+                  {debtPayMethod === "CASH" ? (
                     <select
                       value={debtCashSession}
                       onChange={(e) => setDebtCashSession(e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-200 rounded text-xs"
+                      className={`${FIELD_SOFT} bg-white shadow-sm sm:w-56`}
+                      aria-label="Session de caisse"
                     >
-                      <option value="">Sans session caisse</option>
+                      <option value="">Sans session de caisse</option>
                       {openSessions.map((s) => (
                         <option key={s.sessionNumber} value={s.sessionNumber}>
-                          {s.sessionNumber} — {s.registerCode}
+                          {s.sessionNumber} · {s.registerCode}
                         </option>
                       ))}
                     </select>
-                  )}
-                  {debtPayMethod === "WALLET" && (
+                  ) : (
                     <input
-                      type="text"
                       value={debtWalletNumber}
                       onChange={(e) => setDebtWalletNumber(e.target.value)}
-                      placeholder="N° wallet *"
-                      className="w-full px-2 py-1 border border-gray-200 rounded text-xs"
+                      placeholder="N° de portefeuille"
+                      aria-label="Numéro de portefeuille"
+                      className={`${FIELD_SOFT} bg-white font-mono shadow-sm sm:w-56`}
                     />
                   )}
-                  <button
+                  <ActionButton
+                    icon={Receipt}
+                    pending={paySelectedDocumentsMutation.isPending}
+                    disabled={!canPay}
                     onClick={() => paySelectedDocumentsMutation.mutate()}
-                    disabled={
-                      paySelectedDocumentsMutation.isPending ||
-                      selectedDocuments.length === 0 ||
-                      (debtPayMethod === "WALLET" && !debtWalletNumber)
-                    }
-                    className="w-full bg-green-600 text-white py-1 rounded text-xs hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-1"
                   >
-                    {paySelectedDocumentsMutation.isPending ? (
-                      <Loader2 size={12} className="animate-spin" />
-                    ) : (
-                      <>
-                        <Receipt size={12} /> Payer la sélection
-                      </>
-                    )}
-                  </button>
+                    Payer la sélection
+                  </ActionButton>
                 </div>
               </div>
-            )}
-
-            {isLoadingDebts ? (
-              <div className="text-center py-8">
-                <Loader2 className="animate-spin mx-auto mb-2" size={24} />
-                <p className="text-sm text-gray-500">
-                  Chargement des dettes...
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {payableDocuments && payableDocuments.length > 0 && (
-                  <button
-                    onClick={selectAll}
-                    className="text-xs text-primary-600 hover:text-primary-800 flex items-center gap-1 mb-2"
-                  >
-                    {selectedDocuments.length === payableDocuments.length ? (
-                      <CheckSquare size={14} />
-                    ) : (
-                      <Square size={14} />
-                    )}
-                    {selectedDocuments.length === payableDocuments.length
-                      ? "Tout désélectionner"
-                      : "Tout sélectionner"}
-                  </button>
-                )}
-                {(payableDocuments || []).map((doc: any) => {
-                  const isSelected = selectedDocuments.includes(
-                    doc.documentNumber,
-                  );
-                  const isDisabledCurrency =
-                    selectedDocuments.length > 0 &&
-                    !isSelected &&
-                    doc.currency &&
-                    doc.currency !== selectedCurrency;
-                  return (
-                    <div
-                      key={doc.documentNumber}
-                      onClick={() =>
-                        !isDisabledCurrency &&
-                        toggleDocument(doc.documentNumber, doc.currency)
-                      }
-                      className={`p-3 rounded-lg border transition-colors ${
-                        isDisabledCurrency
-                          ? "cursor-not-allowed opacity-40 border-gray-200 bg-gray-50"
-                          : "cursor-pointer"
-                      } ${
-                        isSelected
-                          ? "border-blue-500 bg-blue-50"
-                          : !isDisabledCurrency
-                            ? "border-gray-200 bg-gray-50 hover:bg-gray-100"
-                            : ""
-                      }`}
-                      title={
-                        isDisabledCurrency
-                          ? `Devise différente (${doc.currency}) — désélectionnez d’abord les documents en ${selectedCurrency}`
-                          : undefined
-                      }
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="mt-0.5">
-                          {isSelected ? (
-                            <CheckSquare size={18} className="text-blue-600" />
-                          ) : (
-                            <Square size={18} className="text-gray-400" />
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="text-sm font-mono font-medium">
-                                {doc.documentNumber}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {doc.customerName || doc.customerCode || "—"}
-                                {doc.customerEmail && (
-                                  <span className="ml-2 text-gray-400">
-                                    {doc.customerEmail}
-                                  </span>
-                                )}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm font-semibold">
-                                {doc.totalAmount?.toLocaleString("fr-FR")}{" "}
-                                {doc.currency}
-                              </p>
-                              {doc.balanceDue > 0 && (
-                                <p className="text-xs text-red-600 font-medium">
-                                  Solde :{" "}
-                                  {doc.balanceDue.toLocaleString("fr-FR")}{" "}
-                                  {doc.currency}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          {doc.resolvedSourceLabel ? (
-                            <div className="mt-1 flex items-center gap-2">
-                              <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                                {doc.resolvedSourceLabel}
-                              </span>
-                              {doc.resolvedSourceType && (
-                                <span className="text-xs text-gray-400 font-mono">
-                                  ({doc.resolvedSourceType})
-                                </span>
-                              )}
-                            </div>
-                          ) : doc.sourceType || doc.sourceCode ? (
-                            <div className="mt-1">
-                              <span className="text-xs text-gray-400">
-                                {doc.sourceType}
-                                {doc.sourceCode ? ` / ${doc.sourceCode}` : ""}
-                              </span>
-                            </div>
-                          ) : null}
-                          <div className="flex justify-between mt-1">
-                            <p className="text-xs text-gray-400">
-                              {doc.documentType}
-                            </p>
-                            {doc.dueDate && (
-                              <p className="text-xs text-gray-500">
-                                Échéance :{" "}
-                                {new Date(doc.dueDate).toLocaleDateString(
-                                  "fr-FR",
-                                )}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {payableDocuments &&
-                  payableDocuments.length === 0 &&
-                  (debtCustomerCode || debtSearchText) && (
-                    <div className="text-center py-8 text-gray-500 text-sm">
-                      Aucune dette trouvée pour ce payeur
-                    </div>
-                  )}
-                {!debtCustomerCode && !debtSearchText && (
-                  <div className="text-center py-8 text-gray-400 text-sm">
-                    Entrez un code payeur ou un texte de recherche pour charger
-                    les dettes
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </ModalPortal>
+            </div>
+          )}
+        </section>
       )}
 
-      {/* ========== MODAL REÇU ========== */}
-      {isReceiptOpen && (
-        <ModalPortal onClose={() => setIsReceiptOpen(false)} size="lg">
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-xl font-bold">Reçu de paiement</h3>
-            <button
-              onClick={() => setIsReceiptOpen(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          <div className="p-6 space-y-4">
-            {receiptLoading ? (
-              <div className="text-center py-8">
-                <Loader2 className="animate-spin mx-auto mb-2" size={24} />
-                <p className="text-sm text-gray-500">Chargement du reçu...</p>
-              </div>
-            ) : receiptData ? (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500">N° Reçu</p>
-                    <p className="font-mono font-bold">
-                      {receiptData.receiptNumber}
+      <div className="space-y-3">
+        <SearchField value={search} onChange={setSearch} placeholder="Client, n° d'intention, e-mail" />
+        <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
+          {STATUS_FILTERS.map((f) => {
+            const on = statusFilter === f.value;
+            return (
+              <button
+                key={f.value || "all"}
+                type="button"
+                onClick={() => {
+                  setStatusFilter(f.value);
+                  setPage(0);
+                }}
+                className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${FOCUS} ${
+                  on ? "bg-[color:var(--logo-pink-dark)] text-white" : "bg-white text-gray-600 shadow-sm hover:bg-gray-50"
+                }`}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+          {isFetching && !isLoading && <Dots />}
+        </div>
+      </div>
+
+      {isLoading ? (
+        <ListSkeleton rows={6} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les intentions." onRetry={() => refetch()} />
+      ) : intents.length === 0 ? (
+        <EmptyState icon={CreditCard} title="Aucune intention" hint="Ajustez la recherche ou créez un nouveau paiement." />
+      ) : (
+        <>
+          <HeadRow cols={COLS}>
+            <span>Intention</span>
+            <span>Client</span>
+            <span>Montant</span>
+            <span>Source</span>
+            <span>Expire</span>
+            <span className="text-right">Statut</span>
+          </HeadRow>
+          <DataCard>
+            {intents.map((intent) => {
+              const st = statusOf(INTENT_STATUS, intent.status);
+              return (
+                <button
+                  key={intent.intentNumber}
+                  type="button"
+                  onClick={() => navigate(`/payments/${intent.intentNumber}`)}
+                  className={`grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 rounded-2xl p-4 text-left transition max-lg:mb-2 max-lg:bg-gray-50 ${COLS} ${ROW_HOVER} ${FOCUS}`}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-xs font-semibold text-[color:var(--logo-pink-dark)]">{intent.intentNumber}</p>
+                    <p className="mt-0.5 truncate text-sm text-gray-500">{PURPOSE_LABEL[intent.purpose] ?? intent.purpose}</p>
+                  </div>
+                  <div className="lg:order-last lg:text-right">
+                    <StatusChip tone={st.tone}>{st.label}</StatusChip>
+                  </div>
+                  <div className="col-span-2 min-w-0 lg:col-span-1">
+                    <p className="truncate font-semibold text-gray-950">{intent.customerName || intent.customerCode}</p>
+                    <p className="truncate text-xs text-gray-400">
+                      {CUSTOMER_TYPE_LABEL[intent.customerType] ?? intent.customerType}
+                      {intent.customerEmail ? ` · ${intent.customerEmail}` : ""}
                     </p>
                   </div>
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500">N° Transaction</p>
-                    <p className="font-mono font-bold">
-                      {receiptData.transactionNumber}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500">Montant payé</p>
-                    <p className="font-bold text-lg">
-                      {receiptData.paidAmount?.toLocaleString("fr-FR")} FCFA
-                    </p>
-                  </div>
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500">Méthode</p>
-                    <p className="font-medium">
-                      {receiptData.paymentMethod}
-                      {receiptData.provider ? ` · ${receiptData.provider}` : ""}
-                    </p>
-                  </div>
-                  {receiptData.allocatedAmount > 0 && (
-                    <div className="p-3 bg-gray-50 rounded-lg">
-                      <p className="text-xs text-gray-500">Alloué</p>
-                      <p className="font-medium">
-                        {receiptData.allocatedAmount?.toLocaleString("fr-FR")}{" "}
-                        FCFA
-                      </p>
-                    </div>
-                  )}
-                  {receiptData.advanceAmount > 0 && (
-                    <div className="p-3 bg-amber-50 rounded-lg">
-                      <p className="text-xs text-amber-600">Avance créditée</p>
-                      <p className="font-medium text-amber-700">
-                        {receiptData.advanceAmount?.toLocaleString("fr-FR")}{" "}
-                        FCFA
-                      </p>
-                    </div>
-                  )}
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500">Date</p>
-                    <p className="text-sm">
-                      {new Date(receiptData.paidAt).toLocaleString("fr-FR")}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500">Encaissé par</p>
-                    <p className="text-sm">{receiptData.receivedBy}</p>
-                  </div>
-                </div>
-                {receiptData.customerName && (
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <p className="text-xs text-blue-500">Client</p>
-                    <p className="font-medium text-blue-800">
-                      {receiptData.customerName}
-                    </p>
-                  </div>
-                )}
-                {receiptData.allocations &&
-                  receiptData.allocations.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-700 mb-2">
-                        Allocations
-                      </h4>
-                      <div className="space-y-1">
-                        {(receiptData.allocations as any[]).map(
-                          (a: any, i: number) => (
-                            <div
-                              key={i}
-                              className="flex justify-between text-xs bg-gray-50 p-2 rounded"
-                            >
-                              <span className="font-mono">
-                                {a.documentNumber || a.referenceCode}
-                              </span>
-                              <span className="font-medium">
-                                {a.amount?.toLocaleString("fr-FR")} FCFA
-                              </span>
-                            </div>
-                          ),
-                        )}
-                      </div>
-                    </div>
-                  )}
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={() =>
-                      handleDownloadReceiptPdf(receiptData.transactionNumber)
-                    }
-                    className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 flex items-center justify-center gap-2"
-                  >
-                    <Download size={16} /> Télécharger PDF
-                  </button>
-                  <button
-                    onClick={() => setIsReceiptOpen(false)}
-                    className="flex-1 px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50"
-                  >
-                    Fermer
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                Reçu introuvable
-              </div>
-            )}
-          </div>
-        </ModalPortal>
+                  <p className="text-sm font-bold tabular-nums text-gray-950">{formatMoney(intent.amount, currencyLabel(intent.currency))}</p>
+                  <p className="min-w-0 truncate text-sm text-gray-600 max-lg:hidden">
+                    {intent.resolvedSourceLabel || intent.sourceCode || intent.sourceType}
+                  </p>
+                  <p className="text-sm text-gray-500 max-lg:text-right">{formatDateTime(intent.expiresAt)}</p>
+                </button>
+              );
+            })}
+          </DataCard>
+          <Pagination page={page} totalPages={totalPages || 1} total={intentsData?.totalElements ?? intents.length} noun="intention" onChange={setPage} />
+        </>
       )}
+
+      <ReceiptModal
+        transactionNumber={receiptTxn}
+        onClose={() => setReceiptTxn(null)}
+        onDownload={downloadReceipt}
+        downloading={downloading}
+      />
     </div>
   );
 };

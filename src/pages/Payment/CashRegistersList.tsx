@@ -1,40 +1,53 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Plus,
-  Search,
-  Power,
-  X,
-  Loader2,
-  Wallet,
-  TrendingUp,
-  TrendingDown,
-  BarChart3,
-} from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus, Power, Wallet } from "lucide-react";
 import { paymentService } from "../../services/payment.service";
 import type { CashRegister } from "../../services/payment.service";
-import { ModalPortal } from "../../components/ui/ModalPortal";
+import {
+  ActionButton,
+  DataCard,
+  EmptyState,
+  ErrorBlock,
+  Field,
+  HeadRow,
+  IconButton,
+  ListHeader,
+  PanelForm,
+  SearchField,
+  StatusChip,
+  Switch,
+} from "../../components/subscription/kit";
+import { FIELD_SOFT, apiMessage, formatMoney } from "../../components/subscription/kitUtils";
+import { toast } from "../../components/ui/toastStore";
+import { ListSkeleton } from "../../components/ui/Skeleton";
+import { KpiRow, KpiRowSkeleton } from "../../components/operations/OpsCharts";
+
+const COLS = "lg:grid-cols-[8rem_minmax(0,1.5fr)_minmax(0,1fr)_7rem_9rem_3rem]";
+
+const EMPTY_FORM = {
+  name: "",
+  locationCode: "",
+  businessEntityCode: "",
+  deviceCode: "",
+  cashControlEnabled: true,
+  maxCashAmount: 500000,
+  managerEmail: "",
+};
 
 export const CashRegistersList: React.FC = () => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    locationCode: "",
-    businessEntityCode: "",
-    deviceCode: "",
-    cashControlEnabled: true,
-    maxCashAmount: 500000,
-    managerEmail: "",
-  });
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [togglingCode, setTogglingCode] = useState<string | null>(null);
 
-  const { data: registersData, isLoading } = useQuery({
+  const { data: registersData, isLoading, isError, refetch } = useQuery({
     queryKey: ["cash-registers"],
     queryFn: () => paymentService.getCashRegisters({ size: 100 }),
   });
 
-  const { data: metrics } = useQuery({
+  const { data: metrics, isLoading: metricsLoading } = useQuery({
     queryKey: ["cash-metrics-overview-registers-screen"],
     queryFn: () => paymentService.getCashMetricsOverview(),
   });
@@ -52,359 +65,179 @@ export const CashRegistersList: React.FC = () => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cash-registers"] });
-      handleCloseModal();
+      setIsFormOpen(false);
+      setFormError(null);
+      toast.success("Caisse créée");
     },
+    onError: (e: unknown) => setFormError(apiMessage(e, "Création impossible.")),
   });
 
   const activateMutation = useMutation({
     mutationFn: (code: string) => paymentService.activateCashRegister(code),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cash-registers"] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["cash-registers"] }),
   });
 
   const deactivateMutation = useMutation({
     mutationFn: (code: string) => paymentService.deactivateCashRegister(code),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cash-registers"] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["cash-registers"] }),
   });
 
   const registers: CashRegister[] = registersData?.content || [];
+  const q = search.trim().toLowerCase();
+  const filtered = registers.filter((r) => r.name.toLowerCase().includes(q) || r.registerCode.toLowerCase().includes(q));
 
-  const filteredRegisters = registers.filter(
-    (r) =>
-      r.name.toLowerCase().includes(search.toLowerCase()) ||
-      r.registerCode.toLowerCase().includes(search.toLowerCase()),
-  );
-
-  const handleOpenModal = () => {
-    setFormData({
-      name: "",
-      locationCode: "",
-      businessEntityCode: "",
-      deviceCode: "",
-      cashControlEnabled: true,
-      maxCashAmount: 500000,
-      managerEmail: "",
-    });
-    setIsModalOpen(true);
+  const openForm = () => {
+    setFormData(EMPTY_FORM);
+    setFormError(null);
+    setIsFormOpen(true);
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createMutation.mutate();
-  };
-
-  const handleToggleActive = (register: CashRegister) => {
+  const toggle = (register: CashRegister) => {
     if (register.active) {
-      deactivateMutation.mutate(register.registerCode);
-    } else {
-      activateMutation.mutate(register.registerCode);
+      toast.confirm({
+        message: `Désactiver « ${register.name} » ?`,
+        detail: "Plus aucune session ne pourra s'ouvrir sur cette caisse.",
+        confirmLabel: "Désactiver",
+        successMessage: "Caisse désactivée",
+        errorMessage: "Désactivation impossible",
+        onConfirm: () => deactivateMutation.mutateAsync(register.registerCode),
+      });
+      return;
     }
+    setTogglingCode(register.registerCode);
+    activateMutation
+      .mutateAsync(register.registerCode)
+      .then(() => toast.success("Caisse activée"))
+      .catch(() => toast.error("Activation impossible"))
+      .finally(() => setTogglingCode(null));
   };
-
-  const isPending = createMutation.isPending;
-
-  if (isLoading) {
-    return <div className="text-center py-8">Chargement...</div>;
-  }
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Caisses</h2>
-        <button
-          onClick={() => handleOpenModal()}
-          className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2"
+    <div className="space-y-5">
+      <ListHeader
+        title="Caisses"
+        subtitle="Les points d'encaissement et leurs règles de contrôle."
+        action={
+          <ActionButton icon={Plus} onClick={openForm} className="w-full sm:w-auto">
+            Nouvelle caisse
+          </ActionButton>
+        }
+      />
+
+      {metricsLoading ? (
+        <KpiRowSkeleton />
+      ) : (
+        metrics && (
+          <KpiRow
+            items={[
+              { label: "Encaissements", value: formatMoney(metrics.totalPayments) },
+              { label: "Entrées d'espèces", value: formatMoney(metrics.totalCashIn), tone: "success" },
+              { label: "Sorties d'espèces", value: formatMoney(metrics.totalCashOut), tone: "danger" },
+              { label: "Sessions ouvertes", value: metrics.openSessionCount ?? 0 },
+            ]}
+          />
+        )
+      )}
+
+      {isFormOpen && (
+        <PanelForm
+          title="Nouvelle caisse"
+          onSubmit={(e) => {
+            e.preventDefault();
+            createMutation.mutate();
+          }}
+          onCancel={() => setIsFormOpen(false)}
+          pending={createMutation.isPending}
+          submitLabel="Créer la caisse"
+          submitDisabled={!formData.name.trim() || !formData.locationCode.trim() || !formData.businessEntityCode.trim()}
+          error={formError}
         >
-          <Plus size={18} />
-          Nouvelle caisse
-        </button>
-      </div>
-
-      {metrics && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-gray-500 text-xs">
-              <Wallet size={15} /> Revenus
-            </div>
-            <p className="text-lg font-semibold mt-1">
-              {(metrics.totalPayments ?? 0).toLocaleString("fr-FR")} FCFA
-            </p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Field label="Nom" required>
+              <input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className={FIELD_SOFT} autoFocus />
+            </Field>
+            <Field label="Emplacement" required>
+              <input value={formData.locationCode} onChange={(e) => setFormData({ ...formData, locationCode: e.target.value })} className={`${FIELD_SOFT} font-mono`} />
+            </Field>
+            <Field label="Entité" required>
+              <input value={formData.businessEntityCode} onChange={(e) => setFormData({ ...formData, businessEntityCode: e.target.value })} className={`${FIELD_SOFT} font-mono`} />
+            </Field>
+            <Field label="Appareil">
+              <input value={formData.deviceCode} onChange={(e) => setFormData({ ...formData, deviceCode: e.target.value })} className={`${FIELD_SOFT} font-mono`} />
+            </Field>
+            <Field label="Montant maximum en caisse (FCFA)">
+              <input
+                type="number"
+                min={0}
+                value={formData.maxCashAmount}
+                onChange={(e) => setFormData({ ...formData, maxCashAmount: Number(e.target.value) || 0 })}
+                className={FIELD_SOFT}
+              />
+            </Field>
+            <Field label="E-mail du responsable" hint="Défini à la création uniquement">
+              <input type="email" value={formData.managerEmail} onChange={(e) => setFormData({ ...formData, managerEmail: e.target.value })} className={FIELD_SOFT} />
+            </Field>
           </div>
-          <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-gray-500 text-xs">
-              <TrendingUp size={15} /> Entrées cash
-            </div>
-            <p className="text-lg font-semibold mt-1">
-              {(metrics.totalCashIn ?? 0).toLocaleString("fr-FR")} FCFA
-            </p>
-          </div>
-          <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-gray-500 text-xs">
-              <TrendingDown size={15} /> Sorties cash
-            </div>
-            <p className="text-lg font-semibold mt-1">
-              {(metrics.totalCashOut ?? 0).toLocaleString("fr-FR")} FCFA
-            </p>
-          </div>
-          <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-gray-500 text-xs">
-              <BarChart3 size={15} /> Sessions ouvertes
-            </div>
-            <p className="text-lg font-semibold mt-1">
-              {metrics.openSessionCount ?? 0}
-            </p>
-          </div>
-        </div>
+          <Switch
+            checked={formData.cashControlEnabled}
+            onChange={(v) => setFormData({ ...formData, cashControlEnabled: v })}
+            label="Contrôle de caisse"
+            hint="Comptage et validation des écarts à la clôture"
+          />
+        </PanelForm>
       )}
 
-      <div className="relative mb-6">
-        <Search
-          size={18}
-          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-        />
-        <input
-          type="text"
-          placeholder="Rechercher une caisse..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg"
-        />
-      </div>
+      <SearchField value={search} onChange={setSearch} placeholder="Nom ou code de la caisse" />
 
-      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-        <table className="w-full border-separate border-spacing-y-2">
-          <thead className="bg-gray-50/70">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Code
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Nom
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Emplacement
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Contrôle cash
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Montant max
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Actif
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRegisters.map((register) => (
-              <tr key={register.registerCode} className="hover:bg-gray-50/80">
-                <td className="px-6 py-4 text-sm font-mono">
-                  {register.registerCode}
-                </td>
-                <td className="px-6 py-4 text-sm font-medium">
-                  {register.name}
-                </td>
-                <td className="px-6 py-4 text-sm">{register.locationCode}</td>
-                <td className="px-6 py-4 text-center">
-                  {register.cashControlEnabled ? (
-                    <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">
-                      Activé
-                    </span>
-                  ) : (
-                    <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500">
-                      Désactivé
-                    </span>
-                  )}
-                </td>
-                <td className="px-6 py-4 text-right">
-                  {register.maxCashAmount?.toLocaleString()} FCFA
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <button
-                    onClick={() => handleToggleActive(register)}
-                    className={`p-1 rounded ${register.active ? "text-green-600 hover:text-green-800" : "text-gray-400 hover:text-gray-600"}`}
-                  >
-                    <Power size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {filteredRegisters.length === 0 && (
-        <div className="text-center py-12 bg-white rounded-xl">
-          <Wallet size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500">Aucune caisse trouvée</p>
-        </div>
-      )}
-
-      {isModalOpen && (
-        <ModalPortal onClose={handleCloseModal}>
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-xl font-bold">Nouvelle caisse</h3>
-            <button
-              onClick={handleCloseModal}
-              className="p-1 hover:bg-gray-100 rounded-lg"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nom *
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                required
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Emplacement *
-              </label>
-              <input
-                type="text"
-                value={formData.locationCode}
-                onChange={(e) =>
-                  setFormData({ ...formData, locationCode: e.target.value })
-                }
-                required
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Code business
-              </label>
-              <input
-                type="text"
-                value={formData.businessEntityCode}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    businessEntityCode: e.target.value,
-                  })
-                }
-                placeholder="Laissez vide pour génération automatique"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Optionnel — le backend générera un code automatiquement si non
-                renseigné
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Code appareil
-              </label>
-              <input
-                type="text"
-                value={formData.deviceCode}
-                onChange={(e) =>
-                  setFormData({ ...formData, deviceCode: e.target.value })
-                }
-                placeholder="Laissez vide pour génération automatique"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Optionnel — le backend générera un code automatiquement si non
-                renseigné
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email du manager
-              </label>
-              <input
-                type="email"
-                value={formData.managerEmail}
-                onChange={(e) =>
-                  setFormData({ ...formData, managerEmail: e.target.value })
-                }
-                placeholder="manager.reception@elleaose.com"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Destinataire des alertes de dépassement de plafond. Si vide,
-                l’adresse superviseur générique est utilisée. Ne se règle
-                qu’à la création — aucun endpoint de modification n’existe
-                actuellement.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formData.cashControlEnabled}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      cashControlEnabled: e.target.checked,
-                    })
-                  }
-                  className="rounded"
-                />
-                <span className="text-sm">Contrôle cash</span>
-              </label>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Montant max (FCFA)
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={
-                    formData.maxCashAmount === 0 ? "" : formData.maxCashAmount
-                  }
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, "");
-                    setFormData({
-                      ...formData,
-                      maxCashAmount: val === "" ? 0 : parseInt(val),
-                    });
-                  }}
-                  placeholder="0"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-                />
+      {isLoading ? (
+        <ListSkeleton rows={5} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les caisses." onRetry={() => refetch()} />
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={Wallet} title="Aucune caisse" hint="Ajustez la recherche ou créez une caisse." />
+      ) : (
+        <>
+          <HeadRow cols={COLS}>
+            <span>Code</span>
+            <span>Nom</span>
+            <span>Emplacement</span>
+            <span>Contrôle</span>
+            <span className="text-right">Plafond</span>
+            <span />
+          </HeadRow>
+          <DataCard>
+            {filtered.map((r) => (
+              <div
+                key={r.registerCode}
+                className={`grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 rounded-2xl p-4 max-lg:mb-2 max-lg:bg-gray-50 ${COLS} ${r.active ? "" : "opacity-60"}`}
+              >
+                <p className="font-mono text-xs font-semibold text-[color:var(--logo-pink-dark)]">{r.registerCode}</p>
+                <div className="lg:order-last">
+                  <IconButton
+                    icon={Power}
+                    label={r.active ? "Désactiver la caisse" : "Activer la caisse"}
+                    tone={r.active ? "success" : "neutral"}
+                    pending={togglingCode === r.registerCode}
+                    onClick={() => toggle(r)}
+                  />
+                </div>
+                <div className="col-span-2 min-w-0 lg:col-span-1">
+                  <p className="truncate font-semibold text-gray-950">{r.name}</p>
+                  {r.managerEmail && <p className="truncate text-xs text-gray-400">{r.managerEmail}</p>}
+                </div>
+                <p className="truncate font-mono text-xs text-gray-500">{r.locationCode}</p>
+                <div>
+                  <StatusChip tone={r.cashControlEnabled ? "success" : "neutral"}>
+                    {r.cashControlEnabled ? "Activé" : "Désactivé"}
+                  </StatusChip>
+                </div>
+                <p className="text-sm font-bold tabular-nums text-gray-950 lg:text-right">
+                  {r.maxCashAmount ? formatMoney(r.maxCashAmount) : ""}
+                </p>
               </div>
-            </div>
-            <div className="flex gap-3 pt-4">
-              <button
-                type="button"
-                onClick={handleCloseModal}
-                className="flex-1 px-4 py-2 border rounded-lg text-gray-700"
-              >
-                Annuler
-              </button>
-              <button
-                type="submit"
-                disabled={isPending}
-                className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isPending ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  "Créer"
-                )}
-              </button>
-            </div>
-          </form>
-        </ModalPortal>
+            ))}
+          </DataCard>
+        </>
       )}
     </div>
   );

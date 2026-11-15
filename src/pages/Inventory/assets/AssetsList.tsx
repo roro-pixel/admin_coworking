@@ -1,594 +1,189 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, Search, Eye, X } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { HardDrive, Pencil, Plus, Trash2 } from "lucide-react";
 import { inventoryService } from "../../../services/inventory.service";
 import type { Asset, InventoryItem } from "../../../services/inventory.service";
-import { AssetDetailModal } from "./AssetDetailModal";
-import { ModalPortal } from "../../../components/ui/ModalPortal";
+import { ActionButton, DataCard, EmptyState, ErrorBlock, Field, FilterButton, FilterPanel, HeadRow, IconButton, ListHeader, PanelForm, Pagination, SearchField } from "../../../components/subscription/kit";
+import { FIELD, ROW_HOVER, apiMessage } from "../../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../../components/ui/Skeleton";
+import { toast } from "../../../components/ui/toastStore";
+import { ASSET_STATUSES, ASSET_STATUS_LABEL, ASSET_STATUS_TONE, CONDITIONS, CONDITION_LABEL, Cell, Chip, Fact, ItemPicker, LocationSelect, label, useServerPaged } from "../../../components/inventory/invKit";
+import { AssetDetail } from "./AssetDetail";
 
-const statusOptions = [
-  {
-    value: "AVAILABLE",
-    label: "Disponible",
-    color: "bg-green-100 text-green-700",
-  },
-  { value: "RESERVED", label: "Réservé", color: "bg-blue-100 text-blue-700" },
-  {
-    value: "ASSIGNED",
-    label: "Attribué",
-    color: "bg-purple-100 text-purple-700",
-  },
-  {
-    value: "IN_USE",
-    label: "En utilisation",
-    color: "bg-cyan-100 text-cyan-700",
-  },
-  {
-    value: "IN_MAINTENANCE",
-    label: "En maintenance",
-    color: "bg-orange-100 text-orange-700",
-  },
-  { value: "LOST", label: "Perdu", color: "bg-red-100 text-red-700" },
-  { value: "RETIRED", label: "Retiré", color: "bg-gray-100 text-gray-700" },
-  { value: "DAMAGED", label: "Endommagé", color: "bg-red-100 text-red-700" },
-];
-
-const conditionOptions = [
-  { value: "NEW", label: "Neuf", color: "bg-green-100 text-green-700" },
-  { value: "GOOD", label: "Bon", color: "bg-blue-100 text-blue-700" },
-  { value: "FAIR", label: "Correct", color: "bg-yellow-100 text-yellow-700" },
-  { value: "POOR", label: "Mauvais", color: "bg-orange-100 text-orange-700" },
-  { value: "DAMAGED", label: "Endommagé", color: "bg-red-100 text-red-700" },
-];
+const COLS = "lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.1fr)_9rem_6rem_auto]";
+const SIZE = 15;
+const EMPTY = {
+  itemCode: "", serialNumber: "", assetTag: "", status: "AVAILABLE" as Asset["status"], condition: "NEW" as Asset["condition"], locationCode: "",
+  purchaseDate: "", purchaseCost: 0, warrantyEndDate: "", usefulLifeMonths: 60, residualValue: 0, notes: "",
+};
 
 export const AssetsList: React.FC = () => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [locationFilter, setLocationFilter] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
-  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
-  const [formData, setFormData] = useState({
-    assetCode: "",
-    itemCode: "",
-    serialNumber: "",
-    assetTag: "",
-    status: "AVAILABLE" as Asset["status"],
-    condition: "NEW" as Asset["condition"],
-    locationCode: "",
-    purchaseDate: "",
-    purchaseCost: 0,
-    warrantyEndDate: "",
-    usefulLifeMonths: 60,
-    residualValue: 0,
-    notes: "",
+  const [status, setStatus] = useState("");
+  const [location, setLocation] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [selected, setSelected] = useState<Asset | null>(null);
+  const [editing, setEditing] = useState<{ asset: Asset | null; form: typeof EMPTY } | null>(null);
+  const [item, setItem] = useState<InventoryItem | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // GET /inventory/assets ne documente pas de paramètre de recherche texte : filtre côté client
+  const list = useServerPaged<Asset>({
+    key: ["assets", status, location],
+    size: SIZE,
+    search,
+    resetKey: `${status}|${location}`,
+    match: (a, q) => a.assetCode.toLowerCase().includes(q) || (a.itemName ?? "").toLowerCase().includes(q) || (a.serialNumber ?? "").toLowerCase().includes(q) || (a.assetTag ?? "").toLowerCase().includes(q),
+    fetch: (p) => inventoryService.getAssets({ status: status || undefined, locationCode: location || undefined, ...p }),
   });
-  const [itemSearch, setItemSearch] = useState("");
-  const [showItemResults, setShowItemResults] = useState(false);
+  const hasFilters = !!(search || status || location);
 
-  const { data: assetsData, isLoading } = useQuery({
-    queryKey: ["assets", statusFilter, locationFilter],
-    queryFn: () =>
-      inventoryService.getAssets({
-        status: statusFilter || undefined,
-        locationCode: locationFilter || undefined,
-        size: 100,
-      }),
-  });
-
-  const { data: itemsData } = useQuery({
-    queryKey: ["inventory-items-assets", itemSearch],
-    queryFn: () =>
-      inventoryService.getItems({
-        query: itemSearch || undefined,
-        itemType: "ASSET",
-        size: 20,
-      }),
-    enabled: itemSearch.length > 1,
-  });
-
-  const { data: locations = [] } = useQuery({
-    queryKey: ["inventory-locations"],
-    queryFn: () => inventoryService.getLocations(true),
-  });
-
-  const assets = assetsData?.content || [];
-  const items = itemsData?.content || [];
-
-  const createMutation = useMutation({
-    mutationFn: () => inventoryService.createAsset(formData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["assets"] });
-      handleCloseModal();
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["assets"] });
+  const save = useMutation({
+    mutationFn: async () => {
+      const f = editing!.form;
+      const body = {
+        itemCode: editing!.asset ? editing!.asset.itemCode : item!.itemCode,
+        serialNumber: f.serialNumber.trim() || undefined, assetTag: f.assetTag.trim() || undefined, status: f.status, condition: f.condition, locationCode: f.locationCode,
+        purchaseDate: f.purchaseDate || undefined, purchaseCost: f.purchaseCost, warrantyEndDate: f.warrantyEndDate || undefined,
+        usefulLifeMonths: f.usefulLifeMonths, residualValue: f.residualValue, notes: f.notes.trim() || undefined,
+      };
+      if (editing!.asset) await inventoryService.updateAsset(editing!.asset.assetCode, { ...body, assetCode: editing!.asset.assetCode });
+      else await inventoryService.createAsset(body);
     },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ code, data }: { code: string; data: any }) =>
-      inventoryService.updateAsset(code, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["assets"] });
-      handleCloseModal();
+    onSuccess: async () => {
+      toast.success(editing?.asset ? "Actif modifié" : "Actif créé");
+      await invalidate();
+      setEditing(null);
+      setError(null);
     },
+    onError: (e) => setError(apiMessage(e, "Enregistrement impossible")),
   });
+  // DELETE /inventory/assets/{code} n'est pas documenté côté backend : à confirmer
+  const remove = useMutation({ mutationFn: (code: string) => inventoryService.deleteAsset(code), onSuccess: invalidate });
 
-  const deleteMutation = useMutation({
-    mutationFn: (code: string) => inventoryService.deleteAsset(code),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["assets"] });
-    },
-  });
-
-  const filteredAssets = assets.filter(
-    (asset: Asset) =>
-      asset.assetCode.toLowerCase().includes(search.toLowerCase()) ||
-      asset.itemName?.toLowerCase().includes(search.toLowerCase()) ||
-      (asset.serialNumber &&
-        asset.serialNumber.toLowerCase().includes(search.toLowerCase())),
-  );
-
-  const handleOpenModal = (asset?: Asset) => {
-    if (asset) {
-      setEditingAsset(asset);
-      setFormData({
-        assetCode: asset.assetCode,
-        itemCode: asset.itemCode,
-        serialNumber: asset.serialNumber || "",
-        assetTag: asset.assetTag || "",
-        status: asset.status,
-        condition: asset.condition,
-        locationCode: asset.locationCode,
-        purchaseDate: asset.purchaseDate?.split("T")[0] || "",
-        purchaseCost: asset.purchaseCost,
-        warrantyEndDate: asset.warrantyEndDate?.split("T")[0] || "",
-        usefulLifeMonths: asset.usefulLifeMonths || 60,
-        residualValue: asset.residualValue || 0,
-        notes: asset.notes || "",
-      });
-    } else {
-      setEditingAsset(null);
-      setFormData({
-        assetCode: "",
-        itemCode: "",
-        serialNumber: "",
-        assetTag: "",
-        status: "AVAILABLE",
-        condition: "NEW",
-        locationCode: "",
-        purchaseDate: "",
-        purchaseCost: 0,
-        warrantyEndDate: "",
-        usefulLifeMonths: 60,
-        residualValue: 0,
-        notes: "",
-      });
-    }
-    setIsModalOpen(true);
+  const f = editing?.form;
+  const set = (p: Partial<typeof EMPTY>) => setEditing((s) => (s ? { ...s, form: { ...s.form, ...p } } : s));
+  const open = (a?: Asset) => {
+    setError(null);
+    setItem(null);
+    setEditing({
+      asset: a ?? null,
+      form: a ? { itemCode: a.itemCode, serialNumber: a.serialNumber ?? "", assetTag: a.assetTag ?? "", status: a.status, condition: a.condition, locationCode: a.locationCode, purchaseDate: a.purchaseDate?.split("T")[0] ?? "", purchaseCost: a.purchaseCost, warrantyEndDate: a.warrantyEndDate?.split("T")[0] ?? "", usefulLifeMonths: a.usefulLifeMonths ?? 60, residualValue: a.residualValue ?? 0, notes: a.notes ?? "" } : { ...EMPTY },
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingAsset(null);
-    setItemSearch("");
-  };
-
-  const handleViewDetail = (asset: Asset) => {
-    setSelectedAsset(asset);
-    setIsDetailOpen(true);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingAsset) {
-      updateMutation.mutate({ code: editingAsset.assetCode, data: formData });
-    } else {
-      createMutation.mutate();
-    }
-  };
-
-  const handleDelete = (code: string) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer cet actif ?")) {
-      deleteMutation.mutate(code);
-    }
-  };
-
-  const selectItem = (item: InventoryItem) => {
-    setFormData({ ...formData, itemCode: item.itemCode });
-    setItemSearch(item.name);
-    setShowItemResults(false);
-  };
-
-  if (isLoading) {
-    return <div className="text-center py-8">Chargement...</div>;
+  if (selected) {
+    return <AssetDetail asset={list.rows.find((a) => a.assetCode === selected.assetCode) ?? selected} onBack={() => setSelected(null)} />;
   }
 
   return (
-    <div className="p-3 sm:p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
-        <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">Actifs</h2>
-        <button
-          onClick={() => handleOpenModal()}
-          className="w-full sm:w-auto justify-center bg-primary-600 text-white px-4 py-3 rounded-2xl hover:bg-primary-700 flex items-center gap-2 text-sm sm:text-base"
+    <div className="space-y-5">
+      <ListHeader title="Actifs" subtitle={list.isLoading ? undefined : `${list.total} actif${list.total > 1 ? "s" : ""} suivis individuellement`} action={<ActionButton icon={Plus} onClick={() => open()}>Nouvel actif</ActionButton>} />
+
+      {editing && f && (
+        <PanelForm
+          title={editing.asset ? `Modifier ${editing.asset.assetCode}` : "Nouvel actif"}
+          onCancel={() => setEditing(null)}
+          pending={save.isPending}
+          submitLabel={editing.asset ? "Enregistrer" : "Créer l'actif"}
+          submitDisabled={(!editing.asset && !item) || !f.locationCode}
+          error={error}
+          onSubmit={(e) => { e.preventDefault(); save.mutate(); }}
         >
-          <Plus size={20} />
-          Nouvel actif
-        </button>
-      </div>
-
-      {/* Filtres - AGRANDIS */}
-      <div className="flex flex-col lg:flex-row gap-5 mb-8">
-        <div className="flex-1 relative">
-          <Search
-            size={20}
-            className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Rechercher un actif..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 ring-1 ring-gray-100 rounded-2xl outline-none transition focus:ring-4 focus:ring-primary-100 text-sm sm:text-base"
-          />
-        </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-5 py-3 ring-1 ring-gray-100 rounded-2xl bg-white text-sm sm:text-base w-full lg:min-w-[180px]"
-        >
-          <option value="">Tous les statuts</option>
-          {statusOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={locationFilter}
-          onChange={(e) => setLocationFilter(e.target.value)}
-          className="px-5 py-3 ring-1 ring-gray-100 rounded-2xl bg-white text-sm sm:text-base w-full lg:min-w-[200px]"
-        >
-          <option value="">Tous les emplacements</option>
-          {locations.map((loc: any) => (
-            <option key={loc.locationCode} value={loc.locationCode}>
-              {loc.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Tableau - AGRANDI */}
-      <div className="bg-white rounded-3xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm sm:text-base">
-            <thead className="bg-gray-50/70">
-              <tr>
-                <th className="px-4 py-4 text-left font-semibold">Code</th>
-                <th className="px-4 py-4 text-left font-semibold">Article</th>
-                <th className="px-4 py-4 text-left font-semibold">Série/Tag</th>
-                <th className="px-4 py-4 text-left font-semibold">
-                  Emplacement
-                </th>
-                <th className="px-4 py-4 text-left font-semibold">Statut</th>
-                <th className="px-4 py-4 text-left font-semibold">Condition</th>
-                <th className="px-4 py-4 text-center font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="">
-              {filteredAssets.map((asset: Asset) => (
-                <tr key={asset.assetCode} className="transition hover:bg-gray-50/70">
-                  <td className="px-4 py-4 font-mono text-sm">
-                    {asset.assetCode}
-                  </td>
-                  <td className="px-4 py-4 font-medium">{asset.itemName}</td>
-                  <td className="px-4 py-4">
-                    {asset.serialNumber || asset.assetTag || "-"}
-                  </td>
-                  <td className="px-4 py-4">{asset.locationName}</td>
-                  <td className="px-4 py-4">
-                    <span
-                      className={`px-2.5 py-1 rounded-full text-xs ${statusOptions.find((s) => s.value === asset.status)?.color}`}
-                    >
-                      {
-                        statusOptions.find((s) => s.value === asset.status)
-                          ?.label
-                      }
-                    </span>
-                  </td>
-                  <td className="px-4 py-4">
-                    <span
-                      className={`px-2.5 py-1 rounded-full text-xs ${conditionOptions.find((c) => c.value === asset.condition)?.color}`}
-                    >
-                      {
-                        conditionOptions.find(
-                          (c) => c.value === asset.condition,
-                        )?.label
-                      }
-                    </span>
-                  </td>
-                  <td className="px-4 py-4 text-center">
-                    <div className="flex justify-center gap-2">
-                      <button
-                        onClick={() => handleViewDetail(asset)}
-                        className="p-1.5 text-gray-600 hover:text-primary-600"
-                        title="Voir détail"
-                      >
-                        <Eye size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleOpenModal(asset)}
-                        className="p-1.5 text-blue-600 hover:text-blue-800"
-                        title="Modifier"
-                      >
-                        <Edit size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(asset.assetCode)}
-                        className="p-1.5 text-red-600 hover:text-red-800"
-                        title="Supprimer"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {filteredAssets.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-2xl">
-          <p className="text-gray-500 text-sm sm:text-base">Aucun actif trouvé</p>
-        </div>
-      )}
-
-      {/* ========== MODAL CRÉATION/ÉDITION AVEC ModalPortal - AGRANDI ========== */}
-      {isModalOpen && (
-        <ModalPortal onClose={handleCloseModal} size="4xl">
-          <div className="sticky top-0 bg-white p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-t-2xl">
-            <h3 className="text-xl sm:text-2xl font-bold">
-              {editingAsset ? "Modifier" : "Nouvel"} actif
-            </h3>
-            <button
-              onClick={handleCloseModal}
-              className="p-2 hover:bg-gray-100 rounded-2xl"
-            >
-              <X size={24} />
-            </button>
+          <Field label="Article" required>
+            {editing.asset ? <Fact title={editing.asset.itemCode}>{editing.asset.itemName || editing.asset.itemCode}</Fact> : <ItemPicker itemType="ASSET" value={item} onChange={setItem} placeholder="Rechercher un article de type Actif" />}
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Numéro de série"><input value={f.serialNumber} onChange={(e) => set({ serialNumber: e.target.value })} className={FIELD} /></Field>
+            <Field label="Tag"><input value={f.assetTag} onChange={(e) => set({ assetTag: e.target.value })} className={FIELD} /></Field>
+            <Field label="Emplacement" required><LocationSelect value={f.locationCode} onChange={(v) => set({ locationCode: v })} /></Field>
+            <Field label="Statut">
+              <select value={f.status} onChange={(e) => set({ status: e.target.value as Asset["status"] })} className={FIELD}>
+                {ASSET_STATUSES.map((s) => <option key={s} value={s}>{ASSET_STATUS_LABEL[s]}</option>)}
+              </select>
+            </Field>
+            <Field label="Condition">
+              <select value={f.condition} onChange={(e) => set({ condition: e.target.value as Asset["condition"] })} className={FIELD}>
+                {CONDITIONS.map((c) => <option key={c} value={c}>{CONDITION_LABEL[c]}</option>)}
+              </select>
+            </Field>
+            <Field label="Coût d'achat (FCFA)"><input type="number" min={0} value={f.purchaseCost} onChange={(e) => set({ purchaseCost: Number(e.target.value) || 0 })} className={FIELD} /></Field>
+            <Field label="Date d'achat"><input type="date" value={f.purchaseDate} onChange={(e) => set({ purchaseDate: e.target.value })} className={FIELD} /></Field>
+            <Field label="Fin de garantie"><input type="date" value={f.warrantyEndDate} onChange={(e) => set({ warrantyEndDate: e.target.value })} className={FIELD} /></Field>
+            <Field label="Durée de vie (mois)"><input type="number" min={1} value={f.usefulLifeMonths} onChange={(e) => set({ usefulLifeMonths: Number(e.target.value) || 0 })} className={FIELD} /></Field>
+            <Field label="Valeur résiduelle (FCFA)"><input type="number" min={0} value={f.residualValue} onChange={(e) => set({ residualValue: Number(e.target.value) || 0 })} className={FIELD} /></Field>
           </div>
-          <form onSubmit={handleSubmit} className="p-5 sm:p-8 space-y-6">
-            <div>
-              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                Article *
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={itemSearch}
-                  onChange={(e) => {
-                    setItemSearch(e.target.value);
-                    setShowItemResults(true);
-                  }}
-                  placeholder="Rechercher un article..."
-                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-                />
-                {showItemResults && items.length > 0 && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border rounded-2xl shadow-lg max-h-60 overflow-y-auto">
-                    {items.map((item: InventoryItem) => (
-                      <button
-                        key={item.itemCode}
-                        type="button"
-                        onClick={() => selectItem(item)}
-                        className="w-full px-4 py-3 text-left hover:bg-gray-50 ring-0 text-sm sm:text-base"
-                      >
-                        <p className="font-medium">{item.name}</p>
-                        <p className="text-sm text-gray-500">{item.itemCode}</p>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:p-6">
-              <div>
-                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                  Numéro de série
-                </label>
-                <input
-                  type="text"
-                  value={formData.serialNumber}
-                  onChange={(e) =>
-                    setFormData({ ...formData, serialNumber: e.target.value })
-                  }
-                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-                />
-              </div>
-              <div>
-                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                  Tag
-                </label>
-                <input
-                  type="text"
-                  value={formData.assetTag}
-                  onChange={(e) =>
-                    setFormData({ ...formData, assetTag: e.target.value })
-                  }
-                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:p-6">
-              <div>
-                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                  Emplacement *
-                </label>
-                <select
-                  value={formData.locationCode}
-                  onChange={(e) =>
-                    setFormData({ ...formData, locationCode: e.target.value })
-                  }
-                  required
-                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-                >
-                  <option value="">Sélectionner</option>
-                  {locations.map((loc: any) => (
-                    <option key={loc.locationCode} value={loc.locationCode}>
-                      {loc.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                  Statut
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) =>
-                    setFormData({ ...formData, status: e.target.value as any })
-                  }
-                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-                >
-                  {statusOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:p-6">
-              <div>
-                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                  Condition
-                </label>
-                <select
-                  value={formData.condition}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      condition: e.target.value as any,
-                    })
-                  }
-                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-                >
-                  {conditionOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                  Coût d'achat (FCFA)
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={
-                    formData.purchaseCost === 0 ? "" : formData.purchaseCost
-                  }
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, "");
-                    setFormData({
-                      ...formData,
-                      purchaseCost: val === "" ? 0 : parseInt(val),
-                    });
-                  }}
-                  placeholder="0"
-                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:p-6">
-              <div>
-                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                  Date d'achat
-                </label>
-                <input
-                  type="date"
-                  value={formData.purchaseDate}
-                  onChange={(e) =>
-                    setFormData({ ...formData, purchaseDate: e.target.value })
-                  }
-                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-                />
-              </div>
-              <div>
-                <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                  Fin garantie
-                </label>
-                <input
-                  type="date"
-                  value={formData.warrantyEndDate}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      warrantyEndDate: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                Notes
-              </label>
-              <textarea
-                value={formData.notes}
-                onChange={(e) =>
-                  setFormData({ ...formData, notes: e.target.value })
-                }
-                rows={3}
-                className="w-full px-4 py-3 ring-1 ring-gray-100 rounded-2xl text-sm sm:text-base"
-              />
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row pt-6">
-              <button
-                type="button"
-                onClick={handleCloseModal}
-                className="flex-1 px-5 py-3 border rounded-2xl text-gray-700 text-sm sm:text-base"
-              >
-                Annuler
-              </button>
-              <button
-                type="submit"
-                disabled={
-                  !formData.itemCode ||
-                  !formData.locationCode ||
-                  createMutation.isPending ||
-                  updateMutation.isPending
-                }
-                className="flex-1 justify-center bg-primary-600 text-white py-3 rounded-2xl hover:bg-primary-700 disabled:opacity-50 text-sm sm:text-base"
-              >
-                {editingAsset ? "Mettre à jour" : "Créer"}
-              </button>
-            </div>
-          </form>
-        </ModalPortal>
+          <Field label="Notes"><textarea value={f.notes} onChange={(e) => set({ notes: e.target.value })} rows={2} className={`${FIELD} resize-none`} /></Field>
+        </PanelForm>
       )}
 
-      {/* ========== MODAL DÉTAIL ========== */}
-      {selectedAsset && (
-        <AssetDetailModal
-          isOpen={isDetailOpen}
-          onClose={() => {
-            setIsDetailOpen(false);
-            setSelectedAsset(null);
-          }}
-          asset={selectedAsset}
-        />
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <SearchField className="flex-1" value={search} onChange={setSearch} placeholder="Code, article, numéro de série ou tag" />
+        <FilterButton open={showFilters} active={!!(status || location)} onClick={() => setShowFilters(!showFilters)} />
+      </div>
+      {showFilters && (
+        <FilterPanel canReset={hasFilters} onReset={() => { setSearch(""); setStatus(""); setLocation(""); }}>
+          <Field label="Statut">
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className={FIELD}>
+              <option value="">Tous les statuts</option>
+              {ASSET_STATUSES.map((s) => <option key={s} value={s}>{ASSET_STATUS_LABEL[s]}</option>)}
+            </select>
+          </Field>
+          <Field label="Emplacement"><LocationSelect value={location} onChange={setLocation} placeholder="Tous les emplacements" /></Field>
+        </FilterPanel>
+      )}
+
+      {list.isLoading ? (
+        <ListSkeleton rows={8} />
+      ) : list.isError ? (
+        <ErrorBlock message="Impossible de charger les actifs." onRetry={() => list.refetch()} />
+      ) : list.rows.length === 0 ? (
+        <EmptyState icon={HardDrive} title="Aucun actif" hint={hasFilters ? "Aucun résultat pour ces filtres." : "Un actif est un équipement identifié, comme un ordinateur ou un écran."} />
+      ) : (
+        <>
+          <HeadRow cols={COLS}>
+            <span>Actif</span>
+            <span>Série ou tag</span>
+            <span>Emplacement</span>
+            <span>Statut</span>
+            <span>Condition</span>
+            <span className="text-right">Actions</span>
+          </HeadRow>
+          <DataCard>
+            {list.rows.map((a) => (
+              <div key={a.assetCode} onClick={() => setSelected(a)} className={`grid cursor-pointer grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl p-4 max-lg:mb-2 max-lg:bg-gray-50 ${COLS} ${ROW_HOVER}`}>
+                <div className="min-w-0"><p className="truncate text-sm font-semibold text-gray-900">{a.itemName || a.itemCode}</p><p className="font-mono text-xs text-gray-400">{a.assetCode}</p></div>
+                <Cell title="Série" className="max-lg:order-3 max-lg:col-span-2"><span className="truncate font-mono text-sm text-gray-600">{a.serialNumber || a.assetTag || "Sans identifiant"}</span></Cell>
+                <Cell title="Emplacement" className="max-lg:order-3 max-lg:col-span-2"><span className="text-sm text-gray-600">{a.locationName || a.locationCode}</span></Cell>
+                <div className="max-lg:order-2 max-lg:justify-self-end"><Chip map={ASSET_STATUS_LABEL} tones={ASSET_STATUS_TONE} value={a.status} /></div>
+                <Cell title="Condition" className="max-lg:order-3"><span className="text-sm text-gray-600">{label(CONDITION_LABEL, a.condition)}</span></Cell>
+                <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 max-lg:order-4 max-lg:col-span-2 lg:justify-end">
+                  <IconButton icon={Pencil} label="Modifier" onClick={() => open(a)} />
+                  <IconButton
+                    icon={Trash2}
+                    label="Supprimer"
+                    tone="danger"
+                    onClick={() =>
+                      toast.confirm({
+                        message: `Supprimer l'actif ${a.assetCode} ?`,
+                        detail: "Cette action est définitive.",
+                        confirmLabel: "Supprimer",
+                        pendingLabel: "Suppression",
+                        successMessage: "Actif supprimé",
+                        errorMessage: "Suppression impossible : l'actif est probablement utilisé",
+                        onConfirm: () => remove.mutateAsync(a.assetCode),
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            ))}
+          </DataCard>
+          <Pagination page={list.page} totalPages={list.totalPages} total={list.total} noun="actif" onChange={list.setPage} />
+        </>
       )}
     </div>
   );

@@ -1,225 +1,95 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw, TrendingUp, ArrowUp, ArrowDown } from "lucide-react";
-import {
-  reportingService,
-  movementTypeLabels,
-} from "../../services/reporting.service";
-
-const getCurrentMonthRange = () => {
-  const now = new Date();
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const format = (d: Date) => d.toISOString().split("T")[0];
-  return { fromDate: format(firstDay), toDate: format(lastDay) };
-};
+import { movementTypeLabels, reportingService } from "../../services/reporting.service";
+import { ChartCard, KpiRow } from "../../components/operations/OpsCharts";
+import { RankBars, SeriesColumns } from "../../components/reporting/ReportCharts";
+import { Disclosure, PeriodBar, RefreshButton, ReportBody, ReportHead, ReportTable } from "../../components/reporting/reportKit";
+import { FLOW_IN, FLOW_OUT, fmtInt, longDay, money, monthRange, shortDay } from "../../components/reporting/reportUtils";
 
 export const CashFlowReport: React.FC = () => {
-  const [dateRange, setDateRange] = useState(getCurrentMonthRange());
+  const [range, setRange] = useState(monthRange());
 
-  const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["cash-flow-report", dateRange.fromDate, dateRange.toDate],
-    queryFn: () =>
-      reportingService.getCashFlowReport({
-        fromDate: dateRange.fromDate,
-        toDate: dateRange.toDate,
-      }),
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
+    queryKey: ["cash-flow-report", range.from, range.to],
+    queryFn: () => reportingService.getCashFlowReport({ fromDate: range.from, toDate: range.to }),
   });
 
-  const formatFCFA = (amount: number | undefined | null) =>
-    `${(amount ?? 0).toLocaleString("fr-FR")} FCFA`;
-
-  if (isLoading) {
-    return (
-      <div className="text-center py-12">
-        <RefreshCw className="animate-spin mx-auto mb-4" size={32} />
-        <p className="text-gray-500">Chargement du rapport...</p>
-      </div>
-    );
-  }
+  const daily = data?.dailySeries ?? [];
+  const types = data?.byMovementType ?? [];
+  const toItems = (direction: string, color: string) =>
+    types
+      .filter((t) => t.direction === direction)
+      .sort((a, b) => b.totalAmount - a.totalAmount)
+      .map((t) => ({
+        key: `${direction}-${t.movementType}`,
+        label: movementTypeLabels[t.movementType] ?? t.movementType,
+        sub: `${fmtInt(t.count)} mouvement${t.count > 1 ? "s" : ""}`,
+        value: t.totalAmount || 0,
+        color,
+      }));
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">
-          Flux de trésorerie
-        </h2>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={dateRange.fromDate}
-              onChange={(e) =>
-                setDateRange((prev) => ({ ...prev, fromDate: e.target.value }))
-              }
-              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm"
+    <div className="space-y-6">
+      <ReportHead title="Flux de trésorerie" subtitle="Entrées et sorties d'argent jour par jour">
+        <PeriodBar value={range} onChange={setRange} />
+        <RefreshButton fetching={isFetching} onClick={() => refetch()} />
+      </ReportHead>
+
+      <ReportBody loading={isLoading} error={isError} hasData={!!data} onRetry={() => refetch()} kpis={3}>
+        {data && (
+          <>
+            <KpiRow
+              columns={3}
+              items={[
+                { label: "Total entrées", value: money(data.totalInflows), tone: "pink" },
+                { label: "Total sorties", value: money(data.totalOutflows) },
+                { label: "Flux net", value: money(data.netCashFlow), tone: data.netCashFlow < 0 ? "danger" : "success" },
+              ]}
             />
-            <span className="text-gray-400">→</span>
-            <input
-              type="date"
-              value={dateRange.toDate}
-              onChange={(e) =>
-                setDateRange((prev) => ({ ...prev, toDate: e.target.value }))
-              }
-              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm"
-            />
-          </div>
-          {isFetching && (
-            <RefreshCw size={14} className="animate-spin text-gray-400" />
-          )}
-        </div>
-      </div>
-
-      {data && (
-        <div className="space-y-6">
-          {/* Résumé */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-white rounded-xl p-5 shadow-sm">
-              <p className="text-sm text-gray-500">Total entrées</p>
-              <div className="flex items-center gap-2">
-                <ArrowUp size={18} className="text-green-500" />
-                <p className="text-2xl font-bold text-green-700">
-                  {formatFCFA(data.totalInflows)}
-                </p>
-              </div>
+            <ChartCard title="Entrées et sorties par jour">
+              <SeriesColumns
+                format={money}
+                labels={daily.map((d) => shortDay(d.date))}
+                series={[
+                  { key: "in", name: "Entrées", color: FLOW_IN, values: daily.map((d) => d.inflows || 0) },
+                  { key: "out", name: "Sorties", color: FLOW_OUT, values: daily.map((d) => d.outflows || 0) },
+                ]}
+              />
+              {daily.length > 0 && (
+                <div className="mt-6">
+                  <Disclosure label="Détail jour par jour">
+                    <ReportTable
+                      cols={[
+                        { key: "d", label: "Date" },
+                        { key: "in", label: "Entrées", align: "right" },
+                        { key: "out", label: "Sorties", align: "right" },
+                        { key: "net", label: "Net", align: "right" },
+                      ]}
+                      rows={daily.map((d) => ({
+                        id: d.date,
+                        cells: {
+                          d: longDay(d.date),
+                          in: money(d.inflows),
+                          out: money(d.outflows),
+                          net: <b className={d.net < 0 ? "text-red-600" : "text-gray-950"}>{`${d.net > 0 ? "+" : ""}${money(d.net)}`}</b>,
+                        },
+                      }))}
+                    />
+                  </Disclosure>
+                </div>
+              )}
+            </ChartCard>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <ChartCard title="Entrées par type de mouvement">
+                <RankBars format={money} items={toItems("IN", FLOW_IN)} />
+              </ChartCard>
+              <ChartCard title="Sorties par type de mouvement">
+                <RankBars format={money} items={toItems("OUT", FLOW_OUT)} />
+              </ChartCard>
             </div>
-            <div className="bg-white rounded-xl p-5 shadow-sm">
-              <p className="text-sm text-gray-500">Total sorties</p>
-              <div className="flex items-center gap-2">
-                <ArrowDown size={18} className="text-red-500" />
-                <p className="text-2xl font-bold text-red-600">
-                  {formatFCFA(data.totalOutflows)}
-                </p>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl p-5 shadow-sm">
-              <p className="text-sm text-gray-500">Flux net</p>
-              <p
-                className={`text-2xl font-bold ${data.netCashFlow >= 0 ? "text-green-700" : "text-red-600"}`}
-              >
-                {formatFCFA(data.netCashFlow)}
-              </p>
-            </div>
-          </div>
-
-          {/* Par type de mouvement */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Par type de mouvement
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full border-separate border-spacing-y-2">
-                <thead className="bg-transparent">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-sm font-semibold">
-                      Type
-                    </th>
-                    <th className="px-4 py-2 text-center text-sm font-semibold">
-                      Direction
-                    </th>
-                    <th className="px-4 py-2 text-right text-sm font-semibold">
-                      Nombre
-                    </th>
-                    <th className="px-4 py-2 text-right text-sm font-semibold">
-                      Montant
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.byMovementType.map((item) => (
-                    <tr key={item.movementType} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm font-medium">
-                        {movementTypeLabels[item.movementType] ||
-                          item.movementType}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs ${
-                            item.direction === "IN"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
-                          }`}
-                        >
-                          {item.direction === "IN" ? "Entrée" : "Sortie"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right">
-                        {item.count}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right font-medium">
-                        {formatFCFA(item.totalAmount)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Série journalière */}
-          {data.dailySeries.length > 0 && (
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Série journalière
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full border-separate border-spacing-y-2">
-                  <thead className="bg-transparent">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-sm font-semibold">
-                        Date
-                      </th>
-                      <th className="px-4 py-2 text-right text-sm font-semibold">
-                        Entrées
-                      </th>
-                      <th className="px-4 py-2 text-right text-sm font-semibold">
-                        Sorties
-                      </th>
-                      <th className="px-4 py-2 text-right text-sm font-semibold">
-                        Net
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.dailySeries.map((day) => (
-                      <tr key={day.date} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm">
-                          {new Date(day.date).toLocaleDateString("fr-FR")}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right text-green-600">
-                          {formatFCFA(day.inflows)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right text-red-600">
-                          {formatFCFA(day.outflows)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right font-medium">
-                          <span
-                            className={
-                              day.net >= 0 ? "text-green-700" : "text-red-600"
-                            }
-                          >
-                            {day.net >= 0 ? "+" : ""}
-                            {formatFCFA(day.net)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {!data && !isLoading && (
-        <div className="text-center py-12 bg-white rounded-xl">
-          <TrendingUp size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500">
-            Aucune donnée disponible pour cette période
-          </p>
-        </div>
-      )}
+          </>
+        )}
+      </ReportBody>
     </div>
   );
 };

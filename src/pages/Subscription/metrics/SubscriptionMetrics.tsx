@@ -1,81 +1,260 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Users,
-  Ticket,
-  AlertCircle,
-  CreditCard,
-  RefreshCw,
-  Activity,
-} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ChevronRight, RefreshCw } from "lucide-react";
 import { subscriptionService } from "../../../services/subscription.service";
+import { Skeleton } from "../../../components/ui/Skeleton";
+import { ActionButton, ErrorBlock, Field, ItemRow, ListHeader, Tag } from "../../../components/subscription/kit";
+import { FIELD_SOFT, formatDate } from "../../../components/subscription/kitUtils";
+import { ColumnChart, DonutChart, KpiStrip, Panel, RingGauge, compact } from "../../../components/subscription/charts";
+import { CHART } from "../../../components/subscription/chartColors";
 
 const safeNum = (val: unknown): number =>
   typeof val === "number" && isFinite(val) ? val : 0;
 
-const formatCurrency = (value: number): string =>
-  `${value.toLocaleString("fr-FR")} FCFA`;
+const formatCurrency = (value: number): string => `${value.toLocaleString("fr-FR")} FCFA`;
 
 const formatNumber = (value: number): string => value.toLocaleString("fr-FR");
 
-type MetricTone = "green" | "blue" | "purple" | "orange" | "slate";
+const formatPercent = (value: number): string =>
+  `${value.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`;
 
-const metricToneClass: Record<MetricTone, { icon: string; bar: string }> = {
-  green: { icon: "bg-green-50 text-green-700", bar: "bg-green-500" },
-  blue: { icon: "bg-blue-50 text-blue-700", bar: "bg-blue-500" },
-  purple: { icon: "bg-purple-50 text-purple-700", bar: "bg-purple-500" },
-  orange: { icon: "bg-orange-50 text-orange-700", bar: "bg-orange-500" },
-  slate: { icon: "bg-slate-50 text-slate-700", bar: "bg-slate-500" },
+const CYCLE_LABELS: Record<string, string> = {
+  MONTHLY: "Mensuel",
+  QUARTERLY: "Trimestriel",
+  YEARLY: "Annuel",
 };
 
-const MetricPanel: React.FC<{
-  title: string;
-  icon: React.ElementType;
-  mainLabel: string;
-  mainValue: string;
-  tone: MetricTone;
-  items: [string, string][];
-}> = ({ title, icon: Icon, mainLabel, mainValue, tone, items }) => {
-  const t = metricToneClass[tone];
+const WATCH_ROWS = [
+  { key: "inGracePeriod", label: "En période de tolérance", status: "GRACE_PERIOD" },
+  { key: "pendingTermination", label: "Résiliation en cours", status: "PENDING_TERMINATION" },
+  { key: "pendingDocuments", label: "Documents en attente", status: "PENDING_DOCUMENTS" },
+] as const;
+
+const KpiSkeleton: React.FC = () => (
+  <div role="status" aria-label="Chargement" className="space-y-4">
+    <Skeleton className="h-32" />
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <Skeleton className="h-72 xl:col-span-2" />
+      <Skeleton className="h-72" />
+    </div>
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <Skeleton className="h-64" />
+      <Skeleton className="h-64" />
+      <Skeleton className="h-64" />
+    </div>
+  </div>
+);
+
+/** Indicateurs de revenu, d'attrition et d'occupation sur une période choisie. */
+const KpiSection: React.FC = () => {
+  const navigate = useNavigate();
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
+  const { data: kpis, isLoading, isError, refetch } = useQuery({
+    queryKey: ["subscription-kpis", from, to],
+    queryFn: () => subscriptionService.getSubscriptionKpis({ from: from || undefined, to: to || undefined }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const cycles = Object.entries(kpis?.mrrByCycle ?? {})
+    .map(([key, value]) => ({ label: CYCLE_LABELS[key] ?? key, value: safeNum(value) }))
+    .filter((c) => c.value > 0);
+  const cycleColors = [CHART.primary, CHART.soft, CHART.neutral];
+
+  const newMrr = safeNum(kpis?.newMrr);
+  const lostMrr = Math.abs(safeNum(kpis?.churnedMrr));
+  const netMrr = safeNum(kpis?.netMrrMovement);
+  const lifetime = kpis?.customerLifetimeValue;
+  const lifetimeMonths = kpis?.averageLifetimeMonths;
+  const capacity = safeNum(kpis?.workspaceCapacity);
 
   return (
-    <section className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-gray-100">
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-gray-500">{title}</p>
-            <p className="mt-4 text-xs font-medium text-gray-400">
-              {mainLabel}
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-gray-950">Indicateurs de la période</h2>
+          {kpis && (
+            <p className="mt-0.5 text-sm text-gray-500">
+              Du {formatDate(kpis.from)} au {formatDate(kpis.to)}
             </p>
-            <p className="mt-1 text-2xl font-black tracking-tight text-gray-950">
-              {mainValue}
-            </p>
-          </div>
-
-          <div className={`rounded-2xl p-3 ${t.icon}`}>
-            <Icon size={22} />
-          </div>
+          )}
         </div>
-
-        <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-gray-100">
-          <div className={`h-full w-2/3 rounded-full ${t.bar}`} />
+        <div className="flex flex-wrap items-end gap-3">
+          <Field label="Du">
+            <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} className={FIELD_SOFT} />
+          </Field>
+          <Field label="Au">
+            <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className={FIELD_SOFT} />
+          </Field>
+          {(from || to) && (
+            <ActionButton variant="ghost" onClick={() => { setFrom(""); setTo(""); }}>
+              Période par défaut
+            </ActionButton>
+          )}
         </div>
       </div>
 
-      <div className="space-y-1 bg-gray-50/70 p-3">
-        {items.map(([label, value]) => (
-          <div
-            key={label}
-            className="flex items-center justify-between rounded-2xl bg-white px-4 py-3"
-          >
-            <span className="text-sm text-gray-500">{label}</span>
-            <span className="text-sm font-bold text-gray-900">{value}</span>
+      {isLoading && <KpiSkeleton />}
+      {isError && <ErrorBlock message="Erreur de chargement des indicateurs" onRetry={() => refetch()} />}
+
+      {kpis && (
+        <>
+          <KpiStrip
+            items={[
+              { label: "MRR", value: formatCurrency(safeNum(kpis.mrr)), hint: "Revenu mensuel récurrent" },
+              { label: "ARR", value: formatCurrency(safeNum(kpis.arr)), hint: "Revenu annuel récurrent" },
+              {
+                label: "Abonnements actifs",
+                value: formatNumber(safeNum(kpis.activeSubscriptions)),
+                hint: `${formatNumber(safeNum(kpis.newInPeriod))} nouveaux sur la période`,
+              },
+              { label: "ARPU", value: formatCurrency(safeNum(kpis.arpu)), hint: "MRR par abonné actif" },
+            ]}
+          />
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <Panel
+              className="xl:col-span-2"
+              title="Mouvement du MRR"
+              subtitle="Gagné, perdu et solde net sur la période"
+              table={{
+                head: ["Mouvement", "FCFA"],
+                rows: [
+                  ["Nouveau", formatNumber(newMrr)],
+                  ["Perdu", formatNumber(-lostMrr)],
+                  ["Net", formatNumber(netMrr)],
+                ],
+              }}
+            >
+              <ColumnChart
+                unit=" FCFA"
+                data={[
+                  { label: "Nouveau", value: newMrr, color: CHART.success },
+                  { label: "Perdu", value: lostMrr, color: CHART.danger },
+                  { label: "Net", value: Math.abs(netMrr), color: CHART.primary, display: `${netMrr < 0 ? "-" : ""}${formatNumber(Math.abs(netMrr))} FCFA` },
+                ]}
+              />
+            </Panel>
+
+            <Panel
+              title="MRR par cycle"
+              subtitle="Répartition de la facturation"
+              table={{
+                head: ["Cycle", "FCFA"],
+                rows: cycles.map((c) => [c.label, formatNumber(c.value)]),
+              }}
+            >
+              {cycles.length === 0 ? (
+                <p className="py-10 text-center text-sm text-gray-500">Aucun revenu récurrent</p>
+              ) : (
+                <DonutChart
+                  slices={cycles.map((c, i) => ({ ...c, color: cycleColors[i % cycleColors.length] }))}
+                  centerValue={compact(safeNum(kpis.mrr))}
+                  centerLabel="MRR"
+                />
+              )}
+            </Panel>
           </div>
-        ))}
-      </div>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <Panel
+              title="Attrition"
+              subtitle="Départs sur la période"
+              table={{
+                head: ["Mesure", "Valeur"],
+                rows: [
+                  ["Taux d'attrition", formatPercent(safeNum(kpis.churnRate))],
+                  ["Attrition mensuelle", formatPercent(safeNum(kpis.monthlyChurnRate))],
+                  ["Abonnements perdus", formatNumber(safeNum(kpis.churnedInPeriod))],
+                  ["Valeur vie client", lifetime == null ? "Non calculable" : formatCurrency(lifetime)],
+                  ["Durée de vie moyenne", lifetimeMonths == null ? "Non calculable" : `${formatNumber(lifetimeMonths)} mois`],
+                ],
+              }}
+            >
+              <dl className="space-y-2.5 text-sm">
+                {[
+                  ["Taux d'attrition", formatPercent(safeNum(kpis.churnRate))],
+                  ["Attrition mensuelle", formatPercent(safeNum(kpis.monthlyChurnRate))],
+                  ["Abonnements perdus", `${formatNumber(safeNum(kpis.churnedInPeriod))} sur ${formatNumber(safeNum(kpis.activeAtStart))}`],
+                  ["Valeur vie client", lifetime == null ? "Non calculable" : formatCurrency(lifetime)],
+                  ["Durée de vie moyenne", lifetimeMonths == null ? "Non calculable" : `${formatNumber(lifetimeMonths)} mois`],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex items-baseline justify-between gap-3">
+                    <dt className="text-gray-500">{k}</dt>
+                    <dd className="text-right font-bold text-gray-950">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Panel>
+
+            <Panel
+              title="Occupation"
+              subtitle="Places occupées sur la capacité"
+              table={{
+                head: ["Mesure", "Valeur"],
+                rows: [
+                  ["Places occupées", formatNumber(safeNum(kpis.seatsOccupied))],
+                  ["Capacité", formatNumber(capacity)],
+                  ["Taux d'occupation", formatPercent(safeNum(kpis.occupancyRate))],
+                  ["Revenu par place", formatCurrency(safeNum(kpis.revenuePerSeat))],
+                ],
+              }}
+            >
+              <div className="space-y-6">
+                <RingGauge label="occupées" value={safeNum(kpis.seatsOccupied)} total={capacity} />
+                <dl className="space-y-2.5 text-sm">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-gray-500">Revenu par place</dt>
+                    <dd className="font-bold text-gray-950">{formatCurrency(safeNum(kpis.revenuePerSeat))}</dd>
+                  </div>
+                </dl>
+              </div>
+            </Panel>
+
+            <Panel title="À surveiller" subtitle="Ouvre la liste filtrée">
+              <div className="space-y-2">
+                {WATCH_ROWS.map((r) => {
+                  const count = safeNum(kpis[r.key]);
+                  return (
+                    <ItemRow key={r.key}>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/subscriptions/subscriptions?status=${r.status}`)}
+                        className="flex w-full items-center justify-between gap-3 rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--logo-pink)]"
+                      >
+                        <span className="text-sm font-semibold text-gray-900">{r.label}</span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <Tag>{formatNumber(count)}</Tag>
+                          <ChevronRight size={16} className="text-gray-400" />
+                        </span>
+                      </button>
+                    </ItemRow>
+                  );
+                })}
+              </div>
+            </Panel>
+          </div>
+        </>
+      )}
     </section>
   );
 };
+
+const MetricsSkeleton: React.FC = () => (
+  <div role="status" aria-label="Chargement" className="space-y-4">
+    <Skeleton className="h-32" />
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <Skeleton className="h-80" />
+      <Skeleton className="h-80 xl:col-span-2" />
+    </div>
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <Skeleton className="h-80 xl:col-span-2" />
+      <Skeleton className="h-80" />
+    </div>
+  </div>
+);
 
 export const SubscriptionMetrics: React.FC = () => {
   const {
@@ -90,163 +269,170 @@ export const SubscriptionMetrics: React.FC = () => {
     staleTime: 5 * 60 * 1000,
   });
 
-  if (isLoading) {
-    return (
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-6">
-          Métriques des abonnements
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div
-              key={i}
-              className="bg-white rounded-3xl p-6 shadow-sm ring-1 ring-gray-100 animate-pulse"
-            >
-              <div className="w-12 h-12 bg-gray-100 rounded-2xl mb-5" />
-              <div className="h-8 bg-gray-100 rounded w-28 mb-3" />
-              <div className="h-4 bg-gray-100 rounded w-36" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const refresh = (
+    <ActionButton
+      variant="ghost"
+      icon={RefreshCw}
+      pending={isFetching && !isLoading}
+      onClick={() => refetch()}
+    >
+      Actualiser
+    </ActionButton>
+  );
 
-  if (isError) {
-    return (
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-6">
-          Métriques des abonnements
-        </h2>
-        <div className="bg-red-50 rounded-2xl p-6 text-center ring-1 ring-red-100">
-          <AlertCircle size={32} className="mx-auto text-red-400 mb-3" />
-          <p className="text-red-700 font-medium">
-            Erreur de chargement des métriques
-          </p>
-          <button
-            onClick={() => refetch()}
-            className="mt-3 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 text-sm"
-          >
-            Réessayer
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const active = safeNum(metrics?.activeSubscriptions);
+  const pending = safeNum(metrics?.pendingSubscriptions);
+  const suspended = safeNum(metrics?.suspendedSubscriptions);
+  const cancelled = safeNum(metrics?.cancelledSubscriptions);
+  const totalSubs = active + pending + suspended + cancelled;
+
+  const mrr = safeNum(metrics?.activeSubscriptionMrr);
+  const pendingAmount = safeNum(metrics?.pendingBillableAmount);
+  const overageAmount = safeNum(metrics?.overageAmount);
+
+  const recorded = safeNum(metrics?.recordedUsageQuantity);
+  const billable = safeNum(metrics?.billableUsageQuantity);
+
+  const activePasses = safeNum(metrics?.activePasses);
+  const activeAddons = safeNum(metrics?.activeAddons);
+  const activePromotions = safeNum(metrics?.activePromotions);
+
+  const statusParts = [
+    { label: "Actives", value: active, color: CHART.success },
+    { label: "En attente", value: pending, color: CHART.warn },
+    { label: "Suspendues", value: suspended, color: CHART.neutral },
+    { label: "Annulées", value: cancelled, color: CHART.danger },
+  ];
+
+  const overageCharges = safeNum(metrics?.overageCharges);
+  const rolloverRecords = safeNum(metrics?.rolloverRecords);
+  const rolloverQuantity = safeNum(metrics?.rolloverQuantity);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">
-            Métriques des abonnements
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Vue consolidée des souscriptions, revenus, usages et reports.
-          </p>
-        </div>
+      <ListHeader
+        title="Métriques des abonnements"
+        subtitle="Vue consolidée des souscriptions, revenus, usages et reports."
+        action={isLoading || isError ? undefined : refresh}
+      />
 
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl ring-1 ring-gray-100 bg-white text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-        >
-          <RefreshCw size={14} className={isFetching ? "animate-spin" : ""} />
-          Actualiser
-        </button>
-      </div>
+      <KpiSection />
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <MetricPanel
-          title="Souscriptions"
-          icon={Users}
-          mainLabel="Actives"
-          mainValue={formatNumber(safeNum(metrics?.activeSubscriptions))}
-          tone="green"
-          items={[
-            [
-              "En attente",
-              formatNumber(safeNum(metrics?.pendingSubscriptions)),
-            ],
-            [
-              "Suspendues",
-              formatNumber(safeNum(metrics?.suspendedSubscriptions)),
-            ],
-            [
-              "Annulées",
-              formatNumber(safeNum(metrics?.cancelledSubscriptions)),
-            ],
-          ]}
-        />
+      <h2 className="text-lg font-bold text-gray-950">Portefeuille et facturation</h2>
 
-        <MetricPanel
-          title="Revenus & facturation"
-          icon={CreditCard}
-          mainLabel="MRR actif"
-          mainValue={formatCurrency(safeNum(metrics?.activeSubscriptionMrr))}
-          tone="blue"
-          items={[
-            [
-              "Montant en attente",
-              formatCurrency(safeNum(metrics?.pendingBillableAmount)),
-            ],
-            [
-              "Items facturables",
-              formatNumber(safeNum(metrics?.pendingBillableItems)),
-            ],
-          ]}
-        />
+      {isLoading && <MetricsSkeleton />}
 
-        <MetricPanel
-          title="Passes & options"
-          icon={Ticket}
-          mainLabel="Passes actifs"
-          mainValue={formatNumber(safeNum(metrics?.activePasses))}
-          tone="purple"
-          items={[
-            ["Add-ons actifs", formatNumber(safeNum(metrics?.activeAddons))],
-            [
-              "Promotions actives",
-              formatNumber(safeNum(metrics?.activePromotions)),
-            ],
-          ]}
-        />
-      </div>
+      {isError && <ErrorBlock message="Erreur de chargement des métriques" onRetry={() => refetch()} />}
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <MetricPanel
-          title="Usage & overage"
-          icon={Activity}
-          mainLabel="Usage enregistré"
-          mainValue={formatNumber(safeNum(metrics?.recordedUsageQuantity))}
-          tone="orange"
-          items={[
-            [
-              "Usage facturable",
-              formatNumber(safeNum(metrics?.billableUsageQuantity)),
-            ],
-            ["Charges overage", formatNumber(safeNum(metrics?.overageCharges))],
-            [
-              "Montant overage",
-              formatCurrency(safeNum(metrics?.overageAmount)),
-            ],
-          ]}
-        />
+      {!isLoading && !isError && (
+        <>
+          <KpiStrip
+            items={[
+              { label: "MRR actif", value: formatCurrency(mrr), hint: "Revenu mensuel récurrent" },
+              { label: "Souscriptions actives", value: formatNumber(active), hint: `${formatNumber(totalSubs)} au total` },
+              { label: "Passes actifs", value: formatNumber(activePasses), hint: `${formatNumber(activeAddons)} add-ons actifs` },
+              {
+                label: "À facturer",
+                value: formatCurrency(pendingAmount),
+                hint: `${formatNumber(safeNum(metrics?.pendingBillableItems))} items en attente`,
+              },
+            ]}
+          />
 
-        <MetricPanel
-          title="Rollover"
-          icon={RefreshCw}
-          mainLabel="Reports appliqués"
-          mainValue={formatNumber(safeNum(metrics?.rolloverRecords))}
-          tone="slate"
-          items={[
-            [
-              "Quantité reportée",
-              formatNumber(safeNum(metrics?.rolloverQuantity)),
-            ],
-          ]}
-        />
-      </div>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <Panel
+              title="Souscriptions par statut"
+              subtitle="Répartition du portefeuille"
+              table={{
+                head: ["Statut", "Souscriptions"],
+                rows: statusParts.map((p) => [p.label, formatNumber(p.value)]),
+              }}
+            >
+              <DonutChart slices={statusParts} centerLabel="souscriptions" />
+            </Panel>
+
+            <Panel
+              className="xl:col-span-2"
+              title="Revenus et facturation"
+              subtitle="Montants en FCFA"
+              table={{
+                head: ["Montant", "FCFA"],
+                rows: [
+                  ["MRR actif", formatNumber(mrr)],
+                  ["À facturer", formatNumber(pendingAmount)],
+                  ["Overage", formatNumber(overageAmount)],
+                ],
+              }}
+            >
+              <ColumnChart
+                unit=" FCFA"
+                data={[
+                  { label: "MRR actif", value: mrr, color: CHART.primary },
+                  { label: "À facturer", value: pendingAmount, color: CHART.soft },
+                  { label: "Overage", value: overageAmount, color: CHART.neutral },
+                ]}
+              />
+            </Panel>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <Panel
+              className="xl:col-span-2"
+              title="Passes et options"
+              subtitle="Éléments actifs"
+              table={{
+                head: ["Élément", "Actifs"],
+                rows: [
+                  ["Passes", formatNumber(activePasses)],
+                  ["Add-ons", formatNumber(activeAddons)],
+                  ["Promotions", formatNumber(activePromotions)],
+                ],
+              }}
+            >
+              <ColumnChart
+                data={[
+                  { label: "Passes", value: activePasses },
+                  { label: "Add-ons", value: activeAddons },
+                  { label: "Promotions", value: activePromotions },
+                ]}
+              />
+            </Panel>
+
+            <Panel
+              title="Usage et reports"
+              subtitle="Part facturable de l'usage enregistré"
+              table={{
+                head: ["Mesure", "Valeur"],
+                rows: [
+                  ["Usage enregistré", formatNumber(recorded)],
+                  ["Usage facturable", formatNumber(billable)],
+                  ["Charges overage", formatNumber(overageCharges)],
+                  ["Montant overage", formatCurrency(overageAmount)],
+                  ["Reports appliqués", formatNumber(rolloverRecords)],
+                  ["Quantité reportée", formatNumber(rolloverQuantity)],
+                ],
+              }}
+            >
+              <div className="space-y-6">
+                <RingGauge label="facturable" value={billable} total={recorded} />
+                <dl className="space-y-2.5 text-sm">
+                  {[
+                    ["Charges overage", formatNumber(overageCharges)],
+                    ["Montant overage", formatCurrency(overageAmount)],
+                    ["Reports appliqués", formatNumber(rolloverRecords)],
+                    ["Quantité reportée", formatNumber(rolloverQuantity)],
+                  ].map(([k, v]) => (
+                    <div key={k} className="flex items-baseline justify-between gap-3">
+                      <dt className="text-gray-500">{k}</dt>
+                      <dd className="font-bold text-gray-950">{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            </Panel>
+          </div>
+        </>
+      )}
     </div>
   );
 };

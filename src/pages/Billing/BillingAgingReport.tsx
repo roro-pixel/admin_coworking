@@ -1,186 +1,163 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Loader2 } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import { billingService } from "../../services/billing.service";
+import { ActionButton, DataCard, EmptyState, ErrorBlock, Field, HeadRow, ListHeader, StatusChip } from "../../components/subscription/kit";
+import { FIELD_SOFT, ROW_HOVER, formatDate, formatMoney } from "../../components/subscription/kitUtils";
+import { ListSkeleton, Skeleton } from "../../components/ui/Skeleton";
+import { useNavigate } from "react-router-dom";
+import { ChartCard, ColumnChart, DonutBreakdown, KpiRow, KpiRowSkeleton } from "../../components/operations/OpsCharts";
+import { CHART_COLORS } from "../../components/operations/opsChartData";
+import type { Slice } from "../../components/operations/opsChartData";
+import { AGING_BUCKETS, BUCKET_LABEL, CUSTOMER_TYPE_LABEL } from "../../components/billing/billingLabels";
+import { currencyLabel } from "../../components/payment/paymentUtils";
 
-const bucketLabels: Record<string, string> = {
-  CURRENT: "Non échue",
-  DAYS_1_TO_30: "1 à 30 jours",
-  DAYS_31_TO_60: "31 à 60 jours",
-  DAYS_61_TO_90: "61 à 90 jours",
-  DAYS_OVER_90: "Plus de 90 jours",
-};
+const COLS = "lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_8rem_10rem_9rem]";
+// Du plus sain au plus critique : rose de marque pour le non échu, puis teintes de la palette qui chauffent
+const BUCKET_COLORS = [CHART_COLORS[2], CHART_COLORS[1], CHART_COLORS[0], "#B8325A", "#7A1F3D"];
 
 export const BillingAgingReport: React.FC = () => {
+  const navigate = useNavigate();
   const [customerType, setCustomerType] = useState("");
   const [customerCode, setCustomerCode] = useState("");
+  const [debouncedCode, setDebouncedCode] = useState("");
   const [currency, setCurrency] = useState("XAF");
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["billing-aging-report", customerType, customerCode, currency],
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedCode(customerCode), 400);
+    return () => clearTimeout(t);
+  }, [customerCode]);
+
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
+    queryKey: ["billing-aging-report", customerType, debouncedCode, currency],
     queryFn: () =>
       billingService.getAgingReport({
         customerType: customerType || undefined,
-        customerCode: customerCode || undefined,
+        customerCode: debouncedCode || undefined,
         currency: currency || undefined,
       }),
   });
 
-  const formatAmount = (amount: number) =>
-    `${amount.toLocaleString("fr-FR")} ${data?.currency ?? currency}`;
+  const cur = currencyLabel(data?.currency ?? currency);
+  const money = (n: number) => formatMoney(n, cur);
+
+  const slices: Slice[] = data
+    ? AGING_BUCKETS.map((b, i) => ({
+        key: b.key,
+        label: b.label,
+        value: data.summary[b.key].totalDue,
+        color: BUCKET_COLORS[i],
+      }))
+    : [];
+  const overdueTotal = data
+    ? data.summary.days1To30.totalDue + data.summary.days31To60.totalDue + data.summary.days61To90.totalDue + data.summary.daysOver90.totalDue
+    : 0;
+  const share = data && data.summary.grandTotal.totalDue > 0 ? Math.round((overdueTotal / data.summary.grandTotal.totalDue) * 100) : 0;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900">
-          Ancienneté des créances
-        </h2>
-        <p className="text-gray-500 text-sm mt-1">
-          Suivi des soldes dus par tranche de retard.
-        </p>
+    <div className="space-y-5">
+      <ListHeader
+        title="Ancienneté des créances"
+        subtitle="Soldes dus classés par tranche de retard"
+        action={
+          <ActionButton variant="ghost" icon={BarChart3} pending={isFetching && !isLoading} onClick={() => refetch()}>
+            Actualiser
+          </ActionButton>
+        }
+      />
+
+      <div className="grid grid-cols-1 gap-3 rounded-[1.75rem] border border-gray-100 bg-white p-4 shadow-sm md:grid-cols-3">
+        <Field label="Type de client">
+          <select value={customerType} onChange={(e) => setCustomerType(e.target.value)} className={FIELD_SOFT}>
+            <option value="">Tous les types</option>
+            {Object.entries(CUSTOMER_TYPE_LABEL).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Code client">
+          <input value={customerCode} onChange={(e) => setCustomerCode(e.target.value)} className={FIELD_SOFT} placeholder="CUS-0001" />
+        </Field>
+        <Field label="Devise">
+          <input value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} className={FIELD_SOFT} placeholder="XAF" />
+        </Field>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-4 grid grid-cols-4 gap-3">
-        <select
-          value={customerType}
-          onChange={(e) => setCustomerType(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-        >
-          <option value="">Tous les types</option>
-          <option value="MEMBER">Membre</option>
-          <option value="CUSTOMER">Customer</option>
-          <option value="BUSINESS_ENTITY">Business entity</option>
-        </select>
-        <input
-          value={customerCode}
-          onChange={(e) => setCustomerCode(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-          placeholder="Code client"
-        />
-        <input
-          value={currency}
-          onChange={(e) => setCurrency(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-          placeholder="XAF"
-        />
-        <button
-          onClick={() => refetch()}
-          className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 flex items-center justify-center gap-2"
-        >
-          <BarChart3 size={15} /> Actualiser
-        </button>
-      </div>
-
-      {isLoading && (
-        <div className="py-12 flex justify-center">
-          <Loader2 className="animate-spin text-primary-600" />
+      {isLoading ? (
+        <div className="space-y-5">
+          <KpiRowSkeleton count={4} />
+          <Skeleton className="h-72 w-full rounded-[1.75rem]" />
+          <ListSkeleton rows={5} />
         </div>
-      )}
-
-      {data && (
+      ) : isError || !data ? (
+        <ErrorBlock message="Impossible de charger l'état des créances." onRetry={() => refetch()} />
+      ) : (
         <>
-          <div className="grid grid-cols-3 gap-4">
-            <SummaryCard
-              label="Non échue"
-              count={data.summary.current.count}
-              total={formatAmount(data.summary.current.totalDue)}
-            />
-            <SummaryCard
-              label="1 à 30 jours"
-              count={data.summary.days1To30.count}
-              total={formatAmount(data.summary.days1To30.totalDue)}
-            />
-            <SummaryCard
-              label="31 à 60 jours"
-              count={data.summary.days31To60.count}
-              total={formatAmount(data.summary.days31To60.totalDue)}
-            />
-            <SummaryCard
-              label="61 à 90 jours"
-              count={data.summary.days61To90.count}
-              total={formatAmount(data.summary.days61To90.totalDue)}
-            />
-            <SummaryCard
-              label="Plus de 90 jours"
-              count={data.summary.daysOver90.count}
-              total={formatAmount(data.summary.daysOver90.totalDue)}
-            />
-            <SummaryCard
-              label="Total général"
-              count={data.summary.grandTotal.count}
-              total={formatAmount(data.summary.grandTotal.totalDue)}
-              strong
-            />
+          <KpiRow
+            columns={4}
+            items={[
+              { label: "Total à recouvrer", value: money(data.summary.grandTotal.totalDue), hint: `${data.summary.grandTotal.count} document${data.summary.grandTotal.count > 1 ? "s" : ""}`, tone: "pink" },
+              { label: "Non échu", value: money(data.summary.current.totalDue), hint: `${data.summary.current.count} document${data.summary.current.count > 1 ? "s" : ""}`, tone: "success" },
+              { label: "En retard", value: money(overdueTotal), hint: `${share} % du total`, tone: overdueTotal > 0 ? "danger" : "default" },
+              { label: "Plus de 90 jours", value: money(data.summary.daysOver90.totalDue), hint: `${data.summary.daysOver90.count} document${data.summary.daysOver90.count > 1 ? "s" : ""}`, tone: data.summary.daysOver90.totalDue > 0 ? "danger" : "default" },
+            ]}
+          />
+
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-5">
+            <ChartCard className="xl:col-span-3" title="Soldes dus par tranche" subtitle={`Montants en ${cur}`}>
+              <ColumnChart data={slices} />
+            </ChartCard>
+            <ChartCard className="xl:col-span-2" title="Répartition" subtitle="Part de chaque tranche dans le total">
+              <DonutBreakdown data={slices} centerLabel="du total" />
+            </ChartCard>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50/80">
-                <tr>
-                  <th className="px-5 py-3 text-left text-sm font-semibold">
-                    Document
-                  </th>
-                  <th className="px-5 py-3 text-left text-sm font-semibold">
-                    Client
-                  </th>
-                  <th className="px-5 py-3 text-left text-sm font-semibold">
-                    Échéance
-                  </th>
-                  <th className="px-5 py-3 text-right text-sm font-semibold">
-                    Solde dû
-                  </th>
-                  <th className="px-5 py-3 text-left text-sm font-semibold">
-                    Tranche
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
+          {data.documents.length === 0 ? (
+            <EmptyState icon={BarChart3} title="Aucune créance" hint="Aucun document n'a de solde dû pour ces critères." />
+          ) : (
+            <>
+              <h3 className="px-1 pt-2 text-base font-bold text-gray-950">Documents concernés</h3>
+              <HeadRow cols={COLS}>
+                <span>Document</span>
+                <span>Client</span>
+                <span>Échéance</span>
+                <span className="text-right">Solde dû</span>
+                <span className="text-right">Tranche</span>
+              </HeadRow>
+              <DataCard>
                 {data.documents.map((doc) => (
-                  <tr key={doc.documentNumber} className="hover:bg-gray-50">
-                    <td className="px-5 py-4 text-sm font-mono">
-                      {doc.documentNumber}
-                    </td>
-                    <td className="px-5 py-4 text-sm">
-                      <p className="font-medium">{doc.customerName}</p>
-                      <p className="text-xs text-gray-500">
-                        {doc.customerType} · {doc.customerCode}
+                  <button
+                    key={doc.documentNumber}
+                    type="button"
+                    onClick={() => navigate(`/billing/documents/${doc.documentNumber}`)}
+                    className={`grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 rounded-2xl p-4 text-left transition max-lg:mb-2 max-lg:bg-gray-50 ${COLS} ${ROW_HOVER}`}
+                  >
+                    <p className="truncate font-mono text-xs font-semibold text-[color:var(--logo-pink-dark)]">{doc.documentNumber}</p>
+                    <div className="lg:order-last lg:text-right">
+                      <StatusChip tone={doc.daysOverdue > 60 ? "danger" : doc.daysOverdue > 0 ? "warn" : "success"}>
+                        {BUCKET_LABEL[doc.agingBucket] ?? doc.agingBucket}
+                      </StatusChip>
+                    </div>
+                    <div className="col-span-2 min-w-0 lg:col-span-1">
+                      <p className="truncate font-semibold text-gray-950">{doc.customerName}</p>
+                      <p className="truncate text-xs text-gray-400">
+                        {CUSTOMER_TYPE_LABEL[doc.customerType] ?? doc.customerType} · {doc.customerCode}
                       </p>
-                    </td>
-                    <td className="px-5 py-4 text-sm">
-                      {doc.dueDate
-                        ? new Date(doc.dueDate).toLocaleDateString("fr-FR")
-                        : "-"}
-                    </td>
-                    <td className="px-5 py-4 text-right text-sm font-semibold text-red-600">
-                      {formatAmount(doc.balanceDue)}
-                    </td>
-                    <td className="px-5 py-4 text-sm">
-                      {bucketLabels[doc.agingBucket] ?? doc.agingBucket}
-                    </td>
-                  </tr>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      {formatDate(doc.dueDate)}
+                      {doc.daysOverdue > 0 ? ` · ${doc.daysOverdue} j` : ""}
+                    </p>
+                    <p className="text-sm font-bold tabular-nums text-red-600 max-lg:text-right lg:text-right">{money(doc.balanceDue)}</p>
+                  </button>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </DataCard>
+            </>
+          )}
         </>
       )}
     </div>
   );
 };
-
-const SummaryCard: React.FC<{
-  label: string;
-  count: number;
-  total: string;
-  strong?: boolean;
-}> = ({ label, count, total, strong }) => (
-  <div
-    className={`bg-white border rounded-xl p-4 ${strong ? "border-primary-200 bg-primary-50" : "border-gray-200"}`}
-  >
-    <p className="text-sm text-gray-500">{label}</p>
-    <p className="text-2xl font-bold text-gray-900 mt-1">{total}</p>
-    <p className="text-xs text-gray-500 mt-1">
-      {count} document{count > 1 ? "s" : ""}
-    </p>
-  </div>
-);

@@ -1,21 +1,27 @@
 import React, { useState } from "react";
-import { AdminLayout } from "../../components/layout/AdminLayout";
 import {
-  FileText,
-  ListChecks,
-  FolderOpen,
-  Eye,
+  AlertTriangle,
   BarChart3,
-  Clock,
   Calendar,
   CheckSquare,
-  AlertTriangle,
+  ClipboardCheck,
+  Clock,
+  Eye,
+  FileSearch,
+  FileText,
+  FolderOpen,
+  GitBranch,
+  GitCompareArrows,
+  ListChecks,
   Search,
   ShieldCheck,
   Tags,
-  FileSearch,
-  GitBranch,
 } from "lucide-react";
+import { AdminLayout } from "../../components/layout/AdminLayout";
+import { brandVars } from "../../components/layout/adminTheme";
+import { PageHeader, Tabs } from "../../components/subscription/kit";
+import type { TabItem } from "../../components/subscription/kit";
+import { Toaster } from "../../components/ui/Toaster";
 import { DocumentTypesList } from "./DocumentTypesList";
 import { DocumentRequirementsList } from "./DocumentRequirementsList";
 import { DocumentsList } from "./DocumentsList";
@@ -25,13 +31,14 @@ import { KycMyQueuePage } from "./KycMyQueuePage";
 import { KycExpiringSoonPage } from "./KycExpiringSoonPage";
 import { KycBulkReviewPage } from "./KycBulkReviewPage";
 import { KycCorrectionPage } from "./KycCorrectionPage";
+import { KycReviewedDocumentsPage } from "./KycReviewedDocumentsPage";
+import { KycCrossValidationPage } from "./KycCrossValidationPage";
 import { DocumentGedDashboard } from "./DocumentGedDashboard";
 import { DocumentAdvancedSearchPage } from "./DocumentAdvancedSearchPage";
 import { DocumentOwnerFolderPage } from "./DocumentOwnerFolderPage";
 import { DocumentGovernancePage } from "./DocumentGovernancePage";
 import { DocumentAnalyticsExportPage } from "./DocumentAnalyticsExportPage";
 import { DocumentOperationsHub } from "./DocumentOperationsHub";
-import { KycOperationsHub } from "./KycOperationsHub";
 
 type TabId =
   | "dashboard"
@@ -40,213 +47,89 @@ type TabId =
   | "corrections"
   | "expiring"
   | "bulk"
-  | "documents"
-  | "types"
-  | "requirements"
+  | "reviewed"
+  | "crossValidation"
   | "gedDashboard"
+  | "documents"
   | "advancedSearch"
   | "folder"
-  | "governance"
-  | "analytics"
   | "operations"
-  | "kycOperations";
+  | "types"
+  | "requirements"
+  | "governance"
+  | "analytics";
 
-const groups: {
-  title: string;
-  description: string;
-  items: { id: TabId; label: string; icon: React.ElementType }[];
-}[] = [
-  {
-    title: "KYC",
-    description: "Traitement, revue et conformité",
-    items: [
-      { id: "dashboard", label: "Dashboard", icon: BarChart3 },
-      { id: "review", label: "Revue", icon: Eye },
-      { id: "myqueue", label: "Mes dossiers", icon: Clock },
-      { id: "corrections", label: "Corrections", icon: AlertTriangle },
-      { id: "expiring", label: "Expirations", icon: Calendar },
-      { id: "bulk", label: "Revue masse", icon: CheckSquare },
-      { id: "kycOperations", label: "API KYC", icon: ShieldCheck },
-    ],
-  },
-  {
-    title: "GED",
-    description: "Documents, recherche et dossiers",
-    items: [
-      { id: "gedDashboard", label: "Dashboard", icon: FileSearch },
-      { id: "documents", label: "Documents", icon: FolderOpen },
-      { id: "advancedSearch", label: "Recherche", icon: Search },
-      { id: "folder", label: "Dossier", icon: FolderOpen },
-      { id: "operations", label: "Opérations", icon: GitBranch },
-    ],
-  },
-  {
-    title: "Administration",
-    description: "Règles, types et gouvernance",
-    items: [
-      { id: "types", label: "Types", icon: FileText },
-      { id: "requirements", label: "Exigences", icon: ListChecks },
-      { id: "governance", label: "Gouvernance", icon: Tags },
-      { id: "analytics", label: "Analytics", icon: ShieldCheck },
-    ],
-  },
+type GroupId = "kyc" | "ged" | "admin";
+
+interface Section extends TabItem<TabId> {
+  group: GroupId;
+  view: React.ReactNode;
+}
+
+const SECTIONS: Section[] = [
+  { id: "dashboard", label: "Tableau de bord", icon: BarChart3, group: "kyc", view: <KycDashboardPage /> },
+  { id: "review", label: "Revue", icon: Eye, group: "kyc", view: <DocumentReviewQueue /> },
+  { id: "myqueue", label: "Mes dossiers", icon: Clock, group: "kyc", view: <KycMyQueuePage /> },
+  { id: "corrections", label: "Corrections", icon: AlertTriangle, group: "kyc", view: <KycCorrectionPage /> },
+  { id: "expiring", label: "Expirations", icon: Calendar, group: "kyc", view: <KycExpiringSoonPage /> },
+  { id: "bulk", label: "Revue en masse", icon: CheckSquare, group: "kyc", view: <KycBulkReviewPage /> },
+  { id: "reviewed", label: "Documents traités", icon: ClipboardCheck, group: "kyc", view: <KycReviewedDocumentsPage /> },
+  { id: "crossValidation", label: "Validation croisée", icon: GitCompareArrows, group: "kyc", view: <KycCrossValidationPage /> },
+  { id: "gedDashboard", label: "Tableau de bord", icon: FileSearch, group: "ged", view: <DocumentGedDashboard /> },
+  { id: "documents", label: "Documents", icon: FolderOpen, group: "ged", view: <DocumentsList /> },
+  { id: "advancedSearch", label: "Recherche", icon: Search, group: "ged", view: <DocumentAdvancedSearchPage /> },
+  { id: "folder", label: "Dossier", icon: FolderOpen, group: "ged", view: <DocumentOwnerFolderPage /> },
+  { id: "operations", label: "Opérations", icon: GitBranch, group: "ged", view: <DocumentOperationsHub /> },
+  { id: "types", label: "Types", icon: FileText, group: "admin", view: <DocumentTypesList /> },
+  { id: "requirements", label: "Exigences", icon: ListChecks, group: "admin", view: <DocumentRequirementsList /> },
+  { id: "governance", label: "Gouvernance", icon: Tags, group: "admin", view: <DocumentGovernancePage /> },
+  { id: "analytics", label: "Analytics", icon: ShieldCheck, group: "admin", view: <DocumentAnalyticsExportPage /> },
 ];
 
-const allTabs = groups.flatMap((group) => group.items);
+const GROUPS: TabItem<GroupId>[] = [
+  { id: "kyc", label: "KYC", icon: ShieldCheck },
+  { id: "ged", label: "GED", icon: FolderOpen },
+  { id: "admin", label: "Administration", icon: Tags },
+];
 
 export const DocumentMaster: React.FC = () => {
+  const [group, setGroup] = useState<GroupId>("kyc");
   const [activeTab, setActiveTab] = useState<TabId>("dashboard");
-  const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(
-    new Set(["dashboard"]),
-  );
+  // Un écran visité reste monté (filtres et saisies conservés), les autres ne se chargent qu'à la première visite.
+  const [visited, setVisited] = useState<Set<TabId>>(new Set(["dashboard"]));
 
-  const handleTabChange = (tabId: TabId) => {
-    setActiveTab(tabId);
-    setVisitedTabs((prev) => new Set([...prev, tabId]));
+  const open = (id: TabId) => {
+    setActiveTab(id);
+    setVisited((prev) => new Set([...prev, id]));
   };
 
-  const activeTabInfo = allTabs.find((tab) => tab.id === activeTab);
+  const openGroup = (g: GroupId) => {
+    setGroup(g);
+    if (SECTIONS.find((s) => s.id === activeTab)?.group !== g) {
+      const first = SECTIONS.find((s) => s.group === g);
+      if (first) open(first.id);
+    }
+  };
+
+  const inGroup: TabItem<TabId>[] = SECTIONS.filter((s) => s.group === group).map(({ id, label, icon }) => ({ id, label, icon }));
 
   return (
     <AdminLayout>
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="mt-1 text-2xl font-bold text-gray-950">
-            Gestion documentaire & conformité
-          </h1>
-          <p className="mt-1 max-w-3xl text-sm text-gray-500">
-            Pilotez les dossiers KYC, la revue documentaire, les exigences et la
-            gouvernance des documents depuis un seul espace.
-          </p>
+      <div style={brandVars}>
+        <Toaster />
+        <PageHeader title="Documents et conformité" subtitle="Dossiers KYC, gestion documentaire, exigences et gouvernance" />
+        <div className="mb-4">
+          <Tabs items={GROUPS} active={group} onChange={openGroup} />
         </div>
-        {activeTabInfo && (
-          <div className="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-gray-100">
-            <p className="text-xs text-gray-400">Section active</p>
-            <p className="text-sm font-semibold text-gray-900">
-              {activeTabInfo.label}
-            </p>
-          </div>
-        )}
-      </div>
-
-      <div className="mb-6 space-y-3 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
-        {groups.map((group) => (
-          <div
-            key={group.title}
-            className="grid gap-3 lg:grid-cols-[180px_1fr]"
-          >
-            <div className="px-2 py-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                {group.title}
-              </p>
-              <p className="mt-0.5 text-xs text-gray-400">
-                {group.description}
-              </p>
+        <div className="mb-6">
+          <Tabs variant="soft" items={inGroup} active={activeTab} onChange={open} />
+        </div>
+        {SECTIONS.map((s) =>
+          visited.has(s.id) ? (
+            <div key={s.id} className={activeTab !== s.id ? "hidden" : ""}>
+              {s.view}
             </div>
-            <div className="flex flex-wrap gap-2">
-              {group.items.map((tab) => {
-                const Icon = tab.icon;
-                const active = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => handleTabChange(tab.id)}
-                    className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition-all ${
-                      active
-                        ? "bg-gray-950 text-white shadow-sm"
-                        : "bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                    }`}
-                  >
-                    <Icon size={16} />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-6">
-        {visitedTabs.has("dashboard") && (
-          <div className={activeTab !== "dashboard" ? "hidden" : ""}>
-            <KycDashboardPage />
-          </div>
-        )}
-        {visitedTabs.has("review") && (
-          <div className={activeTab !== "review" ? "hidden" : ""}>
-            <DocumentReviewQueue />
-          </div>
-        )}
-        {visitedTabs.has("myqueue") && (
-          <div className={activeTab !== "myqueue" ? "hidden" : ""}>
-            <KycMyQueuePage />
-          </div>
-        )}
-        {visitedTabs.has("corrections") && (
-          <div className={activeTab !== "corrections" ? "hidden" : ""}>
-            <KycCorrectionPage />
-          </div>
-        )}
-        {visitedTabs.has("expiring") && (
-          <div className={activeTab !== "expiring" ? "hidden" : ""}>
-            <KycExpiringSoonPage />
-          </div>
-        )}
-        {visitedTabs.has("bulk") && (
-          <div className={activeTab !== "bulk" ? "hidden" : ""}>
-            <KycBulkReviewPage />
-          </div>
-        )}
-        {visitedTabs.has("kycOperations") && (
-          <div className={activeTab !== "kycOperations" ? "hidden" : ""}>
-            <KycOperationsHub />
-          </div>
-        )}
-        {visitedTabs.has("gedDashboard") && (
-          <div className={activeTab !== "gedDashboard" ? "hidden" : ""}>
-            <DocumentGedDashboard />
-          </div>
-        )}
-        {visitedTabs.has("documents") && (
-          <div className={activeTab !== "documents" ? "hidden" : ""}>
-            <DocumentsList />
-          </div>
-        )}
-        {visitedTabs.has("advancedSearch") && (
-          <div className={activeTab !== "advancedSearch" ? "hidden" : ""}>
-            <DocumentAdvancedSearchPage />
-          </div>
-        )}
-        {visitedTabs.has("folder") && (
-          <div className={activeTab !== "folder" ? "hidden" : ""}>
-            <DocumentOwnerFolderPage />
-          </div>
-        )}
-        {visitedTabs.has("operations") && (
-          <div className={activeTab !== "operations" ? "hidden" : ""}>
-            <DocumentOperationsHub />
-          </div>
-        )}
-        {visitedTabs.has("types") && (
-          <div className={activeTab !== "types" ? "hidden" : ""}>
-            <DocumentTypesList />
-          </div>
-        )}
-        {visitedTabs.has("requirements") && (
-          <div className={activeTab !== "requirements" ? "hidden" : ""}>
-            <DocumentRequirementsList />
-          </div>
-        )}
-        {visitedTabs.has("governance") && (
-          <div className={activeTab !== "governance" ? "hidden" : ""}>
-            <DocumentGovernancePage />
-          </div>
-        )}
-        {visitedTabs.has("analytics") && (
-          <div className={activeTab !== "analytics" ? "hidden" : ""}>
-            <DocumentAnalyticsExportPage />
-          </div>
+          ) : null,
         )}
       </div>
     </AdminLayout>

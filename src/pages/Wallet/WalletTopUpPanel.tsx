@@ -1,84 +1,53 @@
-import React, { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import React, { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import {
-  AlertCircle,
-  CheckCircle,
-  Loader2,
-  PlusCircle,
-  Wallet as WalletIcon,
-  ArrowRight,
-  Building2,
-  User,
-} from "lucide-react";
-import { walletService, formatAmountOnly } from "../../services/wallet.service";
+import { PlusCircle, Wallet as WalletIcon } from "lucide-react";
+import { walletService } from "../../services/wallet.service";
 import type { Wallet } from "../../services/wallet.service";
 import { useAuth } from "../../contexts/AuthContext";
-import { CustomerAutocomplete } from "../../components/customers/CustomerAutocomplete";
-import { MemberAutocomplete } from "../../components/members/MemberAutocomplete";
+import { ActionButton, ErrorBanner, Field, Section } from "../../components/subscription/kit";
+import { FIELD_SOFT, apiMessage, formatMoney } from "../../components/subscription/kitUtils";
+import { Skeleton } from "../../components/ui/Skeleton";
+import { toast } from "../../components/ui/toastStore";
+import { currencyLabel } from "../../components/payment/paymentUtils";
+import { RatioBar } from "../../components/operations/OpsCharts";
+import { OwnerPicker } from "../../components/wallet/OwnerPicker";
+import { WalletSummary } from "../../components/wallet/WalletSummary";
+import type { OwnerType } from "../../components/wallet/walletLabels";
 import type { CustomerSummaryResponse } from "../../services/customer.service";
 import type { MemberSummaryResponse } from "../../services/member.service";
 
-type OwnerType = "CUSTOMER" | "MEMBER" | "BUSINESS_ENTITY";
-
-const defaultForm = {
-  ownerType: "CUSTOMER" as OwnerType,
-  ownerCode: "",
-  currency: "XAF",
-  amount: 0,
-  reference: "",
-  metadataJson: "",
-};
+const defaultForm = { ownerType: "CUSTOMER" as OwnerType, ownerCode: "", currency: "XAF", amount: 0, reference: "", metadataJson: "" };
 
 export const WalletTopUpPanel: React.FC = () => {
   const { admin } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [form, setForm] = useState(defaultForm);
-  const [selectedCustomer, setSelectedCustomer] =
-    useState<CustomerSummaryResponse | null>(null);
-  const [selectedMember, setSelectedMember] =
-    useState<MemberSummaryResponse | null>(null);
-  const [wallet, setWallet] = useState<Wallet | null>(null);
-  const [checking, setChecking] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerSummaryResponse | null>(null);
+  const [selectedMember, setSelectedMember] = useState<MemberSummaryResponse | null>(null);
+  const [credited, setCredited] = useState<Wallet | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
-  const resolveWallet = async (
-    ownerType: OwnerType,
-    ownerCode: string,
-    currency = "XAF",
-  ) => {
-    if (!ownerCode) {
-      setWallet(null);
-      return;
-    }
-    setChecking(true);
-    setError(null);
-    try {
-      const w = await walletService.getOrCreateWallet(
-        ownerType,
-        ownerCode,
-        currency,
-      );
-      setWallet(w);
-    } catch (e: any) {
-      setWallet(null);
-      setError(
-        e?.response?.data?.message ||
-          "Impossible de récupérer ou créer le wallet.",
-      );
-    } finally {
-      setChecking(false);
-    }
-  };
+  // Aperçu du portefeuille cible. L'ancien écran appelait get-or-create dès la sélection du propriétaire, ce qui créait
+  // un portefeuille sans qu'aucun crédit ne soit validé. Le top-up crée déjà le portefeuille si besoin : on se contente de lire.
+  const [debounced, setDebounced] = useState({ code: "", currency: "XAF" });
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced({ code: form.ownerCode, currency: form.currency }), 400);
+    return () => clearTimeout(t);
+  }, [form.ownerCode, form.currency]);
+
+  const { data: lookup, isFetching: checking } = useQuery({
+    queryKey: ["wallet-topup-preview", form.ownerType, debounced.code, debounced.currency],
+    queryFn: () => walletService.getWallets({ ownerType: form.ownerType, ownerCode: debounced.code, currency: debounced.currency, size: 1 }),
+    enabled: !!debounced.code && !!debounced.currency,
+  });
+  const preview: Wallet | null = credited ?? lookup?.content?.[0] ?? null;
+  const cur = currencyLabel(preview?.currency ?? form.currency);
 
   const topUpMutation = useMutation({
-    mutationFn: () => {
-      if (form.metadataJson.trim()) {
-        JSON.parse(form.metadataJson);
-      }
-      return walletService.adminTopUp({
+    mutationFn: () =>
+      walletService.adminTopUp({
         ownerType: form.ownerType,
         ownerCode: form.ownerCode,
         currency: form.currency,
@@ -86,336 +55,143 @@ export const WalletTopUpPanel: React.FC = () => {
         createdBy: admin?.email || String(admin?.id || "admin"),
         reference: form.reference || undefined,
         metadataJson: form.metadataJson.trim() || undefined,
-      });
-    },
-    onSuccess: (updatedWallet) => {
-      setWallet(updatedWallet);
-      setSuccess(
-        `Top-up effectué. Nouveau solde disponible : ${formatAmountOnly(updatedWallet.availableBalance)} ${updatedWallet.currency}.`,
-      );
+      }),
+    onSuccess: (w) => {
+      setCredited(w);
       setError(null);
+      setForm((f) => ({ ...f, amount: 0, reference: "", metadataJson: "" }));
       queryClient.invalidateQueries({ queryKey: ["wallets"] });
-      queryClient.invalidateQueries({
-        queryKey: ["wallet", updatedWallet.walletNumber],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["wallet-ledger", updatedWallet.walletNumber],
-      });
+      queryClient.invalidateQueries({ queryKey: ["wallet", w.walletNumber] });
+      queryClient.invalidateQueries({ queryKey: ["wallet-ledger", w.walletNumber] });
+      queryClient.invalidateQueries({ queryKey: ["wallet-topup-preview"] });
+      toast.success(`Top-up effectué. Nouveau solde disponible : ${formatMoney(w.availableBalance, currencyLabel(w.currency))}.`);
     },
-    onError: (e: any) =>
-      setError(
-        e?.response?.data?.message || e?.message || "Erreur lors du top-up.",
-      ),
+    onError: (e: unknown) => setError(apiMessage(e, "Erreur lors du top-up.")),
   });
 
   const changeOwnerType = (ownerType: OwnerType) => {
     setForm({ ...defaultForm, ownerType });
-    setWallet(null);
+    setCredited(null);
     setSelectedCustomer(null);
     setSelectedMember(null);
     setError(null);
-    setSuccess(null);
   };
 
-  const submit = () => {
-    if (!form.ownerCode)
-      return setError("Veuillez sélectionner ou saisir un propriétaire.");
-    if (form.amount <= 0)
-      return setError("Le montant doit être supérieur à 0.");
+  const setOwner = (code: string) => {
+    setForm((f) => ({ ...f, ownerCode: code }));
+    setCredited(null);
+  };
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.ownerCode) return setError("Sélectionnez un propriétaire.");
+    if (form.amount <= 0) return setError("Le montant doit être supérieur à 0.");
     if (form.metadataJson.trim()) {
       try {
         JSON.parse(form.metadataJson);
       } catch {
-        return setError("metadataJson doit être un JSON valide.");
+        return setError("Les métadonnées doivent être un JSON valide.");
       }
     }
     setError(null);
-    setSuccess(null);
     topUpMutation.mutate();
   };
 
-  const projectedBalance = wallet ? wallet.availableBalance + form.amount : 0;
-  const progressBase = wallet
-    ? Math.max(wallet.availableBalance + form.amount, 1)
-    : 1;
-  const currentPct = wallet
-    ? Math.max(0, Math.min(100, (wallet.availableBalance / progressBase) * 100))
-    : 0;
-  const topupPct = wallet
-    ? Math.max(0, Math.min(100, (form.amount / progressBase) * 100))
-    : 0;
+  const base = preview ? Math.max(preview.availableBalance + form.amount, 1) : 1;
 
   return (
-    <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-      <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-6 xl:col-span-2">
-        <div className="mb-6">
-          <p className="mb-2 inline-flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
-            <PlusCircle size={13} /> Crédit manuel
-          </p>
-          <h2 className="text-xl font-semibold text-gray-900">
-            Top-up admin automatisé
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm text-gray-500">
-            Le top-up crée automatiquement le wallet si nécessaire, crédite le
-            solde et écrit une ligne ledger ADMIN_TOPUP.
-          </p>
-        </div>
-
-        {error && (
-          <div className="mb-4 flex gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
-            <AlertCircle size={16} /> {error}
-          </div>
-        )}
-        {success && (
-          <div className="mb-4 flex gap-2 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-700 ring-1 ring-green-100">
-            <CheckCircle size={16} /> {success}
-          </div>
-        )}
-
-        <div className="space-y-5">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Type de propriétaire
-            </label>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              {(["CUSTOMER", "MEMBER", "BUSINESS_ENTITY"] as OwnerType[]).map(
-                (type) => {
-                  const selected = form.ownerType === type;
-                  const Icon = type === "MEMBER" ? User : Building2;
-                  return (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => changeOwnerType(type)}
-                      className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${
-                        selected
-                          ? "bg-primary-50 text-primary-700 ring-2 ring-primary-200"
-                          : "bg-gray-50 text-gray-600 ring-1 ring-gray-100 hover:bg-gray-100"
-                      }`}
-                    >
-                      <span
-                        className={`rounded-xl p-2 ${selected ? "bg-primary-100" : "bg-white"}`}
-                      >
-                        <Icon size={17} />
-                      </span>
-                      <span className="text-sm font-semibold">
-                        {type === "CUSTOMER"
-                          ? "Customer"
-                          : type === "MEMBER"
-                            ? "Membre"
-                            : "Entreprise"}
-                      </span>
-                    </button>
-                  );
-                },
-              )}
-            </div>
-          </div>
-
-          {form.ownerType === "MEMBER" ? (
-            <Field label="Membre *">
-              <MemberAutocomplete
-                selectedMember={selectedMember}
-                onSelect={(member) => {
-                  setSelectedMember(member);
-                  const code = member?.memberId || "";
-                  setForm((f) => ({ ...f, ownerCode: code }));
-                  resolveWallet("MEMBER", code, form.currency);
-                }}
-                placeholder="Rechercher un membre..."
-              />
-            </Field>
-          ) : (
-            <Field
-              label={`${form.ownerType === "BUSINESS_ENTITY" ? "Entreprise" : "Customer"} *`}
-            >
-              <CustomerAutocomplete
-                selectedCustomer={selectedCustomer}
-                typeFilter={
-                  form.ownerType === "BUSINESS_ENTITY" ? "COMPANY" : undefined
-                }
-                onSelect={(customer) => {
-                  setSelectedCustomer(customer);
-                  const code = customer?.customerId || "";
-                  setForm((f) => ({ ...f, ownerCode: code }));
-                  resolveWallet(form.ownerType, code, form.currency);
-                }}
-                placeholder={
-                  form.ownerType === "BUSINESS_ENTITY"
-                    ? "Rechercher une entreprise..."
-                    : "Rechercher un customer..."
-                }
-              />
-            </Field>
-          )}
-
+    <div className="mx-auto w-full max-w-4xl space-y-5">
+      <Section title="Top-up administrateur" description="Crée le portefeuille si nécessaire, crédite le solde et écrit une ligne ADMIN_TOPUP au ledger." icon={PlusCircle}>
+        <form onSubmit={submit} className="space-y-4 rounded-2xl bg-white p-5 shadow-sm">
+          <ErrorBanner message={error} />
+          <OwnerPicker
+            ownerType={form.ownerType}
+            onTypeChange={changeOwnerType}
+            ownerCode={form.ownerCode}
+            onCodeChange={setOwner}
+            selectedCustomer={selectedCustomer}
+            selectedMember={selectedMember}
+            onCustomer={(c) => {
+              setSelectedCustomer(c);
+              setOwner(c?.customerId ?? "");
+            }}
+            onMember={(m) => {
+              setSelectedMember(m);
+              setOwner(m?.memberId ?? "");
+            }}
+          />
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <Field label="Devise *">
+            <Field label="Devise" required>
               <input
                 value={form.currency}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    currency: e.target.value.toUpperCase(),
-                  }))
-                }
-                onBlur={() =>
-                  resolveWallet(form.ownerType, form.ownerCode, form.currency)
-                }
-                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 font-mono text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, currency: e.target.value.toUpperCase() }));
+                  setCredited(null);
+                }}
+                className={`${FIELD_SOFT} font-mono`}
               />
             </Field>
-            <Field label="Montant *">
+            <Field label="Montant" required>
               <input
-                type="text"
                 inputMode="decimal"
                 value={form.amount === 0 ? "" : form.amount}
                 onChange={(e) => {
                   const val = e.target.value.replace(/[^\d.]/g, "");
-                  setForm((f) => ({
-                    ...f,
-                    amount: val === "" ? 0 : Number(val),
-                  }));
+                  setForm((f) => ({ ...f, amount: val === "" ? 0 : Number(val) }));
                 }}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
                 placeholder="100000"
+                className={FIELD_SOFT}
               />
             </Field>
             <Field label="Référence">
-              <input
-                value={form.reference}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, reference: e.target.value }))
-                }
-                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
-                placeholder="CASH-TOPUP-001"
-              />
+              <input value={form.reference} onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))} placeholder="CASH-TOPUP-001" className={FIELD_SOFT} />
             </Field>
           </div>
-
-          <Field label="Metadata JSON">
+          <Field label="Métadonnées JSON" hint="Facultatif. Doit être une chaîne JSON valide.">
             <textarea
               value={form.metadataJson}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, metadataJson: e.target.value }))
-              }
+              onChange={(e) => setForm((f) => ({ ...f, metadataJson: e.target.value }))}
               rows={3}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 font-mono text-sm outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-50"
               placeholder='{"cashSessionNumber":"CSS-202604-000001"}'
+              className={`${FIELD_SOFT} resize-none font-mono text-xs`}
             />
-            <p className="mt-1 text-xs text-gray-400">
-              Optionnel. Doit être une chaîne JSON valide.
-            </p>
           </Field>
+          <ActionButton type="submit" icon={PlusCircle} pending={topUpMutation.isPending} disabled={!form.ownerCode || form.amount <= 0}>
+            Créditer le portefeuille
+          </ActionButton>
+        </form>
+      </Section>
 
-          <button
-            onClick={submit}
-            disabled={
-              topUpMutation.isPending ||
-              checking ||
-              !form.ownerCode ||
-              form.amount <= 0
-            }
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 disabled:opacity-50 sm:w-auto"
-          >
-            {topUpMutation.isPending ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <PlusCircle size={16} />
-            )}
-            Créditer le wallet
-          </button>
-        </div>
-      </div>
-
-      <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-6">
-        <h3 className="font-semibold text-gray-900">Wallet cible</h3>
-        <p className="mt-1 text-sm text-gray-500">
-          Aperçu du solde avant validation.
-        </p>
-
-        <div className="mt-5">
-          {checking ? (
-            <div className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-4 text-sm text-gray-500">
-              <Loader2 size={16} className="animate-spin" /> Vérification...
-            </div>
-          ) : wallet ? (
-            <div className="space-y-4">
-              <div className="rounded-2xl bg-primary-50 p-4 ring-1 ring-primary-100">
-                <p className="font-mono font-semibold text-primary-900">
-                  {wallet.walletNumber}
-                </p>
-                <p className="mt-1 text-xs text-primary-600">
-                  {wallet.ownerType} · {wallet.ownerCode}
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-gray-50 p-4">
-                <div className="mb-3 flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Solde actuel</span>
-                  <span className="font-semibold text-green-600">
-                    {formatAmountOnly(wallet.availableBalance)}{" "}
-                    {wallet.currency}
-                  </span>
-                </div>
-                <div className="mb-3 flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Top-up</span>
-                  <span className="font-semibold text-primary-600">
-                    + {formatAmountOnly(form.amount)} {wallet.currency}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-sm">
-                  <span className="font-medium text-gray-900">
-                    Après opération
-                  </span>
-                  <span className="font-bold text-primary-700">
-                    {formatAmountOnly(projectedBalance)} {wallet.currency}
-                  </span>
-                </div>
-
-                {form.amount > 0 && (
-                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-gray-200">
-                    <div className="flex h-full">
-                      <div
-                        className="bg-green-500"
-                        style={{ width: `${currentPct}%` }}
-                      />
-                      <div
-                        className="bg-primary-500"
-                        style={{ width: `${topupPct}%` }}
-                      />
-                    </div>
+      {form.ownerCode &&
+        (checking && !credited ? (
+          <Skeleton className="h-44 w-full rounded-2xl" />
+        ) : preview ? (
+          <section className="rounded-[1.75rem] border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
+            <h3 className="text-base font-bold text-gray-950">{credited ? "Portefeuille crédité" : "Portefeuille cible"}</h3>
+            <div className="mt-4 space-y-4">
+              <WalletSummary wallet={preview} onOpen={() => navigate(`/wallets/${preview.walletNumber}`)} />
+              {!credited && form.amount > 0 && (
+                <div className="rounded-2xl bg-gray-50 p-4">
+                  <div className="flex items-baseline justify-between text-sm">
+                    <span className="text-gray-500">Après l'opération</span>
+                    <span className="text-lg font-bold tabular-nums text-[color:var(--logo-pink-dark)]">{formatMoney(preview.availableBalance + form.amount, cur)}</span>
                   </div>
-                )}
-              </div>
-
-              <button
-                onClick={() => navigate(`/wallets/${wallet.walletNumber}`)}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-gray-100 transition hover:bg-gray-50"
-              >
-                Ouvrir le détail <ArrowRight size={15} />
-              </button>
+                  <div className="mt-3">
+                    <RatioBar value={preview.availableBalance} total={base} color="#7FB08A" />
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">
+                    Solde actuel {formatMoney(preview.availableBalance, cur)}, crédit de {formatMoney(form.amount, cur)}
+                  </p>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="rounded-2xl bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
-              <WalletIcon size={40} className="mx-auto mb-3 text-gray-300" />
-              Sélectionnez un propriétaire.
-            </div>
-          )}
-        </div>
-      </div>
+          </section>
+        ) : (
+          <p className="flex items-center gap-3 rounded-2xl bg-white p-4 text-sm text-gray-500 shadow-sm">
+            <WalletIcon size={18} className="shrink-0 text-gray-400" />
+            Ce propriétaire n'a pas encore de portefeuille en {form.currency || "cette devise"} : le top-up le créera.
+          </p>
+        ))}
     </div>
   );
 };
-
-const Field: React.FC<{ label: string; children: React.ReactNode }> = ({
-  label,
-  children,
-}) => (
-  <label className="block">
-    <span className="mb-1.5 block text-sm font-medium text-gray-700">
-      {label}
-    </span>
-    {children}
-  </label>
-);

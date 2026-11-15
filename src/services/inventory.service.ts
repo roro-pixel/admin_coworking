@@ -45,6 +45,17 @@ const toList = <T>(raw: any): T[] => {
   return [];
 };
 
+const normPurchaseRequest = (pr: any): PurchaseRequest =>
+  pr && Array.isArray(pr.lines)
+    ? {
+        ...pr,
+        lines: pr.lines.map((l: any) => ({
+          ...l,
+          quantity: l.quantity ?? l.orderedQuantity ?? 0,
+        })),
+      }
+    : pr;
+
 const blob = async (url: string, params?: any): Promise<Blob> =>
   (await apiClient.get(url, { params, responseType: "blob" })).data;
 
@@ -237,13 +248,11 @@ export interface Supplier {
 export interface SupplierPerformance {
   supplierCode: string;
   supplierName?: string;
-  // Ancien nom conservé pour compatibilité UI
   orderCount?: number;
   totalAmount?: number;
   averageLeadTimeDays?: number;
   onTimeDeliveryRate?: number;
   defectRate?: number;
-  // Champs documentés par l'API
   totalOrders?: number;
   completedOrders?: number;
   cancelledOrders?: number;
@@ -257,7 +266,9 @@ export interface SupplierPerformance {
 export interface PurchaseRequestLine {
   itemCode: string;
   itemName?: string;
+  /** Normalisé par le service : le backend renvoie `orderedQuantity`, la création attend `quantity`. */
   quantity: number;
+  orderedQuantity?: number;
   unitCost: number;
   totalCost?: number;
 }
@@ -276,6 +287,7 @@ export interface PurchaseRequest {
   requestedBy: string;
   approvedBy?: string;
   rejectionReason?: string;
+  supplierCode?: string;
   autoCreatedOrderCode?: string;
   createdAt: string;
   lines: PurchaseRequestLine[];
@@ -287,6 +299,13 @@ export interface PurchaseOrderLine {
   quantity: number;
   unitCost: number;
   totalCost: number;
+}
+
+export interface PurchaseApprovalStep {
+  approvalLevel?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  [key: string]: any;
 }
 
 export interface PurchaseOrder {
@@ -312,6 +331,7 @@ export interface PurchaseOrder {
   orderedBy?: string;
   createdAt: string;
   lines: PurchaseOrderLine[];
+  approvalSteps?: PurchaseApprovalStep[];
 }
 
 export interface GoodsReceipt {
@@ -379,11 +399,15 @@ export interface Alert {
     | "RECURRING_LOW_STOCK"
     | "OUT_OF_STOCK"
     | "NEGATIVE_STOCK"
+    | "OVERSTOCK"
+    | "SLOW_MOVING"
     | "EXPIRY_SOON"
-    | "LOT_EXPIRED"
-    | "ASSET_WARRANTY_EXPIRING"
-    | "ASSET_MAINTENANCE_DUE"
+    | "EXPIRY_IMMINENT"
+    | "WARRANTY_SOON"
+    | "MAINTENANCE_DUE"
     | "ASSET_RETURN_DUE_SOON"
+    | "ASSET_RETURN_OVERDUE"
+    | "SUSPICIOUS_ADJUSTMENT"
     | string;
   status: "OPEN" | "ACKNOWLEDGED" | "RESOLVED" | "DISMISSED" | string;
   itemCode?: string;
@@ -395,6 +419,8 @@ export interface Alert {
   thresholdQuantity?: number;
   message: string;
   createdAt: string;
+  acknowledgedAt?: string | null;
+  resolvedAt?: string | null;
 }
 
 export interface ReorderRule {
@@ -409,22 +435,38 @@ export interface ReorderRule {
 }
 
 export interface ReorderSuggestion {
-  suggestionCode: string;
   itemCode: string;
   itemName?: string;
+  itemType?: string;
+  categoryCode?: string;
+  categoryName?: string;
+  unitCode?: string;
+  unitName?: string;
   locationCode: string;
+  locationName?: string;
+  ruleScope?: string;
   currentQuantity: number;
-  minimumQuantity: number;
-  suggestedOrderQuantity: number;
-  estimatedOrderCost: number;
+  quantityOnHand?: number;
+  quantityReserved?: number;
+  minQuantity?: number;
+  maxQuantity?: number;
+  /** Quantité à commander, nette des commandes en cours. */
+  reorderQuantity: number;
+  targetQuantity?: number;
+  shortageQuantity?: number;
+  estimatedUnitCost?: number;
+  estimatedOrderCost?: number;
+  preferredSupplierCode?: string;
   severity?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | string;
+  reasonCode?: string;
+  reason?: string;
   priorityScore?: number;
   consumptionRateLast30Days?: number;
   consumptionRatePrev30Days?: number;
   consumptionTrend?: ConsumptionTrend | string;
-  consumptionTrendPercent?: number;
-  daysOfStockRemaining?: number;
-  quantityOnOrder?: number;
+  consumptionTrendPercent?: number | null;
+  daysOfStockRemaining?: number | null;
+  quantityOnOrder?: number | null;
   recommendedOrderByDate?: string;
   bestSupplierCode?: string;
   bestSupplierPrice?: number;
@@ -441,7 +483,6 @@ export interface InventoryCount {
   createdAt?: string;
   notes?: string;
   lines?: any[];
-  /** Compat UI ancienne : certains écrans lisent countDetail.items. */
   items?: any[];
 }
 
@@ -468,19 +509,34 @@ export interface CreatePurchaseRequestFromReorderSuggestionsParams {
 
 export interface GenerateInventoryLabelsRequest {
   items: Array<{
-    type: string;
+    type: "item" | "asset" | "location" | "lot" | string;
     code: string;
   }>;
-  format?: string;
+}
+
+export interface InventoryImportRow {
+  rowNumber: number;
+  status: "SUCCESS" | "ERROR" | "WARNING" | string;
+  message?: string;
+  data?: Record<string, any>;
 }
 
 export interface InventoryImportResult {
-  success?: boolean;
-  importedCount?: number;
-  failedCount?: number;
-  errors?: any[];
-  warnings?: any[];
-  [key: string]: any;
+  importType?: string;
+  fileName?: string;
+  dryRun?: boolean;
+  totalRows?: number;
+  successCount?: number;
+  errorCount?: number;
+  rows?: InventoryImportRow[];
+}
+
+export interface InventoryLabel {
+  labelType: string;
+  code: string;
+  displayText: string;
+  barcodeValue: string;
+  qrValue: string;
 }
 
 export interface InventoryDashboardMetrics {
@@ -644,29 +700,32 @@ export const inventoryService = {
         .data,
     ),
 
+  // Les dates sont envoyées sous les deux noms (from/to et fromDate/toDate).
   getStockMovements: async (params?: {
     itemCode?: string;
     locationCode?: string;
     movementType?: string;
     referenceType?: string;
     referenceCode?: string;
+    from?: string;
+    to?: string;
     fromDate?: string;
     toDate?: string;
-    from?: string; // compat ancienne UI
-    to?: string; // compat ancienne UI
     reversed?: boolean;
     page?: number;
     size?: number;
     sort?: string;
   }): Promise<PaginatedResponse<StockMovement>> => {
-    const { from, to, ...rest } = params || {};
+    const { fromDate, toDate, ...rest } = params || {};
     return toPage<StockMovement>(
       (
         await apiClient.get("/sni/api/v1/inventory/stock/movements", {
           params: {
             ...rest,
-            fromDate: rest.fromDate ?? from,
-            toDate: rest.toDate ?? to,
+            from: rest.from ?? fromDate,
+            to: rest.to ?? toDate,
+            fromDate: fromDate ?? rest.from,
+            toDate: toDate ?? rest.to,
           },
         })
       ).data,
@@ -685,14 +744,12 @@ export const inventoryService = {
     assetSerialNumbers?: string[];
     referenceType?: string;
     referenceCode?: string;
-    reason?: string; // compat
+    reason?: string;
     reasonDetails?: string;
     performedBy: string;
   }): Promise<StockMovement> => {
-    const payload = {
-      ...data,
-      reasonDetails: data.reasonDetails ?? data.reason,
-    };
+    const { reason, ...rest } = data;
+    const payload = { ...rest, reasonDetails: data.reasonDetails ?? reason };
     return (await apiClient.post("/sni/api/v1/inventory/stock/in", payload))
       .data;
   },
@@ -703,7 +760,7 @@ export const inventoryService = {
     quantity: number;
     reasonCode: StockOutReasonCode | string;
     reasonDetails?: string;
-    reason?: string; // compat
+    reason?: string;
     referenceType?: string;
     referenceCode?: string;
     allowNegativeOverride?: boolean;
@@ -712,10 +769,8 @@ export const inventoryService = {
     confirmCreateLot?: boolean;
     serialNumbers?: string[];
   }): Promise<StockMovement> => {
-    const payload = {
-      ...data,
-      reasonDetails: data.reasonDetails ?? data.reason,
-    };
+    const { reason, ...rest } = data;
+    const payload = { ...rest, reasonDetails: data.reasonDetails ?? reason };
     return (await apiClient.post("/sni/api/v1/inventory/stock/out", payload))
       .data;
   },
@@ -727,16 +782,14 @@ export const inventoryService = {
     quantity: number;
     reasonCode: StockOutReasonCode | string;
     reasonDetails?: string;
-    reason?: string; // compat
+    reason?: string;
     performedBy: string;
     lotNumber?: string | null;
     confirmCreateLot?: boolean;
     serialNumbers?: string[];
   }): Promise<StockMovement> => {
-    const payload = {
-      ...data,
-      reasonDetails: data.reasonDetails ?? data.reason,
-    };
+    const { reason, ...rest } = data;
+    const payload = { ...rest, reasonDetails: data.reasonDetails ?? reason };
     return (
       await apiClient.post("/sni/api/v1/inventory/stock/transfer", payload)
     ).data;
@@ -748,15 +801,13 @@ export const inventoryService = {
     quantityDelta: number;
     reasonCode?: StockOutReasonCode | string;
     reasonDetails?: string;
-    reason?: string; // compat
+    reason?: string;
     referenceType?: string;
     referenceCode?: string;
     performedBy: string;
   }): Promise<StockMovement> => {
-    const payload = {
-      ...data,
-      reasonDetails: data.reasonDetails ?? data.reason,
-    };
+    const { reason, ...rest } = data;
+    const payload = { ...rest, reasonDetails: data.reasonDetails ?? reason };
     return (await apiClient.post("/sni/api/v1/inventory/stock/adjust", payload))
       .data;
   },
@@ -933,14 +984,22 @@ export const inventoryService = {
         })
       ).data,
     ),
-  searchSuppliers: async (query: string): Promise<Supplier[]> =>
-    toPage<Supplier>(
+  // Recherche côté client : le backend ne filtre pas sur un texte.
+  searchSuppliers: async (query: string): Promise<Supplier[]> => {
+    const page = toPage<Supplier>(
       (
         await apiClient.get("/sni/api/v1/inventory/procurement/suppliers", {
-          params: { query, size: 20 },
+          params: { size: 100 },
         })
       ).data,
-    ).content,
+    );
+    const q = query.toLowerCase();
+    return page.content.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        (s.code ?? s.supplierCode ?? "").toLowerCase().includes(q),
+    );
+  },
   getSupplier: async (supplierCode: string): Promise<Supplier> =>
     (
       await apiClient.get(
@@ -979,33 +1038,40 @@ export const inventoryService = {
   // ---------- Purchase requests ----------
   getPurchaseRequests: async (
     params?: any,
-  ): Promise<PaginatedResponse<PurchaseRequest>> =>
-    toPage<PurchaseRequest>(
+  ): Promise<PaginatedResponse<PurchaseRequest>> => {
+    const page = toPage<PurchaseRequest>(
       (
         await apiClient.get(
           "/sni/api/v1/inventory/procurement/purchase-requests",
           { params },
         )
       ).data,
-    ),
+    );
+    const content = page.content.map(normPurchaseRequest);
+    return { ...page, content, data: content };
+  },
   createPurchaseRequest: async (
     data: Partial<PurchaseRequest>,
   ): Promise<PurchaseRequest> =>
-    (
-      await apiClient.post(
-        "/sni/api/v1/inventory/procurement/purchase-requests",
-        data,
-      )
-    ).data,
+    normPurchaseRequest(
+      (
+        await apiClient.post(
+          "/sni/api/v1/inventory/procurement/purchase-requests",
+          data,
+        )
+      ).data,
+    ),
   submitPurchaseRequest: async (
     requestCode: string,
   ): Promise<PurchaseRequest> =>
-    (
-      await apiClient.patch(
-        `/sni/api/v1/inventory/procurement/purchase-requests/${requestCode}/submit`,
-      )
-    ).data,
-  // approvedBy et supplierCode sont des QUERY PARAMS cote backend (pas un body) — doc section 11
+    normPurchaseRequest(
+      (
+        await apiClient.patch(
+          `/sni/api/v1/inventory/procurement/purchase-requests/${requestCode}/submit`,
+        )
+      ).data,
+    ),
+  // approvedBy et supplierCode passent en paramètres de requête.
   approvePurchaseRequest: async (
     requestCode: string,
     approvedByOrData:
@@ -1030,7 +1096,7 @@ export const inventoryService = {
       )
     ).data;
   },
-  // Le champ acteur du rejet s'appelle "approvedBy" cote backend (meme en cas de rejet) — doc section 11
+  // L'acteur du rejet est envoyé sous le nom approvedBy.
   rejectPurchaseRequest: async (
     requestCode: string,
     rejectedByOrReason: string,
@@ -1045,7 +1111,7 @@ export const inventoryService = {
         },
       )
     ).data,
-  // Le backend attend un body JSON {supplierCode, expectedDeliveryDate, orderedBy} — doc section 12
+  // Crée un bon de commande à partir d'une demande d'achat.
   createPurchaseOrderFromRequest: async (
     requestCode: string,
     data: {
@@ -1120,8 +1186,6 @@ export const inventoryService = {
         orderedBy ? { orderedBy } : undefined,
       )
     ).data,
-  // NON DOCUMENTE dans inventory-frontend-api.md (seuls approve/mark-ordered y
-  // figurent). A confirmer aupres du backend avant de s'y fier en prod.
   cancelPurchaseOrder: async (
     orderCode: string,
     reason?: string,
@@ -1163,9 +1227,6 @@ export const inventoryService = {
       (await apiClient.get("/sni/api/v1/inventory/procurement/approval-rules"))
         .data,
     ),
-  // La doc decrit un unique POST recevant un tableau complet de regles
-  // (remplacement bulk). createApprovalRule/updateApprovalRule/deleteApprovalRule
-  // par id ci-dessous sont NON DOCUMENTES — a confirmer aupres du backend.
   createApprovalRule: async (data: any): Promise<any> =>
     (
       await apiClient.post(
@@ -1191,14 +1252,24 @@ export const inventoryService = {
     toPage<Asset>(
       (await apiClient.get("/sni/api/v1/inventory/assets", { params })).data,
     ),
-  searchAssets: async (query: string): Promise<Asset[]> =>
-    toPage<Asset>(
+  // Recherche côté client : le backend ne filtre pas sur un texte.
+  searchAssets: async (query: string): Promise<Asset[]> => {
+    const page = toPage<Asset>(
       (
         await apiClient.get("/sni/api/v1/inventory/assets", {
-          params: { query, size: 20 },
+          params: { size: 100 },
         })
       ).data,
-    ).content,
+    );
+    const q = query.toLowerCase();
+    return page.content.filter(
+      (a) =>
+        a.assetCode.toLowerCase().includes(q) ||
+        a.itemName?.toLowerCase().includes(q) ||
+        a.serialNumber?.toLowerCase().includes(q) ||
+        a.assetTag?.toLowerCase().includes(q),
+    );
+  },
   getAsset: async (assetCode: string): Promise<Asset> =>
     (await apiClient.get(`/sni/api/v1/inventory/assets/${assetCode}`)).data,
   createAsset: async (data: Partial<Asset>): Promise<Asset> =>
@@ -1270,7 +1341,6 @@ export const inventoryService = {
         data,
       )
     ).data,
-  // Manquait entierement — ajoute (doc section 15 "Annuler une reservation")
   cancelAssetReservation: async (assetCode: string): Promise<Asset> =>
     (
       await apiClient.patch(
@@ -1299,7 +1369,7 @@ export const inventoryService = {
         )
       ).data,
     ),
-  // Ressource top-level (pas imbriquee sous /assets/{code}) — doc section 16
+  // Ressource indépendante, non imbriquée sous /assets/{code}.
   createAssetMaintenance: async (
     assetCodeOrData: string | Partial<AssetMaintenance>,
     data?: Partial<AssetMaintenance>,
@@ -1446,6 +1516,7 @@ export const inventoryService = {
       )
     ).data,
 
+  // Aucun filtre serveur : filtrer côté interface.
   getReorderRules: async (
     params?: any,
   ): Promise<PaginatedResponse<ReorderRule>> =>
@@ -1453,9 +1524,6 @@ export const inventoryService = {
       (await apiClient.get("/sni/api/v1/inventory/reorder-rules", { params }))
         .data,
     ),
-  // La doc decrit uniquement un POST en "creer ou modifier" (upsert). Les
-  // routes PUT/DELETE par ruleCode ci-dessous sont NON DOCUMENTEES — a
-  // confirmer aupres du backend avant de s'y fier en prod.
   createReorderRule: async (data: Partial<ReorderRule>): Promise<ReorderRule> =>
     (await apiClient.post("/sni/api/v1/inventory/reorder-rules", data)).data,
   updateReorderRule: async (
@@ -1505,25 +1573,21 @@ export const inventoryService = {
         params,
       })
     ).data,
-  getLabel: async (type: string, code: string): Promise<Blob> =>
-    blob(`/sni/api/v1/inventory/admin/labels/${type}/${code}`),
+  // Renvoie du JSON : le rendu imprimable est à la charge de l'interface.
+  getLabel: async (type: string, code: string): Promise<InventoryLabel> =>
+    (await apiClient.get(`/sni/api/v1/inventory/admin/labels/${type}/${code}`))
+      .data,
   generateLabels: async (
-    data:
-      | GenerateInventoryLabelsRequest
-      | { type: string; codes: string[]; format?: string },
-  ): Promise<Blob> => {
+    data: GenerateInventoryLabelsRequest | { type: string; codes: string[] },
+  ): Promise<InventoryLabel[]> => {
     const payload =
       "items" in data
-        ? data
-        : {
-            items: data.codes.map((code) => ({ type: data.type, code })),
-            format: data.format,
-          };
-    return (
-      await apiClient.post("/sni/api/v1/inventory/admin/labels", payload, {
-        responseType: "blob",
-      })
-    ).data;
+        ? { items: data.items }
+        : { items: data.codes.map((code) => ({ type: data.type, code })) };
+    return toList<InventoryLabel>(
+      (await apiClient.post("/sni/api/v1/inventory/admin/labels", payload))
+        .data,
+    );
   },
 
   // ---------- Import ----------
@@ -1561,10 +1625,7 @@ export const inventoryService = {
     dryRun = false,
   ): Promise<InventoryImportResult> =>
     inventoryService.importInventory("SUPPLIERS", file, dryRun),
-  // ATTENTION: la doc precise explicitement qu'aucun endpoint de template n'est
-  // expose par le controleur actuel ("garder les templates CSV cote frontend
-  // si necessaire"). Cet appel retournera 404. Generer/stocker les templates
-  // CSV statiquement cote front plutot que d'appeler le backend.
+  // Aucun endpoint backend : les modèles d'import sont à fournir côté interface.
   downloadTemplate: async (_type: string): Promise<Blob> => {
     throw new Error(
       "downloadTemplate: aucun endpoint backend pour les templates d'import. " +

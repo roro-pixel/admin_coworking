@@ -1,26 +1,22 @@
 import React, { useState } from "react";
+import { AlertTriangle, Boxes, ClipboardCheck, FileText, HardDrive, LayoutDashboard, MapPin, Package, Repeat, ShoppingCart, TrendingUp, Upload } from "lucide-react";
 import { AdminLayout } from "../../components/layout/AdminLayout";
-import {
-  Package,
-  MapPin,
-  Boxes,
-  TrendingUp,
-  Truck,
-  ClipboardList,
-  Bell,
-  ShoppingCart,
-  FileText,
-  Upload,
-} from "lucide-react";
+import { brandVars } from "../../components/layout/adminTheme";
+import { PageHeader, Tabs } from "../../components/subscription/kit";
+import type { TabItem } from "../../components/subscription/kit";
+import { Toaster } from "../../components/ui/Toaster";
 import { ItemsList } from "./catalog/ItemsList";
 import { CategoriesList } from "./catalog/CategoriesList";
 import { UnitsList } from "./catalog/UnitsList";
 import { LocationsList } from "./locations/LocationsList";
 import { StockLevels } from "./stock/StockLevels";
 import { StockMovements } from "./stock/StockMovements";
+import { ReservationsList } from "./stock/ReservationsList";
+import { LotsList } from "./stock/LotsList";
 import { SuppliersList } from "./procurement/SuppliersList";
 import { PurchaseRequestsList } from "./procurement/PurchaseRequestsList";
 import { PurchaseOrdersList } from "./procurement/PurchaseOrdersList";
+import { ApprovalRulesList } from "./procurement/ApprovalRulesList";
 import { AssetsList } from "./assets/AssetsList";
 import { AlertsCenter } from "./intelligence/AlertsCenter";
 import { ReorderRulesList } from "./intelligence/ReorderRulesList";
@@ -29,199 +25,76 @@ import { ReportsPage } from "./admin/ReportsPage";
 import { ImportPage } from "./admin/ImportPage";
 import { InventoryCountsList } from "./control/InventoryCountsList";
 
-const mainTabs = [
-  { id: "dashboard", label: "Dashboard", icon: Package },
+const MAIN: TabItem<string>[] = [
+  { id: "dashboard", label: "Tableau de bord", icon: LayoutDashboard },
   { id: "catalog", label: "Catalogue", icon: Boxes },
   { id: "locations", label: "Emplacements", icon: MapPin },
   { id: "stock", label: "Stock", icon: TrendingUp },
   { id: "procurement", label: "Achats", icon: ShoppingCart },
-  { id: "assets", label: "Actifs", icon: ClipboardList },
-  { id: "alerts", label: "Alertes", icon: Bell },
-  { id: "reorder", label: "Réappro", icon: Truck },
-  { id: "counts", label: "Comptages", icon: ClipboardList },
+  { id: "assets", label: "Actifs", icon: HardDrive },
+  { id: "alerts", label: "Alertes", icon: AlertTriangle },
+  { id: "reorder", label: "Réappro", icon: Repeat },
+  { id: "counts", label: "Comptages", icon: ClipboardCheck },
   { id: "reports", label: "Rapports", icon: FileText },
   { id: "import", label: "Import", icon: Upload },
 ];
 
-// Sous-onglets pour Catalogue
-const catalogSubTabs = [
-  { id: "items", label: "Articles", icon: Package },
-  { id: "categories", label: "Catégories", icon: Boxes },
-  { id: "units", label: "Unités", icon: TrendingUp },
-];
+const CATALOG: TabItem<string>[] = [{ id: "items", label: "Articles", icon: Package }, { id: "categories", label: "Catégories" }, { id: "units", label: "Unités" }];
+const STOCK: TabItem<string>[] = [{ id: "levels", label: "Niveaux" }, { id: "movements", label: "Mouvements" }, { id: "reservations", label: "Réservations" }, { id: "lots", label: "Lots" }];
+const PROCUREMENT: TabItem<string>[] = [{ id: "suppliers", label: "Fournisseurs" }, { id: "requests", label: "Demandes" }, { id: "orders", label: "Bons de commande" }, { id: "rules", label: "Règles d'approbation" }];
 
-// Sous-onglets pour Achats
-const procurementSubTabs = [
-  { id: "suppliers", label: "Fournisseurs", icon: Truck },
-  { id: "requests", label: "Demandes", icon: FileText },
-  { id: "orders", label: "Bons de commande", icon: ShoppingCart },
-];
+/** Les panneaux déjà ouverts restent montés (masqués) : on garde filtres, page et saisies en changeant d'onglet */
+const Keep: React.FC<{ id: string; active: string; seen: Set<string>; children: React.ReactNode }> = ({ id, active, seen, children }) =>
+  seen.has(id) ? <div className={active !== id ? "hidden" : ""}>{children}</div> : null;
+
+const useVisited = (active: string) => {
+  const [seen, setSeen] = useState<Set<string>>(() => new Set([active]));
+  if (!seen.has(active)) setSeen(new Set(seen).add(active));
+  return seen;
+};
+
+const SubModule: React.FC<{ items: TabItem<string>[]; panels: Record<string, React.ReactNode> }> = ({ items, panels }) => {
+  const [active, setActive] = useState(items[0].id);
+  const seen = useVisited(active);
+  return (
+    <div className="space-y-5">
+      <Tabs variant="soft" items={items} active={active} onChange={setActive} />
+      {items.map((t) => (
+        <Keep key={t.id} id={t.id} active={active} seen={seen}>{panels[t.id]}</Keep>
+      ))}
+    </div>
+  );
+};
 
 export const InventoryMaster: React.FC = () => {
-  const [activeTab, setActiveTab] = useState("dashboard");
-  const [visitedTabs, setVisitedTabs] = React.useState<Set<string>>(
-    new Set(["dashboard"]),
-  );
+  const [active, setActive] = useState("dashboard");
+  const seen = useVisited(active);
 
-  const handleTabChange = (tabId: string) => {
-    setActiveTab(tabId);
-    setVisitedTabs((prev) => new Set([...prev, tabId]));
+  const panels: Record<string, React.ReactNode> = {
+    dashboard: <InventoryDashboard />,
+    catalog: <SubModule items={CATALOG} panels={{ items: <ItemsList />, categories: <CategoriesList />, units: <UnitsList /> }} />,
+    locations: <LocationsList />,
+    stock: <SubModule items={STOCK} panels={{ levels: <StockLevels />, movements: <StockMovements />, reservations: <ReservationsList />, lots: <LotsList /> }} />,
+    procurement: <SubModule items={PROCUREMENT} panels={{ suppliers: <SuppliersList />, requests: <PurchaseRequestsList />, orders: <PurchaseOrdersList />, rules: <ApprovalRulesList /> }} />,
+    assets: <AssetsList />,
+    alerts: <AlertsCenter />,
+    reorder: <ReorderRulesList />,
+    counts: <InventoryCountsList />,
+    reports: <ReportsPage />,
+    import: <ImportPage />,
   };
-  const [activeCatalogSubTab, setActiveCatalogSubTab] = useState("items");
-  const [activeProcurementSubTab, setActiveProcurementSubTab] =
-    useState("suppliers");
 
   return (
     <AdminLayout>
-      <div className="mb-6">
-        <h1 className="text-lg sm:text-xl sm:text-2xl font-bold text-gray-900">
-          Gestion d'inventaire
-        </h1>
-        <p className="text-gray-600 mt-1">
-          Gérez vos articles, stocks, achats et actifs
-        </p>
-      </div>
-
-      {/* Onglets principaux - version responsive avec wrap */}
-      <div className="flex flex-wrap gap-1 ring-1 ring-gray-100 ring-gray-100 mb-6">
-        {mainTabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`
-                flex items-center gap-2 px-4 py-2 rounded-t-lg transition-all whitespace-nowrap
-                ${
-                  activeTab === tab.id
-                    ? "bg-primary-50 text-primary-600 ring-1 ring-gray-100-2 border-primary-600"
-                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                }
-              `}
-            >
-              <Icon size={18} />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Contenu — visitedTabs évite de remonter les composants à chaque clic */}
-      <div className="mt-6">
-        {visitedTabs.has("dashboard") && (
-          <div className={activeTab !== "dashboard" ? "hidden" : ""}>
-            <InventoryDashboard />
-          </div>
-        )}
-        {visitedTabs.has("catalog") && (
-          <div className={activeTab !== "catalog" ? "hidden" : ""}>
-            <div className="flex flex-wrap gap-2 ring-1 ring-gray-100 ring-gray-100 mb-6">
-              {catalogSubTabs.map((subTab) => {
-                const Icon = subTab.icon;
-                return (
-                  <button
-                    key={subTab.id}
-                    onClick={() => setActiveCatalogSubTab(subTab.id)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-t-lg transition-colors ${activeCatalogSubTab === subTab.id ? "bg-primary-50 text-primary-600 ring-1 ring-gray-100-2 border-primary-600" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
-                  >
-                    <Icon size={16} />
-                    {subTab.label}
-                  </button>
-                );
-              })}
-            </div>
-            <div className={activeCatalogSubTab !== "items" ? "hidden" : ""}>
-              <ItemsList />
-            </div>
-            <div
-              className={activeCatalogSubTab !== "categories" ? "hidden" : ""}
-            >
-              <CategoriesList />
-            </div>
-            <div className={activeCatalogSubTab !== "units" ? "hidden" : ""}>
-              <UnitsList />
-            </div>
-          </div>
-        )}
-        {visitedTabs.has("locations") && (
-          <div className={activeTab !== "locations" ? "hidden" : ""}>
-            <LocationsList />
-          </div>
-        )}
-        {visitedTabs.has("stock") && (
-          <div className={activeTab !== "stock" ? "hidden" : ""}>
-            <div className="space-y-8">
-              <StockLevels />
-              <StockMovements />
-            </div>
-          </div>
-        )}
-        {visitedTabs.has("procurement") && (
-          <div className={activeTab !== "procurement" ? "hidden" : ""}>
-            <div className="flex flex-wrap gap-2 ring-1 ring-gray-100 ring-gray-100 mb-6">
-              {procurementSubTabs.map((subTab) => {
-                const Icon = subTab.icon;
-                return (
-                  <button
-                    key={subTab.id}
-                    onClick={() => setActiveProcurementSubTab(subTab.id)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-t-lg transition-colors ${activeProcurementSubTab === subTab.id ? "bg-primary-50 text-primary-600 ring-1 ring-gray-100-2 border-primary-600" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
-                  >
-                    <Icon size={16} />
-                    {subTab.label}
-                  </button>
-                );
-              })}
-            </div>
-            <div
-              className={
-                activeProcurementSubTab !== "suppliers" ? "hidden" : ""
-              }
-            >
-              <SuppliersList />
-            </div>
-            <div
-              className={activeProcurementSubTab !== "requests" ? "hidden" : ""}
-            >
-              <PurchaseRequestsList />
-            </div>
-            <div
-              className={activeProcurementSubTab !== "orders" ? "hidden" : ""}
-            >
-              <PurchaseOrdersList />
-            </div>
-          </div>
-        )}
-        {visitedTabs.has("assets") && (
-          <div className={activeTab !== "assets" ? "hidden" : ""}>
-            <AssetsList />
-          </div>
-        )}
-        {visitedTabs.has("alerts") && (
-          <div className={activeTab !== "alerts" ? "hidden" : ""}>
-            <AlertsCenter />
-          </div>
-        )}
-        {visitedTabs.has("reorder") && (
-          <div className={activeTab !== "reorder" ? "hidden" : ""}>
-            <ReorderRulesList />
-          </div>
-        )}
-        {visitedTabs.has("counts") && (
-          <div className={activeTab !== "counts" ? "hidden" : ""}>
-            <InventoryCountsList />
-          </div>
-        )}
-        {visitedTabs.has("reports") && (
-          <div className={activeTab !== "reports" ? "hidden" : ""}>
-            <ReportsPage />
-          </div>
-        )}
-        {visitedTabs.has("import") && (
-          <div className={activeTab !== "import" ? "hidden" : ""}>
-            <ImportPage />
-          </div>
-        )}
+      <div style={brandVars}>
+        <Toaster />
+        <PageHeader title="Gestion d'inventaire" subtitle="Gérez vos articles, stocks, achats et actifs" />
+        <Tabs items={MAIN} active={active} onChange={setActive} />
+        <div className="mt-6">
+          {MAIN.map((t) => (
+            <Keep key={t.id} id={t.id} active={active} seen={seen}>{panels[t.id]}</Keep>
+          ))}
+        </div>
       </div>
     </AdminLayout>
   );

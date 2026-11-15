@@ -1,28 +1,46 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import {
-  Search,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
-  CreditCard,
-  FileText,
-  Loader2,
-  X,
-} from "lucide-react";
+import { Receipt, FileText } from "lucide-react";
 import { subscriptionService } from "../../../services/subscription.service";
 import type { BillableItem } from "../../../services/subscription.service";
 import { billingService } from "../../../services/billing.service";
-import { ModalPortal } from "../../../components/ui/ModalPortal";
+import { TableSkeleton } from "../../../components/ui/Skeleton";
+import { toast } from "../../../components/ui/toastStore";
+import {
+  ActionButton,
+  DataCard,
+  EmptyState,
+  Field,
+  FilterButton,
+  FilterPanel,
+  HeadRow,
+  ListHeader,
+  PanelForm,
+  Pagination,
+  SearchField,
+  StatusChip,
+  Tag,
+} from "../../../components/subscription/kit";
+import {
+  FIELD_SOFT,
+  PINK_SOFT,
+  apiMessage,
+  formatDate,
+  formatMoney,
+} from "../../../components/subscription/kitUtils";
+import {
+  BILLABLE_STATUS,
+  SUBSCRIBER_TYPE_LABELS,
+  statusOf,
+} from "../../../components/subscription/labels";
 
 const PAGE_SIZE = 20;
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  PENDING: { label: "En attente", color: "bg-yellow-100 text-yellow-700" },
-  INVOICED: { label: "Facturé", color: "bg-green-100 text-green-700" },
-  VOID: { label: "Annulé", color: "bg-gray-100 text-gray-500" },
-};
+const COLS =
+  "lg:grid-cols-[2rem_minmax(0,1.2fr)_minmax(0,1.3fr)_minmax(0,1.3fr)_minmax(0,1fr)_7rem_7rem]";
+
+const CHECK = "h-4 w-4 rounded accent-[color:var(--logo-pink-dark)]";
 
 export const BillableItemsList: React.FC = () => {
   const navigate = useNavigate();
@@ -36,7 +54,7 @@ export const BillableItemsList: React.FC = () => {
   const [page, setPage] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [invoiceForm, setInvoiceForm] = useState({
     title: "Facture éléments facturables",
     description: "",
@@ -59,13 +77,7 @@ export const BillableItemsList: React.FC = () => {
   };
 
   const { data: itemsData, isLoading } = useQuery({
-    queryKey: [
-      "billable-items",
-      statusFilter,
-      subscriberTypeFilter,
-      sourceTypeFilter,
-      page,
-    ],
+    queryKey: ["billable-items", statusFilter, subscriberTypeFilter, sourceTypeFilter, page],
     queryFn: () =>
       subscriptionService.getBillableItems({
         status: statusFilter || undefined,
@@ -80,23 +92,19 @@ export const BillableItemsList: React.FC = () => {
   const totalPages = itemsData?.totalPages ?? 1;
   const totalElements = itemsData?.totalElements ?? 0;
 
+  const needle = debouncedSearch.toLowerCase();
   const filtered = debouncedSearch
     ? items.filter(
         (i) =>
-          i.billableNumber
-            .toLowerCase()
-            .includes(debouncedSearch.toLowerCase()) ||
-          i.subscriberCode
-            .toLowerCase()
-            .includes(debouncedSearch.toLowerCase()) ||
-          i.sourceId.toLowerCase().includes(debouncedSearch.toLowerCase()),
+          i.billableNumber.toLowerCase().includes(needle) ||
+          i.subscriberCode.toLowerCase().includes(needle) ||
+          i.sourceId.toLowerCase().includes(needle),
       )
     : items;
 
   const pendingOnPage = filtered.filter((i) => i.status === "PENDING");
   const allPendingSelected =
-    pendingOnPage.length > 0 &&
-    pendingOnPage.every((i) => selected.has(i.billableNumber));
+    pendingOnPage.length > 0 && pendingOnPage.every((i) => selected.has(i.billableNumber));
 
   const toggleSelect = (billableNumber: string) => {
     const next = new Set(selected);
@@ -106,15 +114,10 @@ export const BillableItemsList: React.FC = () => {
   };
 
   const toggleSelectAllPending = () => {
-    if (allPendingSelected) {
-      const next = new Set(selected);
-      pendingOnPage.forEach((i) => next.delete(i.billableNumber));
-      setSelected(next);
-    } else {
-      const next = new Set(selected);
-      pendingOnPage.forEach((i) => next.add(i.billableNumber));
-      setSelected(next);
-    }
+    const next = new Set(selected);
+    if (allPendingSelected) pendingOnPage.forEach((i) => next.delete(i.billableNumber));
+    else pendingOnPage.forEach((i) => next.add(i.billableNumber));
+    setSelected(next);
   };
 
   const selectedTotal = filtered
@@ -133,20 +136,16 @@ export const BillableItemsList: React.FC = () => {
     onSuccess: (invoice) => {
       queryClient.invalidateQueries({ queryKey: ["billable-items"] });
       queryClient.invalidateQueries({ queryKey: ["billing-documents"] });
-      setIsInvoiceModalOpen(false);
+      setIsInvoiceOpen(false);
       setSelected(new Set());
+      toast.success("Facture créée");
       navigate(`/billing/documents/${invoice.documentNumber}`);
     },
-    onError: (e: any) => {
-      setInvoiceError(
-        e?.response?.data?.message ??
-          "Erreur lors de la création de la facture.",
-      );
-    },
+    onError: (e: unknown) =>
+      setInvoiceError(apiMessage(e, "Erreur lors de la création de la facture.")),
   });
 
-  const hasActiveFilters =
-    statusFilter || subscriberTypeFilter || sourceTypeFilter || search;
+  const hasActiveFilters = !!(statusFilter || subscriberTypeFilter || sourceTypeFilter || search);
 
   const handleReset = () => {
     setSearch("");
@@ -161,364 +160,265 @@ export const BillableItemsList: React.FC = () => {
     .filter((i) => i.status === "PENDING")
     .reduce((sum, i) => sum + i.amount, 0);
 
-  if (isLoading) return <div className="text-center py-8">Chargement...</div>;
-
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">
-            Items facturables
-          </h2>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Sélectionnez des lignes en attente pour générer une facture
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {totalPending > 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 text-right">
-              <p className="text-xs text-yellow-600">Total en attente (page)</p>
-              <p className="font-bold text-yellow-800 text-lg">
-                {totalPending.toLocaleString("fr-FR")} FCFA
-              </p>
-            </div>
-          )}
-          {selected.size > 0 && (
-            <button
-              onClick={() => {
-                setInvoiceError(null);
-                setIsInvoiceModalOpen(true);
-              }}
-              className="bg-primary-600 text-white px-4 py-2 rounded-xl shadow-sm hover:bg-primary-700 hover:shadow transition-all flex items-center gap-2 text-sm font-medium"
-            >
-              <FileText size={15} />
-              Facturer ({selected.size})
-            </button>
-          )}
-        </div>
-      </div>
+    <div className="space-y-5">
+      <ListHeader
+        title="Items facturables"
+        subtitle="Sélectionnez des lignes en attente pour générer une facture"
+        action={
+          <div className="flex flex-wrap items-center gap-3">
+            {totalPending > 0 && (
+              <div className={`rounded-2xl px-4 py-2 ${PINK_SOFT}`}>
+                <p className="text-xs font-semibold text-[color:var(--logo-pink-dark)]">
+                  Total en attente (page)
+                </p>
+                <p className="text-base font-bold text-gray-950">{formatMoney(totalPending, items[0]?.currency)}</p>
+              </div>
+            )}
+            {selected.size > 0 && (
+              <ActionButton
+                icon={FileText}
+                onClick={() => {
+                  setInvoiceError(null);
+                  setIsInvoiceOpen(true);
+                }}
+              >
+                Facturer ({selected.size})
+              </ActionButton>
+            )}
+          </div>
+        }
+      />
 
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Rechercher par n°, souscripteur ou source..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
-          />
-        </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`px-4 py-2 border rounded-xl flex items-center gap-2 ${
-            showFilters || hasActiveFilters
-              ? "bg-primary-50 border-primary-300 text-primary-700"
-              : "bg-white border-gray-200 text-gray-600"
-          }`}
+      {isInvoiceOpen && (
+        <PanelForm
+          title="Créer une facture"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setInvoiceError(null);
+            createInvoiceMutation.mutate();
+          }}
+          onCancel={() => setIsInvoiceOpen(false)}
+          pending={createInvoiceMutation.isPending}
+          submitLabel="Générer la facture"
+          submitDisabled={selected.size === 0 || !invoiceForm.issueDate}
+          error={invoiceError}
         >
-          <Filter size={16} /> Filtres
-          {hasActiveFilters && (
-            <span className="w-2 h-2 bg-primary-600 rounded-full" />
-          )}
-        </button>
+          <div className={`flex flex-wrap gap-x-8 gap-y-1 rounded-2xl px-4 py-3 text-sm ${PINK_SOFT}`}>
+            <p>
+              <span className="text-gray-600">Items sélectionnés : </span>
+              <strong className="text-gray-950">{selected.size}</strong>
+            </p>
+            <p>
+              <span className="text-gray-600">Montant estimé : </span>
+              <strong className="text-gray-950">{formatMoney(selectedTotal, filtered[0]?.currency)}</strong>
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Field label="Titre" className="md:col-span-2">
+              <input
+                type="text"
+                value={invoiceForm.title}
+                onChange={(e) => setInvoiceForm((f) => ({ ...f, title: e.target.value }))}
+                className={FIELD_SOFT}
+              />
+            </Field>
+            <Field label="Description" className="md:col-span-2">
+              <textarea
+                value={invoiceForm.description}
+                onChange={(e) => setInvoiceForm((f) => ({ ...f, description: e.target.value }))}
+                rows={2}
+                className={`${FIELD_SOFT} resize-none`}
+              />
+            </Field>
+            <Field label="Date d'émission" required>
+              <input
+                type="date"
+                value={invoiceForm.issueDate}
+                onChange={(e) => setInvoiceForm((f) => ({ ...f, issueDate: e.target.value }))}
+                className={FIELD_SOFT}
+              />
+            </Field>
+            <Field label="Date d'échéance">
+              <input
+                type="date"
+                value={invoiceForm.dueDate}
+                min={invoiceForm.issueDate}
+                onChange={(e) => setInvoiceForm((f) => ({ ...f, dueDate: e.target.value }))}
+                className={FIELD_SOFT}
+              />
+            </Field>
+          </div>
+        </PanelForm>
+      )}
+
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <SearchField
+          className="flex-1"
+          value={search}
+          onChange={setSearch}
+          placeholder="Rechercher par n°, souscripteur ou source..."
+        />
+        <FilterButton
+          open={showFilters}
+          active={hasActiveFilters}
+          onClick={() => setShowFilters(!showFilters)}
+        />
       </div>
 
       {showFilters && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-4 mb-6 shadow-sm shadow-gray-100/70 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Statut
-            </label>
+        <FilterPanel canReset={hasActiveFilters} onReset={handleReset}>
+          <Field label="Statut">
             <select
               value={statusFilter}
-              onChange={(e) =>
-                handleFilterChange(setStatusFilter, e.target.value)
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
+              onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)}
+              className={FIELD_SOFT}
             >
               <option value="">Tous</option>
-              <option value="PENDING">En attente</option>
-              <option value="INVOICED">Facturé</option>
-              <option value="VOID">Annulé</option>
+              {Object.entries(BILLABLE_STATUS).map(([value, s]) => (
+                <option key={value} value={value}>
+                  {s.label}
+                </option>
+              ))}
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Type souscripteur
-            </label>
+          </Field>
+          <Field label="Type souscripteur">
             <select
               value={subscriberTypeFilter}
-              onChange={(e) =>
-                handleFilterChange(setSubscriberTypeFilter, e.target.value)
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
+              onChange={(e) => handleFilterChange(setSubscriberTypeFilter, e.target.value)}
+              className={FIELD_SOFT}
             >
               <option value="">Tous</option>
-              <option value="MEMBER">Membre</option>
-              <option value="CUSTOMER">Customer</option>
-              <option value="BUSINESS_ENTITY">Entreprise</option>
+              {Object.entries(SUBSCRIBER_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Type source
-            </label>
+          </Field>
+          <Field label="Type source">
             <select
               value={sourceTypeFilter}
-              onChange={(e) =>
-                handleFilterChange(setSourceTypeFilter, e.target.value)
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
+              onChange={(e) => handleFilterChange(setSourceTypeFilter, e.target.value)}
+              className={FIELD_SOFT}
             >
               <option value="">Toutes</option>
               <option value="SUBSCRIPTION">Souscription</option>
               <option value="OVERAGE">Overage</option>
               <option value="USAGE">Usage</option>
             </select>
-          </div>
-          {hasActiveFilters && (
-            <div className="md:col-span-3 flex justify-end">
-              <button
-                onClick={handleReset}
-                className="text-sm text-primary-600 hover:text-primary-700"
-              >
-                Réinitialiser
-              </button>
-            </div>
-          )}
-        </div>
+          </Field>
+        </FilterPanel>
       )}
 
-      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm shadow-gray-100/70 overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50/60 text-gray-500">
-            <tr>
-              <th className="px-4 py-3 text-left">
-                <input
-                  type="checkbox"
-                  checked={allPendingSelected}
-                  onChange={toggleSelectAllPending}
-                  disabled={pendingOnPage.length === 0}
-                  title="Sélectionner tous les items en attente"
-                  className="rounded"
-                />
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                N° Billable
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Souscripteur
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Source
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Montant
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Date
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Statut
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {filtered.map((item: BillableItem) => (
-              <tr
-                key={item.billableNumber}
-                className={`transition-colors hover:bg-primary-50/40 ${selected.has(item.billableNumber) ? "bg-primary-50/60" : ""}`}
-              >
-                <td className="px-4 py-4">
-                  {item.status === "PENDING" ? (
-                    <input
-                      type="checkbox"
-                      checked={selected.has(item.billableNumber)}
-                      onChange={() => toggleSelect(item.billableNumber)}
-                      className="rounded"
-                    />
-                  ) : (
-                    <span className="w-4 inline-block" />
-                  )}
-                </td>
-                <td className="px-6 py-4 text-sm font-mono">
-                  {item.billableNumber}
-                </td>
-                <td className="px-6 py-4 text-sm">
-                  <p className="font-mono">{item.subscriberCode}</p>
-                  <p className="text-xs text-gray-400">{item.subscriberType}</p>
-                </td>
-                <td className="px-6 py-4 text-sm">
-                  <p className="text-xs text-gray-500">{item.sourceType}</p>
-                  <p className="font-mono text-xs">{item.sourceId}</p>
-                </td>
-                <td className="px-6 py-4 text-right font-semibold text-sm">
-                  {item.amount.toLocaleString("fr-FR")} {item.currency}
-                </td>
-                <td className="px-6 py-4 text-sm">
-                  {new Date(item.createdAt).toLocaleDateString("fr-FR")}
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <span
-                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[item.status]?.color ?? "bg-gray-100 text-gray-600"}`}
-                  >
-                    {statusConfig[item.status]?.label ?? item.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {isLoading ? (
+        <TableSkeleton rows={6} cols={5} />
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={Receipt} title="Aucun item facturable trouvé" />
+      ) : (
+        <DataCard>
+          <HeadRow cols={COLS}>
+            <input
+              type="checkbox"
+              checked={allPendingSelected}
+              onChange={toggleSelectAllPending}
+              disabled={pendingOnPage.length === 0}
+              title="Sélectionner tous les items en attente"
+              aria-label="Sélectionner tous les items en attente"
+              className={CHECK}
+            />
+            <span>N° billable</span>
+            <span>Souscripteur</span>
+            <span>Source</span>
+            <span className="text-right">Montant</span>
+            <span>Date</span>
+            <span>Statut</span>
+          </HeadRow>
 
-      {filtered.length === 0 && !isLoading && (
-        <div className="text-center py-12 rounded-2xl border border-dashed border-gray-200 bg-white">
-          <CreditCard size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500">Aucun item facturable trouvé</p>
-        </div>
-      )}
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 px-2">
-          <p className="text-sm text-gray-500">
-            {totalElements} items au total
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-primary-50/40 transition-colors"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="text-sm text-gray-600">
-              Page {page + 1} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
-              className="p-1 rounded border disabled:opacity-40 hover:bg-primary-50/40 transition-colors"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {isInvoiceModalOpen && (
-        <ModalPortal onClose={() => setIsInvoiceModalOpen(false)}>
-          <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-gray-100 p-4 flex justify-between items-center rounded-t-2xl">
-            <h3 className="text-xl font-bold">Créer une facture</h3>
-            <button
-              onClick={() => setIsInvoiceModalOpen(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          <div className="p-6 space-y-4">
-            {invoiceError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm">
-                {invoiceError}
-              </div>
-            )}
-            <div className="bg-gray-50 p-3 rounded-lg text-sm">
-              <p>
-                <span className="text-gray-500">Items sélectionnés :</span>{" "}
-                <strong>{selected.size}</strong>
-              </p>
-              <p>
-                <span className="text-gray-500">Montant estimé :</span>{" "}
-                <strong>{selectedTotal.toLocaleString("fr-FR")} FCFA</strong>
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Titre
-              </label>
-              <input
-                type="text"
-                value={invoiceForm.title}
-                onChange={(e) =>
-                  setInvoiceForm((f) => ({ ...f, title: e.target.value }))
-                }
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea
-                value={invoiceForm.description}
-                onChange={(e) =>
-                  setInvoiceForm((f) => ({ ...f, description: e.target.value }))
-                }
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl resize-none shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Date d'émission *
-                </label>
-                <input
-                  type="date"
-                  value={invoiceForm.issueDate}
-                  onChange={(e) =>
-                    setInvoiceForm((f) => ({ ...f, issueDate: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Date d'échéance
-                </label>
-                <input
-                  type="date"
-                  value={invoiceForm.dueDate}
-                  min={invoiceForm.issueDate}
-                  onChange={(e) =>
-                    setInvoiceForm((f) => ({ ...f, dueDate: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setIsInvoiceModalOpen(false)}
-                disabled={createInvoiceMutation.isPending}
-                className="flex-1 px-4 py-2 border rounded-xl text-gray-700 disabled:opacity-50"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={() => createInvoiceMutation.mutate()}
-                disabled={
-                  createInvoiceMutation.isPending ||
-                  selected.size === 0 ||
-                  !invoiceForm.issueDate
-                }
-                className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {createInvoiceMutation.isPending ? (
-                  <Loader2 size={16} className="animate-spin" />
+          <div className="space-y-2">
+            {filtered.map((item: BillableItem) => {
+              const st = statusOf(BILLABLE_STATUS, item.status);
+              const isSelected = selected.has(item.billableNumber);
+              const subscriberType =
+                SUBSCRIBER_TYPE_LABELS[item.subscriberType] ?? item.subscriberType;
+              const check =
+                item.status === "PENDING" ? (
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelect(item.billableNumber)}
+                    aria-label={`Sélectionner ${item.billableNumber}`}
+                    className={CHECK}
+                  />
                 ) : (
-                  <FileText size={16} />
-                )}
-                Générer la facture
-              </button>
-            </div>
+                  <span className="inline-block w-4" />
+                );
+              return (
+                <div
+                  key={item.billableNumber}
+                  className={`rounded-2xl p-3 transition ${
+                    isSelected ? PINK_SOFT : "bg-gray-50"
+                  }`}
+                >
+                  {/* Desktop */}
+                  <div className={`hidden items-center gap-4 px-1 lg:grid ${COLS}`}>
+                    {check}
+                    <span className="truncate font-mono text-xs font-semibold text-gray-700">
+                      {item.billableNumber}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate font-mono text-xs text-gray-800">{item.subscriberCode}</p>
+                      <p className="mt-0.5 text-xs text-gray-400">{subscriberType}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs text-gray-400">{item.sourceType}</p>
+                      <p className="truncate font-mono text-xs text-gray-700">{item.sourceId}</p>
+                    </div>
+                    <span className="text-right text-sm font-semibold text-gray-900">
+                      {formatMoney(item.amount, item.currency)}
+                    </span>
+                    <span className="text-sm text-gray-600">{formatDate(item.createdAt)}</span>
+                    <span>
+                      <StatusChip tone={st.tone}>{st.label}</StatusChip>
+                    </span>
+                  </div>
+
+                  {/* Mobile et tablette */}
+                  <div className="flex items-start gap-3 lg:hidden">
+                    <div className="pt-1">{check}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-semibold text-gray-900">
+                          {formatMoney(item.amount, item.currency)}
+                        </p>
+                        <StatusChip tone={st.tone}>{st.label}</StatusChip>
+                      </div>
+                      <p className="mt-1 truncate font-mono text-xs font-semibold text-gray-700">
+                        {item.billableNumber}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <Tag>{subscriberType}</Tag>
+                        <span className="font-mono text-xs text-gray-500">{item.subscriberCode}</span>
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500">
+                        {item.sourceType} · {item.sourceId} · {formatDate(item.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </ModalPortal>
+        </DataCard>
       )}
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        total={totalElements}
+        noun="item"
+        onChange={setPage}
+      />
     </div>
   );
 };

@@ -1,132 +1,99 @@
-import React, { useState } from "react";
-import { AdminLayout } from "../../components/layout/AdminLayout";
+import React from "react";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3,
-  FileText,
-  Package,
-  User,
+  BellRing,
   CalendarClock,
   FilePlus2,
-  Wrench,
+  FileText,
+  Package,
+  PackageCheck,
   Search,
+  User,
+  Wrench,
 } from "lucide-react";
+import { AdminLayout } from "../../components/layout/AdminLayout";
+import { brandVars } from "../../components/layout/adminTheme";
+import { PageHeader, Tabs } from "../../components/subscription/kit";
+import type { TabItem } from "../../components/subscription/kit";
+import { Toaster } from "../../components/ui/Toaster";
 import { BillingDocumentsList } from "./BillingDocumentsList";
-import { BillingCustomerStatement } from "./BillingCustomerStatement";
-import { BillingCatalogManager } from "./BillingCatalogManager";
-import { BillingAgingReport } from "./BillingAgingReport";
-import { BillingScheduleManager } from "./BillingScheduleManager";
+import { BillingDocumentDetailPage } from "./BillingDocumentDetailPage";
+import { CreateInvoiceModal } from "./CreateInvoiceModal";
+import { BillingDocumentEditPage } from "./BillingDocumentEditPage";
+import { CreateQuoteModal } from "./CreateQuoteModal";
 import { BillingSourceInvoiceManager } from "./BillingSourceInvoiceManager";
 import { BillingDocumentTools } from "./BillingDocumentTools";
+import { BillingCustomerStatement } from "./BillingCustomerStatement";
+import { BillingScheduleManager } from "./BillingScheduleManager";
+import { BillingCatalogManager } from "./BillingCatalogManager";
 import { BillingCatalogLookupPanel } from "./BillingCatalogLookupPanel";
+import { BillingAgingReport } from "./BillingAgingReport";
+import { BillingRecoverablesPanel } from "./BillingRecoverablesPanel";
+import { BillingDunning } from "./BillingDunning";
 
-type TabId =
-  | "documents"
-  | "sources"
-  | "tools"
-  | "statement"
-  | "schedules"
-  | "catalog"
-  | "lookup"
-  | "aging";
-
-const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
-  { id: "documents", label: "Documents", icon: FileText },
-  { id: "sources", label: "Sources métier", icon: FilePlus2 },
-  { id: "tools", label: "Outils", icon: Wrench },
-  { id: "statement", label: "Relevé client", icon: User },
-  { id: "schedules", label: "Échéanciers", icon: CalendarClock },
-  { id: "catalog", label: "Catalogue", icon: Package },
-  { id: "lookup", label: "Recherche catalogue", icon: Search },
-  { id: "aging", label: "Créances", icon: BarChart3 },
+const navItems: TabItem<string>[] = [
+  { id: "/billing", label: "Documents", icon: FileText },
+  { id: "/billing/sources", label: "Sources métier", icon: FilePlus2 },
+  { id: "/billing/tools", label: "Outils", icon: Wrench },
+  { id: "/billing/statement", label: "Relevé client", icon: User },
+  { id: "/billing/schedules", label: "Échéanciers", icon: CalendarClock },
+  { id: "/billing/catalog", label: "Catalogue", icon: Package },
+  { id: "/billing/lookup", label: "Recherche catalogue", icon: Search },
+  { id: "/billing/recoverables", label: "À récupérer", icon: PackageCheck },
+  { id: "/billing/aging", label: "Créances", icon: BarChart3 },
+  { id: "/billing/dunning", label: "Relances", icon: BellRing },
 ];
 
+/** Onglet actif d'après l'adresse ; null sur les pages création et détail, qui n'affichent pas la navigation. */
+const activeTab = (pathname: string): string | null => {
+  const clean = pathname.replace(/\/+$/, "") || "/";
+  if (clean === "/billing") return "/billing";
+  const hit = navItems.find((i) => i.id !== "/billing" && clean.startsWith(i.id));
+  return hit ? hit.id : null;
+};
+
+/**
+ * Monté sur /billing/*. Les chemins /billing/documents/:documentNumber,
+ * /billing/invoices/create et /billing/quotes/create restent ceux utilisés par la liste.
+ */
 export const BillingMaster: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabId>("documents");
-  const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(
-    new Set(["documents"]),
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const active = activeTab(pathname);
+
+  const routes = (
+    <Routes>
+      <Route path="/" element={<BillingDocumentsList />} />
+      <Route path="/documents/:documentNumber" element={<BillingDocumentDetailPage />} />
+      <Route path="/documents/:documentNumber/edit" element={<BillingDocumentEditPage />} />
+      <Route path="/invoices/create" element={<CreateInvoiceModal />} />
+      <Route path="/quotes/create" element={<CreateQuoteModal />} />
+      <Route path="/sources" element={<BillingSourceInvoiceManager />} />
+      <Route path="/tools" element={<BillingDocumentTools />} />
+      <Route path="/statement" element={<BillingCustomerStatement />} />
+      <Route path="/schedules" element={<BillingScheduleManager />} />
+      <Route path="/catalog" element={<BillingCatalogManager />} />
+      <Route path="/lookup" element={<BillingCatalogLookupPanel />} />
+      <Route path="/recoverables" element={<BillingRecoverablesPanel />} />
+      <Route path="/aging" element={<BillingAgingReport />} />
+      <Route path="/dunning" element={<BillingDunning />} />
+      <Route path="*" element={<Navigate to="/billing" replace />} />
+    </Routes>
   );
 
-  const handleTabChange = (tabId: TabId) => {
-    setActiveTab(tabId);
-    setVisitedTabs((prev) => new Set([...prev, tabId]));
-  };
+  // Détail et création portent leur propre habillage (BillingShell) : on ne les enveloppe pas une seconde fois.
+  if (!active) return routes;
 
   return (
     <AdminLayout>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Facturation</h1>
-        <p className="text-gray-600 mt-1">
-          Gérez les factures, devis, avoirs et relevés clients
-        </p>
-      </div>
-
-      <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-2 shadow-sm">
-        <div className="flex flex-wrap gap-2">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-
-            return (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all whitespace-nowrap ${
-                  isActive
-                    ? "bg-primary-600 text-white shadow-sm"
-                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
-                }`}
-              >
-                <Icon size={17} />
-                {tab.label}
-              </button>
-            );
-          })}
+      <div style={brandVars}>
+        <Toaster />
+        <PageHeader title="Facturation" subtitle="Factures, devis, avoirs, échéanciers, catalogue, créances et relances" />
+        <div className="mb-6">
+          <Tabs items={navItems} active={active} onChange={(id) => navigate(id)} />
         </div>
-      </div>
-
-      <div className="mt-6">
-        {visitedTabs.has("documents") && (
-          <div className={activeTab !== "documents" ? "hidden" : ""}>
-            <BillingDocumentsList />
-          </div>
-        )}
-
-        {visitedTabs.has("sources") && (
-          <div className={activeTab !== "sources" ? "hidden" : ""}>
-            <BillingSourceInvoiceManager />
-          </div>
-        )}
-        {visitedTabs.has("tools") && (
-          <div className={activeTab !== "tools" ? "hidden" : ""}>
-            <BillingDocumentTools />
-          </div>
-        )}
-        {visitedTabs.has("statement") && (
-          <div className={activeTab !== "statement" ? "hidden" : ""}>
-            <BillingCustomerStatement />
-          </div>
-        )}
-        {visitedTabs.has("schedules") && (
-          <div className={activeTab !== "schedules" ? "hidden" : ""}>
-            <BillingScheduleManager />
-          </div>
-        )}
-        {visitedTabs.has("catalog") && (
-          <div className={activeTab !== "catalog" ? "hidden" : ""}>
-            <BillingCatalogManager />
-          </div>
-        )}
-
-        {visitedTabs.has("lookup") && (
-          <div className={activeTab !== "lookup" ? "hidden" : ""}>
-            <BillingCatalogLookupPanel />
-          </div>
-        )}
-        {visitedTabs.has("aging") && (
-          <div className={activeTab !== "aging" ? "hidden" : ""}>
-            <BillingAgingReport />
-          </div>
-        )}
+        {routes}
       </div>
     </AdminLayout>
   );

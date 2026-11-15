@@ -1,102 +1,60 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Package,
-  TrendingDown,
-  AlertTriangle,
-  ShoppingCart,
-  DollarSign,
-} from "lucide-react";
 import { inventoryService } from "../../../services/inventory.service";
+import { ReportBody, ReportHead, RefreshButton } from "../../../components/reporting/reportKit";
+import { BarBreakdown, ChartCard, DonutBreakdown, KpiRow } from "../../../components/operations/OpsCharts";
+import type { Slice } from "../../../components/operations/opsChartData";
+import { CHART_COLORS } from "../../../components/operations/opsChartData";
+import { formatMoney } from "../../../components/subscription/kitUtils";
+import { qty } from "../../../components/inventory/invKit";
 
 export const InventoryDashboard: React.FC = () => {
-  const { data: metrics, isLoading } = useQuery({
-    queryKey: ["inventory-dashboard"],
-    queryFn: () => inventoryService.getDashboardMetrics(),
-  });
+  const q = useQuery({ queryKey: ["inventory-dashboard"], queryFn: () => inventoryService.getDashboardMetrics() });
+  const m = q.data;
 
-  if (isLoading) {
-    return <div className="text-center py-8">Chargement...</div>;
-  }
-
-  const cards = [
-    {
-      title: "Alertes ouvertes",
-      value: metrics?.openAlerts || 0,
-      icon: AlertTriangle,
-      color: "bg-red-100 text-red-600",
-    },
-    {
-      title: "Stock bas",
-      value: metrics?.lowStockAlerts || 0,
-      icon: TrendingDown,
-      color: "bg-yellow-100 text-yellow-600",
-    },
-    {
-      title: "Ruptures",
-      value: metrics?.outOfStockAlerts || 0,
-      icon: AlertTriangle,
-      color: "bg-orange-100 text-orange-600",
-    },
-    {
-      title: "Bons de commande ouverts",
-      value: metrics?.openPurchaseOrders || 0,
-      icon: ShoppingCart,
-      color: "bg-blue-100 text-blue-600",
-    },
-    {
-      title: "Valeur totale du stock",
-      value: `${(metrics?.totalStockValue || 0).toLocaleString()} FCFA`,
-      icon: DollarSign,
-      color: "bg-green-100 text-green-600",
-    },
-    {
-      title: "Lots expirant (30j)",
-      value: metrics?.expiringLots30Days || 0,
-      icon: Package,
-      color: "bg-orange-100 text-orange-600",
-    },
-    {
-      title: "Alertes expiration proche",
-      value: metrics?.expirySoonAlerts || 0,
-      icon: AlertTriangle,
-      color: "bg-orange-100 text-orange-600",
-    },
-    {
-      title: "Stocks négatifs",
-      value: metrics?.negativeStockAlerts || 0,
-      icon: TrendingDown,
-      color: "bg-red-100 text-red-600",
-    },
-  ];
+  const alerts: Slice[] = m
+    ? [
+        { key: "low", label: "Stock bas", value: m.lowStockAlerts || 0, color: CHART_COLORS[1] },
+        { key: "out", label: "Ruptures", value: m.outOfStockAlerts || 0, color: CHART_COLORS[0] },
+        { key: "neg", label: "Stocks négatifs", value: m.negativeStockAlerts || 0, color: CHART_COLORS[3] },
+        { key: "exp", label: "Expiration proche", value: m.expirySoonAlerts || 0, color: CHART_COLORS[2] },
+      ].filter((s) => s.value > 0)
+    : [];
+  const alertTotal = alerts.reduce((a, s) => a + s.value, 0);
 
   return (
-    <div>
-      <h2 className="text-xl font-semibold text-gray-900 mb-6">
-        Tableau de bord inventaire
-      </h2>
+    <div className="space-y-6">
+      <ReportHead title="Tableau de bord" subtitle="Vue d'ensemble de la valeur du stock et des points à traiter.">
+        <RefreshButton fetching={q.isFetching && !q.isLoading} onClick={() => q.refetch()} />
+      </ReportHead>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:p-6">
-        {cards.map((card, index) => {
-          const Icon = card.icon;
-          return (
-            <div
-              key={index}
-              className="bg-white rounded-3xl p-5 sm:p-5 sm:p-6 shadow-sm ring-1 ring-gray-100 hover:shadow-md transition-all"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-2xl ${card.color}`}>
-                  <Icon size={24} />
-                </div>
-              </div>
-              <p className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
-                {card.value}
-              </p>
-              <p className="text-sm text-gray-600">{card.title}</p>
+      <ReportBody loading={q.isLoading} error={q.isError} hasData={!!m} onRetry={() => q.refetch()} kpis={4} emptyTitle="Aucune donnée d'inventaire" emptyHint="Les indicateurs apparaîtront dès les premiers mouvements de stock.">
+        {m && (
+          <>
+            <KpiRow
+              columns={4}
+              items={[
+                { label: "Valeur du stock", value: formatMoney(m.totalStockValue || 0, "FCFA"), tone: "pink" },
+                { label: "Alertes ouvertes", value: qty(m.openAlerts || 0), tone: (m.openAlerts || 0) > 0 ? "danger" : "success", hint: (m.openAlerts || 0) > 0 ? "À traiter" : "Rien à traiter" },
+                { label: "Commandes en cours", value: qty(m.openPurchaseOrders || 0) },
+                { label: "Lots expirant sous 30 jours", value: qty(m.expiringLots30Days || 0), tone: (m.expiringLots30Days || 0) > 0 ? "danger" : "default" },
+              ]}
+            />
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <ChartCard title="Répartition des alertes" subtitle="Alertes liées au stock, par nature">
+                {alertTotal === 0 ? <p className="py-10 text-center text-sm text-gray-500">Aucune alerte de stock en cours.</p> : <DonutBreakdown data={alerts} centerLabel="alertes" />}
+              </ChartCard>
+              <ChartCard title="Points de vigilance" subtitle="Volume par catégorie de risque">
+                {alertTotal === 0 && !(m.expiringLots30Days || 0) ? (
+                  <p className="py-10 text-center text-sm text-gray-500">Aucun point de vigilance.</p>
+                ) : (
+                  <BarBreakdown data={[...alerts, ...((m.expiringLots30Days || 0) > 0 ? [{ key: "lots", label: "Lots expirant (30 jours)", value: m.expiringLots30Days || 0, color: CHART_COLORS[4] }] : [])]} />
+                )}
+              </ChartCard>
             </div>
-          );
-        })}
-      </div>
+          </>
+        )}
+      </ReportBody>
     </div>
   );
 };

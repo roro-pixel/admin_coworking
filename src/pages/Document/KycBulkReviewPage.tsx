@@ -1,266 +1,189 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  CheckCircle,
-  XCircle,
-  Search,
-  Loader2,
-  CheckSquare,
-  Square,
-  FileText,
-  RefreshCw,
-} from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CheckCircle2, FileCheck2, XCircle } from "lucide-react";
 import { documentService } from "../../services/document.service";
+import type { KycBulkActionResponse, KycDocumentResponse } from "../../services/document.service";
 import { useAuth } from "../../contexts/AuthContext";
+import { ActionButton, DataCard, EmptyState, ErrorBlock, Field, HeadRow, ListHeader, PanelForm, Pagination, SearchField } from "../../components/subscription/kit";
+import { FIELD, ROW_HOVER, apiMessage } from "../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../components/ui/Skeleton";
+import { toast } from "../../components/ui/toastStore";
+import { Cell, RowCheck } from "../../components/documents/docKit";
+import { OWNER_LABEL, bulkSummary, dayOnly, label, usePaged } from "../../components/documents/docUtils";
+
+const COLS = "lg:grid-cols-[2rem_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_8rem]";
+const codeOf = (d: KycDocumentResponse): string => String(d.documentCode ?? d.code ?? d.id ?? "");
 
 export const KycBulkReviewPage: React.FC = () => {
   const { admin } = useAuth();
   const queryClient = useQueryClient();
   const adminId = Number(admin?.id) || 1;
-
-  const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
   const [search, setSearch] = useState("");
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [bulkResult, setBulkResult] = useState<any>(null);
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState("");
+  const [result, setResult] = useState<KycBulkActionResponse | null>(null);
 
-  const { data: documentsData, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["kyc-documents-review-queue"],
     queryFn: () => documentService.getKycDocumentReviewQueue(),
   });
 
-  const documents = documentsData || [];
+  const q = search.trim().toLowerCase();
+  const docs = (data ?? []).filter((d) =>
+    q === "" ? true : [d.documentTypeName, d.documentType, d.documentCode, d.fileName, d.ownerName, d.ownerCode].filter(Boolean).join(" ").toLowerCase().includes(q),
+  );
+  const { page, setPage, slice, totalPages, total } = usePaged(docs, 15);
 
-  const bulkApproveMutation = useMutation({
-    mutationFn: () =>
-      documentService.bulkApproveDocuments(selectedDocs, adminId),
-    onSuccess: (data) => {
-      setBulkResult(data);
-      setSelectedDocs([]);
-      queryClient.invalidateQueries({ queryKey: ["kyc-documents-review-queue"] });
-    },
-    onError: (e: any) =>
-      setActionError(e?.response?.data?.message || "Erreur bulk approve."),
-  });
-
-  const bulkRejectMutation = useMutation({
-    mutationFn: (reason: string) =>
-      documentService.bulkRejectDocuments(
-        selectedDocs.map((id) => ({ documentCode: String(id), reason })),
-        adminId,
-      ),
-    onSuccess: (data) => {
-      setBulkResult(data);
-      setSelectedDocs([]);
-      queryClient.invalidateQueries({ queryKey: ["kyc-documents-review-queue"] });
-    },
-    onError: (e: any) =>
-      setActionError(e?.response?.data?.message || "Erreur bulk reject."),
-  });
-
-  const toggleSelectAll = () => {
-    if (selectedDocs.length === documents.length) {
-      setSelectedDocs([]);
-    } else {
-      setSelectedDocs(documents.map((d: any) => d.documentCode ?? d.code ?? d.id));
-    }
+  const done = (r: KycBulkActionResponse, ok: string) => {
+    setResult(r);
+    setSelected([]);
+    setRejecting(false);
+    setReason("");
+    queryClient.invalidateQueries({ queryKey: ["kyc-documents-review-queue"] });
+    queryClient.invalidateQueries({ queryKey: ["kyc-dashboard"] });
+    if ((r.failed ?? 0) > 0) toast.error(bulkSummary(r));
+    else if (ok) toast.success(ok);
   };
 
-  const toggleDoc = (code: string) => {
-    setSelectedDocs((prev) =>
-      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
-    );
-  };
-
-  const filteredDocs = documents.filter((doc: any) => {
-    const haystack = [
-      doc.title,
-      doc.documentTypeName,
-      doc.documentType,
-      doc.documentCode,
-      doc.code,
-      doc.fileName,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-    return haystack.includes(search.toLowerCase());
+  const approve = useMutation({
+    mutationFn: () => documentService.bulkApproveDocuments(selected, adminId),
+    onSuccess: (r) => done(r, ""),
+  });
+  const reject = useMutation({
+    mutationFn: () => documentService.bulkRejectDocuments(selected.map((documentCode) => ({ documentCode, reason })), adminId),
+    onSuccess: (r) => done(r, "Documents rejetés"),
+    onError: (e) => toast.error(apiMessage(e, "Rejet en masse impossible")),
   });
 
-  if (isLoading) {
-    return (
-      <div className="text-center py-12">
-        <RefreshCw className="animate-spin mx-auto mb-4" size={32} />
-        <p className="text-gray-500">Chargement des documents...</p>
-      </div>
-    );
-  }
+  const toggle = (c: string) => setSelected((p) => (p.includes(c) ? p.filter((x) => x !== c) : [...p, c]));
+  // La sélection porte sur tous les documents filtrés, pas seulement sur la page affichée.
+  const allCodes = docs.map(codeOf);
+  const allSelected = allCodes.length > 0 && allCodes.every((c) => selected.includes(c));
+
+  const confirmApprove = () =>
+    toast.confirm({
+      message: `Approuver ${selected.length} document${selected.length > 1 ? "s" : ""} ?`,
+      confirmLabel: "Approuver",
+      pendingLabel: "Approbation",
+      successMessage: "Documents approuvés",
+      errorMessage: "Approbation en masse impossible",
+      onConfirm: () => approve.mutateAsync(),
+    });
+
+  const failures = (result?.results ?? []).filter((r) => r.success === false);
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">
-            Revue en masse
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Approuvez ou rejetez plusieurs documents à la fois
-          </p>
-        </div>
-        <div className="flex gap-3">
-          {selectedDocs.length > 0 && (
-            <>
-              <button
-                onClick={() => {
-                  const reason = prompt(
-                    "Motif de rejet pour tous les documents sélectionnés :",
-                  );
-                  if (reason) bulkRejectMutation.mutate(reason);
-                }}
-                disabled={bulkRejectMutation.isPending}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 text-sm"
-              >
-                {bulkRejectMutation.isPending ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <XCircle size={14} />
-                )}
-                Rejeter ({selectedDocs.length})
-              </button>
-              <button
-                onClick={() => {
-                  if (confirm(`Approuver ${selectedDocs.length} documents ?`)) {
-                    bulkApproveMutation.mutate();
-                  }
-                }}
-                disabled={bulkApproveMutation.isPending}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm"
-              >
-                {bulkApproveMutation.isPending ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <CheckCircle size={14} />
-                )}
-                Approuver ({selectedDocs.length})
-              </button>
-            </>
+    <div className="space-y-5">
+      <ListHeader
+        title="Revue en masse"
+        subtitle={isLoading ? undefined : `${total} document${total > 1 ? "s" : ""} en attente de revue`}
+        action={
+          selected.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              <ActionButton variant="danger" icon={XCircle} onClick={() => setRejecting(true)}>
+                Rejeter ({selected.length})
+              </ActionButton>
+              <ActionButton icon={CheckCircle2} pending={approve.isPending} onClick={confirmApprove}>
+                Approuver ({selected.length})
+              </ActionButton>
+            </div>
+          )
+        }
+      />
+
+      {rejecting && (
+        <PanelForm
+          title={`Rejeter ${selected.length} document${selected.length > 1 ? "s" : ""}`}
+          onCancel={() => setRejecting(false)}
+          pending={reject.isPending}
+          submitLabel="Rejeter"
+          submitDisabled={!reason.trim()}
+          onSubmit={(e) => {
+            e.preventDefault();
+            reject.mutate();
+          }}
+        >
+          <Field label="Motif du rejet" required hint="Le même motif est appliqué à tous les documents sélectionnés.">
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} className={`${FIELD} resize-none`} />
+          </Field>
+        </PanelForm>
+      )}
+
+      {result && (
+        <div className="rounded-[1.5rem] bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-gray-950">Résultat du traitement</p>
+              <p className="mt-1 text-sm text-gray-600">{bulkSummary(result)}</p>
+            </div>
+            <ActionButton variant="ghost" onClick={() => setResult(null)}>
+              Fermer
+            </ActionButton>
+          </div>
+          {failures.length > 0 && (
+            <ul className="mt-3 space-y-1 text-sm text-red-600">
+              {failures.map((f, i) => (
+                <li key={i}>
+                  <span className="font-mono text-xs">{f.documentCode ?? f.code}</span> : {f.error ?? f.reason ?? "échec"}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
-      </div>
-
-      {actionError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
-          {actionError}
-        </div>
       )}
 
-      {bulkResult && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
-          <p className="font-medium text-blue-800">
-            Résultat du traitement en masse
-          </p>
-          <p className="text-blue-700 mt-1">
-            Traités : {bulkResult.processed} · Réussis : {bulkResult.succeeded}{" "}
-            · Échecs : {bulkResult.failed}
-          </p>
-          {bulkResult.results
-            ?.filter((r: any) => !r.success)
-            .map((r: any) => (
-              <p key={r.documentCode} className="text-red-600 text-xs mt-1">
-                {r.documentCode} : {r.error}
-              </p>
-            ))}
-          <button
-            onClick={() => setBulkResult(null)}
-            className="text-xs text-blue-600 underline mt-2"
-          >
-            Fermer
-          </button>
-        </div>
+      <SearchField value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Type, code, nom de fichier ou propriétaire" />
+
+      {isLoading ? (
+        <ListSkeleton rows={8} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger la file de revue." onRetry={() => refetch()} />
+      ) : docs.length === 0 ? (
+        <EmptyState icon={FileCheck2} title="Aucun document à revoir" hint={q ? "Aucun résultat pour cette recherche." : "La file de revue est vide."} />
+      ) : (
+        <>
+          <HeadRow cols={COLS}>
+            <RowCheck checked={allSelected} onChange={() => setSelected(allSelected ? [] : allCodes)} name="Tout sélectionner" />
+            <span>Document</span>
+            <span>Type</span>
+            <span>Propriétaire</span>
+            <span>Envoyé le</span>
+          </HeadRow>
+          <DataCard>
+            {slice.map((d) => {
+              const c = codeOf(d);
+              const on = selected.includes(c);
+              return (
+                <div
+                  key={c}
+                  onClick={() => toggle(c)}
+                  className={`grid cursor-pointer grid-cols-[2rem_1fr] items-center gap-x-3 gap-y-1 rounded-2xl p-4 transition max-lg:mb-2 ${on ? "bg-[color:color-mix(in_srgb,var(--logo-pink)_10%,white)]" : "max-lg:bg-gray-50"} ${COLS} ${ROW_HOVER}`}
+                >
+                  <RowCheck checked={on} onChange={() => toggle(c)} name={`Sélectionner ${c}`} />
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-xs font-semibold text-[color:var(--logo-pink-dark)]">{c}</p>
+                    <p className="truncate text-xs text-gray-400">{d.fileName ?? ""}</p>
+                  </div>
+                  <Cell title="Type" className="max-lg:col-start-2">
+                    <span className="text-sm font-semibold text-gray-900">{d.documentTypeName ?? d.documentType ?? "Non précisé"}</span>
+                  </Cell>
+                  <Cell title="Propriétaire" className="max-lg:col-start-2">
+                    <span className="text-sm text-gray-700">
+                      {d.ownerName ?? (d.ownerCode ? String(d.ownerCode) : "Non renseigné")}
+                      {d.ownerType ? <span className="ml-1 text-xs text-gray-400">{label(OWNER_LABEL, String(d.ownerType))}</span> : null}
+                    </span>
+                  </Cell>
+                  <Cell title="Envoyé le" className="max-lg:col-start-2">
+                    <span className="text-sm text-gray-700">{d.uploadedAt ? dayOnly(d.uploadedAt) : "Inconnu"}</span>
+                  </Cell>
+                </div>
+              );
+            })}
+          </DataCard>
+          <Pagination page={page} totalPages={totalPages} total={total} noun="document" onChange={setPage} />
+        </>
       )}
-
-      {/* Barre de recherche */}
-      <div className="relative">
-        <Search
-          size={18}
-          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-        />
-        <input
-          type="text"
-          placeholder="Rechercher un document..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl"
-        />
-      </div>
-
-      {/* Liste des documents */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50/70">
-            <tr>
-              <th className="px-4 py-3 text-center w-12">
-                <button onClick={toggleSelectAll} className="p-1">
-                  {selectedDocs.length === documents.length &&
-                  documents.length > 0 ? (
-                    <CheckSquare size={18} className="text-primary-600" />
-                  ) : (
-                    <Square size={18} className="text-gray-400" />
-                  )}
-                </button>
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold">
-                Code
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold">
-                Titre
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold">
-                Type
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold">
-                Propriétaire
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold">
-                Uploadé le
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {filteredDocs.map((doc: any) => (
-              <tr
-                key={doc.documentCode || doc.code || doc.id}
-                className={`hover:bg-gray-100 cursor-pointer ${selectedDocs.includes(doc.documentCode || doc.code || doc.id) ? "bg-blue-50" : ""}`}
-                onClick={() => toggleDoc(doc.documentCode || doc.code || doc.id)}
-              >
-                <td className="px-4 py-3 text-center">
-                  {selectedDocs.includes(doc.documentCode || doc.code || doc.id) ? (
-                    <CheckSquare size={18} className="text-primary-600" />
-                  ) : (
-                    <Square size={18} className="text-gray-400" />
-                  )}
-                </td>
-                <td className="px-4 py-3 text-sm font-mono">{doc.documentCode || doc.code || doc.id}</td>
-                <td className="px-4 py-3 text-sm font-medium">{doc.title || doc.fileName || "Document KYC"}</td>
-                <td className="px-4 py-3 text-sm">{doc.documentTypeName || doc.documentType}</td>
-                <td className="px-4 py-3 text-sm">
-                  {doc.ownerType}
-                  {doc.ownerCode ? ` · ${doc.ownerCode}` : ""}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
-                  {new Date(doc.uploadedAt).toLocaleDateString("fr-FR")}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {filteredDocs.length === 0 && (
-          <div className="text-center py-12">
-            <FileText size={48} className="mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500">Aucun document en attente de revue</p>
-          </div>
-        )}
-      </div>
     </div>
   );
 };

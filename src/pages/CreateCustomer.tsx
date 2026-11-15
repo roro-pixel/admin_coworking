@@ -1,9 +1,16 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AdminLayout } from "../components/layout/AdminLayout";
-import { ArrowLeft, Save, Building2, User } from "lucide-react";
+import { ArrowLeft, Save, Building2, User, Check } from "lucide-react";
 import { customerService } from "../services/customer.service";
 import type { CreateCustomerRequest } from "../services/customer.service";
+import { brandVars } from "../components/layout/adminTheme";
+import { Dots } from "../components/ui/Toaster";
+
+const FOCUS =
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--logo-pink)]";
+const FIELD =
+  "w-full rounded-2xl border border-transparent bg-white px-4 py-3 text-sm shadow-sm text-gray-900 placeholder:text-gray-400 transition focus:border-[color:var(--logo-pink)] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--logo-pink)_20%,white)]";
 
 const countries = [
   { code: "CG", name: "Congo", phoneCode: "+242" },
@@ -41,7 +48,6 @@ const countries = [
   { code: "TN", name: "Tunisie", phoneCode: "+216" },
   { code: "LY", name: "Libye", phoneCode: "+218" },
   { code: "EG", name: "Égypte", phoneCode: "+20" },
-  { code: "MR", name: "Mauritanie", phoneCode: "+222" },
   { code: "SD", name: "Soudan", phoneCode: "+249" },
 
   { code: "AO", name: "Angola", phoneCode: "+244" },
@@ -71,17 +77,82 @@ const countries = [
   { code: "NL", name: "Pays-Bas", phoneCode: "+31" },
 ];
 
+const Section: React.FC<{ title: string; hint?: string; children: React.ReactNode }> = ({
+  title,
+  hint,
+  children,
+}) => (
+  <section className="rounded-[1.75rem] border border-gray-100 bg-white p-3 shadow-sm">
+    <div className="px-3 pb-3 pt-2">
+      <h2 className="text-base font-semibold text-gray-950">{title}</h2>
+      {hint && <p className="mt-0.5 text-xs text-gray-500">{hint}</p>}
+    </div>
+    <div className="rounded-2xl bg-gray-50/60 p-3 sm:p-4">{children}</div>
+  </section>
+);
+
+const Field: React.FC<{ label: string; required?: boolean; children: React.ReactNode }> = ({
+  label,
+  required,
+  children,
+}) => (
+  <label className="block">
+    <span className="mb-1.5 block text-sm font-medium text-gray-700">
+      {label}
+      {required && <span className="ml-0.5 text-[color:var(--logo-pink-dark)]">*</span>}
+    </span>
+    {children}
+  </label>
+);
+
+const TypeTile: React.FC<{
+  active: boolean;
+  onClick: () => void;
+  icon: React.ElementType;
+  title: string;
+  text: string;
+}> = ({ active, onClick, icon: Icon, title, text }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-pressed={active}
+    className={`relative flex items-center gap-4 rounded-2xl p-4 text-left transition ${FOCUS} ${
+      active
+        ? "bg-[color:color-mix(in_srgb,var(--logo-pink)_16%,white)] ring-2 ring-[color:var(--logo-pink)]"
+        : "bg-white ring-1 ring-gray-100 hover:bg-gray-50"
+    }`}
+  >
+    <span
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+        active ? "bg-white text-[color:var(--logo-pink-dark)]" : "bg-gray-50 text-gray-400"
+      }`}
+    >
+      <Icon size={21} />
+    </span>
+    <span className="min-w-0">
+      <span className={`block text-sm font-semibold ${active ? "text-[color:var(--logo-pink-dark)]" : "text-gray-900"}`}>
+        {title}
+      </span>
+      <span className="mt-0.5 block text-xs text-gray-500">{text}</span>
+    </span>
+    {active && (
+      <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-[color:var(--logo-pink)] text-white">
+        <Check size={12} strokeWidth={3} />
+      </span>
+    )}
+  </button>
+);
+
 export const CreateCustomer: React.FC = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const [type, setType] = useState<"PERSON" | "COMPANY">("PERSON");
+  const type = "PERSON" as const;
   const [formData, setFormData] = useState({
     firstname: "",
     lastname: "",
-    companyName: "",
     email: "",
     billingEmail: "",
     phone: "",
@@ -111,20 +182,13 @@ export const CreateCustomer: React.FC = () => {
   };
 
   const validateForm = (): boolean => {
-    if (type === "PERSON") {
-      if (!formData.firstname) {
-        setError("Le prénom est requis");
-        return false;
-      }
-      if (!formData.lastname) {
-        setError("Le nom est requis");
-        return false;
-      }
-    } else {
-      if (!formData.companyName) {
-        setError("Le nom de l'entreprise est requis");
-        return false;
-      }
+    if (!formData.firstname) {
+      setError("Le prénom est requis");
+      return false;
+    }
+    if (!formData.lastname) {
+      setError("Le nom est requis");
+      return false;
     }
     if (!formData.email) {
       setError("L'email est requis");
@@ -159,11 +223,8 @@ export const CreateCustomer: React.FC = () => {
       type,
       email: formData.email,
       phone: formData.phone,
-      ...(type === "PERSON" && {
-        firstname: formData.firstname,
-        lastname: formData.lastname,
-      }),
-      ...(type === "COMPANY" && { companyName: formData.companyName }),
+      firstname: formData.firstname,
+      lastname: formData.lastname,
       ...(formData.billingEmail && { billingEmail: formData.billingEmail }),
       ...(formData.whatsappPhone && { whatsappPhone: formData.whatsappPhone }),
       ...(formData.address.streetNumber ||
@@ -175,7 +236,7 @@ export const CreateCustomer: React.FC = () => {
 
     try {
       const response = await customerService.createCustomer(payload);
-      setSuccess(`Customer créé avec succès ! ID: ${response.customerId}`);
+      setSuccess(`Client créé avec succès ! ID: ${response.customerId}`);
       setTimeout(() => navigate(`/customers/${response.customerId}`), 2000);
     } catch (err: any) {
       setError(err.response?.data?.message || "Erreur lors de la création");
@@ -184,271 +245,139 @@ export const CreateCustomer: React.FC = () => {
     }
   };
 
+
   return (
     <AdminLayout>
-      <div className="mb-5 flex items-center rounded-2xl bg-white p-3 shadow-sm ring-1 ring-gray-100 sm:p-4">
-        <button
-          onClick={() => navigate("/customers")}
-          className="mr-3 rounded-xl p-2 transition-colors hover:bg-gray-100 sm:mr-4"
-        >
-          <ArrowLeft size={20} className="text-gray-600" />
-        </button>
-        <h1 className="text-xl font-black tracking-tight text-gray-900 sm:text-2xl">Créer un customer</h1>
-      </div>
-
-      <form onSubmit={handleSubmit} className="w-full max-w-5xl space-y-5 pb-24 lg:pb-0">
-        {/* Type de customer */}
-        <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-6">
-          <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">
-            Type de customer
-          </h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-            <button
-              type="button"
-              onClick={() => setType("PERSON")}
-              className={`rounded-xl border-2 p-4 text-center transition-all ${
-                type === "PERSON"
-                  ? "border-primary-600 bg-primary-50 text-primary-700"
-                  : "border-gray-200 hover:border-primary-200"
-              }`}
-            >
-              <User
-                size={24}
-                className={`mx-auto mb-2 ${type === "PERSON" ? "text-primary-600" : "text-gray-400"}`}
-              />
-              <span className="font-medium">Personne physique</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setType("COMPANY")}
-              className={`rounded-xl border-2 p-4 text-center transition-all ${
-                type === "COMPANY"
-                  ? "border-primary-600 bg-primary-50 text-primary-700"
-                  : "border-gray-200 hover:border-primary-200"
-              }`}
-            >
-              <Building2
-                size={24}
-                className={`mx-auto mb-2 ${type === "COMPANY" ? "text-primary-600" : "text-gray-400"}`}
-              />
-              <span className="font-medium">Compagnie</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Informations principales */}
-        <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-6">
-          <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">
-            Informations principales
-          </h2>
-
-          {type === "PERSON" ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-bold text-gray-700">
-                  Prénom *
-                </label>
-                <input
-                  type="text"
-                  name="firstname"
-                  value={formData.firstname}
-                  onChange={handleChange}
-                  className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-bold text-gray-700">
-                  Nom *
-                </label>
-                <input
-                  type="text"
-                  name="lastname"
-                  value={formData.lastname}
-                  onChange={handleChange}
-                  className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-            </div>
-          ) : (
-            <div>
-              <label className="mb-1 block text-sm font-bold text-gray-700">
-                Nom de l'entreprise *
-              </label>
-              <input
-                type="text"
-                name="companyName"
-                value={formData.companyName}
-                onChange={handleChange}
-                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Contact */}
-        <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-6">
-          <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">Contact</h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-bold text-gray-700">
-                Email *
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-bold text-gray-700">
-                Email de facturation
-              </label>
-              <input
-                type="email"
-                name="billingEmail"
-                value={formData.billingEmail}
-                onChange={handleChange}
-                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-bold text-gray-700">
-                Téléphone *
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-bold text-gray-700">
-                WhatsApp
-              </label>
-              <input
-                type="tel"
-                name="whatsappPhone"
-                value={formData.whatsappPhone}
-                onChange={handleChange}
-                placeholder="Laissez vide pour utiliser le téléphone"
-                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Adresse */}
-        <div className="mb-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-6">
-          <h2 className="mb-4 text-base font-black text-gray-900 sm:text-lg">Adresse</h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-bold text-gray-700">
-                Numéro rue
-              </label>
-              <input
-                type="text"
-                name="streetNumber"
-                value={formData.address.streetNumber}
-                onChange={handleAddressChange}
-                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-bold text-gray-700">
-                Nom rue
-              </label>
-              <input
-                type="text"
-                name="streetName"
-                value={formData.address.streetName}
-                onChange={handleAddressChange}
-                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-bold text-gray-700">
-                Quartier
-              </label>
-              <input
-                type="text"
-                name="district"
-                value={formData.address.district}
-                onChange={handleAddressChange}
-                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-bold text-gray-700">
-                Ville
-              </label>
-              <input
-                type="text"
-                name="city"
-                value={formData.address.city}
-                onChange={handleAddressChange}
-                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-bold text-gray-700">
-                Pays
-              </label>
-              <select
-                name="countryCode"
-                value={formData.address.countryCode}
-                onChange={handleAddressChange}
-                className="w-full rounded-2xl px-3 py-2.5 text-sm ring-1 ring-gray-100 focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="">Sélectionner un pays</option>
-                {countries.map((country) => (
-                  <option key={country.code} value={country.code}>
-                    {country.name} ({country.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Messages */}
-        {error && (
-          <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-600">
-            {error}
-          </div>
-        )}
-        {success && (
-          <div className="mb-5 rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-600">
-            {success}
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+      <div className="mx-auto w-full max-w-4xl" style={brandVars}>
+        <div className="mb-6 flex items-center gap-3">
           <button
             type="button"
             onClick={() => navigate("/customers")}
-            className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50/70 sm:w-auto"
+            aria-label="Retour aux clients"
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-gray-100 bg-white text-gray-600 shadow-sm transition hover:bg-gray-50 ${FOCUS}`}
           >
-            Annuler
+            <ArrowLeft size={19} />
           </button>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="flex w-full items-center justify-center rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50 sm:w-auto"
-          >
-            {isLoading ? (
-              <div className="mr-2 h-5 w-5 animate-spin rounded-full border-b-2 border-white"></div>
-            ) : (
-              <Save size={16} className="mr-2" />
-            )}
-            {isLoading ? "Création..." : "Créer le customer"}
-          </button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-950 sm:text-3xl">Créer un client</h1>
+            <p className="mt-0.5 text-sm text-gray-500">Les champs marqués d'un astérisque sont requis.</p>
+          </div>
         </div>
-      </form>
+
+        <form onSubmit={handleSubmit} className="space-y-4 pb-28 lg:pb-0">
+          <Section title="Type de client">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <TypeTile
+                active
+                onClick={() => undefined}
+                icon={User}
+                title="Personne physique"
+                text="Un client individuel"
+              />
+              <TypeTile
+                active={false}
+                onClick={() => navigate("/companies/create")}
+                icon={Building2}
+                title="Compagnie"
+                text="Formulaire dédié : type, NIU, RCCM, TVA"
+              />
+            </div>
+          </Section>
+
+          <Section title="Informations principales">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Field label="Prénom" required>
+                <input type="text" name="firstname" value={formData.firstname} onChange={handleChange} className={FIELD} />
+              </Field>
+              <Field label="Nom" required>
+                <input type="text" name="lastname" value={formData.lastname} onChange={handleChange} className={FIELD} />
+              </Field>
+            </div>
+          </Section>
+
+          <Section title="Contact">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Field label="Email" required>
+                <input type="email" name="email" value={formData.email} onChange={handleChange} className={FIELD} />
+              </Field>
+              <Field label="Email de facturation">
+                <input type="email" name="billingEmail" value={formData.billingEmail} onChange={handleChange} className={FIELD} />
+              </Field>
+              <Field label="Téléphone" required>
+                <input type="tel" name="phone" value={formData.phone} onChange={handleChange} className={FIELD} />
+              </Field>
+              <Field label="WhatsApp">
+                <input
+                  type="tel"
+                  name="whatsappPhone"
+                  value={formData.whatsappPhone}
+                  onChange={handleChange}
+                  placeholder="Laissez vide pour utiliser le téléphone"
+                  className={FIELD}
+                />
+              </Field>
+            </div>
+          </Section>
+
+          <Section title="Adresse" hint="Facultative">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Field label="Numéro rue">
+                <input type="text" name="streetNumber" value={formData.address.streetNumber} onChange={handleAddressChange} className={FIELD} />
+              </Field>
+              <Field label="Nom rue">
+                <input type="text" name="streetName" value={formData.address.streetName} onChange={handleAddressChange} className={FIELD} />
+              </Field>
+              <Field label="Quartier">
+                <input type="text" name="district" value={formData.address.district} onChange={handleAddressChange} className={FIELD} />
+              </Field>
+              <Field label="Ville">
+                <input type="text" name="city" value={formData.address.city} onChange={handleAddressChange} className={FIELD} />
+              </Field>
+              <div className="md:col-span-2">
+                <Field label="Pays">
+                  <select name="countryCode" value={formData.address.countryCode} onChange={handleAddressChange} className={FIELD}>
+                    <option value="">Sélectionner un pays</option>
+                    {countries.map((country) => (
+                      <option key={country.code} value={country.code}>
+                        {country.name} ({country.code})
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+            </div>
+          </Section>
+
+          {error && (
+            <div role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div role="status" className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+              {success}
+            </div>
+          )}
+
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => navigate("/customers")}
+              className={`w-full rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-gray-100 transition hover:bg-gray-50 sm:w-auto ${FOCUS}`}
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className={`flex w-full items-center justify-center gap-2 rounded-full bg-[color:var(--logo-pink-dark)] px-6 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50 sm:w-auto ${FOCUS}`}
+            >
+              {isLoading ? <Dots /> : <Save size={16} />}
+              {isLoading ? "Création en cours" : "Créer le client"}
+            </button>
+          </div>
+        </form>
+      </div>
     </AdminLayout>
   );
 };

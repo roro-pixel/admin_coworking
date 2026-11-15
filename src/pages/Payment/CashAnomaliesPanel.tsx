@@ -1,40 +1,50 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle, Loader2, Search } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CheckCheck, Eye, ScanSearch, ShieldOff } from "lucide-react";
 import { paymentService } from "../../services/payment.service";
-import type {
-  CashAnomalyFlag,
-  CashAnomalyReviewStatus,
-} from "../../services/payment.service";
+import type { CashAnomalyFlag, CashAnomalyReviewStatus } from "../../services/payment.service";
 import { useAuth } from "../../contexts/AuthContext";
+import {
+  ActionButton,
+  DataCard,
+  EmptyState,
+  ErrorBlock,
+  Field,
+  FilterButton,
+  FilterPanel,
+  HeadRow,
+  IconButton,
+  ListHeader,
+  Pagination,
+  Section,
+  StatusChip,
+} from "../../components/subscription/kit";
+import { FIELD, FIELD_SOFT, formatDateTime } from "../../components/subscription/kitUtils";
+import { statusOf } from "../../components/subscription/labels";
+import { Dots } from "../../components/ui/Toaster";
+import { toast } from "../../components/ui/toastStore";
+import { ListSkeleton } from "../../components/ui/Skeleton";
+import { ANOMALY_REVIEW, SEVERITY, humanize } from "../../components/payment/paymentLabels";
 
 const PAGE_SIZE = 20;
-const severityClass: Record<string, string> = {
-  LOW: "bg-blue-100 text-blue-700",
-  MEDIUM: "bg-yellow-100 text-yellow-700",
-  HIGH: "bg-red-100 text-red-700",
-};
+const COLS = "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_6rem_minmax(0,2fr)_8rem_10rem]";
 
 export const CashAnomaliesPanel: React.FC = () => {
   const { admin } = useAuth();
   const queryClient = useQueryClient();
+
   const [page, setPage] = useState(0);
   const [sessionNumber, setSessionNumber] = useState("");
   const [registerCode, setRegisterCode] = useState("");
   const [severity, setSeverity] = useState("");
   const [reviewStatus, setReviewStatus] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [analyzeSession, setAnalyzeSession] = useState("");
   const [reviewNote, setReviewNote] = useState("");
+  const [reviewing, setReviewing] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
-    queryKey: [
-      "cash-anomalies",
-      page,
-      sessionNumber,
-      registerCode,
-      severity,
-      reviewStatus,
-    ],
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
+    queryKey: ["cash-anomalies", page, sessionNumber, registerCode, severity, reviewStatus],
     queryFn: () =>
       paymentService.getCashAnomalies({
         sessionNumber: sessionNumber || undefined,
@@ -47,21 +57,18 @@ export const CashAnomaliesPanel: React.FC = () => {
       }),
   });
   const anomalies: CashAnomalyFlag[] = data?.content || [];
-  const totalPages = data?.totalPages ?? 1;
+
   const analyzeMutation = useMutation({
     mutationFn: () => paymentService.analyzeCashSession(analyzeSession),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["cash-anomalies"] }),
-    onError: () => alert("Erreur lors de l’analyse de session."),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cash-anomalies"] });
+      toast.success("Analyse terminée");
+    },
+    onError: () => toast.error("Analyse de la session impossible"),
   });
+
   const reviewMutation = useMutation({
-    mutationFn: ({
-      flag,
-      status,
-    }: {
-      flag: CashAnomalyFlag;
-      status: CashAnomalyReviewStatus;
-    }) =>
+    mutationFn: ({ flag, status }: { flag: CashAnomalyFlag; status: CashAnomalyReviewStatus }) =>
       paymentService.reviewCashAnomaly(flag.flagNumber, {
         reviewedBy: admin?.email || "admin",
         status,
@@ -70,215 +77,194 @@ export const CashAnomaliesPanel: React.FC = () => {
     onSuccess: () => {
       setReviewNote("");
       queryClient.invalidateQueries({ queryKey: ["cash-anomalies"] });
+      toast.success("Revue enregistrée");
     },
-    onError: () => alert("Erreur lors de la revue."),
+    onError: () => toast.error("Revue impossible"),
+    onSettled: () => setReviewing(null),
   });
 
+  const review = (flag: CashAnomalyFlag, status: CashAnomalyReviewStatus) => {
+    setReviewing(`${flag.flagNumber}:${status}`);
+    reviewMutation.mutate({ flag, status });
+  };
+
+  const hasFilters = !!(sessionNumber || registerCode || severity || reviewStatus);
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900">
-          Anomalies de caisse
-        </h2>
-        <p className="text-sm text-gray-500 mt-1">
-          Analyse, suivi et revue des anomalies de caisse.
-        </p>
-      </div>
-      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-4 grid grid-cols-1 md:grid-cols-5 gap-3">
-        <input
-          value={sessionNumber}
-          onChange={(e) => setSessionNumber(e.target.value)}
-          placeholder="Session"
-          className="px-3 py-2 border border-gray-200 rounded-xl font-mono"
-        />
-        <input
-          value={registerCode}
-          onChange={(e) => setRegisterCode(e.target.value)}
-          placeholder="Caisse"
-          className="px-3 py-2 border border-gray-200 rounded-xl font-mono"
-        />
-        <select
-          value={severity}
-          onChange={(e) => setSeverity(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
+    <div className="space-y-5">
+      <ListHeader title="Anomalies de caisse" subtitle="Analyse des sessions, suivi et revue des écarts suspects." />
+
+      <Section title="Analyser une session" description="Lance la détection d'anomalies sur une session." icon={ScanSearch}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            analyzeMutation.mutate();
+          }}
+          className="flex flex-col gap-3 sm:flex-row sm:items-end"
         >
-          <option value="">Toutes sévérités</option>
-          <option value="LOW">Faible</option>
-          <option value="MEDIUM">Moyenne</option>
-          <option value="HIGH">Élevée</option>
-        </select>
-        <select
-          value={reviewStatus}
-          onChange={(e) => setReviewStatus(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
-        >
-          <option value="">Tous statuts</option>
-          <option value="PENDING">En attente</option>
-          <option value="ACKNOWLEDGED">Reconnue</option>
-          <option value="FALSE_POSITIVE">Faux positif</option>
-          <option value="ESCALATED">Escaladée</option>
-          <option value="RESOLVED">Résolue</option>
-        </select>
-        <div className="flex items-center text-sm text-gray-500 gap-2">
-          <Search size={16} /> {data?.totalElements ?? 0} anomalie(s)
+          <Field label="N° de session" className="flex-1">
+            <input value={analyzeSession} onChange={(e) => setAnalyzeSession(e.target.value)} placeholder="SES-2026-0091" className={`${FIELD} font-mono`} />
+          </Field>
+          <ActionButton type="submit" icon={AlertTriangle} pending={analyzeMutation.isPending} disabled={!analyzeSession.trim()}>
+            Lancer l'analyse
+          </ActionButton>
+        </form>
+      </Section>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-gray-500">
+            <b className="text-gray-950">{data?.totalElements ?? 0}</b> anomalie{(data?.totalElements ?? 0) > 1 ? "s" : ""}
+            {isFetching && !isLoading && <Dots className="ml-3 align-middle" />}
+          </p>
+          <FilterButton open={filtersOpen} active={hasFilters} onClick={() => setFiltersOpen((o) => !o)} />
         </div>
-      </div>
-      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-4 flex flex-col md:flex-row gap-3 items-end">
-        <div className="flex-1">
-          <label className="text-sm font-medium">Analyser une session</label>
+        {filtersOpen && (
+          <FilterPanel
+            canReset={hasFilters}
+            onReset={() => {
+              setSessionNumber("");
+              setRegisterCode("");
+              setSeverity("");
+              setReviewStatus("");
+              setPage(0);
+            }}
+          >
+            <Field label="Session">
+              <input
+                value={sessionNumber}
+                onChange={(e) => {
+                  setSessionNumber(e.target.value);
+                  setPage(0);
+                }}
+                placeholder="SES-…"
+                className={`${FIELD_SOFT} font-mono`}
+              />
+            </Field>
+            <Field label="Caisse">
+              <input
+                value={registerCode}
+                onChange={(e) => {
+                  setRegisterCode(e.target.value);
+                  setPage(0);
+                }}
+                placeholder="CSH-…"
+                className={`${FIELD_SOFT} font-mono`}
+              />
+            </Field>
+            <Field label="Sévérité">
+              <select
+                value={severity}
+                onChange={(e) => {
+                  setSeverity(e.target.value);
+                  setPage(0);
+                }}
+                className={FIELD_SOFT}
+              >
+                <option value="">Toutes</option>
+                {Object.entries(SEVERITY).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Statut de la revue">
+              <select
+                value={reviewStatus}
+                onChange={(e) => {
+                  setReviewStatus(e.target.value);
+                  setPage(0);
+                }}
+                className={FIELD_SOFT}
+              >
+                <option value="">Tous</option>
+                {Object.entries(ANOMALY_REVIEW).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </FilterPanel>
+        )}
+        <Field label="Note de revue" hint="Facultative. Elle est jointe à la prochaine action de revue.">
           <input
-            value={analyzeSession}
-            onChange={(e) => setAnalyzeSession(e.target.value)}
-            placeholder="N° session"
-            className="w-full mt-1 px-3 py-2 border rounded-lg font-mono"
+            value={reviewNote}
+            onChange={(e) => setReviewNote(e.target.value)}
+            placeholder="Ex. vérifié avec la caissière"
+            className={`${FIELD_SOFT} bg-white shadow-sm`}
           />
-        </div>
-        <button
-          onClick={() => analyzeMutation.mutate()}
-          disabled={!analyzeSession || analyzeMutation.isPending}
-          className="px-4 py-2 bg-orange-600 text-white rounded-lg flex items-center gap-2 disabled:opacity-50"
-        >
-          {analyzeMutation.isPending ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <AlertTriangle size={16} />
-          )}{" "}
-          Lancer analyse
-        </button>
+        </Field>
       </div>
-      <div>
-        <label className="text-sm font-medium">Note de revue</label>
-        <input
-          value={reviewNote}
-          onChange={(e) => setReviewNote(e.target.value)}
-          className="w-full mt-1 px-3 py-2 border rounded-lg"
-          placeholder="Note optionnelle appliquée à la prochaine action de revue"
-        />
-      </div>
+
       {isLoading ? (
-        <div className="text-center py-8">
-          <Loader2 className="animate-spin mx-auto" />
-        </div>
+        <ListSkeleton rows={5} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les anomalies." onRetry={() => refetch()} />
+      ) : anomalies.length === 0 ? (
+        <EmptyState icon={AlertTriangle} title="Aucune anomalie" hint="Aucune anomalie ne correspond à ces filtres." />
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-          <table className="w-full border-separate border-spacing-y-2">
-            <thead className="bg-gray-50/70">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Flag
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Session
-                </th>
-                <th className="px-4 py-3 text-center text-sm">Sévérité</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Description
-                </th>
-                <th className="px-4 py-3 text-center text-sm">Revue</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {anomalies.map((a) => (
-                <tr key={a.flagNumber}>
-                  <td className="px-4 py-3 font-mono text-sm">
-                    {a.flagNumber}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-sm">
-                    {a.sessionNumber}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full ${severityClass[a.severity] || "bg-gray-100"}`}
-                    >
-                      {a.severity}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <p>{a.anomalyType}</p>
-                    <p className="text-xs text-gray-500">
-                      {a.description || "—"}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3 text-center text-sm">
-                    {a.reviewStatus || "PENDING"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-1">
-                      <button
-                        onClick={() =>
-                          reviewMutation.mutate({
-                            flag: a,
-                            status: "ACKNOWLEDGED",
-                          })
-                        }
-                        className="p-1 text-blue-600"
-                        title="Reconnaître"
-                      >
-                        <CheckCircle size={16} />
-                      </button>
-                      <button
-                        onClick={() =>
-                          reviewMutation.mutate({ flag: a, status: "RESOLVED" })
-                        }
-                        className="p-1 text-green-600"
-                        title="Résoudre"
-                      >
-                        <CheckCircle size={16} />
-                      </button>
-                      <button
-                        onClick={() =>
-                          reviewMutation.mutate({
-                            flag: a,
-                            status: "FALSE_POSITIVE",
-                          })
-                        }
-                        className="p-1 text-gray-500"
-                        title="Faux positif"
-                      >
-                        FP
-                      </button>
-                      <button
-                        onClick={() =>
-                          reviewMutation.mutate({
-                            flag: a,
-                            status: "ESCALATED",
-                          })
-                        }
-                        className="p-1 text-orange-600"
-                        title="Escalader"
-                      >
-                        <AlertTriangle size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <HeadRow cols={COLS}>
+            <span>Anomalie</span>
+            <span>Session</span>
+            <span>Sévérité</span>
+            <span>Description</span>
+            <span>Revue</span>
+            <span className="text-right">Actions</span>
+          </HeadRow>
+          <DataCard>
+            {anomalies.map((a) => {
+              const sev = statusOf(SEVERITY, a.severity);
+              const rev = statusOf(ANOMALY_REVIEW, a.reviewStatus || "PENDING");
+              const current = a.reviewStatus || "PENDING";
+              const actions: { status: CashAnomalyReviewStatus; label: string; icon: React.ElementType; tone: "pink" | "success" | "neutral" | "danger" }[] = [
+                { status: "ACKNOWLEDGED", label: "Prendre en compte", icon: Eye, tone: "pink" },
+                { status: "RESOLVED", label: "Marquer comme résolue", icon: CheckCheck, tone: "success" },
+                { status: "FALSE_POSITIVE", label: "Faux positif", icon: ShieldOff, tone: "neutral" },
+                { status: "ESCALATED", label: "Escalader", icon: ArrowUpRight, tone: "danger" },
+              ];
+              return (
+                <div
+                  key={a.flagNumber}
+                  className={`grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 rounded-2xl p-4 max-lg:mb-2 max-lg:bg-gray-50 ${COLS}`}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-xs font-semibold text-[color:var(--logo-pink-dark)]">{a.flagNumber}</p>
+                    <p className="text-xs text-gray-400">{formatDateTime(a.createdAt)}</p>
+                  </div>
+                  <div className="flex items-center justify-end gap-0.5 lg:order-last">
+                    {actions.map((act) => (
+                      <IconButton
+                        key={act.status}
+                        icon={act.icon}
+                        label={act.label}
+                        tone={act.tone}
+                        disabled={current === act.status}
+                        pending={reviewing === `${a.flagNumber}:${act.status}`}
+                        onClick={() => review(a, act.status)}
+                      />
+                    ))}
+                  </div>
+                  <p className="col-span-2 truncate font-mono text-xs text-gray-600 lg:col-span-1">{a.sessionNumber}</p>
+                  <div>
+                    <StatusChip tone={sev.tone}>{sev.label}</StatusChip>
+                  </div>
+                  <div className="col-span-2 min-w-0 lg:col-span-1">
+                    <p className="truncate text-sm font-semibold text-gray-900">{humanize(a.anomalyType)}</p>
+                    {a.description && <p className="line-clamp-2 text-xs text-gray-500">{a.description}</p>}
+                  </div>
+                  <div>
+                    <StatusChip tone={rev.tone}>{rev.label}</StatusChip>
+                  </div>
+                </div>
+              );
+            })}
+          </DataCard>
+          <Pagination page={page} totalPages={data?.totalPages || 1} total={data?.totalElements ?? anomalies.length} noun="anomalie" onChange={setPage} />
+        </>
       )}
-      <div className="flex justify-end gap-2">
-        <button
-          disabled={page <= 0}
-          onClick={() => setPage((p) => p - 1)}
-          className="px-3 py-1 border rounded disabled:opacity-50"
-        >
-          Précédent
-        </button>
-        <span className="px-3 py-1 text-sm">
-          {page + 1}/{Math.max(totalPages, 1)}
-        </span>
-        <button
-          disabled={page + 1 >= totalPages}
-          onClick={() => setPage((p) => p + 1)}
-          className="px-3 py-1 border rounded disabled:opacity-50"
-        >
-          Suivant
-        </button>
-      </div>
     </div>
   );
 };

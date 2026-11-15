@@ -140,12 +140,6 @@ export const memberService = {
     return response.data?.data || [];
   },
 
-  // Recherche basique pour autocomplete
-  // searchMembers: async (query: string): Promise<MemberSummaryResponse[]> => {
-  //   const response = await apiClient.get('/sni/api/v1/members/search/basic', { params: { query } });
-  //   return response.data;
-  // },
-
   // Recherche avancée multicritères
   searchMembersAdvanced: async (
     payload: MemberSearchPayload,

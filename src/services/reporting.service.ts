@@ -1,4 +1,3 @@
-// admin/src/services/reporting.service.ts
 import { apiClient } from "./api";
 
 // ==================== TYPES ====================
@@ -170,7 +169,7 @@ export interface OccupancyByResource {
   revenue: number;
 }
 
-// ==================== TYPES ANALYTICS (NOUVEAUX - spec consolidée) ====================
+// ==================== TYPES ANALYTICS ====================
 
 export interface LiveKpiResponse {
   currentActiveBookings: number;
@@ -342,13 +341,13 @@ export interface RealComparisonResponse {
   };
 }
 
-// Type pour un propriétaire (Owner) réel de l'API
+// Propriétaire actif (réponse réelle de l'API)
 export interface RealOwnerActivity {
   ownerType: string;
   ownerCode: string;
   ownerName: string;
   bookingCount: number;
-  revenue: number; // Note: c'est 'revenue' pas 'totalSpent'
+  revenue: number;
   confirmedCount?: number;
   completedCount?: number;
   cancelledCount?: number;
@@ -356,7 +355,7 @@ export interface RealOwnerActivity {
   lastBookingAt?: string;
 }
 
-// ==================== REPORTING METIER (NOUVEAU) ====================
+// ==================== REPORTING MÉTIER ====================
 
 export interface ActivityVariation {
   previousValue: number;
@@ -677,7 +676,7 @@ export interface SubscriptionAnalyticsResponse {
 // ==================== SERVICE ====================
 
 export const reportingService = {
-  // ========== ANALYTICS (nouveaux endpoints - spec consolidée) ==========
+  // ========== ANALYTICS ==========
 
   // KPIs temps réel
   getLiveKpis: async (): Promise<LiveKpiResponse> => {
@@ -799,7 +798,7 @@ export const reportingService = {
     return response.data;
   },
 
-  // ========== REPORTING (existants) ==========
+  // ========== REPORTING ==========
 
   // Tableau de bord financier
   getFinanceDashboard: async (params?: {
@@ -864,7 +863,7 @@ export const reportingService = {
     return response.data;
   },
 
-  // ========== REPORTING METIER (NOUVEAU) ==========
+  // ========== REPORTING MÉTIER ==========
   getActivityReport: async (params?: {
     from?: string;
     to?: string;

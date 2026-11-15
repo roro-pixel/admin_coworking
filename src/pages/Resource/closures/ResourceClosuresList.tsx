@@ -1,523 +1,212 @@
-import React, { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Plus,
-  Trash2,
-  Search,
-  X,
-  Loader2,
-  Calendar,
-  Power,
-  Clock,
-  Lock,
-  Unlock,
-  CalendarOff,
-} from "lucide-react";
+import React, { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CalendarOff, Plus, Power, Trash2 } from "lucide-react";
 import { resourceService } from "../../../services/resource.service";
-import type {
-  ResourceClosureResponse,
-  ResourceSummaryResponse,
-} from "../../../services/resource.service";
-import { ModalPortal } from "../../../components/ui/ModalPortal";
+import type { ResourceClosureResponse, ResourceSummaryResponse } from "../../../services/resource.service";
+import { ActionButton, CheckField, DataCard, EmptyState, ErrorBlock, Field, FilterButton, FilterPanel, HeadRow, IconButton, ListHeader, PanelForm, Pagination, StatusChip, Tag } from "../../../components/subscription/kit";
+import { FIELD, ROW_HOVER, apiMessage, formatDateTime } from "../../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../../components/ui/Skeleton";
+import { toast } from "../../../components/ui/toastStore";
+import { Cell } from "../../../components/resources/resKit";
 import { ResourceAutocomplete } from "../../../components/resources/ResourceAutocomplete";
 
-const buildDefaultFormData = (resourceCode: string = "") => ({
-  resourceCode,
-  startedAt: "",
-  endedAt: "",
-  reason: "",
-  active: true,
-});
+const COLS = "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.2fr)_6rem_6rem_auto]";
+const SIZE = 15;
+const EMPTY = { resourceCode: "", startedAt: "", endedAt: "", reason: "", active: true };
 
-const formatDateTime = (value: string) =>
-  new Date(value).toLocaleString("fr-FR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-
-const getDurationLabel = (startedAt: string, endedAt: string) => {
-  const start = new Date(startedAt).getTime();
-  const end = new Date(endedAt).getTime();
-  const minutes = Math.max(0, Math.round((end - start) / 60000));
+const durationLabel = (a: string, b: string) => {
+  const minutes = Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000));
   if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
   const rest = minutes % 60;
-  return rest ? `${hours}h${String(rest).padStart(2, "0")}` : `${hours}h`;
+  return [days ? `${days} j` : "", hours ? `${hours} h` : "", rest ? `${rest} min` : ""].filter(Boolean).join(" ");
 };
 
 export const ResourceClosuresList: React.FC = () => {
   const queryClient = useQueryClient();
-
+  const [page, setPage] = useState(0);
   const [resourceFilter, setResourceFilter] = useState("");
-  const [selectedResourceSummary, setSelectedResourceSummary] =
-    useState<ResourceSummaryResponse | null>(null);
-  const [search, setSearch] = useState("");
+  const [selectedResource, setSelectedResource] = useState<ResourceSummaryResponse | null>(null);
+  const [activeFilter, setActiveFilter] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [creating, setCreating] = useState<typeof EMPTY | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [formData, setFormData] = useState(() => buildDefaultFormData());
-
-  useEffect(() => {
-    if (isModalOpen) {
-      setFormData(buildDefaultFormData(resourceFilter));
-      setErrorMessage(null);
-    }
-  }, [isModalOpen, resourceFilter]);
-
-  const { data: closuresData, isLoading } = useQuery({
-    queryKey: ["resource-closures", resourceFilter],
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["resource-closures", resourceFilter, page, activeFilter],
     queryFn: () =>
       resourceService.getClosures({
         resourceCode: resourceFilter || undefined,
-        size: 200,
+        active: activeFilter === "" ? undefined : activeFilter === "true",
+        page,
+        size: SIZE,
+        sort: "startedAt,desc",
       }),
   });
+  const closures = data?.content ?? [];
+  const total = data?.totalElements ?? 0;
 
-  const closures: ResourceClosureResponse[] = closuresData?.content || [];
-
-  const createMutation = useMutation({
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["resource-closures"] });
+  const create = useMutation({
     mutationFn: () =>
       resourceService.createClosure({
-        resourceCode: formData.resourceCode,
-        startedAt: formData.startedAt,
-        endedAt: formData.endedAt,
-        reason: formData.reason || undefined,
-        active: formData.active,
+        resourceCode: creating!.resourceCode,
+        startedAt: creating!.startedAt,
+        endedAt: creating!.endedAt,
+        reason: creating!.reason.trim() || undefined,
+        active: creating!.active,
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resource-closures"] });
-      setIsModalOpen(false);
+    onSuccess: async () => {
+      await Promise.all([refresh(), queryClient.invalidateQueries({ queryKey: ["resource-closures-calendar"] })]);
+      toast.success("Fermeture créée");
+      setCreating(null);
+      setError(null);
     },
-    onError: (error: any) => {
-      setErrorMessage(
-        error?.response?.data?.message ||
-          "Erreur lors de la création de la fermeture.",
-      );
-    },
+    onError: (e) => setError(apiMessage(e, "Création impossible")),
   });
-
-  const updateActiveMutation = useMutation({
-    mutationFn: ({ id, active }: { id: number; active: boolean }) =>
-      resourceService.updateClosureActive(id, active),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["resource-closures"] }),
-    onError: () => alert("Erreur lors de la mise à jour du statut."),
+  const toggle = useMutation({
+    mutationFn: (c: ResourceClosureResponse) => resourceService.updateClosureActive(c.id, !c.active),
+    onSuccess: refresh,
+    onError: (e) => toast.error(apiMessage(e, "Changement d'état impossible")),
   });
+  const remove = useMutation({ mutationFn: (id: number) => resourceService.deleteClosure(id), onSuccess: refresh });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => resourceService.deleteClosure(id),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["resource-closures"] }),
-    onError: () => alert("Erreur lors de la suppression de la fermeture."),
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (new Date(formData.endedAt) <= new Date(formData.startedAt)) {
-      setErrorMessage(
-        "La date de fin doit être postérieure à la date de début.",
-      );
-      return;
-    }
-    setErrorMessage(null);
-    createMutation.mutate();
-  };
-
-  const handleDelete = (id: number) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer cette fermeture ?")) {
-      deleteMutation.mutate(id);
-    }
-  };
-
-  const filteredClosures = search
-    ? closures.filter(
-        (c) =>
-          c.resourceCode.toLowerCase().includes(search.toLowerCase()) ||
-          (c.reason || "").toLowerCase().includes(search.toLowerCase()),
-      )
-    : closures;
-
-  const getResourceName = (code: string) =>
-    selectedResourceSummary?.code === code
-      ? selectedResourceSummary.name
-      : code;
-
-  const activeCount = closures.filter((closure) => closure.active).length;
-  const inactiveCount = closures.length - activeCount;
-  const upcomingCount = closures.filter(
-    (closure) => closure.active && new Date(closure.startedAt) > new Date(),
-  ).length;
-
-  if (isLoading) {
-    return <div className="text-center py-8">Chargement...</div>;
-  }
+  const hasFilters = !!(resourceFilter || activeFilter);
+  const change = (fn: () => void) => { fn(); setPage(0); };
+  const now = Date.now();
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            Fermetures de ressources
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Planifiez les indisponibilités liées à la maintenance, aux
-            événements ou aux exceptions.
-          </p>
-        </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-primary-600 text-white px-4 py-2.5 rounded-xl hover:bg-primary-700 flex items-center justify-center gap-2 shadow-sm"
+    <div className="space-y-5">
+      <ListHeader
+        title="Fermetures"
+        subtitle={isLoading ? undefined : `${total} fermeture${total > 1 ? "s" : ""}: maintenance, événements, exceptions`}
+        action={<ActionButton icon={Plus} onClick={() => { setError(null); setCreating({ ...EMPTY, resourceCode: resourceFilter }); }}>Nouvelle fermeture</ActionButton>}
+      />
+
+      {creating && (
+        <PanelForm
+          title="Nouvelle fermeture"
+          onCancel={() => setCreating(null)}
+          pending={create.isPending}
+          submitLabel="Créer la fermeture"
+          submitDisabled={!creating.resourceCode}
+          error={error}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!creating.startedAt || !creating.endedAt) return setError("Les dates de début et de fin sont obligatoires.");
+            if (new Date(creating.endedAt) <= new Date(creating.startedAt)) return setError("La date de fin doit être postérieure à la date de début.");
+            setError(null);
+            create.mutate();
+          }}
         >
-          <Plus size={18} />
-          Nouvelle fermeture
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-500">Total</p>
-            <CalendarOff size={18} className="text-gray-400" />
+          <p className="text-sm text-gray-500">Pendant cette période, la ressource ne peut plus être réservée.</p>
+          <Field label="Ressource" required>
+            <ResourceAutocomplete selectedCode={creating.resourceCode} onSelect={(r) => setCreating({ ...creating, resourceCode: r?.code || "" })} required />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Début" required>
+              <input type="datetime-local" value={creating.startedAt} onChange={(e) => setCreating({ ...creating, startedAt: e.target.value })} className={FIELD} />
+            </Field>
+            <Field label="Fin" required>
+              <input type="datetime-local" value={creating.endedAt} min={creating.startedAt} onChange={(e) => setCreating({ ...creating, endedAt: e.target.value })} className={FIELD} />
+            </Field>
           </div>
-          <p className="text-2xl font-bold text-gray-900 mt-2">
-            {closures.length}
-          </p>
-        </div>
-        <div className="bg-white rounded-2xl border border-green-100 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-green-700">Actives</p>
-            <Lock size={18} className="text-green-500" />
-          </div>
-          <p className="text-2xl font-bold text-green-700 mt-2">
-            {activeCount}
-          </p>
-        </div>
-        <div className="bg-white rounded-2xl border border-blue-100 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-blue-700">À venir</p>
-            <Clock size={18} className="text-blue-500" />
-          </div>
-          <p className="text-2xl font-bold text-blue-700 mt-2">
-            {upcomingCount}
-          </p>
-        </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-500">Inactives</p>
-            <Unlock size={18} className="text-gray-400" />
-          </div>
-          <p className="text-2xl font-bold text-gray-700 mt-2">
-            {inactiveCount}
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-gray-100 p-3">
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="w-full md:w-80">
-            <ResourceAutocomplete
-              selectedResource={selectedResourceSummary}
-              selectedCode={resourceFilter}
-              onSelect={(resource) => {
-                setSelectedResourceSummary(resource);
-                setResourceFilter(resource?.code || "");
-              }}
-              placeholder="Filtrer par ressource..."
-            />
-          </div>
-          {!resourceFilter && (
-            <div className="flex-1 relative">
-              <Search
-                size={18}
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-              />
-              <input
-                type="text"
-                placeholder="Filtrer par code ressource ou motif..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              />
-            </div>
-          )}
-          {(resourceFilter || search) && (
-            <button
-              onClick={() => {
-                setResourceFilter("");
-                setSelectedResourceSummary(null);
-                setSearch("");
-              }}
-              className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 whitespace-nowrap"
-            >
-              Réinitialiser
-            </button>
-          )}
-        </div>
-      </div>
-
-      {filteredClosures.length === 0 ? (
-        <div className="text-center py-14 bg-white rounded-2xl border border-gray-100">
-          <Calendar size={46} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-600 font-medium">Aucune fermeture trouvée</p>
-          <p className="text-sm text-gray-400 mt-1">
-            Sélectionnez une autre ressource ou créez une fermeture.
-          </p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full border-separate border-spacing-y-2 p-2">
-              <thead>
-                <tr className="text-xs uppercase tracking-wide text-gray-400">
-                  <th className="px-4 py-2 text-left font-semibold">
-                    Ressource
-                  </th>
-                  <th className="px-4 py-2 text-left font-semibold">Période</th>
-                  <th className="px-4 py-2 text-left font-semibold">Motif</th>
-                  <th className="px-4 py-2 text-center font-semibold">Durée</th>
-                  <th className="px-4 py-2 text-center font-semibold">
-                    Statut
-                  </th>
-                  <th className="px-4 py-2 text-right font-semibold">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredClosures.map((closure) => (
-                  <tr
-                    key={closure.id}
-                    className={`group bg-gray-50/60 hover:bg-primary-50/40 transition-colors ${
-                      !closure.active ? "opacity-70" : ""
-                    }`}
-                  >
-                    <td className="px-4 py-4 rounded-l-2xl">
-                      <p className="text-sm font-semibold text-gray-900">
-                        {getResourceName(closure.resourceCode)}
-                      </p>
-                      <p className="text-xs text-gray-400 font-mono mt-0.5">
-                        {closure.resourceCode} · #{closure.id}
-                      </p>
-                    </td>
-                    <td className="px-4 py-4">
-                      <p className="text-sm text-gray-800">
-                        {formatDateTime(closure.startedAt)}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        jusqu’au {formatDateTime(closure.endedAt)}
-                      </p>
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-600 max-w-md">
-                      {closure.reason || "—"}
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-                        {getDurationLabel(closure.startedAt, closure.endedAt)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <button
-                        onClick={() =>
-                          updateActiveMutation.mutate({
-                            id: closure.id,
-                            active: !closure.active,
-                          })
-                        }
-                        disabled={updateActiveMutation.isPending}
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium disabled:opacity-40 ${
-                          closure.active
-                            ? "bg-green-50 text-green-700 hover:bg-green-100"
-                            : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                        }`}
-                        title={closure.active ? "Désactiver" : "Activer"}
-                      >
-                        {closure.active ? "Active" : "Inactive"}
-                      </button>
-                    </td>
-                    <td className="px-4 py-4 rounded-r-2xl">
-                      <div className="flex justify-end gap-1">
-                        <button
-                          onClick={() =>
-                            updateActiveMutation.mutate({
-                              id: closure.id,
-                              active: !closure.active,
-                            })
-                          }
-                          disabled={updateActiveMutation.isPending}
-                          className="p-2 rounded-xl text-gray-600 hover:bg-gray-100 disabled:opacity-40"
-                          title={closure.active ? "Désactiver" : "Activer"}
-                        >
-                          <Power size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(closure.id)}
-                          disabled={deleteMutation.isPending}
-                          className="p-2 rounded-xl text-red-600 hover:bg-red-50 disabled:opacity-40"
-                          title="Supprimer"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+          <Field label="Motif">
+            <input value={creating.reason} onChange={(e) => setCreating({ ...creating, reason: e.target.value })} placeholder="Ex. Maintenance, événement exceptionnel" className={FIELD} />
+          </Field>
+          <CheckField checked={creating.active} onChange={(v) => setCreating({ ...creating, active: v })} label="Fermeture active immédiatement" />
+        </PanelForm>
       )}
 
-      {isModalOpen && (
-        <ModalPortal onClose={() => setIsModalOpen(false)} size="lg">
-          <div className="px-6 pt-6 pb-4">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div className="h-11 w-11 rounded-2xl bg-primary-50 text-primary-600 flex items-center justify-center">
-                  <CalendarOff size={20} />
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex-1">
+          <ResourceAutocomplete
+            selectedResource={selectedResource}
+            selectedCode={resourceFilter}
+            onSelect={(r) => change(() => { setSelectedResource(r); setResourceFilter(r?.code || ""); })}
+            placeholder="Filtrer par ressource"
+          />
+        </div>
+        <FilterButton open={showFilters} active={!!activeFilter} onClick={() => setShowFilters(!showFilters)} />
+      </div>
+      {showFilters && (
+        <FilterPanel canReset={hasFilters} onReset={() => change(() => { setResourceFilter(""); setSelectedResource(null); setActiveFilter(""); })}>
+          <Field label="État">
+            <select value={activeFilter} onChange={(e) => change(() => setActiveFilter(e.target.value))} className={FIELD}>
+              <option value="">Toutes</option>
+              <option value="true">Actives</option>
+              <option value="false">Inactives</option>
+            </select>
+          </Field>
+        </FilterPanel>
+      )}
+
+      {isLoading ? (
+        <ListSkeleton rows={6} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les fermetures." onRetry={() => refetch()} />
+      ) : closures.length === 0 ? (
+        <EmptyState icon={CalendarOff} title="Aucune fermeture" hint={hasFilters ? "Ajustez les filtres." : "Planifiez une fermeture pour bloquer une ressource sur une période."} />
+      ) : (
+        <>
+          <HeadRow cols={COLS}>
+            <span>Ressource</span>
+            <span>Période</span>
+            <span>Motif</span>
+            <span>Durée</span>
+            <span>État</span>
+            <span className="text-right">Actions</span>
+          </HeadRow>
+          <DataCard>
+            {closures.map((c) => {
+              const upcoming = c.active && new Date(c.startedAt).getTime() > now;
+              return (
+                <div key={c.id} className={`rounded-2xl max-lg:mb-2 max-lg:bg-gray-50 ${ROW_HOVER}`}>
+                  <div className={`grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 p-4 ${COLS}`}>
+                    <div className="min-w-0">
+                      <p className="truncate font-mono text-sm font-semibold text-gray-900">{c.resourceCode}</p>
+                      <p className="text-xs text-gray-400">n° {c.id}</p>
+                    </div>
+                    <Cell title="Période" className="max-lg:order-3 max-lg:col-span-2">
+                      <span className="block text-sm text-gray-800">{formatDateTime(c.startedAt)}</span>
+                      <span className="block text-xs text-gray-400">jusqu'au {formatDateTime(c.endedAt)}</span>
+                    </Cell>
+                    <Cell title="Motif" className="max-lg:order-4 max-lg:col-span-2">
+                      <span className="line-clamp-2 text-sm text-gray-600">{c.reason || "Aucun motif"}</span>
+                    </Cell>
+                    <Cell title="Durée" className="max-lg:order-5 max-lg:col-span-2">
+                      <Tag tone="gray">{durationLabel(c.startedAt, c.endedAt)}</Tag>
+                    </Cell>
+                    <div className="flex flex-wrap gap-1.5 max-lg:order-2 max-lg:justify-self-end">
+                      <StatusChip tone={c.active ? (upcoming ? "info" : "success") : "neutral"}>{c.active ? (upcoming ? "À venir" : "Active") : "Inactive"}</StatusChip>
+                    </div>
+                    <div className="flex items-center gap-1 max-lg:order-6 max-lg:col-span-2 lg:justify-end">
+                      <IconButton icon={Power} label={c.active ? "Désactiver" : "Activer"} tone={c.active ? "success" : "neutral"} pending={toggle.isPending && toggle.variables?.id === c.id} onClick={() => toggle.mutate(c)} />
+                      <IconButton
+                        icon={Trash2}
+                        label="Supprimer"
+                        tone="danger"
+                        onClick={() =>
+                          toast.confirm({
+                            message: `Supprimer la fermeture de ${c.resourceCode} ?`,
+                            detail: "La ressource redevient réservable sur cette période.",
+                            confirmLabel: "Supprimer",
+                            pendingLabel: "Suppression",
+                            successMessage: "Fermeture supprimée",
+                            errorMessage: "Suppression impossible",
+                            onConfirm: () => remove.mutateAsync(c.id),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">
-                    Nouvelle fermeture
-                  </h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Créez une période pendant laquelle une ressource ne pourra
-                    pas être réservée.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100"
-              >
-                <X size={20} />
-              </button>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-5">
-            {errorMessage && (
-              <div className="bg-red-50 border border-red-100 text-red-700 px-4 py-3 rounded-xl text-sm">
-                {errorMessage}
-              </div>
-            )}
-
-            <div className="rounded-2xl border border-gray-100 bg-white p-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Ressource *
-                </label>
-                <ResourceAutocomplete
-                  selectedCode={formData.resourceCode}
-                  onSelect={(resource) =>
-                    setFormData({
-                      ...formData,
-                      resourceCode: resource?.code || "",
-                    })
-                  }
-                  placeholder="Rechercher une ressource..."
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Date de début *
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={formData.startedAt}
-                    onChange={(e) =>
-                      setFormData({ ...formData, startedAt: e.target.value })
-                    }
-                    required
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Date de fin *
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={formData.endedAt}
-                    min={formData.startedAt}
-                    onChange={(e) =>
-                      setFormData({ ...formData, endedAt: e.target.value })
-                    }
-                    required
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Motif
-                </label>
-                <input
-                  type="text"
-                  value={formData.reason}
-                  onChange={(e) =>
-                    setFormData({ ...formData, reason: e.target.value })
-                  }
-                  placeholder="ex: Maintenance, événement exceptionnel..."
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                setFormData({ ...formData, active: !formData.active })
-              }
-              className={`w-full rounded-2xl px-4 py-3 flex items-center justify-between transition-colors ${
-                formData.active
-                  ? "bg-green-50 text-green-700"
-                  : "bg-gray-50 text-gray-500"
-              }`}
-            >
-              <span className="flex items-center gap-2 text-sm font-medium">
-                <Lock size={17} />
-                Fermeture active immédiatement
-              </span>
-              <span
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  formData.active ? "bg-green-600" : "bg-gray-300"
-                }`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                    formData.active ? "translate-x-5" : "translate-x-1"
-                  }`}
-                />
-              </span>
-            </button>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                disabled={createMutation.isPending}
-                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-              >
-                Annuler
-              </button>
-              <button
-                type="submit"
-                disabled={createMutation.isPending || !formData.resourceCode}
-                className="flex-1 bg-primary-600 text-white py-2.5 rounded-xl hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {createMutation.isPending ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  "Créer"
-                )}
-              </button>
-            </div>
-          </form>
-        </ModalPortal>
+              );
+            })}
+          </DataCard>
+          <Pagination page={page} totalPages={data?.totalPages ?? 1} total={total} noun="fermeture" onChange={setPage} />
+        </>
       )}
     </div>
   );

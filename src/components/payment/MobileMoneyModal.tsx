@@ -1,10 +1,13 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Loader2, Smartphone, AlertCircle, CheckCircle } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CheckCircle2 } from "lucide-react";
 import { paymentService } from "../../services/payment.service";
-import type { PaymentIntent } from "../../services/payment.service";
-import { ModalPortal } from "../../components/ui/ModalPortal";
+import type { MobileMoneyDeposit, PaymentIntent } from "../../services/payment.service";
 import { useAuth } from "../../contexts/AuthContext";
+import { ActionButton, Detail, Field, PanelForm } from "../subscription/kit";
+import { FIELD_SOFT, apiMessage, formatMoney } from "../subscription/kitUtils";
+import { Skeleton } from "../ui/Skeleton";
+import { currencyLabel } from "./paymentUtils";
 
 interface MobileMoneyModalProps {
   isOpen: boolean;
@@ -13,6 +16,10 @@ interface MobileMoneyModalProps {
   onPaymentSuccess?: (transactionNumber: string) => void;
 }
 
+/**
+ * Paiement Mobile Money. Même nom et mêmes props qu'avant, mais ce n'est plus une modale :
+ * le formulaire s'ouvre en panneau dans la page de l'intention.
+ */
 export const MobileMoneyModal: React.FC<MobileMoneyModalProps> = ({
   isOpen,
   onClose,
@@ -26,7 +33,7 @@ export const MobileMoneyModal: React.FC<MobileMoneyModalProps> = ({
   const [correspondent, setCorrespondent] = useState("");
   const [amount, setAmount] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<MobileMoneyDeposit | null>(null);
 
   const { data: providers = [], isLoading: providersLoading } = useQuery({
     queryKey: ["mobile-money-providers"],
@@ -47,25 +54,23 @@ export const MobileMoneyModal: React.FC<MobileMoneyModalProps> = ({
       setResult(data);
       setError(null);
       queryClient.invalidateQueries({ queryKey: ["payment-intents"] });
+      queryClient.invalidateQueries({ queryKey: ["payment-intent", intent.intentNumber] });
+      queryClient.invalidateQueries({ queryKey: ["payment-transactions", intent.intentNumber] });
       if (data.transactionNumber && onPaymentSuccess) {
         onPaymentSuccess(data.transactionNumber);
       }
     },
-    onError: (err: any) => {
-      setError(
-        err?.response?.data?.message ||
-          "Erreur lors de l'initiation du paiement.",
-      );
-    },
+    onError: (err: unknown) => setError(apiMessage(err, "Erreur lors de l'initiation du paiement.")),
   });
 
-  const handleSubmit = () => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     if (!phoneNumber.trim()) {
       setError("Le numéro de téléphone est obligatoire.");
       return;
     }
     if (!correspondent) {
-      setError("Veuillez sélectionner un provider.");
+      setError("Veuillez sélectionner un fournisseur.");
       return;
     }
     setError(null);
@@ -74,186 +79,85 @@ export const MobileMoneyModal: React.FC<MobileMoneyModalProps> = ({
 
   if (!isOpen) return null;
 
+  if (result) {
+    return (
+      <div className="mb-4 rounded-[1.5rem] bg-white p-4 shadow-sm ring-2 ring-emerald-200 sm:p-5">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+            <CheckCircle2 size={18} />
+          </span>
+          <div>
+            <h4 className="text-base font-bold text-gray-950">Paiement initié</h4>
+            {result.customerMessage && <p className="text-sm text-gray-500">{result.customerMessage}</p>}
+          </div>
+        </div>
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Detail label="Statut">{result.status}</Detail>
+          <Detail label="Fournisseur">{result.provider}</Detail>
+          <Detail label="Montant">{formatMoney(result.amount, currencyLabel(result.currency))}</Detail>
+          <Detail label="Transaction" mono>{result.transactionNumber}</Detail>
+          <Detail label="Identifiant du dépôt PawaPay" mono wide>{result.depositId}</Detail>
+        </dl>
+        <div className="mt-5 flex justify-end">
+          <ActionButton onClick={onClose}>Fermer</ActionButton>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <ModalPortal onClose={onClose}>
-      <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
-        <h3 className="text-xl font-bold flex items-center gap-2">
-          <Smartphone size={20} />
-          Paiement Mobile Money
-        </h3>
-        <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
-          <X size={20} />
-        </button>
+    <PanelForm
+      title="Paiement Mobile Money"
+      onSubmit={handleSubmit}
+      onCancel={onClose}
+      pending={depositMutation.isPending}
+      submitLabel="Initier le paiement"
+      submitDisabled={!phoneNumber.trim() || !correspondent}
+      error={error}
+    >
+      <p className="text-sm text-gray-500">
+        Intention <span className="font-mono font-semibold text-gray-800">{intent.intentNumber}</span> ·{" "}
+        <b className="text-gray-950">{formatMoney(intent.amount, currencyLabel(intent.currency))}</b>
+      </p>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <Field label="Fournisseur" required>
+          {providersLoading ? (
+            <Skeleton className="h-11 w-full rounded-2xl" />
+          ) : (
+            <select value={correspondent} onChange={(e) => setCorrespondent(e.target.value)} className={FIELD_SOFT}>
+              <option value="">Choisir</option>
+              {providers.map((p) => (
+                <option key={p.code} value={p.code}>
+                  {p.displayName} ({p.countryCode})
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+        <Field label="Numéro de téléphone" required hint="Format international sans « + »">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
+            placeholder="242061135836"
+            className={`${FIELD_SOFT} font-mono`}
+          />
+        </Field>
+        <Field label="Montant" hint="Laissez vide pour le solde restant de l'intention">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={amount === 0 ? "" : amount}
+            onChange={(e) => {
+              const v = e.target.value.replace(/\D/g, "");
+              setAmount(v === "" ? 0 : parseInt(v, 10));
+            }}
+            placeholder={`Total : ${intent.amount.toLocaleString("fr-FR")}`}
+            className={FIELD_SOFT}
+          />
+        </Field>
       </div>
-
-      <div className="p-6 space-y-4">
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex items-start gap-2">
-            <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-            {error}
-          </div>
-        )}
-
-        {result ? (
-          <div className="space-y-4">
-            <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-lg text-sm">
-              <div className="flex items-center gap-2">
-                <CheckCircle size={16} className="text-green-600" />
-                <span>Paiement initié avec succès</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500">Statut</p>
-                <p className="font-medium text-yellow-600">{result.status}</p>
-              </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500">Provider</p>
-                <p className="font-medium">{result.provider}</p>
-              </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500">Montant</p>
-                <p className="font-bold">
-                  {result.amount?.toLocaleString("fr-FR")} {result.currency}
-                </p>
-              </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500">Transaction</p>
-                <p className="font-mono text-sm">{result.transactionNumber}</p>
-              </div>
-              {result.depositId && (
-                <div className="p-3 bg-gray-50 rounded-lg col-span-2">
-                  <p className="text-xs text-gray-500">ID Dépôt PawaPay</p>
-                  <p className="font-mono text-xs">{result.depositId}</p>
-                </div>
-              )}
-            </div>
-
-            {result.customerMessage && (
-              <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
-                <p className="text-xs text-blue-500">Message</p>
-                <p>{result.customerMessage}</p>
-              </div>
-            )}
-
-            <button
-              onClick={onClose}
-              className="w-full bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700"
-            >
-              Fermer
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="bg-gray-50 p-3 rounded-lg text-sm">
-              <p>
-                Intention :{" "}
-                <span className="font-mono font-medium">
-                  {intent.intentNumber}
-                </span>
-              </p>
-              <p>
-                Montant :{" "}
-                <span className="font-bold">
-                  {intent.amount.toLocaleString("fr-FR")} {intent.currency}
-                </span>
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Provider *
-              </label>
-              {providersLoading ? (
-                <div className="text-center py-2">
-                  <Loader2 size={14} className="animate-spin mx-auto" />
-                </div>
-              ) : (
-                <select
-                  value={correspondent}
-                  onChange={(e) => setCorrespondent(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                >
-                  <option value="">Sélectionner un provider</option>
-                  {providers.map((p) => (
-                    <option key={p.code} value={p.code}>
-                      {p.displayName} ({p.countryCode})
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Numéro de téléphone *
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={phoneNumber}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, "");
-                  setPhoneNumber(val);
-                }}
-                placeholder="242061135836"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg font-mono"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Format international sans "+"
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Montant (laisser vide = montant total)
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={amount === 0 ? "" : amount}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, "");
-                  setAmount(val === "" ? 0 : parseInt(val));
-                }}
-                placeholder={`Total : ${intent.amount.toLocaleString("fr-FR")} ${intent.currency}`}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Si vide, le backend utilisera le solde restant de l'intention
-              </p>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={onClose}
-                disabled={depositMutation.isPending}
-                className="flex-1 px-4 py-2 border rounded-lg text-gray-700 disabled:opacity-50"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={
-                  depositMutation.isPending ||
-                  !phoneNumber.trim() ||
-                  !correspondent
-                }
-                className="flex-1 bg-yellow-600 text-white py-2 rounded-lg hover:bg-yellow-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {depositMutation.isPending ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <>
-                    <Smartphone size={16} /> Initier le paiement
-                  </>
-                )}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </ModalPortal>
+    </PanelForm>
   );
 };

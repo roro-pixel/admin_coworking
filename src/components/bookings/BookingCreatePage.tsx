@@ -757,6 +757,9 @@ export const BookingCreatePage: React.FC = () => {
                           ).getDate();
                           const today = new Date();
                           today.setHours(0, 0, 0, 0);
+                          // L'équipe peut saisir après coup jusqu'à 31 jours en arrière
+                          const earliest = new Date(today);
+                          earliest.setDate(earliest.getDate() - 31);
                           const selectedDate = formData.startedAt
                             ? formData.startedAt.slice(0, 10)
                             : "";
@@ -771,7 +774,7 @@ export const BookingCreatePage: React.FC = () => {
                               day,
                             );
                             const isSunday = date.getDay() === 0;
-                            const isPast = date < today;
+                            const isPast = date < earliest;
                             const dateStr = `${calendarNav.year}-${String(calendarNav.month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                             const isSelected = dateStr === selectedDate;
                             const isToday = date.getTime() === today.getTime();
@@ -1041,6 +1044,10 @@ export const BookingCreatePage: React.FC = () => {
                     {availabilityResult.estimatedAmount.toLocaleString("fr-FR")}{" "}
                     {availabilityResult.currency}
                   </p>
+                  {availabilityResult.message &&
+                    availabilityResult.message !== "Disponible" && (
+                      <p>{availabilityResult.message}</p>
+                    )}
                 </div>
               )}
               {!availabilityResult.available && availabilityResult.message && (

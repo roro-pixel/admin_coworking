@@ -1,257 +1,168 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Plus,
-  Edit,
-  Trash2,
-  Search,
-  Users,
-  Eye,
-  EyeOff,
-  CheckCircle2,
-  Archive,
-} from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, Eye, EyeOff, Layers, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { resourceService } from "../../../services/resource.service";
 import type { ResourceGroupResponse } from "../../../services/resource.service";
-import { ResourceGroupFormModal } from "./ResourceGroupFormModal";
+import { ActionButton, CheckField, DataCard, EmptyState, ErrorBlock, Field, HeadRow, IconButton, ListHeader, PanelForm, Pagination, SearchField, StatusChip } from "../../../components/subscription/kit";
+import { FIELD, ROW_HOVER, apiMessage } from "../../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../../components/ui/Skeleton";
+import { toast } from "../../../components/ui/toastStore";
+import { Cell, Fact, useDebounced } from "../../../components/resources/resKit";
+
+const COLS = "lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.5fr)_7rem_7rem_auto]";
+const SIZE = 15;
+const EMPTY = { name: "", description: "", portalVisible: true, active: true };
+type Form = typeof EMPTY;
 
 export const ResourceGroupsList: React.FC = () => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingGroup, setEditingGroup] =
-    useState<ResourceGroupResponse | null>(null);
+  const [page, setPage] = useState(0);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ code: string | null; form: Form } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const q = useDebounced(search.trim());
 
-  const { data: groupsData, isLoading } = useQuery({
-    queryKey: ["resource-groups"],
-    queryFn: () => resourceService.getResourceGroups(),
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["resource-groups", page, q],
+    queryFn: () => (q ? resourceService.searchResourceGroups(q, { page, size: SIZE }) : resourceService.getResourceGroups({ page, size: SIZE })),
   });
+  const groups = data?.content ?? [];
+  const total = data?.totalElements ?? 0;
 
-  const deleteMutation = useMutation({
-    mutationFn: (code: string) => resourceService.deleteResourceGroup(code),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resource-groups"] });
-      queryClient.invalidateQueries({ queryKey: ["resource-groups-list"] });
+  const invalidate = () => Promise.all([queryClient.invalidateQueries({ queryKey: ["resource-groups"] }), queryClient.invalidateQueries({ queryKey: ["resource-groups-list"] })]);
+  const save = useMutation({
+    mutationFn: async () => {
+      const f = editing!.form;
+      const body = { name: f.name.trim(), description: f.description.trim() || undefined, portalVisible: f.portalVisible, active: f.active };
+      if (editing!.code === null) await resourceService.createResourceGroup(body);
+      else await resourceService.updateResourceGroup(editing!.code, body);
     },
-    onError: () =>
-      alert(
-        "Erreur lors de la suppression. Ce groupe est peut-être utilisé par des ressources.",
-      ),
+    onSuccess: async () => {
+      toast.success(editing?.code === null ? "Groupe créé" : "Groupe modifié");
+      await invalidate();
+      setEditing(null);
+      setError(null);
+    },
+    onError: (e) => setError(apiMessage(e, "Enregistrement impossible")),
   });
+  const toggle = useMutation({
+    mutationFn: (g: ResourceGroupResponse) => resourceService.updateResourceGroup(g.code, { name: g.name, description: g.description ?? undefined, portalVisible: g.portalVisible, active: !g.active }),
+    onSuccess: invalidate,
+    onError: (e) => toast.error(apiMessage(e, "Changement d'état impossible")),
+  });
+  const remove = useMutation({ mutationFn: (code: string) => resourceService.deleteResourceGroup(code), onSuccess: invalidate });
 
-  const groups: ResourceGroupResponse[] = groupsData?.content || [];
-
-  const filteredGroups = search
-    ? groups.filter(
-        (g) =>
-          g.name.toLowerCase().includes(search.toLowerCase()) ||
-          g.code.toLowerCase().includes(search.toLowerCase()),
-      )
-    : groups;
-
-  const activeCount = groups.filter((group) => group.active).length;
-  const portalVisibleCount = groups.filter(
-    (group) => group.portalVisible,
-  ).length;
-
-  const handleDelete = (code: string) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer ce groupe ?")) {
-      deleteMutation.mutate(code);
-    }
-  };
-
-  if (isLoading) {
-    return <div className="text-center py-8">Chargement...</div>;
-  }
+  const f = editing?.form;
+  const set = (patch: Partial<Form>) => setEditing((p) => (p ? { ...p, form: { ...p.form, ...patch } } : p));
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            Groupes de ressources
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Structurez vos ressources par zones, équipes, bâtiments ou espaces
-            métier.
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            setEditingGroup(null);
-            setIsModalOpen(true);
-          }}
-          className="bg-primary-600 text-white px-4 py-2.5 rounded-xl hover:bg-primary-700 flex items-center justify-center gap-2 shadow-sm"
+    <div className="space-y-5">
+      <ListHeader
+        title="Groupes de ressources"
+        subtitle={isLoading ? undefined : `${total} groupe${total > 1 ? "s" : ""}`}
+        action={<ActionButton icon={Plus} onClick={() => { setError(null); setEditing({ code: null, form: { ...EMPTY } }); }}>Nouveau groupe</ActionButton>}
+      />
+
+      {editing && f && (
+        <PanelForm
+          title={editing.code === null ? "Nouveau groupe" : `Modifier ${editing.code}`}
+          onCancel={() => setEditing(null)}
+          pending={save.isPending}
+          submitLabel={editing.code === null ? "Créer" : "Enregistrer"}
+          submitDisabled={!f.name.trim()}
+          error={error}
+          onSubmit={(e) => { e.preventDefault(); save.mutate(); }}
         >
-          <Plus size={18} />
-          Nouveau groupe
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-500">Total</p>
-            <Users size={18} className="text-gray-400" />
+          <Field label="Nom" required>
+            <input value={f.name} onChange={(e) => set({ name: e.target.value })} className={FIELD} autoFocus />
+          </Field>
+          <Field label="Description" hint="Zone, bâtiment, équipe ou espace métier.">
+            <textarea value={f.description} onChange={(e) => set({ description: e.target.value })} rows={2} className={`${FIELD} resize-none`} />
+          </Field>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <CheckField checked={f.portalVisible} onChange={(v) => set({ portalVisible: v })} label="Visible sur le portail" />
+            <CheckField checked={f.active} onChange={(v) => set({ active: v })} label="Groupe actif" />
           </div>
-          <p className="text-2xl font-bold text-gray-900 mt-2">
-            {groups.length}
-          </p>
-        </div>
-        <div className="bg-white rounded-2xl border border-green-100 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-green-700">Actifs</p>
-            <CheckCircle2 size={18} className="text-green-500" />
-          </div>
-          <p className="text-2xl font-bold text-green-700 mt-2">
-            {activeCount}
-          </p>
-        </div>
-        <div className="bg-white rounded-2xl border border-blue-100 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-blue-700">Visibles portail</p>
-            <Eye size={18} className="text-blue-500" />
-          </div>
-          <p className="text-2xl font-bold text-blue-700 mt-2">
-            {portalVisibleCount}
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-gray-100 p-3">
-        <div className="relative">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Rechercher par nom ou code..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          />
-        </div>
-      </div>
-
-      {filteredGroups.length === 0 ? (
-        <div className="text-center py-14 bg-white rounded-2xl border border-gray-100">
-          <Archive size={46} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-600 font-medium">Aucun groupe trouvé</p>
-          <p className="text-sm text-gray-400 mt-1">
-            Modifiez votre recherche ou créez un nouveau groupe.
-          </p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full border-separate border-spacing-y-2 p-2">
-              <thead>
-                <tr className="text-xs uppercase tracking-wide text-gray-400">
-                  <th className="px-4 py-2 text-left font-semibold">Groupe</th>
-                  <th className="px-4 py-2 text-left font-semibold">
-                    Description
-                  </th>
-                  <th className="px-4 py-2 text-center font-semibold">
-                    Portail
-                  </th>
-                  <th className="px-4 py-2 text-center font-semibold">
-                    Statut
-                  </th>
-                  <th className="px-4 py-2 text-right font-semibold">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredGroups.map((group) => (
-                  <tr
-                    key={group.code}
-                    className={`group bg-gray-50/60 hover:bg-primary-50/40 transition-colors ${
-                      !group.active ? "opacity-70" : ""
-                    }`}
-                  >
-                    <td className="px-4 py-4 rounded-l-2xl">
-                      <p className="text-sm font-semibold text-gray-900">
-                        {group.name}
-                      </p>
-                      <p className="text-xs text-gray-400 font-mono mt-0.5">
-                        {group.code}
-                      </p>
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-600 max-w-xl">
-                      {group.description || "—"}
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
-                          group.portalVisible
-                            ? "bg-blue-50 text-blue-700"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {group.portalVisible ? (
-                          <Eye size={12} />
-                        ) : (
-                          <EyeOff size={12} />
-                        )}
-                        {group.portalVisible ? "Visible" : "Masqué"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                          group.active
-                            ? "bg-green-50 text-green-700"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {group.active ? "Actif" : "Inactif"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 rounded-r-2xl">
-                      <div className="flex justify-end gap-1">
-                        <button
-                          onClick={() => {
-                            setEditingGroup(group);
-                            setIsModalOpen(true);
-                          }}
-                          className="p-2 rounded-xl text-blue-600 hover:bg-blue-50"
-                          title="Modifier"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(group.code)}
-                          disabled={deleteMutation.isPending}
-                          className="p-2 rounded-xl text-red-600 hover:bg-red-50 disabled:opacity-40"
-                          title="Supprimer"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        </PanelForm>
       )}
 
-      <ResourceGroupFormModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingGroup(null);
-        }}
-        editingGroup={editingGroup}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["resource-groups"] });
-          setIsModalOpen(false);
-          setEditingGroup(null);
-        }}
-      />
+      <SearchField value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Nom ou code du groupe" />
+
+      {isLoading ? (
+        <ListSkeleton rows={6} />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les groupes." onRetry={() => refetch()} />
+      ) : groups.length === 0 ? (
+        <EmptyState icon={Layers} title="Aucun groupe" hint={q ? "Aucun résultat pour cette recherche." : "Créez un groupe pour organiser vos ressources par bâtiment ou par zone."} />
+      ) : (
+        <>
+          <HeadRow cols={COLS}>
+            <span>Groupe</span>
+            <span>Description</span>
+            <span>Portail</span>
+            <span>État</span>
+            <span className="text-right">Actions</span>
+          </HeadRow>
+          <DataCard>
+            {groups.map((g) => {
+              const open = expanded === g.code;
+              return (
+                <div key={g.code} className={`rounded-2xl max-lg:mb-2 max-lg:bg-gray-50 ${ROW_HOVER}`}>
+                  <div onClick={() => setExpanded(open ? null : g.code)} className={`grid cursor-pointer grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 p-4 ${COLS}`}>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <ChevronDown size={16} className={`shrink-0 text-gray-400 transition ${open ? "" : "-rotate-90"}`} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-900">{g.name}</p>
+                        <p className="font-mono text-xs text-gray-400">{g.code}</p>
+                      </div>
+                    </div>
+                    <Cell title="Description" className="max-lg:order-4 max-lg:col-span-2">
+                      <span className="line-clamp-1 text-sm text-gray-600">{g.description || "Sans description"}</span>
+                    </Cell>
+                    <Cell title="Portail" className="max-lg:order-3 max-lg:col-span-2">
+                      <span className="inline-flex items-center gap-1.5 text-sm text-gray-600">
+                        {g.portalVisible ? <Eye size={14} className="text-gray-400" /> : <EyeOff size={14} className="text-gray-400" />}
+                        {g.portalVisible ? "Visible" : "Masqué"}
+                      </span>
+                    </Cell>
+                    <div className="max-lg:order-2 max-lg:justify-self-end">
+                      <StatusChip tone={g.active ? "success" : "neutral"}>{g.active ? "Actif" : "Inactif"}</StatusChip>
+                    </div>
+                    <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 max-lg:order-5 max-lg:col-span-2 lg:justify-end">
+                      <IconButton icon={Power} label={g.active ? "Désactiver" : "Activer"} tone={g.active ? "success" : "neutral"} pending={toggle.isPending && toggle.variables?.code === g.code} onClick={() => toggle.mutate(g)} />
+                      <IconButton icon={Pencil} label="Modifier" onClick={() => { setError(null); setEditing({ code: g.code, form: { name: g.name, description: g.description ?? "", portalVisible: g.portalVisible, active: g.active } }); }} />
+                      <IconButton
+                        icon={Trash2}
+                        label="Supprimer"
+                        tone="danger"
+                        onClick={() =>
+                          toast.confirm({
+                            message: `Supprimer le groupe « ${g.name} » ?`,
+                            detail: "La suppression échoue si des ressources appartiennent à ce groupe.",
+                            confirmLabel: "Supprimer",
+                            pendingLabel: "Suppression",
+                            successMessage: "Groupe supprimé",
+                            errorMessage: "Suppression impossible : le groupe est probablement utilisé",
+                            onConfirm: () => remove.mutateAsync(g.code),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                  {open && (
+                    <div className="grid gap-3 rounded-2xl bg-gray-50 p-3 sm:grid-cols-2 lg:mx-3 lg:mb-3">
+                      <Fact title="Code"><span className="font-mono">{g.code}</span></Fact>
+                      <Fact title="Description">{g.description || "Aucune"}</Fact>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </DataCard>
+          <Pagination page={page} totalPages={data?.totalPages ?? 1} total={total} noun="groupe" onChange={setPage} />
+        </>
+      )}
     </div>
   );
 };

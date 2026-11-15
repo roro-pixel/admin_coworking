@@ -1,846 +1,342 @@
 import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  CalendarDays,
-  CheckCircle,
-  Clock,
-  Loader2,
-  Lock,
-  RefreshCw,
-  Search,
-  Unlock,
-  Users,
-  XCircle,
-} from "lucide-react";
-import { resourceService } from "../../../services/resource.service";
-import type {
-  AdminCalendarSlot,
-  OccupancyLevel,
-  ResourceBookingUnit,
-  ResourceSummaryResponse,
-} from "../../../services/resource.service";
+import { Calculator, CalendarDays, DoorOpen, Lock, Plus, RefreshCw, Search, Unlock } from "lucide-react";
+import { resourceService, SLOT_DURATION_OPTIONS } from "../../../services/resource.service";
+import type { AdminCalendarSlot, ResourceBookingUnit, ResourceSummaryResponse, SlotDurationMinutes } from "../../../services/resource.service";
+import { ActionButton, CheckField, DataCard, EmptyState, ErrorBlock, Field, ListHeader, PanelForm, Pagination, Section } from "../../../components/subscription/kit";
+import { FIELD, apiMessage, formatDateTime, formatMoney } from "../../../components/subscription/kitUtils";
+import { Skeleton } from "../../../components/ui/Skeleton";
+import { toast } from "../../../components/ui/toastStore";
 import { ResourceAutocomplete } from "../../../components/resources/ResourceAutocomplete";
+import { ChartCard, ChartSkeleton, ColumnChart, DonutBreakdown, KpiRow, KpiRowSkeleton, BarBreakdown, NoData } from "../../../components/operations/OpsCharts";
+import type { Slice } from "../../../components/operations/opsChartData";
+import { UNIT_LABEL, UNITS, lastDayOf, usePaged } from "../../../components/resources/resKit";
 
-const inputClass =
-  "w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100";
-const primaryBtn =
-  "inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50";
-const softBtn =
-  "inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50";
-
-const bookingUnits: ResourceBookingUnit[] = [
-  "HOUR",
-  "HALF_DAY",
-  "DAY",
-  "WEEK",
-  "MONTH",
+const LEVELS: { key: string; label: string; color: string }[] = [
+  { key: "FREE", label: "Libre", color: "#16a34a" },
+  { key: "PARTIALLY_OCCUPIED", label: "Partiel", color: "#eab308" },
+  { key: "HIGHLY_OCCUPIED", label: "Très occupé", color: "#f97316" },
+  { key: "FULL", label: "Complet", color: "#dc2626" },
 ];
-const occupancyLabel: Record<string, string> = {
-  FREE: "Libre",
-  PARTIALLY_OCCUPIED: "Partiel",
-  HIGHLY_OCCUPIED: "Très occupé",
-  FULL: "Complet",
-};
+const PINK = "#e6007e";
 
-const occupancyClass: Record<string, string> = {
-  FREE: "bg-green-50 text-green-700 ring-green-100",
-  PARTIALLY_OCCUPIED: "bg-yellow-50 text-yellow-700 ring-yellow-100",
-  HIGHLY_OCCUPIED: "bg-orange-50 text-orange-700 ring-orange-100",
-  FULL: "bg-red-50 text-red-700 ring-red-100",
-};
-
-const SectionCard: React.FC<{
-  title: string;
-  description: string;
-  icon: React.ElementType;
-  children: React.ReactNode;
-}> = ({ title, description, icon: Icon, children }) => (
-  <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
-    <div className="mb-5 flex items-start gap-3">
-      <div className="rounded-2xl bg-primary-50 p-3 text-primary-600">
-        <Icon size={20} />
-      </div>
-      <div>
-        <h3 className="text-lg font-semibold text-gray-950">{title}</h3>
-        <p className="mt-1 text-sm text-gray-500">{description}</p>
-      </div>
-    </div>
-    {children}
-  </section>
-);
-
-const toDate = (month: string, end = false) => {
-  const [year, rawMonth] = month.split("-").map(Number);
-  const day = end ? new Date(year, rawMonth, 0).getDate() : 1;
-  return `${month}-${String(day).padStart(2, "0")}`;
-};
-
-const formatDateTime = (value?: string) =>
-  value
-    ? new Date(value).toLocaleString("fr-FR", {
-        dateStyle: "short",
-        timeStyle: "short",
-      })
-    : "—";
+type Op = { mode: "reserve" | "release"; slotId: string; quantity: number };
 
 export const ResourcePlanningAdminPage: React.FC = () => {
   const queryClient = useQueryClient();
-  const [selectedResource, setSelectedResource] =
-    useState<ResourceSummaryResponse | null>(null);
+  const [summary, setSummary] = useState<ResourceSummaryResponse | null>(null);
   const [resourceCode, setResourceCode] = useState("");
-  const [month, setMonth] = useState(() =>
-    new Date().toISOString().slice(0, 7),
-  );
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
 
-  const [remainingForm, setRemainingForm] = useState({
-    from: "",
-    to: "",
-    durationMinutes: 60,
-  });
-  const [availabilityForm, setAvailabilityForm] = useState({
-    startedAt: "",
-    endedAt: "",
-    slotDurationMinutes: 60,
-    totalCapacity: 1,
-    active: true,
-  });
-  const [slotActionForm, setSlotActionForm] = useState({ id: "", quantity: 1 });
-  const [quoteForm, setQuoteForm] = useState({
-    bookingUnit: "HOUR" as ResourceBookingUnit,
-    startedAt: "",
-    endedAt: "",
-  });
+  const [gen, setGen] = useState<{ startedAt: string; endedAt: string; capacity: number; active: boolean; duration?: SlotDurationMinutes } | null>(null);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [op, setOp] = useState<Op | null>(null);
+  const [opError, setOpError] = useState<string | null>(null);
+  const [remaining, setRemaining] = useState({ from: "", to: "", durationMinutes: 60 });
+  const [quote, setQuote] = useState({ bookingUnit: "HOUR" as ResourceBookingUnit, startedAt: "", endedAt: "" });
 
-  const fromDate = toDate(month, false);
-  const toDateValue = toDate(month, true);
+  const fromDate = `${month}-01`;
+  const toDate = lastDayOf(month);
 
-  const adminCalendarQuery = useQuery({
+  const adminQuery = useQuery({
     queryKey: ["resource-admin-calendar", resourceCode, month],
-    queryFn: () =>
-      resourceService.getAdminCalendar(resourceCode, {
-        fromDate,
-        toDate: toDateValue,
-      }),
+    queryFn: () => resourceService.getAdminCalendar(resourceCode, { fromDate, toDate }),
     enabled: !!resourceCode,
   });
-
-  const publicCalendarQuery = useQuery({
+  const publicQuery = useQuery({
     queryKey: ["resource-public-calendar", resourceCode, month],
-    queryFn: () =>
-      resourceService.getPublicCalendar(resourceCode, {
-        fromDate,
-        toDate: toDateValue,
-      }),
+    queryFn: () => resourceService.getPublicCalendar(resourceCode, { fromDate, toDate }),
     enabled: !!resourceCode,
   });
-
   const occupiedQuery = useQuery({
     queryKey: ["resource-occupied-slots", resourceCode, month],
-    queryFn: () =>
-      resourceService.getOccupiedSlots({
-        resourceCode: resourceCode || undefined,
-        from: `${fromDate}T00:00:00`,
-        to: `${toDateValue}T23:59:59`,
-        size: 200,
-      }),
+    queryFn: () => resourceService.getOccupiedSlots({ resourceCode: resourceCode || undefined, from: `${fromDate}T00:00:00`, to: `${toDate}T23:59:59`, size: 200 }),
     enabled: !!resourceCode,
   });
-
-  const groupedAvailabilityQuery = useQuery({
+  const groupedQuery = useQuery({
     queryKey: ["resource-availability-grouped", month],
-    queryFn: () =>
-      resourceService.getAvailabilitiesGrouped({
-        from: `${fromDate}T00:00:00`,
-        to: `${toDateValue}T23:59:59`,
-        active: true,
-      }),
+    queryFn: () => resourceService.getAvailabilitiesGrouped({ from: `${fromDate}T00:00:00`, to: `${toDate}T23:59:59`, active: true }),
   });
-
+  // Créneaux réels (avec identifiant) pour choisir quoi réserver ou libérer
+  const slotsQuery = useQuery({
+    queryKey: ["resource-availabilities", resourceCode, month],
+    queryFn: () => resourceService.getAvailabilities({ resourceCode, from: `${fromDate}T00:00:00`, to: `${toDate}T23:59:59`, size: 500, sort: "startedAt,asc" }),
+    enabled: !!resourceCode,
+  });
   const remainingQuery = useQuery({
-    queryKey: [
-      "resource-remaining-slots",
-      resourceCode,
-      remainingForm.from,
-      remainingForm.to,
-      remainingForm.durationMinutes,
-    ],
-    queryFn: () =>
-      resourceService.searchRemainingSlots({
-        resourceCode,
-        from: remainingForm.from,
-        to: remainingForm.to,
-        durationMinutes: remainingForm.durationMinutes,
-      }),
+    queryKey: ["resource-remaining-slots", resourceCode, remaining.from, remaining.to, remaining.durationMinutes],
+    queryFn: () => resourceService.searchRemainingSlots({ resourceCode, from: remaining.from, to: remaining.to, durationMinutes: remaining.durationMinutes }),
     enabled: false,
   });
-
-
   const quoteQuery = useQuery({
-    queryKey: ["resource-price-quote", resourceCode, quoteForm],
-    queryFn: () =>
-      resourceService.quotePrice({
-        resourceCode,
-        bookingUnit: quoteForm.bookingUnit,
-        startedAt: quoteForm.startedAt,
-        endedAt: quoteForm.endedAt,
-      }),
+    queryKey: ["resource-price-quote", resourceCode, quote],
+    queryFn: () => resourceService.quotePrice({ resourceCode, bookingUnit: quote.bookingUnit, startedAt: quote.startedAt, endedAt: quote.endedAt }),
     enabled: false,
   });
 
   const adminSlots: AdminCalendarSlot[] = useMemo(() => {
-    const data: any = adminCalendarQuery.data;
+    const data: any = adminQuery.data;
     if (Array.isArray(data?.slots)) return data.slots;
-    if (Array.isArray(data?.days))
-      return data.days.flatMap((day: any) => day.slots || []);
+    if (Array.isArray(data?.days)) return data.days.flatMap((d: any) => d.slots || []);
     return [];
-  }, [adminCalendarQuery.data]);
-
-  const days = publicCalendarQuery.data?.days || [];
-  const occupied = occupiedQuery.data?.content || [];
-  const grouped = groupedAvailabilityQuery.data || [];
+  }, [adminQuery.data]);
+  const days = publicQuery.data?.days || [];
+  const occupied: any[] = occupiedQuery.data?.content || [];
+  const grouped = groupedQuery.data || [];
+  const slots = slotsQuery.data?.content ?? [];
+  const occPaged = usePaged(occupied, 8);
 
   const stats = useMemo(() => {
-    const total = adminSlots.length;
-    const full = adminSlots.filter(
-      (s) => s.occupancyLevel === "FULL" || !s.available,
-    ).length;
-    const available = adminSlots.filter((s) => s.available).length;
-    const occupiedSlots = occupied.length;
-    return { total, full, available, occupiedSlots };
-  }, [adminSlots, occupied.length]);
+    const totalCap = adminSlots.reduce((a, s) => a + s.totalCapacity, 0);
+    const left = adminSlots.reduce((a, s) => a + s.remainingCapacity, 0);
+    return { totalCap, left, booked: totalCap - left, rate: totalCap > 0 ? Math.round(((totalCap - left) / totalCap) * 100) : 0 };
+  }, [adminSlots]);
 
-  const success = (text: string) => {
-    setMessage(text);
-    setError(null);
-  };
-  const fail = (e: any, fallback: string) => {
-    setError(e?.response?.data?.message || e?.message || fallback);
-    setMessage(null);
-  };
+  const levelSlices: Slice[] = LEVELS.map((l) => ({
+    ...l,
+    value: adminSlots.filter((s) => (s.occupancyLevel || (s.available ? "FREE" : "FULL")) === l.key).length,
+  })).filter((s) => s.value > 0);
 
-  const createAvailabilityMutation = useMutation({
-    mutationFn: () =>
-      resourceService.createAvailability({
-        resourceCode,
-        startedAt: availabilityForm.startedAt,
-        endedAt: availabilityForm.endedAt,
-        slotDurationMinutes: Number(availabilityForm.slotDurationMinutes) || 60,
-        totalCapacity: Number(availabilityForm.totalCapacity) || 1,
-        active: availabilityForm.active,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resource-admin-calendar"] });
-      queryClient.invalidateQueries({ queryKey: ["resource-public-calendar"] });
-      queryClient.invalidateQueries({
-        queryKey: ["resource-availability-grouped"],
-      });
-      setAvailabilityForm({
-        startedAt: "",
-        endedAt: "",
-        slotDurationMinutes: 60,
-        totalCapacity: 1,
-        active: true,
-      });
-      success("Créneau créé.");
-    },
-    onError: (e) => fail(e, "Erreur création disponibilité."),
-  });
+  const perDay: Slice[] = days.map((d) => ({
+    key: d.date,
+    label: [1, 5, 10, 15, 20, 25, 30].includes(new Date(d.date).getDate()) ? String(new Date(d.date).getDate()) : "",
+    value: d.totalCapacity - d.remainingCapacity,
+    color: PINK,
+  }));
 
-  const reserveMutation = useMutation({
-    mutationFn: () =>
-      resourceService.reserveAvailabilitySlot(
-        Number(slotActionForm.id),
-        Number(slotActionForm.quantity) || 1,
+  const groupSlices: Slice[] = grouped
+    .map((g) => ({ key: g.resourceCode, label: g.resourceName, value: g.availabilities.length, color: PINK }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8);
+
+  const refreshAll = () =>
+    Promise.all(
+      ["resource-admin-calendar", "resource-public-calendar", "resource-occupied-slots", "resource-availability-grouped", "resource-availabilities", "resource-availabilities-remaining"].map((k) =>
+        queryClient.invalidateQueries({ queryKey: [k] }),
       ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resource-admin-calendar"] });
-      queryClient.invalidateQueries({ queryKey: ["resource-occupied-slots"] });
-      success("Capacité réservée.");
-    },
-    onError: (e) => fail(e, "Erreur réservation capacité."),
-  });
+    );
 
-  const releaseMutation = useMutation({
+  const create = useMutation({
     mutationFn: () =>
-      resourceService.releaseAvailabilitySlot(
-        Number(slotActionForm.id),
-        Number(slotActionForm.quantity) || 1,
-      ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resource-admin-calendar"] });
-      queryClient.invalidateQueries({ queryKey: ["resource-occupied-slots"] });
-      success("Capacité libérée.");
+      resourceService.createAvailability({ resourceCode, startedAt: gen!.startedAt, endedAt: gen!.endedAt, slotDurationMinutes: gen!.duration, totalCapacity: gen!.capacity || 1, active: gen!.active }),
+    onSuccess: async () => { await refreshAll(); toast.success("Créneaux générés"); setGen(null); },
+    onError: (e) => setGenError(apiMessage(e, "Génération impossible")),
+  });
+  const adjust = useMutation({
+    mutationFn: () => {
+      const id = Number(op!.slotId);
+      return op!.mode === "reserve" ? resourceService.reserveAvailabilitySlot(id, op!.quantity || 1) : resourceService.releaseAvailabilitySlot(id, op!.quantity || 1);
     },
-    onError: (e) => fail(e, "Erreur libération capacité."),
+    onSuccess: async () => { await refreshAll(); toast.success(op?.mode === "reserve" ? "Capacité réservée" : "Capacité libérée"); setOp(null); },
+    onError: (e) => setOpError(apiMessage(e, "Opération impossible")),
   });
 
-
-  const selectedCode = (code: string) => {
-    setResourceCode(code);
-    setRemainingForm({
-      from: `${fromDate}T08:00`,
-      to: `${toDateValue}T18:00`,
-      durationMinutes: 60,
-    });
-    setQuoteForm({
-      bookingUnit: "HOUR",
-      startedAt: `${fromDate}T08:00`,
-      endedAt: `${fromDate}T09:00`,
-    });
+  const pick = (r: ResourceSummaryResponse | null) => {
+    setSummary(r);
+    setResourceCode(r?.code || "");
+    setGen(null);
+    setOp(null);
+    setRemaining({ from: `${fromDate}T08:00`, to: `${toDate}T18:00`, durationMinutes: 60 });
+    setQuote({ bookingUnit: "HOUR", startedAt: `${fromDate}T08:00`, endedAt: `${fromDate}T09:00` });
   };
+  const loading = adminQuery.isLoading || publicQuery.isLoading;
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-600">
-              Planning ressources
-            </p>
-            <h2 className="mt-2 text-2xl font-bold text-gray-950">
-              Calendrier admin, occupation et disponibilité
-            </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Visualisez l'occupation, les créneaux publics, les réservations,
-              les disponibilités restantes et le devis tarifaire.
-            </p>
-          </div>
-          <div className="flex w-full flex-col gap-3 lg:w-auto lg:flex-row lg:items-center">
-            <div className="w-full lg:w-[560px] xl:w-[680px]">
-              <ResourceAutocomplete
-                selectedResource={selectedResource}
-                selectedCode={resourceCode}
-                onSelect={(res) => {
-                  setSelectedResource(res);
-                  selectedCode(res?.code || "");
-                }}
-                placeholder="Sélectionner une ressource..."
-              />
-            </div>
-            <input
-              type="month"
-              className={inputClass}
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-            />
-            <button
-              className={softBtn}
-              onClick={() => {
-                adminCalendarQuery.refetch();
-                publicCalendarQuery.refetch();
-                occupiedQuery.refetch();
-              }}
-              disabled={!resourceCode}
-            >
-              <RefreshCw size={16} /> Actualiser
-            </button>
-          </div>
+    <div className="space-y-5">
+      <ListHeader
+        title="Planning"
+        subtitle="Occupation, réservations et créneaux restants d'une ressource."
+        action={
+          <ActionButton icon={Plus} onClick={() => { if (!resourceCode) return toast.error("Choisissez d'abord une ressource"); setGenError(null); setGen({ startedAt: "", endedAt: "", capacity: 1, active: true }); }}>
+            Générer des créneaux
+          </ActionButton>
+        }
+      />
+
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="min-w-0 flex-1">
+          <ResourceAutocomplete selectedResource={summary} selectedCode={resourceCode} onSelect={pick} placeholder="Choisir une ressource" />
         </div>
+        <input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} aria-label="Mois" className="rounded-2xl bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-[color:var(--logo-pink)]" />
+        <button type="button" disabled={!resourceCode} onClick={refreshAll} aria-label="Actualiser" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 disabled:opacity-40">
+          <RefreshCw size={16} />
+        </button>
       </div>
 
-      {(message || error) && (
-        <div
-          className={`rounded-2xl px-4 py-3 text-sm ${error ? "bg-red-50 text-red-700 ring-1 ring-red-100" : "bg-green-50 text-green-700 ring-1 ring-green-100"}`}
+      {gen && (
+        <PanelForm
+          title="Générer des créneaux"
+          onCancel={() => setGen(null)}
+          pending={create.isPending}
+          submitLabel="Générer"
+          error={genError}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!gen.startedAt || !gen.endedAt) return setGenError("Les dates sont obligatoires.");
+            if (new Date(gen.endedAt) <= new Date(gen.startedAt)) return setGenError("La fin doit être après le début.");
+            setGenError(null);
+            create.mutate();
+          }}
         >
-          {error || message}
-        </div>
-      )}
-
-      {!resourceCode && (
-        <div className="rounded-3xl bg-white p-12 text-center shadow-sm ring-1 ring-gray-100">
-          <Search size={44} className="mx-auto mb-3 text-gray-300" />
-          <p className="font-medium text-gray-700">
-            Sélectionnez une ressource pour charger son planning complet.
+          <p className="text-sm text-gray-500">
+            {summary?.slotDurationMinutes ? `Cette ressource fonctionne par tranches de ${summary.slotDurationMinutes} min.` : "Durée par défaut de la ressource (30 min si non configurée)."}
           </p>
-        </div>
+          <CheckField checked={gen.duration !== undefined} onChange={(v) => setGen({ ...gen, duration: v ? ((summary?.slotDurationMinutes ?? 30) as SlotDurationMinutes) : undefined })} label="Changer la durée pour ce lot" />
+          {gen.duration !== undefined && (
+            <select value={gen.duration} onChange={(e) => setGen({ ...gen, duration: Number(e.target.value) as SlotDurationMinutes })} className={`${FIELD} sm:max-w-[12rem]`}>
+              {SLOT_DURATION_OPTIONS.map((m) => <option key={m} value={m}>{m} min</option>)}
+            </select>
+          )}
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Début" required><input type="datetime-local" value={gen.startedAt} onChange={(e) => setGen({ ...gen, startedAt: e.target.value })} className={FIELD} /></Field>
+            <Field label="Fin" required><input type="datetime-local" value={gen.endedAt} min={gen.startedAt} onChange={(e) => setGen({ ...gen, endedAt: e.target.value })} className={FIELD} /></Field>
+            <Field label="Capacité"><input type="number" min={1} value={gen.capacity} onChange={(e) => setGen({ ...gen, capacity: parseInt(e.target.value) || 1 })} className={FIELD} /></Field>
+          </div>
+          <CheckField checked={gen.active} onChange={(v) => setGen({ ...gen, active: v })} label="Actif immédiatement" />
+        </PanelForm>
       )}
 
-      {resourceCode && (
+      {!resourceCode ? (
         <>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-            <Metric
-              label="Créneaux admin"
-              value={stats.total}
-              icon={CalendarDays}
+          <EmptyState icon={DoorOpen} title="Choisissez une ressource" hint="Son planning complet s'affichera ici." />
+          <GroupedBlock loading={groupedQuery.isLoading} slices={groupSlices} />
+        </>
+      ) : adminQuery.isError ? (
+        <ErrorBlock message="Impossible de charger le planning." onRetry={() => adminQuery.refetch()} />
+      ) : (
+        <>
+          {loading ? (
+            <KpiRowSkeleton />
+          ) : (
+            <KpiRow
+              items={[
+                { label: "Taux d'occupation", value: `${stats.rate} %`, tone: "pink" },
+                { label: "Créneaux", value: adminSlots.length },
+                { label: "Places restantes", value: stats.left, tone: "success" },
+                { label: "Réservations", value: occupied.length },
+              ]}
             />
-            <Metric
-              label="Disponibles"
-              value={stats.available}
-              icon={CheckCircle}
-            />
-            <Metric
-              label="Occupés/complets"
-              value={stats.full}
-              icon={XCircle}
-            />
-            <Metric
-              label="Réservations"
-              value={stats.occupiedSlots}
-              icon={Users}
-            />
+          )}
+
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+            {loading ? <ChartSkeleton /> : (
+              <ChartCard title="Places réservées par jour" subtitle={summary?.name || resourceCode}>
+                {perDay.length === 0 ? <NoData text="Aucun créneau sur ce mois." /> : <ColumnChart data={perDay} />}
+              </ChartCard>
+            )}
+            {loading ? <ChartSkeleton /> : (
+              <ChartCard title="Niveau d'occupation" subtitle="Répartition des créneaux">
+                <DonutBreakdown data={levelSlices} centerLabel="créneaux" />
+              </ChartCard>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-            <SectionCard
-              title="Calendrier admin avec occupation"
-              description="Créneaux détaillés avec niveau d'occupation et capacité restante."
-              icon={CalendarDays}
+          {op && (
+            <PanelForm
+              title={op.mode === "reserve" ? "Réserver de la capacité" : "Libérer de la capacité"}
+              onCancel={() => setOp(null)}
+              pending={adjust.isPending}
+              submitLabel={op.mode === "reserve" ? "Réserver" : "Libérer"}
+              submitDisabled={!op.slotId}
+              error={opError}
+              onSubmit={(e) => { e.preventDefault(); setOpError(null); adjust.mutate(); }}
             >
-              {adminCalendarQuery.isLoading ? (
-                <div className="py-10 text-center text-sm text-gray-500">
-                  <Loader2 className="mx-auto mb-2 animate-spin" />{" "}
-                  Chargement...
-                </div>
-              ) : adminSlots.length === 0 ? (
-                <p className="rounded-2xl bg-gray-50 p-6 text-center text-sm text-gray-500">
-                  Aucun créneau sur ce mois.
-                </p>
-              ) : (
-                <div className="max-h-[640px] overflow-auto rounded-2xl ring-1 ring-gray-100">
-                  <table className="w-full border-separate border-spacing-y-2 p-2">
-                    <thead>
-                      <tr className="text-xs uppercase tracking-wide text-gray-400">
-                        <th className="px-4 py-2 text-left">Début</th>
-                        <th className="px-4 py-2 text-left">Fin</th>
-                        <th className="px-4 py-2 text-center">Capacité</th>
-                        <th className="px-4 py-2 text-center">Occupation</th>
-                        <th className="px-4 py-2 text-center">Statut</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {adminSlots.map((slot: any, index) => {
-                        const level = (slot.occupancyLevel ||
-                          (slot.available ? "FREE" : "FULL")) as OccupancyLevel;
-                        return (
-                          <tr
-                            key={`${slot.startedAt}-${index}`}
-                            className="bg-gray-50/70 hover:bg-primary-50/40"
-                          >
-                            <td className="rounded-l-2xl px-4 py-3 text-sm text-gray-800">
-                              {formatDateTime(slot.startedAt)}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-600">
-                              {formatDateTime(slot.endedAt)}
-                            </td>
-                            <td className="px-4 py-3 text-center text-sm font-medium">
-                              {slot.remainingCapacity}/{slot.totalCapacity}
-                            </td>
-                            <td className="px-4 py-3 text-center text-sm">
-                              {Math.round(slot.occupancyRate ?? 0)}%
-                            </td>
-                            <td className="rounded-r-2xl px-4 py-3 text-center">
-                              <span
-                                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${occupancyClass[level] || occupancyClass.FREE}`}
-                              >
-                                {occupancyLabel[level] || level}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </SectionCard>
+              <Field label="Créneau" required hint={slots.length === 0 ? "Aucun créneau sur ce mois." : undefined}>
+                <select value={op.slotId} onChange={(e) => setOp({ ...op, slotId: e.target.value })} className={FIELD}>
+                  <option value="">Choisir un créneau</option>
+                  {slots.map((s) => <option key={s.id} value={s.id}>{formatDateTime(s.startedAt)}, {s.remainingCapacity}/{s.totalCapacity} places</option>)}
+                </select>
+              </Field>
+              <Field label="Quantité" required>
+                <input type="number" min={1} value={op.quantity} onChange={(e) => setOp({ ...op, quantity: parseInt(e.target.value) || 1 })} className={`${FIELD} sm:max-w-[10rem]`} />
+              </Field>
+            </PanelForm>
+          )}
 
-            <SectionCard
-              title="Créneaux publics"
-              description="Synthèse de disponibilité visible côté portail."
-              icon={Clock}
-            >
-              <div className="space-y-2">
-                {days.length === 0 ? (
-                  <p className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-500">
-                    Aucune donnée publique.
-                  </p>
-                ) : (
-                  days.map((day) => (
-                    <div
-                      key={day.date}
-                      className="flex items-center justify-between rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-100"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">
-                          {new Date(day.date).toLocaleDateString("fr-FR")}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {day.availableSlots}/{day.totalSlots} créneaux ·{" "}
-                          {day.remainingCapacity}/{day.totalCapacity} places
-                        </p>
+          <div className="flex flex-wrap gap-2">
+            <ActionButton variant="ghost" icon={Lock} onClick={() => { setOpError(null); setOp({ mode: "reserve", slotId: "", quantity: 1 }); }}>Réserver</ActionButton>
+            <ActionButton variant="ghost" icon={Unlock} onClick={() => { setOpError(null); setOp({ mode: "release", slotId: "", quantity: 1 }); }}>Libérer</ActionButton>
+          </div>
+
+          <Section title="Réservations du mois" icon={CalendarDays}>
+            {occupiedQuery.isLoading ? (
+              <Skeleton className="h-24 w-full" />
+            ) : occupied.length === 0 ? (
+              <p className="text-sm text-gray-500">Aucun créneau occupé.</p>
+            ) : (
+              <>
+                <DataCard>
+                  {occPaged.slice.map((s, i) => (
+                    <div key={`${s.bookingCode || i}-${s.startedAt}`} className="flex items-center justify-between gap-3 rounded-2xl p-4 max-lg:mb-2 max-lg:bg-gray-50">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-900">{s.customerName || s.memberName || s.bookingCode || "Occupation"}</p>
+                        <p className="text-xs text-gray-500">{formatDateTime(s.startedAt)} à {String(s.endedAt || "").slice(11, 16)}</p>
                       </div>
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${day.status === "FULL" ? "bg-red-50 text-red-700" : day.status === "PARTIAL" ? "bg-yellow-50 text-yellow-700" : "bg-green-50 text-green-700"}`}
-                      >
-                        {day.status}
-                      </span>
+                      <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">Qté {s.quantity || 1}</span>
                     </div>
-                  ))
-                )}
-              </div>
-            </SectionCard>
-          </div>
+                  ))}
+                </DataCard>
+                <Pagination page={occPaged.page} totalPages={occPaged.totalPages} total={occPaged.total} noun="réservation" onChange={occPaged.setPage} />
+              </>
+            )}
+          </Section>
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <SectionCard
-              title="Création de disponibilités"
-              description="Créer des créneaux avec durée et capacité."
-              icon={CheckCircle}
-            >
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <input
-                  type="datetime-local"
-                  className={inputClass}
-                  value={availabilityForm.startedAt}
-                  onChange={(e) =>
-                    setAvailabilityForm({
-                      ...availabilityForm,
-                      startedAt: e.target.value,
-                    })
-                  }
-                />
-                <input
-                  type="datetime-local"
-                  className={inputClass}
-                  value={availabilityForm.endedAt}
-                  onChange={(e) =>
-                    setAvailabilityForm({
-                      ...availabilityForm,
-                      endedAt: e.target.value,
-                    })
-                  }
-                />
-                <input
-                  type="number"
-                  className={inputClass}
-                  value={availabilityForm.slotDurationMinutes}
-                  onChange={(e) =>
-                    setAvailabilityForm({
-                      ...availabilityForm,
-                      slotDurationMinutes: Number(e.target.value),
-                    })
-                  }
-                  placeholder="Durée créneau minutes"
-                />
-                <input
-                  type="number"
-                  className={inputClass}
-                  value={availabilityForm.totalCapacity}
-                  onChange={(e) =>
-                    setAvailabilityForm({
-                      ...availabilityForm,
-                      totalCapacity: Number(e.target.value),
-                    })
-                  }
-                  placeholder="Capacité"
-                />
+          <div className="grid gap-5 lg:grid-cols-2">
+            <Section title="Fenêtres libres" description="Cherchez une plage pour une durée donnée." icon={Search}>
+              <div className="grid gap-3 sm:grid-cols-[1fr_1fr_6rem]">
+                <input type="datetime-local" value={remaining.from} onChange={(e) => setRemaining({ ...remaining, from: e.target.value })} className={FIELD} aria-label="Début" />
+                <input type="datetime-local" value={remaining.to} onChange={(e) => setRemaining({ ...remaining, to: e.target.value })} className={FIELD} aria-label="Fin" />
+                <input type="number" min={5} value={remaining.durationMinutes} onChange={(e) => setRemaining({ ...remaining, durationMinutes: parseInt(e.target.value) || 60 })} className={FIELD} aria-label="Durée en minutes" />
               </div>
-              <label className="mt-3 flex items-center gap-2 text-sm text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={availabilityForm.active}
-                  onChange={(e) =>
-                    setAvailabilityForm({
-                      ...availabilityForm,
-                      active: e.target.checked,
-                    })
-                  }
-                />{" "}
-                Active
-              </label>
-              <button
-                className={`${primaryBtn} mt-4`}
-                disabled={
-                  !availabilityForm.startedAt ||
-                  !availabilityForm.endedAt ||
-                  createAvailabilityMutation.isPending
-                }
-                onClick={() => createAvailabilityMutation.mutate()}
-              >
-                {createAvailabilityMutation.isPending ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <CheckCircle size={16} />
-                )}{" "}
-                Créer disponibilité
-              </button>
-            </SectionCard>
-
-            <SectionCard
-              title="Disponibilités restantes"
-              description="Rechercher les fenêtres libres pour une durée donnée."
-              icon={Search}
-            >
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_120px]">
-                <input
-                  type="datetime-local"
-                  className={inputClass}
-                  value={remainingForm.from}
-                  onChange={(e) =>
-                    setRemainingForm({ ...remainingForm, from: e.target.value })
-                  }
-                />
-                <input
-                  type="datetime-local"
-                  className={inputClass}
-                  value={remainingForm.to}
-                  onChange={(e) =>
-                    setRemainingForm({ ...remainingForm, to: e.target.value })
-                  }
-                />
-                <input
-                  type="number"
-                  className={inputClass}
-                  value={remainingForm.durationMinutes}
-                  onChange={(e) =>
-                    setRemainingForm({
-                      ...remainingForm,
-                      durationMinutes: Number(e.target.value),
-                    })
-                  }
-                />
+              <div className="mt-3">
+                <ActionButton variant="ghost" icon={Search} pending={remainingQuery.isFetching} disabled={!remaining.from || !remaining.to} onClick={() => remainingQuery.refetch()}>Rechercher</ActionButton>
               </div>
-              <button
-                className={`${softBtn} mt-3`}
-                disabled={
-                  !remainingForm.from ||
-                  !remainingForm.to ||
-                  remainingQuery.isFetching
-                }
-                onClick={() => remainingQuery.refetch()}
-              >
-                Rechercher
-              </button>
-              <div className="mt-4 max-h-60 space-y-2 overflow-auto">
-                {(remainingQuery.data || []).map((w, index) => (
-                  <div
-                    key={`${w.startedAt}-${index}`}
-                    className="rounded-2xl bg-gray-50 p-3 text-sm ring-1 ring-gray-100"
-                  >
-                    <p className="font-medium text-gray-900">
-                      {formatDateTime(w.startedAt)} →{" "}
-                      {formatDateTime(w.endedAt)}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {w.durationMinutes} min · capacité restante{" "}
-                      {w.remainingCapacity} · {w.slotCount} créneau(x)
-                    </p>
+              <div className="mt-4 space-y-2">
+                {(remainingQuery.data || []).map((w, i) => (
+                  <div key={i} className="rounded-2xl bg-gray-50 px-4 py-3 text-sm">
+                    <p className="font-semibold text-gray-900">{formatDateTime(w.startedAt)} à {formatDateTime(w.endedAt)}</p>
+                    <p className="text-xs text-gray-500">{w.durationMinutes} min, {w.remainingCapacity} place{w.remainingCapacity > 1 ? "s" : ""}, {w.slotCount} créneau{w.slotCount > 1 ? "x" : ""}</p>
                   </div>
                 ))}
-                {remainingQuery.isFetched &&
-                  (remainingQuery.data || []).length === 0 && (
-                    <p className="rounded-xl bg-gray-50 p-4 text-sm text-gray-500">
-                      Aucune fenêtre libre.
-                    </p>
-                  )}
+                {remainingQuery.isFetched && (remainingQuery.data || []).length === 0 && <p className="text-sm text-gray-500">Aucune fenêtre libre.</p>}
               </div>
-            </SectionCard>
+            </Section>
 
-            <SectionCard
-              title="Réservation / libération de capacité"
-              description="Action admin sur un créneau par ID."
-              icon={Lock}
-            >
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_120px_auto_auto]">
-                <input
-                  className={inputClass}
-                  value={slotActionForm.id}
-                  onChange={(e) =>
-                    setSlotActionForm({ ...slotActionForm, id: e.target.value })
-                  }
-                  placeholder="ID disponibilité"
-                />
-                <input
-                  type="number"
-                  className={inputClass}
-                  value={slotActionForm.quantity}
-                  onChange={(e) =>
-                    setSlotActionForm({
-                      ...slotActionForm,
-                      quantity: Number(e.target.value),
-                    })
-                  }
-                />
-                <button
-                  className={primaryBtn}
-                  disabled={!slotActionForm.id || reserveMutation.isPending}
-                  onClick={() => reserveMutation.mutate()}
-                >
-                  <Lock size={16} /> Réserver
-                </button>
-                <button
-                  className={softBtn}
-                  disabled={!slotActionForm.id || releaseMutation.isPending}
-                  onClick={() => releaseMutation.mutate()}
-                >
-                  <Unlock size={16} /> Libérer
-                </button>
+            <Section title="Devis tarifaire" description="Prix d'une période selon les règles en vigueur." icon={Calculator}>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Unité">
+                  <select value={quote.bookingUnit} onChange={(e) => setQuote({ ...quote, bookingUnit: e.target.value as ResourceBookingUnit })} className={FIELD}>
+                    {UNITS.map((u) => <option key={u} value={u}>{UNIT_LABEL[u] ?? u}</option>)}
+                  </select>
+                </Field>
+                <span className="hidden sm:block" />
+                <Field label="Début"><input type="datetime-local" value={quote.startedAt} onChange={(e) => setQuote({ ...quote, startedAt: e.target.value })} className={FIELD} /></Field>
+                <Field label="Fin"><input type="datetime-local" value={quote.endedAt} onChange={(e) => setQuote({ ...quote, endedAt: e.target.value })} className={FIELD} /></Field>
               </div>
-            </SectionCard>
-
-            <SectionCard
-              title="Devis tarifaire"
-              description="Calculer le prix d'une période selon les règles tarifaires."
-              icon={Clock}
-            >
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-[160px_1fr_1fr_auto]">
-                <select
-                  className={inputClass}
-                  value={quoteForm.bookingUnit}
-                  onChange={(e) =>
-                    setQuoteForm({
-                      ...quoteForm,
-                      bookingUnit: e.target.value as ResourceBookingUnit,
-                    })
-                  }
-                >
-                  {bookingUnits.map((u) => (
-                    <option key={u}>{u}</option>
-                  ))}
-                </select>
-                <input
-                  type="datetime-local"
-                  className={inputClass}
-                  value={quoteForm.startedAt}
-                  onChange={(e) =>
-                    setQuoteForm({ ...quoteForm, startedAt: e.target.value })
-                  }
-                />
-                <input
-                  type="datetime-local"
-                  className={inputClass}
-                  value={quoteForm.endedAt}
-                  onChange={(e) =>
-                    setQuoteForm({ ...quoteForm, endedAt: e.target.value })
-                  }
-                />
-                <button
-                  className={primaryBtn}
-                  disabled={
-                    !quoteForm.startedAt ||
-                    !quoteForm.endedAt ||
-                    quoteQuery.isFetching
-                  }
-                  onClick={() => quoteQuery.refetch()}
-                >
-                  Calculer
-                </button>
+              <div className="mt-3">
+                <ActionButton variant="ghost" icon={Calculator} pending={quoteQuery.isFetching} disabled={!quote.startedAt || !quote.endedAt} onClick={() => quoteQuery.refetch()}>Calculer</ActionButton>
               </div>
               {quoteQuery.data && (
-                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-                  <Metric
-                    label="Base"
-                    value={quoteQuery.data.basePrice}
-                    suffix=" FCFA"
-                    icon={Clock}
-                  />
-                  <Metric
-                    label="Final"
-                    value={quoteQuery.data.finalPrice}
-                    suffix=" FCFA"
-                    icon={CheckCircle}
-                  />
-                  <Metric
-                    label="Règle"
-                    value={quoteQuery.data.appliedRuleId || 0}
-                    icon={Search}
-                  />
+                <div className="mt-4 flex flex-wrap items-baseline gap-x-6 gap-y-1">
+                  <p className="text-3xl font-bold text-gray-950">{formatMoney(quoteQuery.data.finalPrice, "FCFA")}</p>
+                  <p className="text-sm text-gray-500">base {formatMoney(quoteQuery.data.basePrice, "FCFA")}{quoteQuery.data.appliedRuleId ? `, règle n° ${quoteQuery.data.appliedRuleId}` : ""}</p>
                 </div>
               )}
-            </SectionCard>
-
-            <SectionCard
-              title="Créneaux occupés"
-              description="Liste des réservations/occupations sur la période."
-              icon={Users}
-            >
-              <div className="max-h-72 space-y-2 overflow-auto">
-                {occupied.length === 0 ? (
-                  <p className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-500">
-                    Aucun créneau occupé.
-                  </p>
-                ) : (
-                  occupied.map((slot: any, index) => (
-                    <div
-                      key={`${slot.bookingCode || index}-${slot.startedAt}`}
-                      className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-100"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">
-                            {slot.customerName ||
-                              slot.memberName ||
-                              slot.bookingCode ||
-                              "Occupation"}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {formatDateTime(slot.startedAt)} →{" "}
-                            {formatDateTime(slot.endedAt)}
-                          </p>
-                        </div>
-                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                          Qté {slot.quantity || 1}
-                        </span>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </SectionCard>
+            </Section>
           </div>
 
-          <SectionCard
-            title="Disponibilités groupées"
-            description="Vue synthétique multi-ressources sur le mois."
-            icon={CalendarDays}
-          >
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {grouped.length === 0 ? (
-                <p className="text-sm text-gray-500">
-                  Aucune disponibilité groupée.
-                </p>
-              ) : (
-                grouped.map((group) => (
-                  <div
-                    key={group.resourceCode}
-                    className="rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-100"
-                  >
-                    <p className="font-medium text-gray-900">
-                      {group.resourceName}
-                    </p>
-                    <p className="font-mono text-xs text-gray-400">
-                      {group.resourceCode}
-                    </p>
-                    <p className="mt-2 text-sm text-gray-500">
-                      {group.availabilities.length} créneau(x)
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-          </SectionCard>
+          <GroupedBlock loading={groupedQuery.isLoading} slices={groupSlices} />
         </>
       )}
     </div>
   );
 };
 
-const Metric: React.FC<{
-  label: string;
-  value: number;
-  suffix?: string;
-  icon: React.ElementType;
-}> = ({ label, value, suffix = "", icon: Icon }) => (
-  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-    <div className="flex items-center justify-between text-sm text-gray-500">
-      <span>{label}</span>
-      <Icon size={17} className="text-gray-400" />
-    </div>
-    <p className="mt-2 text-2xl font-bold text-gray-950">
-      {value.toLocaleString("fr-FR")}
-      {suffix}
-    </p>
-  </div>
-);
+const GroupedBlock: React.FC<{ loading: boolean; slices: Slice[] }> = ({ loading, slices }) =>
+  loading ? (
+    <ChartSkeleton />
+  ) : (
+    <ChartCard title="Créneaux ouverts par ressource" subtitle="Les ressources les plus ouvertes sur le mois">
+      <BarBreakdown data={slices} />
+    </ChartCard>
+  );

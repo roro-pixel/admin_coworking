@@ -1,198 +1,106 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Download, Loader2, Receipt, Search } from "lucide-react";
+import { Download, Receipt, Search } from "lucide-react";
 import { paymentService } from "../../services/payment.service";
 import type { PaymentReceipt } from "../../services/payment.service";
+import { ActionButton, EmptyState, ErrorBlock, ListHeader, Section } from "../../components/subscription/kit";
+import { FIELD_SOFT } from "../../components/subscription/kitUtils";
+import { toast } from "../../components/ui/toastStore";
+import { DetailsSkeleton } from "../../components/ui/Skeleton";
+import { PillChoice } from "../../components/operations/opsKit";
+import { ReceiptView } from "../../components/payment/ReceiptModal";
+import { saveBlob } from "../../components/payment/paymentUtils";
 
-const formatAmount = (amount?: number) =>
-  `${(amount ?? 0).toLocaleString("fr-FR")} FCFA`;
-const formatDate = (value?: string) =>
-  value ? new Date(value).toLocaleString("fr-FR") : "—";
+type Mode = "transaction" | "receipt";
 
 export const PaymentReceiptViewer: React.FC = () => {
-  const [mode, setMode] = useState<"transaction" | "receipt">("transaction");
+  const [mode, setMode] = useState<Mode>("transaction");
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
+  const [downloading, setDownloading] = useState(false);
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["payment-receipt-viewer", mode, submitted],
     queryFn: () =>
-      mode === "transaction"
-        ? paymentService.getReceipt(submitted)
-        : paymentService.getReceiptByNumber(submitted),
+      mode === "transaction" ? paymentService.getReceipt(submitted) : paymentService.getReceiptByNumber(submitted),
     enabled: !!submitted,
   });
   const receipt = data as PaymentReceipt | undefined;
 
-  const search = () => {
+  const search = (e: React.FormEvent) => {
+    e.preventDefault();
     if (query.trim()) setSubmitted(query.trim());
   };
 
   const downloadPdf = async () => {
     if (!submitted) return;
-    const blob =
-      mode === "transaction"
-        ? await paymentService.getReceiptPdf(submitted)
-        : await paymentService.getReceiptPdfByNumber(submitted);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${mode === "transaction" ? "recu_transaction" : "recu"}_${submitted}.pdf`;
-    a.click();
-    URL.revokeObjectURL(url);
+    setDownloading(true);
+    try {
+      const blob =
+        mode === "transaction"
+          ? await paymentService.getReceiptPdf(submitted)
+          : await paymentService.getReceiptPdfByNumber(submitted);
+      saveBlob(blob, `${mode === "transaction" ? "recu_transaction" : "recu"}_${submitted}.pdf`);
+    } catch {
+      toast.error("Téléchargement impossible");
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900">
-          Visualisation de reçu
-        </h2>
-        <p className="text-sm text-gray-500 mt-1">
-          Recherchez un reçu par numéro de transaction ou par numéro de reçu.
-        </p>
-      </div>
-      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-4 flex flex-col md:flex-row gap-3">
-        <select
+    <div className="mx-auto w-full max-w-4xl space-y-5">
+      <ListHeader title="Reçus" subtitle="Retrouvez un reçu par numéro de transaction ou par numéro de reçu." />
+
+      <form onSubmit={search} className="space-y-3">
+        <PillChoice
+          label="Rechercher par"
           value={mode}
-          onChange={(e) => setMode(e.target.value as any)}
-          className="h-11 rounded-2xl
-border-0
-bg-white
-px-4
-text-sm
-font-medium
-text-gray-700
-shadow-sm
-ring-1
-ring-gray-200
-outline-none
-transition
-focus:ring-2
-focus:ring-primary-500
-"
-        >
-          <option value="transaction">Transaction</option>
-          <option value="receipt">Reçu</option>
-        </select>
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") search();
+          onChange={(v) => {
+            setMode(v);
+            setSubmitted("");
           }}
-          placeholder={mode === "transaction" ? "N° transaction" : "N° reçu"}
-          className="
-flex-1
-h-11
-rounded-2xl
-border-0
-bg-white
-px-4
-font-mono
-text-sm
-shadow-sm
-ring-1
-ring-gray-200
-outline-none
-transition
-focus:ring-2
-focus:ring-primary-500
-"
+          options={[
+            { value: "transaction", label: "N° de transaction" },
+            { value: "receipt", label: "N° de reçu" },
+          ]}
         />
-        <button
-          onClick={search}
-          className="px-4 py-2 bg-primary-600 text-white rounded-lg flex items-center gap-2 justify-center"
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="relative flex-1">
+            <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={mode === "transaction" ? "TXN-2026-00001" : "RCP-00001"}
+              className={`${FIELD_SOFT} bg-white pl-10 font-mono shadow-sm`}
+            />
+          </div>
+          <ActionButton type="submit" icon={Search} disabled={!query.trim()}>
+            Rechercher
+          </ActionButton>
+        </div>
+      </form>
+
+      {!submitted ? (
+        <EmptyState icon={Receipt} title="Aucun reçu affiché" hint="Saisissez un numéro pour afficher le reçu." />
+      ) : isLoading ? (
+        <DetailsSkeleton />
+      ) : isError || !receipt ? (
+        <ErrorBlock message="Reçu introuvable ou erreur de chargement." onRetry={() => refetch()} />
+      ) : (
+        <Section
+          title={`Reçu ${receipt.receiptNumber}`}
+          description={`Transaction ${receipt.transactionNumber}`}
+          icon={Receipt}
+          action={
+            <ActionButton variant="ghost" icon={Download} pending={downloading} onClick={downloadPdf}>
+              PDF
+            </ActionButton>
+          }
         >
-          <Search size={16} /> Rechercher
-        </button>
-      </div>
-      {isLoading && (
-        <div className="text-center py-8">
-          <Loader2 className="animate-spin mx-auto" />
-        </div>
-      )}
-      {isError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-          Reçu introuvable ou erreur de chargement.
-        </div>
-      )}
-      {receipt && (
-        <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
-          <div className="p-5 border-b flex justify-between items-start">
-            <div className="flex gap-3 items-center">
-              <Receipt className="text-primary-600" />
-              <div>
-                <h3 className="font-bold text-lg">
-                  Reçu {receipt.receiptNumber}
-                </h3>
-                <p className="text-sm text-gray-500">
-                  Transaction {receipt.transactionNumber}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={downloadPdf}
-              className="px-3 py-2 border border-gray-200 rounded-xl flex items-center gap-2 text-sm"
-            >
-              <Download size={15} /> PDF
-            </button>
-          </div>
-          <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Info label="Client" value={receipt.customerName || "—"} />
-            <Info label="Méthode" value={receipt.paymentMethod} />
-            <Info label="Payé le" value={formatDate(receipt.paidAt)} />
-            <Info
-              label="Montant payé"
-              value={formatAmount(receipt.paidAmount)}
-              strong
-            />
-            <Info
-              label="Montant alloué"
-              value={formatAmount(receipt.allocatedAmount)}
-            />
-            <Info label="Avance" value={formatAmount(receipt.advanceAmount)} />
-            <Info label="Reçu par" value={receipt.receivedBy || "—"} />
-            <Info label="Provider" value={receipt.provider || "—"} />
-            <Info
-              label="Référence provider"
-              value={receipt.providerReference || "—"}
-            />
-          </div>
-          {receipt.allocations && receipt.allocations.length > 0 && (
-            <div className="p-5 border-t">
-              <h4 className="font-semibold mb-3">Allocations</h4>
-              <div className="divide-y border rounded-lg">
-                {receipt.allocations.map((a: any, idx: number) => (
-                  <div key={idx} className="p-3 flex justify-between text-sm">
-                    <span>
-                      {a.documentNumber ||
-                        a.sourceCode ||
-                        `Allocation ${idx + 1}`}
-                    </span>
-                    <span className="font-semibold">
-                      {formatAmount(a.amount || a.allocatedAmount)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+          <ReceiptView receipt={receipt} />
+        </Section>
       )}
     </div>
   );
 };
-
-const Info: React.FC<{ label: string; value: string; strong?: boolean }> = ({
-  label,
-  value,
-  strong,
-}) => (
-  <div className="bg-gray-50 rounded-lg p-3">
-    <p className="text-xs text-gray-500">{label}</p>
-    <p className={`${strong ? "text-lg" : "text-sm"} font-semibold mt-1`}>
-      {value}
-    </p>
-  </div>
-);

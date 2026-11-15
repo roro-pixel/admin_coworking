@@ -1,246 +1,268 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  ArrowLeft,
-  Archive,
-  CheckCircle2,
-  Loader2,
-  Plus,
-  Rocket,
-} from "lucide-react";
+import { Archive, CheckCircle2, Layers, Plus, Rocket } from "lucide-react";
 import { subscriptionService } from "../../../services/subscription.service";
 import type { PassPlanVersionResponse } from "../../../services/subscription.service";
-import { PassPlanVersionFormModal } from "./PassPlanVersionFormModal";
+import { AdminLayout } from "../../../components/layout/AdminLayout";
+import { brandVars } from "../../../components/layout/adminTheme";
+import { DetailsSkeleton } from "../../../components/ui/Skeleton";
+import { Toaster } from "../../../components/ui/Toaster";
+import { toast } from "../../../components/ui/toastStore";
+import {
+  ActionButton,
+  Detail,
+  EmptyState,
+  ErrorBlock,
+  PageHeader,
+  Section,
+  StatusChip,
+  Tag,
+} from "../../../components/subscription/kit";
+import { PINK_SOFT, apiMessage } from "../../../components/subscription/kitUtils";
+import {
+  DURATION_UNIT_LABELS,
+  PASS_TYPE_LABELS,
+  PLAN_STATUS,
+  TARGET_AUDIENCE_LABELS,
+  VERSION_STATUS,
+  statusOf,
+} from "../../../components/subscription/labels";
+import { PassPlanVersionPanel } from "./PassPlanVersionPanel";
 import { PassPlanPriceManager } from "./PassPlanPriceManager";
 import { PassPlanEntitlementsManager } from "./PassPlanEntitlementsManager";
-import { PurchasePassModal } from "./PurchasePassModal";
-
-const statusClass: Record<string, string> = {
-  DRAFT: "bg-gray-100 text-gray-700",
-  ACTIVE: "bg-green-50 text-green-700",
-  ARCHIVED: "bg-red-50 text-red-700",
-};
+import { PurchasePassPanel } from "./PurchasePassPanel";
 
 export const PassPlanDetailPage: React.FC = () => {
-  const { planCode } = useParams<{ planCode: string }>();
+  const { planCode = "" } = useParams<{ planCode: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [isVersionOpen, setIsVersionOpen] = useState(false);
-  const [selectedVersion, setSelectedVersion] =
-    useState<PassPlanVersionResponse | null>(null);
-  const [isPurchaseOpen, setIsPurchaseOpen] = useState(false);
+  const [panel, setPanel] = useState<"version" | "purchase" | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const { data: plan, isLoading } = useQuery({
     queryKey: ["pass-plan", planCode],
-    queryFn: () => subscriptionService.getPassPlan(planCode!),
-    enabled: !!planCode,
-  });
-  const { data: versions = [] } = useQuery({
-    queryKey: ["pass-plan-versions", planCode],
-    queryFn: () => subscriptionService.getPassPlanVersions(planCode!),
+    queryFn: () => subscriptionService.getPassPlan(planCode),
     enabled: !!planCode,
   });
 
+  const { data: versions = [] } = useQuery({
+    queryKey: ["pass-plan-versions", planCode],
+    queryFn: () => subscriptionService.getPassPlanVersions(planCode),
+    enabled: !!planCode,
+  });
+  const versionsList = versions as PassPlanVersionResponse[];
+  // La version sélectionnée est relue dans la liste pour refléter son statut à jour
+  const selectedVersion = versionsList.find((v) => v.id === selectedId) ?? null;
+
   const publishPlanMutation = useMutation({
-    mutationFn: () => subscriptionService.publishPassPlan(planCode!),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["pass-plan", planCode] }),
-  });
-  const archivePlanMutation = useMutation({
-    mutationFn: () => subscriptionService.archivePassPlan(planCode!),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["pass-plan", planCode] }),
-  });
-  const publishVersionMutation = useMutation({
-    mutationFn: (versionId: number) =>
-      subscriptionService.publishPassPlanVersion(planCode!, versionId),
+    mutationFn: () => subscriptionService.publishPassPlan(planCode),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["pass-plan-versions", planCode],
-      });
       queryClient.invalidateQueries({ queryKey: ["pass-plan", planCode] });
+      queryClient.invalidateQueries({ queryKey: ["pass-plans"] });
+      toast.success("Plan publié");
+    },
+    onError: (e: unknown) => toast.error(apiMessage(e, "Erreur lors de la publication.")),
+  });
+
+  // Archivage : toast de confirmation, l'erreur de l'API y est affichée
+  const archivePlanMutation = useMutation({
+    mutationFn: () => subscriptionService.archivePassPlan(planCode),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pass-plan", planCode] });
+      queryClient.invalidateQueries({ queryKey: ["pass-plans"] });
     },
   });
 
-  if (isLoading)
-    return (
-      <div className="py-12 text-center">
-        <Loader2 className="mx-auto animate-spin text-primary-600" />
-      </div>
-    );
-  if (!plan)
-    return (
-      <div className="rounded-2xl bg-white p-8 text-center text-gray-500">
-        Plan introuvable.
-      </div>
-    );
+  const publishVersionMutation = useMutation({
+    mutationFn: (versionId: number) => subscriptionService.publishPassPlanVersion(planCode, versionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pass-plan-versions", planCode] });
+      queryClient.invalidateQueries({ queryKey: ["pass-plan", planCode] });
+      toast.success("Version publiée");
+    },
+    onError: (e: unknown) => toast.error(apiMessage(e, "Erreur lors de la publication de la version.")),
+  });
 
-  const versionsList = versions as PassPlanVersionResponse[];
+  const askArchive = () =>
+    toast.confirm({
+      message: "Archiver ce plan ?",
+      detail: plan?.name ?? planCode,
+      confirmLabel: "Archiver",
+      pendingLabel: "Archivage en cours",
+      successMessage: "Plan archivé",
+      errorMessage: "L'archivage a échoué",
+      onConfirm: () => archivePlanMutation.mutateAsync(),
+    });
+
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div style={brandVars} className="mx-auto w-full max-w-4xl">
+          <DetailsSkeleton />
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (!plan) {
+    return (
+      <AdminLayout>
+        <div style={brandVars} className="mx-auto w-full max-w-4xl">
+          <PageHeader title="Plan introuvable" onBack={() => navigate("/subscriptions/pass-plans")} backLabel="Plans de pass" />
+          <ErrorBlock message="Ce plan n'existe pas ou n'est plus accessible." />
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  const st = statusOf(PLAN_STATUS, plan.status);
 
   return (
-    <div className="space-y-6">
-      <button
-        onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-800"
-      >
-        <ArrowLeft size={17} /> Retour
-      </button>
-      <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold text-gray-950">{plan.name}</h1>
-              <span
-                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass[plan.status] ?? "bg-gray-100"}`}
-              >
-                {plan.status}
-              </span>
-              {plan.visible && (
-                <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                  Visible client
-                </span>
-              )}
+    <AdminLayout>
+      <div style={brandVars} className="mx-auto w-full max-w-4xl">
+        <PageHeader
+          title={plan.name}
+          subtitle={
+            <div>
+              <span className="font-mono">{plan.code}</span>
+              {plan.description && <p className="mt-2 max-w-2xl text-gray-600">{plan.description}</p>}
             </div>
-            <p className="mt-1 font-mono text-xs text-gray-400">{plan.code}</p>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-600">
-              {plan.description || "Aucune description."}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setIsPurchaseOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-medium text-white"
-            >
-              <Rocket size={16} /> Acheter
-            </button>
-            <button
-              onClick={() => publishPlanMutation.mutate()}
-              disabled={publishPlanMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-xl border border-green-100 bg-green-50 px-4 py-2 text-sm font-medium text-green-700"
-            >
-              <CheckCircle2 size={16} /> Publier
-            </button>
-            <button
-              onClick={() => archivePlanMutation.mutate()}
-              disabled={archivePlanMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm font-medium text-red-700"
-            >
-              <Archive size={16} /> Archiver
-            </button>
-          </div>
-        </div>
-        <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Metric label="Type" value={String(plan.passType)} />
-          <Metric label="Audience" value={String(plan.targetAudience)} />
-          <Metric label="KYC" value={`Niveau ${plan.requiredKycLevel}`} />
-          <Metric label="Ordre" value={String(plan.sortOrder)} />
-        </div>
-      </section>
+          }
+          badge={
+            <>
+              <StatusChip tone={st.tone}>{st.label}</StatusChip>
+              {plan.visible && <Tag tone="pink">Visible client</Tag>}
+            </>
+          }
+          actions={
+            <>
+              <ActionButton icon={Rocket} onClick={() => setPanel(panel === "purchase" ? null : "purchase")}>
+                Acheter
+              </ActionButton>
+              <ActionButton
+                variant="ghost"
+                icon={CheckCircle2}
+                pending={publishPlanMutation.isPending}
+                onClick={() => publishPlanMutation.mutate()}
+              >
+                Publier
+              </ActionButton>
+              <ActionButton variant="danger" icon={Archive} onClick={askArchive}>
+                Archiver
+              </ActionButton>
+            </>
+          }
+          onBack={() => navigate("/subscriptions/pass-plans")}
+          backLabel="Plans de pass"
+        />
 
-      <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-950">Versions</h2>
-            <p className="text-sm text-gray-500">
-              Chaque version porte la durée, les prix et les droits.
-            </p>
-          </div>
-          <button
-            onClick={() => setIsVersionOpen(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-medium text-white"
+        {panel === "purchase" && (
+          <PurchasePassPanel
+            plan={plan}
+            onCancel={() => setPanel(null)}
+            onDone={(passNumber) => {
+              setPanel(null);
+              toast.success("Pass généré");
+              navigate(`/subscriptions/passes/${passNumber}`);
+            }}
+          />
+        )}
+
+        <div className="space-y-4">
+          <Section title="Informations" icon={Layers}>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-5 md:grid-cols-4">
+              <Detail label="Type">{PASS_TYPE_LABELS[plan.passType] ?? String(plan.passType)}</Detail>
+              <Detail label="Public cible">
+                {TARGET_AUDIENCE_LABELS[plan.targetAudience] ?? String(plan.targetAudience)}
+              </Detail>
+              <Detail label="KYC requis">{`Niveau ${plan.requiredKycLevel}`}</Detail>
+              <Detail label="Ordre d'affichage">{String(plan.sortOrder)}</Detail>
+            </div>
+          </Section>
+
+          {panel === "version" && (
+            <PassPlanVersionPanel planCode={plan.code} onDone={() => setPanel(null)} onCancel={() => setPanel(null)} />
+          )}
+
+          <Section
+            title="Versions"
+            description="Chaque version porte la durée, les prix et les droits."
+            action={
+              <ActionButton icon={Plus} className="!px-4 !py-2" onClick={() => setPanel(panel === "version" ? null : "version")}>
+                Nouvelle version
+              </ActionButton>
+            }
           >
-            <Plus size={16} /> Nouvelle version
-          </button>
-        </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {versionsList.map((v) => (
-            <button
-              key={v.id}
-              onClick={() => setSelectedVersion(v)}
-              className={`rounded-2xl p-4 text-left ring-1 transition ${selectedVersion?.id === v.id ? "bg-primary-50 ring-primary-100" : "bg-gray-50 ring-gray-100 hover:bg-white"}`}
-            >
-              <div className="flex items-start justify-between gap-3">
+            {versionsList.length === 0 ? (
+              <EmptyState
+                icon={Layers}
+                title="Aucune version"
+                hint="Créez une version pour pouvoir définir prix et droits."
+              />
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2">
+                {versionsList.map((v) => {
+                  const vs = statusOf(VERSION_STATUS, v.status);
+                  const on = selectedVersion?.id === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setSelectedId(on ? null : v.id)}
+                      aria-pressed={on}
+                      className={`rounded-2xl p-4 text-left shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--logo-pink)] ${
+                        on ? `${PINK_SOFT} ring-2 ring-[color:var(--logo-pink)]` : "bg-white hover:bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900">
+                            v{v.versionNumber} · {v.name}
+                          </p>
+                          <p className="mt-1 text-xs text-gray-500">
+                            {v.duration} {DURATION_UNIT_LABELS[v.durationUnit] ?? v.durationUnit} ·{" "}
+                            {v.autoRenewable ? "renouvelable" : "non renouvelable"}
+                          </p>
+                        </div>
+                        <StatusChip tone={vs.tone}>{vs.label}</StatusChip>
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <Tag>KYC {v.requiredKycLevel}</Tag>
+                        <Tag>Max {v.maxUses ?? "illimité"}</Tag>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </Section>
+
+          {selectedVersion && (
+            <>
+              <div className={`flex flex-col gap-3 rounded-[1.75rem] p-4 sm:flex-row sm:items-center sm:justify-between ${PINK_SOFT}`}>
                 <div>
-                  <p className="font-semibold text-gray-900">
-                    v{v.versionNumber} — {v.name}
-                  </p>
-                  <p className="mt-1 text-xs text-gray-500">
-                    {v.duration} {v.durationUnit} ·{" "}
-                    {v.autoRenewable ? "renouvelable" : "non renouvelable"}
+                  <p className="text-sm text-gray-500">Version sélectionnée</p>
+                  <p className="font-semibold">
+                    v{selectedVersion.versionNumber} · {selectedVersion.name}
                   </p>
                 </div>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs ${statusClass[v.status] ?? "bg-gray-100"}`}
-                >
-                  {v.status}
-                </span>
+                {selectedVersion.status !== "ACTIVE" && (
+                  <ActionButton
+                    pending={publishVersionMutation.isPending}
+                    onClick={() => publishVersionMutation.mutate(selectedVersion.id)}
+                  >
+                    Publier la version
+                  </ActionButton>
+                )}
               </div>
-              <div className="mt-3 flex gap-2">
-                <span className="rounded-full bg-white px-2 py-1 text-xs text-gray-500">
-                  KYC {v.requiredKycLevel}
-                </span>
-                <span className="rounded-full bg-white px-2 py-1 text-xs text-gray-500">
-                  Max {v.maxUses ?? "∞"}
-                </span>
-              </div>
-            </button>
-          ))}
+              <PassPlanPriceManager versionId={selectedVersion.id} />
+              <PassPlanEntitlementsManager versionId={selectedVersion.id} />
+            </>
+          )}
         </div>
-        {versionsList.length === 0 && (
-          <p className="rounded-2xl bg-gray-50 p-6 text-center text-sm text-gray-500">
-            Aucune version. Créez une version pour pouvoir définir prix et
-            droits.
-          </p>
-        )}
-      </section>
-
-      {selectedVersion && (
-        <div className="space-y-5">
-          <div className="flex items-center justify-between rounded-3xl bg-gray-950 p-4 text-white">
-            <div>
-              <p className="text-sm text-white/60">Version sélectionnée</p>
-              <p className="font-semibold">
-                v{selectedVersion.versionNumber} — {selectedVersion.name}
-              </p>
-            </div>
-            <button
-              onClick={() => publishVersionMutation.mutate(selectedVersion.id)}
-              className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-gray-950"
-            >
-              Publier la version
-            </button>
-          </div>
-          <PassPlanPriceManager versionId={selectedVersion.id} />
-          <PassPlanEntitlementsManager versionId={selectedVersion.id} />
-        </div>
-      )}
-
-      <PassPlanVersionFormModal
-        isOpen={isVersionOpen}
-        onClose={() => setIsVersionOpen(false)}
-        planCode={plan.code}
-        onSuccess={() => setIsVersionOpen(false)}
-      />
-      <PurchasePassModal
-        isOpen={isPurchaseOpen}
-        onClose={() => setIsPurchaseOpen(false)}
-        plan={plan}
-        onSuccess={(passNumber) => {
-          setIsPurchaseOpen(false);
-          navigate(`/subscriptions/passes/${passNumber}`);
-        }}
-      />
-    </div>
+      </div>
+      <Toaster />
+    </AdminLayout>
   );
 };
-
-const Metric: React.FC<{ label: string; value: string }> = ({
-  label,
-  value,
-}) => (
-  <div className="rounded-2xl bg-gray-50 p-4">
-    <p className="text-xs uppercase tracking-wide text-gray-400">{label}</p>
-    <p className="mt-1 truncate font-semibold text-gray-900">{value}</p>
-  </div>
-);

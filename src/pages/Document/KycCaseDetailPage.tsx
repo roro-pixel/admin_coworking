@@ -1,112 +1,37 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  AlertCircle,
-  ArrowLeft,
-  CalendarClock,
-  CheckCircle2,
-  Download,
-  Eye,
-  FileCheck2,
-  FileText,
-  History,
-  Loader2,
-  MessageSquare,
-  Plus,
-  RefreshCw,
-  ScanSearch,
-  ShieldCheck,
-  Trash2,
-  Upload,
-  UserCheck,
-  XCircle,
-} from "lucide-react";
+import { CalendarClock, CheckCircle2, Download, Eye, FileCheck2, FileText, FileX2, History, MessageSquare, Plus, ScanSearch, ShieldCheck, Trash2, Upload, UserCheck, XCircle } from "lucide-react";
 import { AdminLayout } from "../../components/layout/AdminLayout";
+import { brandVars } from "../../components/layout/adminTheme";
 import { documentService, kycService } from "../../services/document.service";
-import type {
-  KycCaseRequirementResponse,
-  KycDocumentResponse,
-  KycRiskLevel,
-} from "../../services/document.service";
+import type { KycDocumentResponse, KycRiskLevel } from "../../services/document.service";
 import { useAuth } from "../../contexts/AuthContext";
-import { DocumentReviewModal } from "../../components/kyc/DocumentReviewModal";
+import { ActionButton, CheckField, Detail, EmptyState, ErrorBlock, Field, IconButton, ItemRow, PageHeader, Tabs, Tag, StatusChip } from "../../components/subscription/kit";
+import type { TabItem } from "../../components/subscription/kit";
+import { FIELD_SOFT, apiMessage, formatDateTime } from "../../components/subscription/kitUtils";
+import { DetailsSkeleton, ListSkeleton } from "../../components/ui/Skeleton";
+import { Toaster } from "../../components/ui/Toaster";
+import { toast } from "../../components/ui/toastStore";
+import { RefreshButton } from "../../components/reporting/reportKit";
+import { saveBlob } from "../../components/payment/paymentUtils";
+import { DocStatusChip, Fact, KycStatusChip, RiskChip, RowCheck } from "../../components/documents/docKit";
+import { KycDocumentReviewPanel } from "../../components/documents/KycDocumentReviewPanel";
+import { OWNER_LABEL, RISK_LEVELS, dayOnly, label } from "../../components/documents/docUtils";
+import { kycRiskLevelLabels } from "../../services/document.service";
 
-type Tab =
-  | "overview"
-  | "documents"
-  | "requirements"
-  | "notes"
-  | "timeline"
-  | "expiry"
-  | "ocr"
-  | "upload";
+type Tab = "overview" | "documents" | "requirements" | "notes" | "timeline" | "expiry" | "ocr" | "upload";
 
-const tabs: Array<{ id: Tab; label: string; icon: React.ElementType }> = [
-  { id: "overview", label: "Vue générale", icon: ShieldCheck },
-  { id: "documents", label: "Documents", icon: FileCheck2 },
-  { id: "requirements", label: "Exigences", icon: FileText },
-  { id: "notes", label: "Notes", icon: MessageSquare },
-  { id: "timeline", label: "Historique", icon: History },
-  { id: "expiry", label: "Expiration", icon: CalendarClock },
-  { id: "ocr", label: "OCR", icon: ScanSearch },
-  { id: "upload", label: "Upload admin", icon: Upload },
-];
+const Card: React.FC<{ title: string; hint?: string; children: React.ReactNode }> = ({ title, hint, children }) => (
+  <section className="rounded-[1.5rem] bg-white p-4 shadow-sm sm:p-5">
+    <h3 className="text-base font-bold text-gray-950">{title}</h3>
+    {hint && <p className="mt-1 text-sm text-gray-500">{hint}</p>}
+    <div className="mt-4 space-y-4">{children}</div>
+  </section>
+);
 
-const riskLevels: KycRiskLevel[] = [
-  "LOW",
-  "MEDIUM",
-  "HIGH",
-  "VERY_HIGH",
-];
-
-const statusLabel: Record<string, string> = {
-  NOT_STARTED: "Non commencé",
-  IN_PROGRESS: "En cours",
-  SUBMITTED: "Soumis",
-  UNDER_REVIEW: "En revue",
-  APPROVED: "Approuvé",
-  REJECTED: "Rejeté",
-  PENDING_CORRECTION: "Correction demandée",
-  RENEWAL_REQUIRED: "Renouvellement requis",
-  EXPIRED: "Expiré",
-  DRAFT: "Brouillon",
-  PENDING_REVIEW: "En attente de revue",
-  IN_REVIEW: "En revue",
-};
-
-const statusColor: Record<string, string> = {
-  APPROVED: "bg-green-100 text-green-700",
-  VERIFIED: "bg-green-100 text-green-700",
-  REJECTED: "bg-red-100 text-red-700",
-  EXPIRED: "bg-gray-100 text-gray-600",
-  PENDING_CORRECTION: "bg-orange-100 text-orange-700",
-  SUBMITTED: "bg-yellow-100 text-yellow-700",
-  PENDING_REVIEW: "bg-yellow-100 text-yellow-700",
-  UNDER_REVIEW: "bg-blue-100 text-blue-700",
-  IN_REVIEW: "bg-blue-100 text-blue-700",
-  PENDING: "bg-yellow-100 text-yellow-700",
-};
-
-const panelClass = "rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100";
-const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100";
-const softButton =
-  "inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50";
-const primaryButton =
-  "inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50";
-
-const downloadBlob = (blob: Blob, filename: string) => {
-  const url = URL.createObjectURL(blob);
-  const link = window.document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-};
-
-const getDocumentCode = (document: KycDocumentResponse): string =>
-  String(document.documentCode || "");
+const docName = (d: KycDocumentResponse) => d.documentTypeName || d.documentTypeCode || d.documentType || "Document KYC";
+const docCode = (d: KycDocumentResponse) => String(d.documentCode || "");
 
 export const KycCaseDetailPage: React.FC = () => {
   const { code } = useParams<{ code: string }>();
@@ -115,393 +40,146 @@ export const KycCaseDetailPage: React.FC = () => {
   const { admin } = useAuth();
   const reviewerId = Number(admin?.id) || 1;
 
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("overview");
   const [decisionComment, setDecisionComment] = useState("");
   const [assignValue, setAssignValue] = useState("");
   const [assignMode, setAssignMode] = useState<"id" | "email">("id");
-  const [riskLevel, setRiskLevel] = useState<KycRiskLevel>("MEDIUM");
+  const [riskLevel, setRiskLevel] = useState<string>("MEDIUM");
   const [riskComment, setRiskComment] = useState("");
   const [noteContent, setNoteContent] = useState("");
   const [noteInternal, setNoteInternal] = useState(true);
-  const [requirementForm, setRequirementForm] = useState({
-    documentTypeCode: "",
-    documentTypeName: "",
-    required: true,
-  });
-  const [selectedDocumentCodes, setSelectedDocumentCodes] = useState<string[]>(
-    [],
-  );
+  const [reqForm, setReqForm] = useState({ documentTypeCode: "", documentTypeName: "", required: true });
+  const [selected, setSelected] = useState<string[]>([]);
+  const [rejecting, setRejecting] = useState(false);
   const [rejectReasons, setRejectReasons] = useState<Record<string, string>>({});
-  const [correction, setCorrection] = useState({
-    documentCode: "",
-    correctionNote: "",
-    deadlineDays: 7,
-  });
-  const [ocrDocumentCode, setOcrDocumentCode] = useState("");
-  const [reviewDocument, setReviewDocument] = useState<KycDocumentResponse | null>(null);
+  const [correction, setCorrection] = useState({ documentCode: "", correctionNote: "", deadlineDays: 7 });
+  const [ocrCode, setOcrCode] = useState("");
+  const [review, setReview] = useState<KycDocumentResponse | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadForm, setUploadForm] = useState({
-    documentTypeCode: "",
-    side: "FRONT",
-    documentNumber: "",
-    issueDate: "",
-    expiryDate: "",
-  });
-  const [selectedDetailsDocumentCode, setSelectedDetailsDocumentCode] =
-    useState("");
-  const [detailsForm, setDetailsForm] = useState({
-    documentNumber: "",
-    issueDate: "",
-    expiryDate: "",
-  });
+  const [uploadForm, setUploadForm] = useState({ documentTypeCode: "", side: "FRONT", documentNumber: "", issueDate: "", expiryDate: "" });
+  const [detailsCode, setDetailsCode] = useState("");
+  const [detailsForm, setDetailsForm] = useState({ documentNumber: "", issueDate: "", expiryDate: "" });
 
-  const fail = (e: any, fallback: string) => {
-    setError(e?.response?.data?.message || e?.message || fallback);
-    setMessage(null);
-  };
-  const success = (text: string) => {
-    setMessage(text);
-    setError(null);
-  };
-
-  const caseQuery = useQuery({
-    queryKey: ["kyc-case-detail", code],
-    queryFn: () => kycService.getKycCase(code!),
-    enabled: !!code,
-  });
-
-  const documentTypesQuery = useQuery({
-    queryKey: ["kyc-document-types", caseQuery.data?.ownerType],
-    queryFn: () =>
-      documentService.getDocumentTypes(
-        String(caseQuery.data!.ownerType),
-        true,
-      ),
-    enabled: !!caseQuery.data?.ownerType,
-  });
-
-  const missingQuery = useQuery({
-    queryKey: ["kyc-case-missing-requirements", code],
-    queryFn: () => kycService.getKycMissingRequirements(code!),
-    enabled: !!code,
-  });
-
-  const requirementsQuery = useQuery({
-    queryKey: ["kyc-case-requirements", code],
-    queryFn: () => documentService.getKycCaseRequirements(code!),
-    enabled: !!code,
-  });
-
-  const reviewQueueQuery = useQuery({
-    queryKey: ["kyc-case-review-queue", code],
-    queryFn: () => documentService.getKycCaseReviewQueue(code!),
-    enabled: !!code,
-  });
-
-  const notesQuery = useQuery({
-    queryKey: ["kyc-case-notes", code],
-    queryFn: () => kycService.getNotes(code!),
-    enabled: !!code,
-  });
-
-  const timelineQuery = useQuery({
-    queryKey: ["kyc-case-timeline", code],
-    queryFn: () => kycService.getTimeline(code!),
-    enabled: !!code,
-  });
-
-  const expiryQuery = useQuery({
-    queryKey: ["kyc-case-expiry", code],
-    queryFn: () => kycService.getExpiryStatus(code!),
-    enabled: !!code,
-  });
-
-  const ocrQuery = useQuery({
-    queryKey: ["kyc-document-ocr", ocrDocumentCode],
-    queryFn: () => documentService.getOcrResult(ocrDocumentCode),
-    enabled: !!ocrDocumentCode,
-  });
-
+  const caseQuery = useQuery({ queryKey: ["kyc-case-detail", code], queryFn: () => kycService.getKycCase(code!), enabled: !!code });
   const kycCase = caseQuery.data;
+  const typesQuery = useQuery({
+    queryKey: ["kyc-document-types", kycCase?.ownerType],
+    queryFn: () => documentService.getDocumentTypes(String(kycCase!.ownerType), true),
+    enabled: !!kycCase?.ownerType,
+  });
+  const missingQuery = useQuery({ queryKey: ["kyc-case-missing-requirements", code], queryFn: () => kycService.getKycMissingRequirements(code!), enabled: !!code });
+  const reqQuery = useQuery({ queryKey: ["kyc-case-requirements", code], queryFn: () => documentService.getKycCaseRequirements(code!), enabled: !!code });
+  const queueQuery = useQuery({ queryKey: ["kyc-case-review-queue", code], queryFn: () => documentService.getKycCaseReviewQueue(code!), enabled: !!code });
+  const notesQuery = useQuery({ queryKey: ["kyc-case-notes", code], queryFn: () => kycService.getNotes(code!), enabled: !!code });
+  const timelineQuery = useQuery({ queryKey: ["kyc-case-timeline", code], queryFn: () => kycService.getTimeline(code!), enabled: !!code });
+  const expiryQuery = useQuery({ queryKey: ["kyc-case-expiry", code], queryFn: () => kycService.getExpiryStatus(code!), enabled: !!code });
+  const ocrQuery = useQuery({ queryKey: ["kyc-document-ocr", ocrCode], queryFn: () => documentService.getOcrResult(ocrCode), enabled: !!ocrCode });
+
   const documents = useMemo<KycDocumentResponse[]>(() => {
-    const detailDocuments = kycCase?.documents || [];
-    const queuedDocuments = reviewQueueQuery.data || [];
     const merged = new Map<string, KycDocumentResponse>();
-    [...detailDocuments, ...queuedDocuments].forEach((document) => {
-      const documentCode = getDocumentCode(document);
-      if (documentCode) merged.set(documentCode, document);
+    [...(kycCase?.documents ?? []), ...(queueQuery.data ?? [])].forEach((d) => {
+      const c = docCode(d);
+      if (c) merged.set(c, d);
     });
     return Array.from(merged.values());
-  }, [kycCase?.documents, reviewQueueQuery.data]);
+  }, [kycCase?.documents, queueQuery.data]);
 
-  const availableDocumentTypes = useMemo(
-    () =>
-      (documentTypesQuery.data || []).filter(
-        (type) =>
-          String(type.category).toUpperCase() === "KYC" ||
-          String(type.ownerType || "") === String(kycCase?.ownerType || ""),
-      ),
-    [documentTypesQuery.data, kycCase?.ownerType],
+  const docTypes = useMemo(
+    () => (typesQuery.data ?? []).filter((t) => String(t.category).toUpperCase() === "KYC" || String(t.ownerType ?? "") === String(kycCase?.ownerType ?? "")),
+    [typesQuery.data, kycCase?.ownerType],
   );
+  const detailsDoc = documents.find((d) => docCode(d) === detailsCode) ?? null;
 
-  const selectedDetailsDocument = useMemo(
-    () =>
-      documents.find(
-        (document) =>
-          getDocumentCode(document) === selectedDetailsDocumentCode,
-      ) || null,
-    [documents, selectedDetailsDocumentCode],
+  const invalidate = () =>
+    Promise.all(
+      [
+        ["kyc-case-detail", code],
+        ["kycCases"],
+        ["kyc-dashboard"],
+        ["kyc-my-queue"],
+        ["kyc-case-review-queue", code],
+        ["kyc-case-requirements", code],
+        ["kyc-case-missing-requirements", code],
+        ["kyc-case-notes", code],
+        ["kyc-case-timeline", code],
+        ["kyc-case-expiry", code],
+      ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+    );
+
+  /** Mutation du dossier : rafraîchit les données liées puis confirme par un toast */
+  function useCaseMutation<V = void>(fn: (v: V) => Promise<unknown>, ok: string, fail: string, after?: () => void) {
+    return useMutation({
+      mutationFn: fn,
+      onSuccess: async () => {
+        await invalidate();
+        toast.success(ok);
+        after?.();
+      },
+      onError: (e) => {
+        const msg = apiMessage(e, fail);
+        setReviewError(msg);
+        toast.error(msg);
+      },
+    });
+  }
+
+  const submit = useCaseMutation(() => kycService.submitKycCase(code!), "Dossier soumis pour revue", "Soumission impossible");
+  const approveCase = useCaseMutation(() => kycService.approveKycCase(code!, reviewerId, decisionComment || undefined), "Dossier approuvé", "Approbation impossible", () => setDecisionComment(""));
+  const rejectCase = useCaseMutation(() => kycService.rejectKycCase(code!, reviewerId, decisionComment.trim()), "Dossier rejeté", "Rejet impossible", () => setDecisionComment(""));
+  const assign = useCaseMutation(
+    () => kycService.assignKycCase(code!, assignMode === "id" ? { assignedTo: Number(assignValue) } : { email: assignValue.trim() }),
+    "Dossier assigné",
+    "Assignation impossible",
+    () => setAssignValue(""),
   );
-
-  const invalidateCase = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["kyc-case-detail", code] }),
-      queryClient.invalidateQueries({ queryKey: ["kycCases"] }),
-      queryClient.invalidateQueries({ queryKey: ["kyc-dashboard"] }),
-      queryClient.invalidateQueries({ queryKey: ["kyc-my-queue"] }),
-      queryClient.invalidateQueries({ queryKey: ["kyc-case-review-queue", code] }),
-      queryClient.invalidateQueries({ queryKey: ["kyc-case-requirements", code] }),
-      queryClient.invalidateQueries({
-        queryKey: ["kyc-case-missing-requirements", code],
-      }),
-      queryClient.invalidateQueries({ queryKey: ["kyc-case-notes", code] }),
-      queryClient.invalidateQueries({ queryKey: ["kyc-case-timeline", code] }),
-      queryClient.invalidateQueries({ queryKey: ["kyc-case-expiry", code] }),
-    ]);
-  };
-
-  const submitMutation = useMutation({
-    mutationFn: () => kycService.submitKycCase(code!),
-    onSuccess: async () => {
-      await invalidateCase();
-      success("Dossier soumis pour revue.");
-    },
-    onError: (e) => fail(e, "Impossible de soumettre le dossier."),
-  });
-
-  const approveCaseMutation = useMutation({
-    mutationFn: () =>
-      kycService.approveKycCase(code!, reviewerId, decisionComment || undefined),
-    onSuccess: async () => {
-      await invalidateCase();
-      setDecisionComment("");
-      success("Dossier approuvé.");
-    },
-    onError: (e) => fail(e, "Impossible d'approuver le dossier."),
-  });
-
-  const rejectCaseMutation = useMutation({
-    mutationFn: () =>
-      kycService.rejectKycCase(code!, reviewerId, decisionComment.trim()),
-    onSuccess: async () => {
-      await invalidateCase();
-      setDecisionComment("");
-      success("Dossier rejeté.");
-    },
-    onError: (e) => fail(e, "Impossible de rejeter le dossier."),
-  });
-
-  const assignMutation = useMutation({
-    mutationFn: () =>
-      kycService.assignKycCase(
-        code!,
-        assignMode === "id"
-          ? { assignedTo: Number(assignValue) }
-          : { email: assignValue.trim() },
-      ),
-    onSuccess: async () => {
-      await invalidateCase();
-      setAssignValue("");
-      success("Dossier assigné.");
-    },
-    onError: (e) => fail(e, "Impossible d'assigner le dossier."),
-  });
-
-  const riskMutation = useMutation({
-    mutationFn: () =>
-      kycService.updateRiskLevel(
-        code!,
-        riskLevel,
-        reviewerId,
-        riskComment || undefined,
-      ),
-    onSuccess: async () => {
-      await invalidateCase();
-      setRiskComment("");
-      success("Niveau de risque mis à jour.");
-    },
-    onError: (e) => fail(e, "Impossible de modifier le risque."),
-  });
-
-  const addRequirementMutation = useMutation({
-    mutationFn: () =>
-      documentService.addKycCaseRequirement(code!, {
-        documentTypeCode: requirementForm.documentTypeCode.trim(),
-        documentTypeName: requirementForm.documentTypeName.trim() || undefined,
-        required: requirementForm.required,
-      }),
-    onSuccess: async () => {
-      await invalidateCase();
-      setRequirementForm({
-        documentTypeCode: "",
-        documentTypeName: "",
-        required: true,
-      });
-      success("Exigence ajoutée.");
-    },
-    onError: (e) => fail(e, "Impossible d'ajouter l'exigence."),
-  });
-
-  const removeRequirementMutation = useMutation({
-    mutationFn: (documentTypeCode: string) =>
-      documentService.removeKycCaseRequirement(code!, documentTypeCode),
-    onSuccess: async () => {
-      await invalidateCase();
-      success("Exigence retirée.");
-    },
-    onError: (e) => fail(e, "Impossible de retirer l'exigence."),
-  });
-
-  const addNoteMutation = useMutation({
-    mutationFn: () =>
-      kycService.addNote(code!, {
-        content: noteContent.trim(),
-        authorId: reviewerId,
-        authorName: admin?.email || "Admin",
-        internal: noteInternal,
-      }),
-    onSuccess: async () => {
-      await invalidateCase();
-      setNoteContent("");
-      success("Note ajoutée.");
-    },
-    onError: (e) => fail(e, "Impossible d'ajouter la note."),
-  });
-
-  const approveDocumentsMutation = useMutation({
-    mutationFn: () =>
-      documentService.bulkApproveKycCaseDocuments(
-        code!,
-        selectedDocumentCodes,
-        reviewerId,
-      ),
-    onSuccess: async () => {
-      await invalidateCase();
-      setSelectedDocumentCodes([]);
-      success("Documents approuvés.");
-    },
-    onError: (e) => fail(e, "Impossible d'approuver les documents."),
-  });
-
-  const rejectDocumentsMutation = useMutation({
-    mutationFn: () =>
-      documentService.bulkRejectKycCaseDocuments(
-        code!,
-        selectedDocumentCodes.map((documentCode) => ({
-          documentCode,
-          reason:
-            rejectReasons[documentCode]?.trim() || "Document non conforme",
-        })),
-        reviewerId,
-      ),
-    onSuccess: async () => {
-      await invalidateCase();
-      setSelectedDocumentCodes([]);
+  const risk = useCaseMutation(() => kycService.updateRiskLevel(code!, riskLevel as KycRiskLevel, reviewerId, riskComment || undefined), "Niveau de risque mis à jour", "Modification du risque impossible", () => setRiskComment(""));
+  const addReq = useCaseMutation(
+    () => documentService.addKycCaseRequirement(code!, { documentTypeCode: reqForm.documentTypeCode.trim(), documentTypeName: reqForm.documentTypeName.trim() || undefined, required: reqForm.required }),
+    "Exigence ajoutée",
+    "Ajout impossible",
+    () => setReqForm({ documentTypeCode: "", documentTypeName: "", required: true }),
+  );
+  const removeReq = useCaseMutation((c: string) => documentService.removeKycCaseRequirement(code!, c), "Exigence retirée", "Retrait impossible");
+  const addNote = useCaseMutation(
+    () => kycService.addNote(code!, { content: noteContent.trim(), authorId: reviewerId, authorName: admin?.email || "Admin", internal: noteInternal }),
+    "Note ajoutée",
+    "Ajout de la note impossible",
+    () => setNoteContent(""),
+  );
+  const approveDocs = useCaseMutation(() => documentService.bulkApproveKycCaseDocuments(code!, selected, reviewerId), "Documents approuvés", "Approbation impossible", () => setSelected([]));
+  const rejectDocs = useCaseMutation(
+    () => documentService.bulkRejectKycCaseDocuments(code!, selected.map((documentCode) => ({ documentCode, reason: rejectReasons[documentCode].trim() })), reviewerId),
+    "Documents rejetés",
+    "Rejet impossible",
+    () => {
+      setSelected([]);
       setRejectReasons({});
-      success("Documents rejetés.");
+      setRejecting(false);
     },
-    onError: (e) => fail(e, "Impossible de rejeter les documents."),
-  });
-
-  const correctionMutation = useMutation({
-    mutationFn: () =>
-      documentService.requestKycCaseDocumentCorrection(code!, {
-        documentCode: correction.documentCode,
-        reviewedBy: reviewerId,
-        correctionNote: correction.correctionNote.trim(),
-        deadlineDays: correction.deadlineDays,
-      }),
-    onSuccess: async () => {
-      await invalidateCase();
-      setCorrection({
-        documentCode: "",
-        correctionNote: "",
-        deadlineDays: 7,
-      });
-      success("Demande de correction envoyée.");
-    },
-    onError: (e) => fail(e, "Impossible de demander la correction."),
-  });
-
-
-  const approveSingleDocumentMutation = useMutation({
-    mutationFn: (documentCode: string) =>
-      documentService.bulkApproveKycCaseDocuments(
-        code!,
-        [documentCode],
-        reviewerId,
-      ),
-    onSuccess: async () => {
-      await invalidateCase();
-      setReviewDocument(null);
-      success("Document approuvé.");
-    },
-    onError: (e) => fail(e, "Impossible d'approuver le document."),
-  });
-
-  const rejectSingleDocumentMutation = useMutation({
-    mutationFn: ({
-      documentCode,
-      reason,
-    }: {
-      documentCode: string;
-      reason: string;
-    }) =>
-      documentService.bulkRejectKycCaseDocuments(
-        code!,
-        [{ documentCode, reason }],
-        reviewerId,
-      ),
-    onSuccess: async () => {
-      await invalidateCase();
-      setReviewDocument(null);
-      success("Document rejeté.");
-    },
-    onError: (e) => fail(e, "Impossible de rejeter le document."),
-  });
-
-  const correctSingleDocumentMutation = useMutation({
-    mutationFn: ({
-      documentCode,
-      correctionNote,
-      deadlineDays,
-    }: {
-      documentCode: string;
-      correctionNote: string;
-      deadlineDays: number;
-    }) =>
-      documentService.requestKycCaseDocumentCorrection(code!, {
-        documentCode,
-        reviewedBy: reviewerId,
-        correctionNote,
-        deadlineDays,
-      }),
-    onSuccess: async () => {
-      await invalidateCase();
-      setReviewDocument(null);
-      success("Demande de correction envoyée.");
-    },
-    onError: (e) => fail(e, "Impossible de demander la correction."),
-  });
-
-  const uploadMutation = useMutation({
-    mutationFn: () => {
-      if (!uploadFile || !kycCase?.ownerCode) {
-        throw new Error("Fichier ou code propriétaire manquant.");
-      }
-      return documentService.uploadKycDocumentAsAdmin({
+  );
+  const askCorrection = useCaseMutation(
+    () => documentService.requestKycCaseDocumentCorrection(code!, { documentCode: correction.documentCode, reviewedBy: reviewerId, correctionNote: correction.correctionNote.trim(), deadlineDays: correction.deadlineDays }),
+    "Demande de correction envoyée",
+    "Demande impossible",
+    () => setCorrection({ documentCode: "", correctionNote: "", deadlineDays: 7 }),
+  );
+  const closeReview = () => {
+    setReview(null);
+    setReviewError(null);
+  };
+  const reviewApprove = useCaseMutation((c: string) => documentService.bulkApproveKycCaseDocuments(code!, [c], reviewerId), "Document approuvé", "Approbation impossible", closeReview);
+  const reviewReject = useCaseMutation((v: { documentCode: string; reason: string }) => documentService.bulkRejectKycCaseDocuments(code!, [v], reviewerId), "Document rejeté", "Rejet impossible", closeReview);
+  const reviewCorrect = useCaseMutation(
+    (v: { documentCode: string; correctionNote: string; deadlineDays: number }) => documentService.requestKycCaseDocumentCorrection(code!, { ...v, reviewedBy: reviewerId }),
+    "Demande de correction envoyée",
+    "Demande impossible",
+    closeReview,
+  );
+  const upload = useCaseMutation(
+    async () => {
+      if (!uploadFile || !kycCase?.ownerCode) throw new Error("Fichier ou code propriétaire manquant.");
+      const data = await documentService.uploadKycDocumentAsAdmin({
         ownerType: String(kycCase.ownerType),
         ownerCode: kycCase.ownerCode,
         documentTypeCode: uploadForm.documentTypeCode.trim(),
@@ -511,1206 +189,601 @@ export const KycCaseDetailPage: React.FC = () => {
         expiryDate: uploadForm.expiryDate || undefined,
         file: uploadFile,
       });
+      setDetailsCode(data.documentCode || "");
+      return data;
     },
-    onSuccess: async (data) => {
-      await invalidateCase();
-      setUploadFile(null);
-      setSelectedDetailsDocumentCode(data.documentCode || "");
-      success("Document uploadé pour le propriétaire.");
+    "Document envoyé pour le propriétaire",
+    "Envoi impossible",
+    () => setUploadFile(null),
+  );
+  const updateDetails = useCaseMutation(
+    async () => {
+      if (!detailsDoc?.id) throw new Error("Le document n'a pas d'identifiant technique.");
+      return documentService.updateKycDocumentAdminDetails(detailsDoc.id, {
+        documentNumber: detailsForm.documentNumber || undefined,
+        issueDate: detailsForm.issueDate || undefined,
+        expiryDate: detailsForm.expiryDate || undefined,
+      });
     },
-    onError: (e) => fail(e, "Impossible d'uploader le document."),
+    "Informations du document mises à jour",
+    "Mise à jour impossible",
+  );
+  const exportPdf = useMutation({
+    mutationFn: async () => saveBlob(await kycService.exportPdf(code!, true), `kyc_${code}.pdf`),
+    onError: (e) => toast.error(apiMessage(e, "Export impossible")),
   });
 
-  const updateDetailsMutation = useMutation({
-    mutationFn: () => {
-      if (!selectedDetailsDocument?.id) {
-        throw new Error(
-          "Le document sélectionné ne contient pas son identifiant technique.",
-        );
-      }
-
-      return documentService.updateKycDocumentAdminDetails(
-        selectedDetailsDocument.id,
-        {
-          documentNumber: detailsForm.documentNumber || undefined,
-          issueDate: detailsForm.issueDate || undefined,
-          expiryDate: detailsForm.expiryDate || undefined,
-        },
-      );
-    },
-    onSuccess: async () => {
-      await invalidateCase();
-      success("Métadonnées du document mises à jour.");
-    },
-    onError: (e) => fail(e, "Impossible de mettre à jour les métadonnées."),
-  });
-
-  const exportPdf = async () => {
-    try {
-      const blob = await kycService.exportPdf(code!, true);
-      downloadBlob(blob, `kyc_${code}.pdf`);
-    } catch (e) {
-      fail(e, "Impossible d'exporter le dossier.");
-    }
-  };
-
-  const toggleDocument = (documentCode: string) => {
-    setSelectedDocumentCodes((current) =>
-      current.includes(documentCode)
-        ? current.filter((item) => item !== documentCode)
-        : [...current, documentCode],
-    );
-  };
-
-  if (!code) {
-    return (
-      <AdminLayout>
-        <div className={panelClass}>Code du dossier manquant.</div>
-      </AdminLayout>
-    );
-  }
-
-  if (caseQuery.isLoading) {
-    return (
-      <AdminLayout>
-        <div className="py-16 text-center text-gray-500">
-          <Loader2 className="mx-auto mb-3 animate-spin" />
-          Chargement du dossier KYC…
-        </div>
-      </AdminLayout>
-    );
-  }
-
-  if (!kycCase) {
-    return (
-      <AdminLayout>
-        <div className={panelClass}>Dossier KYC introuvable.</div>
-      </AdminLayout>
-    );
-  }
-
-  const requirements = requirementsQuery.data || [];
-  const missingRequirements = missingQuery.data || [];
-  const isBusy =
-    submitMutation.isPending ||
-    approveCaseMutation.isPending ||
-    rejectCaseMutation.isPending ||
-    assignMutation.isPending ||
-    riskMutation.isPending;
-
-  return (
+  const shell = (children: React.ReactNode) => (
     <AdminLayout>
-      <div className="mx-auto w-full max-w-7xl space-y-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div>
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="mb-3 inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900"
-            >
-              <ArrowLeft size={17} /> Retour
-            </button>
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-bold text-gray-950">
-                {kycCase.ownerName || "Dossier KYC"}
-              </h1>
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                  statusColor[String(kycCase.status)] ||
-                  "bg-gray-100 text-gray-700"
-                }`}
-              >
-                {statusLabel[String(kycCase.status)] || kycCase.status}
-              </span>
+      <div style={brandVars}>
+        <Toaster />
+        <div className="mx-auto w-full max-w-4xl">{children}</div>
+      </div>
+    </AdminLayout>
+  );
+
+  if (!code) return shell(<EmptyState icon={FileX2} title="Code du dossier manquant" />);
+  if (caseQuery.isLoading) return shell(<DetailsSkeleton />);
+  if (caseQuery.isError || !kycCase) {
+    return shell(<EmptyState icon={FileX2} title="Dossier KYC introuvable" hint="Il a peut-être été supprimé, ou le code est incorrect." action={<ActionButton onClick={() => navigate("/documents")}>Retour aux documents</ActionButton>} />);
+  }
+
+  const requirements = reqQuery.data ?? [];
+  const missing = missingQuery.data ?? [];
+  const notes = notesQuery.data ?? [];
+  const timeline = timelineQuery.data ?? [];
+  const expiry = expiryQuery.data ?? [];
+  const busy = submit.isPending || approveCase.isPending || rejectCase.isPending;
+  const toggle = (c: string) => setSelected((p) => (p.includes(c) ? p.filter((x) => x !== c) : [...p, c]));
+
+  const tabs: TabItem<Tab>[] = [
+    { id: "overview", label: "Vue générale", icon: ShieldCheck },
+    { id: "documents", label: "Documents", icon: FileCheck2, count: documents.length },
+    { id: "requirements", label: "Exigences", icon: FileText, count: missing.length || undefined },
+    { id: "notes", label: "Notes", icon: MessageSquare, count: notes.length || undefined },
+    { id: "timeline", label: "Historique", icon: History },
+    { id: "expiry", label: "Expiration", icon: CalendarClock },
+    { id: "ocr", label: "OCR", icon: ScanSearch },
+    { id: "upload", label: "Envoi admin", icon: Upload },
+  ];
+
+  const ocr = ocrQuery.data as (typeof ocrQuery.data & Record<string, unknown>) | undefined;
+  const score = ocr?.confidenceScore !== undefined ? Math.round(Number(ocr.confidenceScore) <= 1 ? Number(ocr.confidenceScore) * 100 : Number(ocr.confidenceScore)) : undefined;
+  const rawOcr = ocr?.rawOcrJson ? (typeof ocr.rawOcrJson === "string" ? ocr.rawOcrJson : JSON.stringify(ocr.rawOcrJson, null, 2)) : undefined;
+
+  return shell(
+    <>
+      <PageHeader
+        title={kycCase.ownerName || "Dossier KYC"}
+        onBack={() => navigate(-1)}
+        badge={<KycStatusChip status={String(kycCase.status)} />}
+        subtitle={
+          <span>
+            <span className="font-mono">{kycCase.code}</span> · {label(OWNER_LABEL, String(kycCase.ownerType))} · {kycCase.ownerCode || "Code indisponible"}
+          </span>
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <RefreshButton fetching={caseQuery.isFetching} onClick={() => caseQuery.refetch()} />
+            <ActionButton variant="ghost" icon={Download} pending={exportPdf.isPending} onClick={() => exportPdf.mutate()}>
+              Export PDF
+            </ActionButton>
+            <ActionButton icon={FileCheck2} pending={submit.isPending} disabled={busy} onClick={() => submit.mutate()}>
+              Soumettre
+            </ActionButton>
+          </div>
+        }
+      />
+
+      <div className="mb-5">
+        <Tabs items={tabs} active={tab} onChange={setTab} />
+      </div>
+
+      {tab === "overview" && (
+        <div className="space-y-4">
+          <Card title="Synthèse du dossier">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Detail label="Propriétaire">{kycCase.ownerName}</Detail>
+              <Detail label="Code propriétaire" mono>{kycCase.ownerCode}</Detail>
+              <Detail label="Niveau KYC">{kycCase.kycLevel !== undefined ? String(kycCase.kycLevel) : undefined}</Detail>
+              <Detail label="Risque">{kycCase.riskLevel ? <RiskChip level={String(kycCase.riskLevel)} /> : "Non évalué"}</Detail>
+              <Detail label="Assigné à">{kycCase.assignedToEmail || (kycCase.assignedTo ? `Agent #${kycCase.assignedTo}` : "Non assigné")}</Detail>
+              <Detail label="Échéance SLA">{kycCase.slaDeadline ? formatDateTime(kycCase.slaDeadline) : "Aucune"}</Detail>
+              <Detail label="Documents">{String(kycCase.documents?.length ?? 0)}</Detail>
+              <Detail label="Exigences manquantes">{String(missing.length)}</Detail>
+              <Detail label="Décision">{kycCase.decisionComment}</Detail>
             </div>
-            <p className="mt-1 font-mono text-sm text-gray-500">
-              {kycCase.code}
-            </p>
-            <p className="mt-1 text-sm text-gray-500">
-              {kycCase.ownerType} · {kycCase.ownerCode || "Code indisponible"}
-            </p>
-          </div>
+          </Card>
 
-          <div className="flex flex-wrap gap-2">
-            <button className={softButton} onClick={() => caseQuery.refetch()}>
-              <RefreshCw size={16} /> Actualiser
-            </button>
-            <button className={softButton} onClick={exportPdf}>
-              <Download size={16} /> Export PDF
-            </button>
-            <button
-              className={primaryButton}
-              onClick={() => submitMutation.mutate()}
-              disabled={isBusy}
-            >
-              <FileCheck2 size={16} /> Soumettre
-            </button>
-          </div>
-        </div>
+          <Card title="Décision sur le dossier">
+            <Field label="Commentaire ou motif" hint="Le motif est obligatoire pour un rejet.">
+              <textarea value={decisionComment} onChange={(e) => setDecisionComment(e.target.value)} rows={3} className={`${FIELD_SOFT} resize-none`} />
+            </Field>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <ActionButton icon={CheckCircle2} pending={approveCase.isPending} disabled={busy} onClick={() => approveCase.mutate()}>
+                Approuver
+              </ActionButton>
+              <ActionButton variant="danger" icon={XCircle} pending={rejectCase.isPending} disabled={busy || !decisionComment.trim()} onClick={() => rejectCase.mutate()}>
+                Rejeter
+              </ActionButton>
+            </div>
+          </Card>
 
-        {(error || message) && (
-          <div
-            className={`rounded-2xl px-4 py-3 text-sm ring-1 ${
-              error
-                ? "bg-red-50 text-red-700 ring-red-100"
-                : "bg-green-50 text-green-700 ring-green-100"
-            }`}
-          >
-            {error || message}
-          </div>
-        )}
-
-        <div className="overflow-x-auto rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-gray-100 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="flex min-w-max gap-1">
-            {tabs.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => setActiveTab(id)}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium ${
-                  activeTab === id
-                    ? "bg-gray-950 text-white"
-                    : "text-gray-600 hover:bg-gray-50"
-                }`}
-              >
-                <Icon size={16} /> {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {activeTab === "overview" && (
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_1fr]">
-            <section className={panelClass}>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Synthèse du dossier
-              </h2>
-              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Info label="Propriétaire" value={kycCase.ownerName || "—"} />
-                <Info label="Code propriétaire" value={kycCase.ownerCode || "—"} />
-                <Info label="Niveau KYC" value={String(kycCase.kycLevel ?? "—")} />
-                <Info label="Risque" value={String(kycCase.riskLevel || "—")} />
-                <Info
-                  label="Assigné à"
-                  value={
-                    kycCase.assignedToEmail ||
-                    (kycCase.assignedTo
-                      ? `Agent #${kycCase.assignedTo}`
-                      : "Non assigné")
-                  }
-                />
-                <Info label="Échéance SLA" value={kycCase.slaDeadline || "—"} />
-                <Info
-                  label="Documents"
-                  value={String(kycCase.documents?.length || 0)}
-                />
-                <Info
-                  label="Exigences manquantes"
-                  value={String(missingRequirements.length)}
-                />
-              </div>
-            </section>
-
-            <div className="space-y-6">
-              <section className={panelClass}>
-                <h2 className="font-semibold text-gray-900">
-                  Décision sur le dossier
-                </h2>
-                <textarea
-                  value={decisionComment}
-                  onChange={(e) => setDecisionComment(e.target.value)}
-                  rows={3}
-                  placeholder="Commentaire ou motif de décision"
-                  className={`${inputClass} mt-4 resize-none`}
-                />
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => approveCaseMutation.mutate()}
-                    disabled={isBusy}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
-                  >
-                    <CheckCircle2 size={16} /> Approuver
-                  </button>
-                  <button
-                    onClick={() => rejectCaseMutation.mutate()}
-                    disabled={isBusy || !decisionComment.trim()}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-                  >
-                    <XCircle size={16} /> Rejeter
-                  </button>
-                </div>
-              </section>
-
-              <section className={panelClass}>
-                <h2 className="font-semibold text-gray-900">Assignation</h2>
-                <div className="mt-4 grid grid-cols-[120px_1fr] gap-2">
-                  <select
-                    value={assignMode}
-                    onChange={(e) =>
-                      setAssignMode(e.target.value as "id" | "email")
-                    }
-                    className={inputClass}
-                  >
-                    <option value="id">ID agent</option>
-                    <option value="email">Email</option>
-                  </select>
-                  <input
-                    value={assignValue}
-                    onChange={(e) => setAssignValue(e.target.value)}
-                    className={inputClass}
-                    placeholder={
-                      assignMode === "id" ? "42" : "agent@elleaose.com"
-                    }
-                  />
-                </div>
-                <button
-                  className={`${softButton} mt-3 w-full`}
-                  disabled={!assignValue.trim() || assignMutation.isPending}
-                  onClick={() => assignMutation.mutate()}
-                >
-                  <UserCheck size={16} /> Assigner
-                </button>
-              </section>
-
-              <section className={panelClass}>
-                <h2 className="font-semibold text-gray-900">Niveau de risque</h2>
-                <select
-                  value={riskLevel}
-                  onChange={(e) => setRiskLevel(e.target.value as KycRiskLevel)}
-                  className={`${inputClass} mt-4`}
-                >
-                  {riskLevels.map((level) => (
-                    <option key={level}>{level}</option>
-                  ))}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Card title="Assignation">
+              <div className="grid grid-cols-[7rem_1fr] gap-2">
+                <select value={assignMode} onChange={(e) => setAssignMode(e.target.value as "id" | "email")} className={FIELD_SOFT} aria-label="Mode d'assignation">
+                  <option value="id">ID agent</option>
+                  <option value="email">E-mail</option>
                 </select>
-                <input
-                  value={riskComment}
-                  onChange={(e) => setRiskComment(e.target.value)}
-                  className={`${inputClass} mt-2`}
-                  placeholder="Justification facultative"
-                />
-                <button
-                  className={`${softButton} mt-3 w-full`}
-                  onClick={() => riskMutation.mutate()}
-                  disabled={riskMutation.isPending}
-                >
-                  <ShieldCheck size={16} /> Mettre à jour
-                </button>
-              </section>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "documents" && (
-          <div className="space-y-6">
-            <section className={panelClass}>
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    Documents du dossier
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Sélectionnez les documents puis approuvez ou rejetez le lot.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                    disabled={
-                      selectedDocumentCodes.length === 0 ||
-                      approveDocumentsMutation.isPending
-                    }
-                    onClick={() => approveDocumentsMutation.mutate()}
-                  >
-                    <CheckCircle2 size={16} /> Approuver la sélection
-                  </button>
-                  <button
-                    className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                    disabled={
-                      selectedDocumentCodes.length === 0 ||
-                      rejectDocumentsMutation.isPending
-                    }
-                    onClick={() => rejectDocumentsMutation.mutate()}
-                  >
-                    <XCircle size={16} /> Rejeter la sélection
-                  </button>
-                </div>
+                <input value={assignValue} onChange={(e) => setAssignValue(e.target.value)} placeholder={assignMode === "id" ? "42" : "agent@exemple.com"} className={FIELD_SOFT} aria-label="Agent" />
               </div>
-
-              <div className="mt-5 space-y-3">
-                {documents.length === 0 ? (
-                  <div className="rounded-xl bg-gray-50 p-8 text-center text-sm text-gray-500">
-                    Aucun document dans ce dossier.
-                  </div>
-                ) : (
-                  documents.map((document) => {
-                    const documentCode = getDocumentCode(document);
-                    const selected = selectedDocumentCodes.includes(documentCode);
-                    return (
-                      <div
-                        key={documentCode}
-                        className={`rounded-2xl p-4 ring-1 ${
-                          selected
-                            ? "bg-primary-50 ring-primary-200"
-                            : "bg-gray-50 ring-gray-100"
-                        }`}
-                      >
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                          <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
-                            <input
-                              type="checkbox"
-                              checked={selected}
-                              onChange={() => toggleDocument(documentCode)}
-                              className="mt-1"
-                            />
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="font-semibold text-gray-900">
-                                  {document.documentTypeName ||
-                                    document.documentTypeCode ||
-                                    document.documentType ||
-                                    "Document KYC"}
-                                </p>
-                                <span
-                                  className={`rounded-full px-2 py-0.5 text-xs ${
-                                    statusColor[String(document.status)] ||
-                                    "bg-gray-100 text-gray-600"
-                                  }`}
-                                >
-                                  {document.status}
-                                </span>
-                              </div>
-                              <p className="mt-1 break-all font-mono text-xs text-gray-500">
-                                {documentCode}
-                              </p>
-                              <p className="mt-1 text-xs text-gray-500">
-                                {document.fileName || "Fichier"} ·{" "}
-                                {document.documentNumber || "Numéro non renseigné"}
-                              </p>
-                            </div>
-                          </label>
-
-                          <div className="flex flex-wrap gap-2">
-                            {document.previewUrl && (
-                              <a
-                                href={document.previewUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className={softButton}
-                              >
-                                <Eye size={15} /> Aperçu
-                              </a>
-                            )}
-                            {document.downloadUrl && (
-                              <a
-                                href={document.downloadUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className={softButton}
-                              >
-                                <Download size={15} /> Télécharger
-                              </a>
-                            )}
-                            <button
-                              className={softButton}
-                              onClick={() => setReviewDocument(document)}
-                            >
-                              Revoir
-                            </button>
-                            <button
-                              className={softButton}
-                              onClick={() => {
-                                setOcrDocumentCode(documentCode);
-                                setActiveTab("ocr");
-                              }}
-                            >
-                              <ScanSearch size={15} /> OCR
-                            </button>
-                          </div>
-                        </div>
-
-                        {selected && (
-                          <input
-                            value={rejectReasons[documentCode] || ""}
-                            onChange={(e) =>
-                              setRejectReasons((current) => ({
-                                ...current,
-                                [documentCode]: e.target.value,
-                              }))
-                            }
-                            className={`${inputClass} mt-3`}
-                            placeholder="Motif de rejet pour ce document"
-                          />
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </section>
-
-            <section className={panelClass}>
-              <h2 className="font-semibold text-gray-900">
-                Demander une correction
-              </h2>
-              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
-                <select
-                  value={correction.documentCode}
-                  onChange={(e) =>
-                    setCorrection((current) => ({
-                      ...current,
-                      documentCode: e.target.value,
-                    }))
-                  }
-                  className={inputClass}
-                >
-                  <option value="">Document</option>
-                  {documents.map((document) => {
-                    const documentCode = getDocumentCode(document);
-                    return (
-                      <option key={documentCode} value={documentCode}>
-                        {document.documentTypeName ||
-                          document.documentTypeCode ||
-                          documentCode}
-                      </option>
-                    );
-                  })}
-                </select>
-                <input
-                  value={correction.correctionNote}
-                  onChange={(e) =>
-                    setCorrection((current) => ({
-                      ...current,
-                      correctionNote: e.target.value,
-                    }))
-                  }
-                  className="md:col-span-2 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
-                  placeholder="Correction demandée"
-                />
-                <input
-                  type="number"
-                  min={1}
-                  value={correction.deadlineDays}
-                  onChange={(e) =>
-                    setCorrection((current) => ({
-                      ...current,
-                      deadlineDays: Number(e.target.value),
-                    }))
-                  }
-                  className={inputClass}
-                />
-              </div>
-              <button
-                className={`${softButton} mt-3`}
-                disabled={
-                  !correction.documentCode ||
-                  !correction.correctionNote.trim() ||
-                  correctionMutation.isPending
-                }
-                onClick={() => correctionMutation.mutate()}
-              >
-                <AlertCircle size={16} /> Envoyer la demande
-              </button>
-            </section>
-          </div>
-        )}
-
-        {activeTab === "requirements" && (
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.3fr_1fr]">
-            <section className={panelClass}>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Toutes les exigences configurées
-              </h2>
-              <div className="mt-4 space-y-3">
-                {requirements.length === 0 ? (
-                  <p className="text-sm text-gray-500">
-                    Aucune exigence configurée.
-                  </p>
-                ) : (
-                  requirements.map((requirement: KycCaseRequirementResponse) => (
-                    <div
-                      key={requirement.id || requirement.documentTypeCode}
-                      className="flex flex-col gap-3 rounded-xl bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {requirement.documentTypeName ||
-                            requirement.documentTypeCode}
-                        </p>
-                        <p className="font-mono text-xs text-gray-500">
-                          {requirement.documentTypeCode}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-500">
-                          {requirement.required ? "Obligatoire" : "Facultatif"} ·{" "}
-                          {requirement.active === false ? "Inactive" : "Active"}
-                        </p>
-                      </div>
-                      <button
-                        className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                        onClick={() =>
-                          removeRequirementMutation.mutate(
-                            requirement.documentTypeCode,
-                          )
-                        }
-                      >
-                        <Trash2 size={15} /> Retirer
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
-
-            <div className="space-y-6">
-              <section className={panelClass}>
-                <h2 className="font-semibold text-gray-900">
-                  Exigences documentaires manquantes
-                </h2>
-                <div className="mt-4 space-y-2">
-                  {missingRequirements.length === 0 ? (
-                    <div className="rounded-xl bg-green-50 p-4 text-sm text-green-700">
-                      Toutes les exigences sont satisfaites.
-                    </div>
-                  ) : (
-                    missingRequirements.map((requirement) => (
-                      <div
-                        key={requirement.documentTypeCode}
-                        className="rounded-xl bg-orange-50 p-3"
-                      >
-                        <p className="font-medium text-orange-800">
-                          {requirement.documentTypeName ||
-                            requirement.documentTypeCode}
-                        </p>
-                        <p className="mt-1 text-xs text-orange-700">
-                          {requirement.status || "PENDING"}
-                          {requirement.requiresBackSide
-                            ? " · Recto et verso requis"
-                            : ""}
-                        </p>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </section>
-
-              <section className={panelClass}>
-                <h2 className="font-semibold text-gray-900">
-                  Ajouter une exigence
-                </h2>
-                <div className="mt-4 space-y-3">
-                  <input
-                    value={requirementForm.documentTypeCode}
-                    onChange={(e) =>
-                      setRequirementForm((current) => ({
-                        ...current,
-                        documentTypeCode: e.target.value,
-                      }))
-                    }
-                    className={inputClass}
-                    placeholder="Code du type, ex. PASSEPORT"
-                  />
-                  <input
-                    value={requirementForm.documentTypeName}
-                    onChange={(e) =>
-                      setRequirementForm((current) => ({
-                        ...current,
-                        documentTypeName: e.target.value,
-                      }))
-                    }
-                    className={inputClass}
-                    placeholder="Nom affiché"
-                  />
-                  <label className="flex items-center gap-2 text-sm text-gray-600">
-                    <input
-                      type="checkbox"
-                      checked={requirementForm.required}
-                      onChange={(e) =>
-                        setRequirementForm((current) => ({
-                          ...current,
-                          required: e.target.checked,
-                        }))
-                      }
-                    />
-                    Exigence obligatoire
-                  </label>
-                  <button
-                    className={`${primaryButton} w-full`}
-                    disabled={
-                      !requirementForm.documentTypeCode.trim() ||
-                      addRequirementMutation.isPending
-                    }
-                    onClick={() => addRequirementMutation.mutate()}
-                  >
-                    <Plus size={16} /> Ajouter
-                  </button>
-                </div>
-              </section>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "notes" && (
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.5fr]">
-            <section className={panelClass}>
-              <h2 className="font-semibold text-gray-900">Ajouter une note</h2>
-              <textarea
-                value={noteContent}
-                onChange={(e) => setNoteContent(e.target.value)}
-                rows={6}
-                className={`${inputClass} mt-4 resize-none`}
-                placeholder="Contenu de la note"
-              />
-              <label className="mt-3 flex items-center gap-2 text-sm text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={noteInternal}
-                  onChange={(e) => setNoteInternal(e.target.checked)}
-                />
-                Note interne
-              </label>
-              <button
-                className={`${primaryButton} mt-4 w-full`}
-                disabled={!noteContent.trim() || addNoteMutation.isPending}
-                onClick={() => addNoteMutation.mutate()}
-              >
-                <Plus size={16} /> Ajouter la note
-              </button>
-            </section>
-
-            <section className={panelClass}>
-              <h2 className="font-semibold text-gray-900">Notes du dossier</h2>
-              <div className="mt-4 space-y-3">
-                {(notesQuery.data || []).length === 0 ? (
-                  <p className="text-sm text-gray-500">Aucune note.</p>
-                ) : (
-                  (notesQuery.data || []).map((note) => (
-                    <div key={note.id} className="rounded-xl bg-gray-50 p-4">
-                      <p className="text-sm text-gray-800">{note.content}</p>
-                      <p className="mt-2 text-xs text-gray-500">
-                        {note.authorName || `Auteur #${note.authorId}`} ·{" "}
-                        {note.createdAt}
-                        {note.internal ? " · Interne" : ""}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
-          </div>
-        )}
-
-        {activeTab === "timeline" && (
-          <section className={panelClass}>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Historique complet
-            </h2>
-            <div className="mt-5 space-y-4">
-              {(timelineQuery.data || []).length === 0 ? (
-                <p className="text-sm text-gray-500">Aucun événement.</p>
-              ) : (
-                (timelineQuery.data || []).map((event, index) => (
-                  <div
-                    key={event.id || `${event.timestamp}-${index}`}
-                    className="flex gap-3"
-                  >
-                    <div className="mt-1 h-3 w-3 shrink-0 rounded-full bg-primary-500" />
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {event.action || event.eventType || "Événement"}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {event.description}
-                      </p>
-                      <p className="mt-1 text-xs text-gray-400">
-                        {event.actor || event.actorName || "Système"} ·{" "}
-                        {event.timestamp || event.occurredAt || "—"}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-        )}
-
-        {activeTab === "expiry" && (
-          <section className={panelClass}>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Statut d'expiration par document
-            </h2>
-            <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
-              {(expiryQuery.data || []).length === 0 ? (
-                <p className="text-sm text-gray-500">
-                  Aucun statut d'expiration disponible.
-                </p>
-              ) : (
-                (expiryQuery.data || []).map((item) => (
-                  <div
-                    key={item.documentCode}
-                    className={`rounded-2xl p-4 ring-1 ${
-                      item.expired
-                        ? "bg-red-50 ring-red-100"
-                        : item.daysUntilExpiry <= 30
-                          ? "bg-orange-50 ring-orange-100"
-                          : "bg-gray-50 ring-gray-100"
-                    }`}
-                  >
-                    <p className="font-semibold text-gray-900">
-                      {item.documentType}
-                    </p>
-                    <p className="mt-1 font-mono text-xs text-gray-500">
-                      {item.documentCode}
-                    </p>
-                    <p className="mt-3 text-sm text-gray-700">
-                      Échéance : {item.expiryDate}
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      {item.expired
-                        ? "Document expiré"
-                        : `${item.daysUntilExpiry} jour(s) restant(s)`}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-        )}
-
-
-        {activeTab === "ocr" && (
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[380px_1fr]">
-            <section className={panelClass}>
-              <div className="flex items-center gap-2">
-                <ScanSearch size={19} className="text-primary-600" />
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Documents disponibles
-                </h2>
-              </div>
-              <p className="mt-1 text-sm text-gray-500">
-                Sélectionnez un document pour consulter les données extraites.
-              </p>
-
-              <div className="mt-5 space-y-2">
-                {documents.length === 0 ? (
-                  <div className="rounded-xl bg-gray-50 p-6 text-center text-sm text-gray-500">
-                    Aucun document disponible.
-                  </div>
-                ) : (
-                  documents.map((document) => {
-                    const documentCode = getDocumentCode(document);
-                    const selected = ocrDocumentCode === documentCode;
-                    return (
-                      <button
-                        key={documentCode}
-                        type="button"
-                        onClick={() => setOcrDocumentCode(documentCode)}
-                        className={`w-full rounded-xl p-3 text-left ring-1 transition ${
-                          selected
-                            ? "bg-primary-50 ring-primary-200"
-                            : "bg-gray-50 ring-gray-100 hover:bg-gray-100"
-                        }`}
-                      >
-                        <p className="font-medium text-gray-900">
-                          {document.documentTypeName ||
-                            document.documentTypeCode ||
-                            document.documentType ||
-                            "Document KYC"}
-                        </p>
-                        <p className="mt-1 break-all font-mono text-xs text-gray-500">
-                          {documentCode}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-400">
-                          {document.fileName || "Fichier sans nom"}
-                        </p>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </section>
-
-            <section className={panelClass}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    Résultat OCR
-                  </h2>
-                  <p className="mt-1 font-mono text-xs text-gray-500">
-                    {ocrDocumentCode || "Aucun document sélectionné"}
-                  </p>
-                </div>
-                {ocrDocumentCode && (
-                  <button
-                    type="button"
-                    onClick={() => ocrQuery.refetch()}
-                    className={softButton}
-                  >
-                    <RefreshCw
-                      size={15}
-                      className={ocrQuery.isFetching ? "animate-spin" : ""}
-                    />
-                    Actualiser
-                  </button>
-                )}
-              </div>
-
-              {!ocrDocumentCode ? (
-                <div className="mt-6 flex min-h-72 items-center justify-center rounded-2xl bg-gray-50 text-center">
-                  <div>
-                    <ScanSearch
-                      size={42}
-                      className="mx-auto mb-3 text-gray-300"
-                    />
-                    <p className="text-sm text-gray-500">
-                      Choisissez un document pour afficher son OCR.
-                    </p>
-                  </div>
-                </div>
-              ) : ocrQuery.isLoading ? (
-                <div className="mt-6 flex min-h-72 items-center justify-center">
-                  <Loader2 className="animate-spin text-primary-600" />
-                </div>
-              ) : ocrQuery.isError ? (
-                <div className="mt-6 rounded-2xl bg-red-50 p-5 text-sm text-red-700 ring-1 ring-red-100">
-                  Impossible de récupérer le résultat OCR de ce document.
-                </div>
-              ) : ocrQuery.data ? (
-                <div className="mt-6 space-y-6">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    <OcrField
-                      label="Prénom extrait"
-                      value={(ocrQuery.data as any).extractedFirstName}
-                    />
-                    <OcrField
-                      label="Nom extrait"
-                      value={(ocrQuery.data as any).extractedLastName}
-                    />
-                    <OcrField
-                      label="Date de naissance"
-                      value={(ocrQuery.data as any).extractedDateOfBirth}
-                    />
-                    <OcrField
-                      label="Nationalité"
-                      value={(ocrQuery.data as any).extractedNationality}
-                    />
-                    <OcrField
-                      label="Numéro du document"
-                      value={ocrQuery.data.extractedDocumentNumber}
-                    />
-                    <OcrField
-                      label="Date d’expiration"
-                      value={ocrQuery.data.extractedExpiryDate}
-                    />
-                    <OcrField
-                      label="Score de confiance"
-                      value={
-                        ocrQuery.data.confidenceScore !== undefined
-                          ? `${Math.round(
-                              Number(ocrQuery.data.confidenceScore) <= 1
-                                ? Number(ocrQuery.data.confidenceScore) * 100
-                                : Number(ocrQuery.data.confidenceScore),
-                            )} %`
-                          : undefined
-                      }
-                    />
-                    <OcrField
-                      label="Traité le"
-                      value={(ocrQuery.data as any).processedAt}
-                    />
-                  </div>
-
-                  {(ocrQuery.data as any).rawOcrJson && (
-                    <div className="rounded-2xl bg-gray-950 p-4 text-xs text-gray-100">
-                      <div className="mb-3 flex items-center justify-between">
-                        <p className="font-semibold">Données OCR brutes</p>
-                      </div>
-                      <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words font-mono">
-                        {typeof (ocrQuery.data as any).rawOcrJson === "string"
-                          ? (ocrQuery.data as any).rawOcrJson
-                          : JSON.stringify(
-                              (ocrQuery.data as any).rawOcrJson,
-                              null,
-                              2,
-                            )}
-                      </pre>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="mt-6 rounded-2xl bg-gray-50 p-8 text-center text-sm text-gray-500">
-                  Aucun résultat OCR disponible pour ce document.
-                </div>
-              )}
-            </section>
-          </div>
-        )}
-
-        {activeTab === "upload" && (
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <section className={panelClass}>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Upload KYC par un administrateur
-              </h2>
-              {!kycCase.ownerCode && (
-                <div className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">
-                  Le dossier ne contient pas de code propriétaire public.
-                  L'upload est bloqué pour éviter un ownerCode incorrect.
-                </div>
-              )}
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <select
-                  value={uploadForm.documentTypeCode}
-                  onChange={(e) =>
-                    setUploadForm((current) => ({
-                      ...current,
-                      documentTypeCode: e.target.value,
-                    }))
-                  }
-                  className={inputClass}
-                  disabled={documentTypesQuery.isLoading}
-                >
-                  <option value="">
-                    {documentTypesQuery.isLoading
-                      ? "Chargement des types…"
-                      : "Sélectionner un type de document"}
+              <ActionButton variant="ghost" icon={UserCheck} pending={assign.isPending} disabled={!assignValue.trim()} onClick={() => assign.mutate()}>
+                Assigner
+              </ActionButton>
+            </Card>
+            <Card title="Niveau de risque">
+              <select value={riskLevel} onChange={(e) => setRiskLevel(e.target.value)} className={FIELD_SOFT} aria-label="Niveau de risque">
+                {RISK_LEVELS.map((l) => (
+                  <option key={l} value={l}>
+                    {kycRiskLevelLabels[l] ?? l}
                   </option>
-                  {availableDocumentTypes.map((type) => (
-                    <option key={type.code} value={type.code}>
-                      {type.name} — {type.code}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={uploadForm.side}
-                  onChange={(e) =>
-                    setUploadForm((current) => ({
-                      ...current,
-                      side: e.target.value,
-                    }))
+                ))}
+              </select>
+              <input value={riskComment} onChange={(e) => setRiskComment(e.target.value)} placeholder="Justification facultative" className={FIELD_SOFT} aria-label="Justification" />
+              <ActionButton variant="ghost" icon={ShieldCheck} pending={risk.isPending} onClick={() => risk.mutate()}>
+                Mettre à jour
+              </ActionButton>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {tab === "documents" && (
+        <div className="space-y-4">
+          {review && (
+            <KycDocumentReviewPanel
+              document={review}
+              onClose={closeReview}
+              onApprove={(c) => reviewApprove.mutate(c)}
+              onReject={(documentCode, reason) => reviewReject.mutate({ documentCode, reason })}
+              onRequestCorrection={(documentCode, correctionNote, deadlineDays) => reviewCorrect.mutate({ documentCode, correctionNote, deadlineDays })}
+              isProcessing={reviewApprove.isPending || reviewReject.isPending || reviewCorrect.isPending}
+              error={reviewError}
+            />
+          )}
+
+          <Card
+            title="Documents du dossier"
+            hint="Cochez des documents pour les approuver ou les rejeter en lot."
+          >
+            {selected.length > 0 && (
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <ActionButton
+                  icon={CheckCircle2}
+                  pending={approveDocs.isPending}
+                  onClick={() =>
+                    toast.confirm({
+                      message: `Approuver ${selected.length} document${selected.length > 1 ? "s" : ""} ?`,
+                      confirmLabel: "Approuver",
+                      pendingLabel: "Approbation",
+                      successMessage: "Documents approuvés",
+                      errorMessage: "Approbation impossible",
+                      onConfirm: () => approveDocs.mutateAsync(),
+                    })
                   }
-                  className={inputClass}
                 >
+                  Approuver ({selected.length})
+                </ActionButton>
+                <ActionButton variant="danger" icon={XCircle} onClick={() => setRejecting(true)}>
+                  Rejeter ({selected.length})
+                </ActionButton>
+              </div>
+            )}
+
+            {rejecting && selected.length > 0 && (
+              <div className="space-y-3 rounded-2xl bg-gray-50 p-4">
+                <p className="text-sm font-bold text-gray-950">Motif de rejet par document</p>
+                {selected.map((c) => {
+                  const d = documents.find((x) => docCode(x) === c);
+                  return (
+                    <Field key={c} label={d ? `${docName(d)} (${c})` : c} required>
+                      <input value={rejectReasons[c] ?? ""} onChange={(e) => setRejectReasons((p) => ({ ...p, [c]: e.target.value }))} className="w-full rounded-2xl bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--logo-pink)]" />
+                    </Field>
+                  );
+                })}
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <ActionButton variant="ghost" onClick={() => setRejecting(false)} disabled={rejectDocs.isPending}>
+                    Annuler
+                  </ActionButton>
+                  <ActionButton variant="danger" pending={rejectDocs.isPending} disabled={selected.some((c) => !(rejectReasons[c] ?? "").trim())} onClick={() => rejectDocs.mutate()}>
+                    Confirmer le rejet
+                  </ActionButton>
+                </div>
+              </div>
+            )}
+
+            {queueQuery.isLoading ? (
+              <ListSkeleton rows={3} />
+            ) : documents.length === 0 ? (
+              <p className="text-sm text-gray-400">Aucun document dans ce dossier.</p>
+            ) : (
+              <div className="space-y-2">
+                {documents.map((d) => {
+                  const c = docCode(d);
+                  return (
+                    <div key={c} className={`flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-center ${selected.includes(c) ? "bg-[color:color-mix(in_srgb,var(--logo-pink)_10%,white)]" : "bg-gray-50"}`}>
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
+                        <RowCheck checked={selected.includes(c)} onChange={() => toggle(c)} name={`Sélectionner ${c}`} />
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-semibold text-gray-900">{docName(d)}</p>
+                            <DocStatusChip status={d.status} />
+                          </div>
+                          <p className="font-mono text-xs text-gray-400">{c}</p>
+                          <p className="truncate text-xs text-gray-500">
+                            {d.fileName || "Fichier"} · {d.documentNumber || "Numéro non renseigné"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {d.previewUrl && (
+                          <a href={d.previewUrl} target="_blank" rel="noreferrer" aria-label="Aperçu" title="Aperçu" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-800">
+                            <Eye size={16} />
+                          </a>
+                        )}
+                        {d.downloadUrl && (
+                          <a href={d.downloadUrl} target="_blank" rel="noreferrer" aria-label="Télécharger" title="Télécharger" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-800">
+                            <Download size={16} />
+                          </a>
+                        )}
+                        <IconButton icon={ScanSearch} label="Voir l'OCR" onClick={() => { setOcrCode(c); setTab("ocr"); }} />
+                        <ActionButton variant="ghost" className="!px-4 !py-2" onClick={() => { setReviewError(null); setReview(d); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+                          Revoir
+                        </ActionButton>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+
+          <Card title="Demander une correction">
+            <Field label="Document" required>
+              <select value={correction.documentCode} onChange={(e) => setCorrection((p) => ({ ...p, documentCode: e.target.value }))} className={FIELD_SOFT}>
+                <option value="">Choisir un document</option>
+                {documents.map((d) => (
+                  <option key={docCode(d)} value={docCode(d)}>
+                    {docName(d)} ({docCode(d)})
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Correction demandée" required>
+              <textarea value={correction.correctionNote} onChange={(e) => setCorrection((p) => ({ ...p, correctionNote: e.target.value }))} rows={3} className={`${FIELD_SOFT} resize-none`} />
+            </Field>
+            <Field label="Délai (jours)" required>
+              <input type="number" min={1} value={correction.deadlineDays} onChange={(e) => setCorrection((p) => ({ ...p, deadlineDays: Number(e.target.value) }))} className={`${FIELD_SOFT} sm:max-w-[10rem]`} />
+            </Field>
+            <ActionButton variant="ghost" pending={askCorrection.isPending} disabled={!correction.documentCode || !correction.correctionNote.trim() || correction.deadlineDays < 1} onClick={() => askCorrection.mutate()}>
+              Envoyer la demande
+            </ActionButton>
+          </Card>
+        </div>
+      )}
+
+      {tab === "requirements" && (
+        <div className="space-y-4">
+          <Card title="Exigences du dossier">
+            {reqQuery.isLoading ? (
+              <ListSkeleton rows={3} />
+            ) : reqQuery.isError ? (
+              <ErrorBlock message="Impossible de charger les exigences." onRetry={() => reqQuery.refetch()} />
+            ) : requirements.length === 0 ? (
+              <p className="text-sm text-gray-400">Aucune exigence configurée.</p>
+            ) : (
+              <div className="space-y-2">
+                {requirements.map((r) => (
+                  <div key={r.id ?? r.documentTypeCode} className="flex items-center justify-between gap-3 rounded-2xl bg-gray-50 p-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">{r.documentTypeName || r.documentTypeCode}</p>
+                      <p className="font-mono text-xs text-gray-400">{r.documentTypeCode}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Tag>{r.required ? "Obligatoire" : "Facultatif"}</Tag>
+                      {r.active === false && <Tag>Inactive</Tag>}
+                      <IconButton
+                        icon={Trash2}
+                        label="Retirer l'exigence"
+                        tone="danger"
+                        pending={removeReq.isPending && removeReq.variables === r.documentTypeCode}
+                        onClick={() =>
+                          toast.confirm({
+                            message: `Retirer l'exigence « ${r.documentTypeName || r.documentTypeCode} » ?`,
+                            confirmLabel: "Retirer",
+                            pendingLabel: "Retrait",
+                            successMessage: "Exigence retirée",
+                            errorMessage: "Retrait impossible",
+                            onConfirm: () => removeReq.mutateAsync(r.documentTypeCode),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          <Card title="Exigences manquantes">
+            {missingQuery.isLoading ? (
+              <ListSkeleton rows={2} />
+            ) : missing.length === 0 ? (
+              <p className="text-sm text-gray-400">Toutes les exigences sont satisfaites.</p>
+            ) : (
+              <div className="space-y-2">
+                {missing.map((r) => (
+                  <div key={r.documentTypeCode} className="flex items-center justify-between gap-3 rounded-2xl bg-amber-50 p-4">
+                    <p className="text-sm font-semibold text-gray-900">{r.documentTypeName || r.documentTypeCode}</p>
+                    <p className="text-xs text-amber-700">
+                      {r.status || "En attente"}
+                      {r.requiresBackSide ? " · Recto et verso requis" : ""}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          <Card title="Ajouter une exigence">
+            <Field label="Type de document" required>
+              <select
+                value={reqForm.documentTypeCode}
+                onChange={(e) => {
+                  const t = docTypes.find((x) => x.code === e.target.value);
+                  setReqForm((p) => ({ ...p, documentTypeCode: e.target.value, documentTypeName: t?.name ?? p.documentTypeName }));
+                }}
+                className={FIELD_SOFT}
+              >
+                <option value="">Choisir un type</option>
+                {docTypes.map((t) => (
+                  <option key={t.code} value={t.code}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Nom affiché">
+              <input value={reqForm.documentTypeName} onChange={(e) => setReqForm((p) => ({ ...p, documentTypeName: e.target.value }))} className={FIELD_SOFT} />
+            </Field>
+            <CheckField checked={reqForm.required} onChange={(v) => setReqForm((p) => ({ ...p, required: v }))} label="Exigence obligatoire" />
+            <ActionButton icon={Plus} pending={addReq.isPending} disabled={!reqForm.documentTypeCode.trim()} onClick={() => addReq.mutate()}>
+              Ajouter
+            </ActionButton>
+          </Card>
+        </div>
+      )}
+
+      {tab === "notes" && (
+        <div className="space-y-4">
+          <Card title="Nouvelle note">
+            <textarea value={noteContent} onChange={(e) => setNoteContent(e.target.value)} rows={4} placeholder="Contenu de la note" aria-label="Contenu de la note" className={`${FIELD_SOFT} resize-none`} />
+            <CheckField checked={noteInternal} onChange={setNoteInternal} label="Note interne" />
+            <ActionButton icon={Plus} pending={addNote.isPending} disabled={!noteContent.trim()} onClick={() => addNote.mutate()}>
+              Ajouter la note
+            </ActionButton>
+          </Card>
+          <Card title="Notes du dossier">
+            {notesQuery.isLoading ? (
+              <ListSkeleton rows={3} />
+            ) : notes.length === 0 ? (
+              <p className="text-sm text-gray-400">Aucune note pour le moment.</p>
+            ) : (
+              <div className="space-y-2">
+                {notes.map((n) => (
+                  <ItemRow key={n.id} className="!bg-gray-50 !shadow-none">
+                    <p className="text-xs text-gray-400">
+                      {n.authorName || `Auteur #${n.authorId}`} · {formatDateTime(n.createdAt)}
+                      {n.internal ? " · Interne" : ""}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">{n.content}</p>
+                  </ItemRow>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {tab === "timeline" && (
+        <Card title="Historique complet">
+          {timelineQuery.isLoading ? (
+            <ListSkeleton rows={4} />
+          ) : timeline.length === 0 ? (
+            <p className="text-sm text-gray-400">Aucun événement enregistré.</p>
+          ) : (
+            <ol className="space-y-3">
+              {timeline.map((ev, i) => (
+                <li key={ev.id ?? `${ev.timestamp}-${i}`} className="flex gap-3">
+                  <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-[color:var(--logo-pink)]" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">{ev.action || ev.eventType || "Événement"}</p>
+                    <p className="text-sm text-gray-600">{ev.description}</p>
+                    <p className="text-xs text-gray-400">
+                      {ev.actor || ev.actorName || "Système"} · {formatDateTime(ev.timestamp || ev.occurredAt)}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Card>
+      )}
+
+      {tab === "expiry" && (
+        <Card title="Expiration par document">
+          {expiryQuery.isLoading ? (
+            <ListSkeleton rows={3} />
+          ) : expiry.length === 0 ? (
+            <p className="text-sm text-gray-400">Aucun statut d'expiration disponible.</p>
+          ) : (
+            <div className="space-y-2">
+              {expiry.map((e) => (
+                <div key={e.documentCode} className={`flex items-center justify-between gap-3 rounded-2xl p-4 ${e.expired ? "bg-red-50" : e.daysUntilExpiry <= 30 ? "bg-amber-50" : "bg-gray-50"}`}>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">{e.documentType}</p>
+                    <p className="font-mono text-xs text-gray-400">{e.documentCode}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-xs text-gray-500">Échéance {dayOnly(e.expiryDate)}</p>
+                    <StatusChip tone={e.expired ? "danger" : e.daysUntilExpiry <= 30 ? "warn" : "success"}>{e.expired ? "Expiré" : `${e.daysUntilExpiry} jour(s)`}</StatusChip>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {tab === "ocr" && (
+        <div className="space-y-4">
+          <Card title="Document à analyser" hint="Choisissez un document pour consulter les données extraites.">
+            {documents.length === 0 ? (
+              <p className="text-sm text-gray-400">Aucun document disponible.</p>
+            ) : (
+              <div className="space-y-2">
+                {documents.map((d) => (
+                  <button
+                    key={docCode(d)}
+                    type="button"
+                    onClick={() => setOcrCode(docCode(d))}
+                    className={`block w-full rounded-2xl p-3 text-left transition ${ocrCode === docCode(d) ? "bg-[color:color-mix(in_srgb,var(--logo-pink)_10%,white)]" : "bg-gray-50 hover:bg-gray-100"}`}
+                  >
+                    <p className="text-sm font-semibold text-gray-900">{docName(d)}</p>
+                    <p className="font-mono text-xs text-gray-400">{docCode(d)}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          <Card title="Résultat OCR">
+            {!ocrCode ? (
+              <p className="text-sm text-gray-400">Aucun document sélectionné.</p>
+            ) : ocrQuery.isLoading ? (
+              <ListSkeleton rows={2} />
+            ) : ocrQuery.isError ? (
+              <ErrorBlock message="Impossible de récupérer le résultat OCR de ce document." onRetry={() => ocrQuery.refetch()} />
+            ) : ocr ? (
+              <>
+                <div className="grid gap-3 rounded-2xl bg-gray-50 p-3 sm:grid-cols-2">
+                  {[
+                    ["Prénom extrait", ocr.extractedFirstName],
+                    ["Nom extrait", ocr.extractedLastName],
+                    ["Date de naissance", ocr.extractedDateOfBirth],
+                    ["Nationalité", ocr.extractedNationality],
+                    ["Numéro du document", ocr.extractedDocumentNumber],
+                    ["Date d'expiration", ocr.extractedExpiryDate],
+                    ["Score de confiance", score !== undefined ? `${score} %` : undefined],
+                    ["Traité le", ocr.processedAt ? formatDateTime(String(ocr.processedAt)) : undefined],
+                  ]
+                    .filter(([, v]) => v !== undefined && v !== null && v !== "")
+                    .map(([k, v]) => (
+                      <Fact key={String(k)} title={String(k)}>
+                        {String(v)}
+                      </Fact>
+                    ))}
+                </div>
+                {rawOcr && (
+                  <details className="rounded-2xl bg-gray-50 p-4">
+                    <summary className="cursor-pointer text-sm font-semibold text-gray-700">Données brutes</summary>
+                    <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs text-gray-600">{rawOcr}</pre>
+                  </details>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-gray-400">Aucun résultat OCR pour ce document.</p>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {tab === "upload" && (
+        <div className="space-y-4">
+          <Card title="Envoi d'un document par un administrateur">
+            {!kycCase.ownerCode && <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800">Ce dossier n'a pas de code propriétaire public : l'envoi est bloqué pour éviter un rattachement incorrect.</p>}
+            <Field label="Type de document" required>
+              <select value={uploadForm.documentTypeCode} onChange={(e) => setUploadForm((p) => ({ ...p, documentTypeCode: e.target.value }))} disabled={typesQuery.isLoading} className={FIELD_SOFT}>
+                <option value="">{typesQuery.isLoading ? "Chargement des types" : "Choisir un type"}</option>
+                {docTypes.map((t) => (
+                  <option key={t.code} value={t.code}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Face">
+                <select value={uploadForm.side} onChange={(e) => setUploadForm((p) => ({ ...p, side: e.target.value }))} className={FIELD_SOFT}>
                   <option value="FRONT">Recto</option>
                   <option value="BACK">Verso</option>
                 </select>
-                <input
-                  value={uploadForm.documentNumber}
-                  onChange={(e) =>
-                    setUploadForm((current) => ({
-                      ...current,
-                      documentNumber: e.target.value,
-                    }))
-                  }
-                  className={inputClass}
-                  placeholder="Numéro du document"
-                />
-                <input
-                  type="date"
-                  value={uploadForm.issueDate}
-                  onChange={(e) =>
-                    setUploadForm((current) => ({
-                      ...current,
-                      issueDate: e.target.value,
-                    }))
-                  }
-                  className={inputClass}
-                />
-                <input
-                  type="date"
-                  value={uploadForm.expiryDate}
-                  onChange={(e) =>
-                    setUploadForm((current) => ({
-                      ...current,
-                      expiryDate: e.target.value,
-                    }))
-                  }
-                  className={inputClass}
-                />
-                <input
-                  type="file"
-                  onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                  className={inputClass}
-                  accept="application/pdf,image/jpeg,image/png,image/webp"
-                />
-              </div>
-              <button
-                className={`${primaryButton} mt-4`}
-                disabled={
-                  !kycCase.ownerCode ||
-                  !uploadFile ||
-                  !uploadForm.documentTypeCode.trim() ||
-                  uploadMutation.isPending
-                }
-                onClick={() => uploadMutation.mutate()}
+              </Field>
+              <Field label="Numéro du document">
+                <input value={uploadForm.documentNumber} onChange={(e) => setUploadForm((p) => ({ ...p, documentNumber: e.target.value }))} className={FIELD_SOFT} />
+              </Field>
+              <Field label="Date d'émission">
+                <input type="date" value={uploadForm.issueDate} onChange={(e) => setUploadForm((p) => ({ ...p, issueDate: e.target.value }))} className={FIELD_SOFT} />
+              </Field>
+              <Field label="Date d'expiration">
+                <input type="date" value={uploadForm.expiryDate} onChange={(e) => setUploadForm((p) => ({ ...p, expiryDate: e.target.value }))} className={FIELD_SOFT} />
+              </Field>
+            </div>
+            <Field label="Fichier" required>
+              <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} className={FIELD_SOFT} />
+            </Field>
+            <ActionButton icon={Upload} pending={upload.isPending} disabled={!kycCase.ownerCode || !uploadFile || !uploadForm.documentTypeCode.trim()} onClick={() => upload.mutate()}>
+              Envoyer
+            </ActionButton>
+          </Card>
+
+          <Card title="Compléter les informations d'un document" hint="Choisissez un document déjà présent dans ce dossier.">
+            <Field label="Document">
+              <select
+                value={detailsCode}
+                onChange={(e) => {
+                  setDetailsCode(e.target.value);
+                  const d = documents.find((x) => docCode(x) === e.target.value);
+                  setDetailsForm({ documentNumber: d?.documentNumber || "", issueDate: d?.issueDate || "", expiryDate: d?.expiryDate || "" });
+                }}
+                className={FIELD_SOFT}
               >
-                <Upload size={16} /> Uploader
-              </button>
-            </section>
-
-            <section className={panelClass}>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Compléter les métadonnées
-              </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Sélectionnez un document déjà présent dans ce dossier. Son
-                identifiant technique est transmis automatiquement au backend.
-              </p>
-              <div className="mt-4 space-y-3">
-                <select
-                  value={selectedDetailsDocumentCode}
-                  onChange={(e) => {
-                    const documentCode = e.target.value;
-                    setSelectedDetailsDocumentCode(documentCode);
-
-                    const selected = documents.find(
-                      (document) =>
-                        getDocumentCode(document) === documentCode,
-                    );
-
-                    setDetailsForm({
-                      documentNumber: selected?.documentNumber || "",
-                      issueDate: selected?.issueDate || "",
-                      expiryDate: selected?.expiryDate || "",
-                    });
-                  }}
-                  className={inputClass}
-                >
-                  <option value="">Sélectionner un document du dossier</option>
-                  {documents.map((document) => {
-                    const documentCode = getDocumentCode(document);
-                    return (
-                      <option
-                        key={documentCode}
-                        value={documentCode}
-                        disabled={!document.id}
-                      >
-                        {document.documentTypeName ||
-                          document.documentTypeCode ||
-                          document.documentType ||
-                          "Document KYC"}{" "}
-                        — {documentCode}
-                        {!document.id ? " (ID indisponible)" : ""}
-                      </option>
-                    );
-                  })}
-                </select>
-                {selectedDetailsDocument && (
-                  <div className="rounded-xl bg-gray-50 p-3 text-sm ring-1 ring-gray-100">
-                    <p className="font-medium text-gray-900">
-                      {selectedDetailsDocument.documentTypeName ||
-                        selectedDetailsDocument.documentTypeCode ||
-                        selectedDetailsDocument.documentType ||
-                        "Document KYC"}
-                    </p>
-                    <p className="mt-1 font-mono text-xs text-gray-500">
-                      {selectedDetailsDocument.documentCode}
-                    </p>
-                  </div>
-                )}
-
-                <input
-                  value={detailsForm.documentNumber}
-                  onChange={(e) =>
-                    setDetailsForm((current) => ({
-                      ...current,
-                      documentNumber: e.target.value,
-                    }))
-                  }
-                  className={inputClass}
-                  placeholder="Numéro du document"
-                />
-                <input
-                  type="date"
-                  value={detailsForm.issueDate}
-                  onChange={(e) =>
-                    setDetailsForm((current) => ({
-                      ...current,
-                      issueDate: e.target.value,
-                    }))
-                  }
-                  className={inputClass}
-                />
-                <input
-                  type="date"
-                  value={detailsForm.expiryDate}
-                  onChange={(e) =>
-                    setDetailsForm((current) => ({
-                      ...current,
-                      expiryDate: e.target.value,
-                    }))
-                  }
-                  className={inputClass}
-                />
-                <button
-                  className={`${softButton} w-full`}
-                  disabled={
-                    !selectedDetailsDocument?.id ||
-                    updateDetailsMutation.isPending
-                  }
-                  onClick={() => updateDetailsMutation.mutate()}
-                >
-                  Mettre à jour
-                </button>
-              </div>
-            </section>
-          </div>
-        )}
-      </div>
-
-        {reviewDocument && (
-          <DocumentReviewModal
-            document={reviewDocument}
-            onClose={() => setReviewDocument(null)}
-            onApprove={(documentCode) =>
-              approveSingleDocumentMutation.mutate(documentCode)
-            }
-            onReject={(documentCode, reason) =>
-              rejectSingleDocumentMutation.mutate({ documentCode, reason })
-            }
-            onRequestCorrection={(
-              documentCode,
-              correctionNote,
-              deadlineDays,
-            ) =>
-              correctSingleDocumentMutation.mutate({
-                documentCode,
-                correctionNote,
-                deadlineDays,
-              })
-            }
-            isProcessing={
-              approveSingleDocumentMutation.isPending ||
-              rejectSingleDocumentMutation.isPending ||
-              correctSingleDocumentMutation.isPending
-            }
-            error={error}
-          />
-        )}
-    </AdminLayout>
+                <option value="">Choisir un document</option>
+                {documents.map((d) => (
+                  <option key={docCode(d)} value={docCode(d)} disabled={!d.id}>
+                    {docName(d)} ({docCode(d)}){!d.id ? " : identifiant indisponible" : ""}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Numéro">
+                <input value={detailsForm.documentNumber} onChange={(e) => setDetailsForm((p) => ({ ...p, documentNumber: e.target.value }))} className={FIELD_SOFT} />
+              </Field>
+              <Field label="Émission">
+                <input type="date" value={detailsForm.issueDate} onChange={(e) => setDetailsForm((p) => ({ ...p, issueDate: e.target.value }))} className={FIELD_SOFT} />
+              </Field>
+              <Field label="Expiration">
+                <input type="date" value={detailsForm.expiryDate} onChange={(e) => setDetailsForm((p) => ({ ...p, expiryDate: e.target.value }))} className={FIELD_SOFT} />
+              </Field>
+            </div>
+            <ActionButton variant="ghost" pending={updateDetails.isPending} disabled={!detailsDoc?.id} onClick={() => updateDetails.mutate()}>
+              Mettre à jour
+            </ActionButton>
+          </Card>
+        </div>
+      )}
+    </>,
   );
 };
-
-const Info: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="rounded-xl bg-gray-50 p-4">
-    <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-      {label}
-    </p>
-    <p className="mt-1 break-words text-sm font-semibold text-gray-900">
-      {value}
-    </p>
-  </div>
-);
-
-
-const OcrField: React.FC<{
-  label: string;
-  value?: string | number | null;
-}> = ({ label, value }) => (
-  <div className="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-100">
-    <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-      {label}
-    </p>
-    <p className="mt-2 break-words text-sm font-semibold text-gray-900">
-      {value === undefined || value === null || value === "" ? "Non détecté" : value}
-    </p>
-  </div>
-);

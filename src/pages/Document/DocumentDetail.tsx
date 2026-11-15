@@ -1,470 +1,359 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  X,
-  Eye,
-  Download,
-  FileText,
-  AlertCircle,
-  Archive,
-  RotateCcw,
-  Tag,
-  PenLine,
-  Database,
-} from "lucide-react";
-import { ModalPortal } from "../../components/ui/ModalPortal";
+import { Archive, Database, Download, Eye, FileText, PenLine, RotateCcw, Tag as TagIcon, Trash2, X } from "lucide-react";
 import { documentService } from "../../services/document.service";
 import type { DocumentResponse } from "../../services/document.service";
+import { ActionButton, Detail, Field, IconButton, PageHeader, StatusChip, Tabs, Tag } from "../../components/subscription/kit";
+import type { TabItem } from "../../components/subscription/kit";
+import { FIELD_SOFT, apiMessage } from "../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../components/ui/Skeleton";
+import { toast } from "../../components/ui/toastStore";
+import { saveBlob } from "../../components/payment/paymentUtils";
+import { DocStatusChip } from "../../components/documents/docKit";
+import { CATEGORY_LABEL, OWNER_LABEL, SPACE_LABEL, dateTime, dayOnly, formatBytes, isPast, label } from "../../components/documents/docUtils";
 import { DocumentAccessLogsPanel } from "./DocumentAccessLogsPanel";
-
-interface DocumentDetailModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  document: DocumentResponse;
-}
 
 type Tab = "info" | "versions" | "tags" | "metadata" | "signatures" | "logs";
 
-const downloadBlob = (blob: Blob, filename: string) => {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-};
+const Card: React.FC<{ children: React.ReactNode }> = ({ children }) => <section className="rounded-[1.5rem] bg-white p-4 shadow-sm sm:p-5">{children}</section>;
 
-export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({
-  isOpen,
-  onClose,
-  document,
-}) => {
+/**
+ * Détail d'un document, affiché à la place de la liste (donc dans la mise en page avec menu et en-tête).
+ * Remplace l'ancienne fenêtre modale DocumentDetailModal.
+ */
+export const DocumentDetailView: React.FC<{ document: DocumentResponse; onBack: () => void }> = ({ document, onBack }) => {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<Tab>("info");
+  const [tab, setTab] = useState<Tab>("info");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState(false);
+  const [archiveReason, setArchiveReason] = useState("");
   const [newTag, setNewTag] = useState("");
   const [metaKey, setMetaKey] = useState("");
   const [metaValue, setMetaValue] = useState("");
-  const [signatureForm, setSignatureForm] = useState({
-    signerName: "",
-    signerEmail: "",
-    expiresAt: "",
-  });
-  const [error, setError] = useState<string | null>(null);
+  const [signature, setSignature] = useState({ signerName: "", signerEmail: "", expiresAt: "" });
 
-  const { data: freshDoc } = useQuery({
+  const { data: fresh } = useQuery({
     queryKey: ["document-detail", document.code],
     queryFn: () => documentService.getDocument(document.code),
     initialData: document,
-    enabled: isOpen,
   });
-  const doc = freshDoc || document;
-  const { data: versions = [] } = useQuery({
-    queryKey: ["document-versions", doc.code],
-    queryFn: () => documentService.getDocumentVersions(doc.code),
-    enabled: isOpen && activeTab === "versions",
-  });
-  const { data: allTags = [] } = useQuery({
-    queryKey: ["document-tags"],
-    queryFn: () => documentService.getDocumentTags(),
-    enabled: isOpen && activeTab === "tags",
-  });
-  const { data: metadata = {} } = useQuery({
-    queryKey: ["document-metadata", doc.code],
-    queryFn: () => documentService.getDocumentMetadata(doc.code),
-    enabled: isOpen && activeTab === "metadata",
-  });
-  const { data: signatures = [] } = useQuery({
-    queryKey: ["document-signatures", doc.code],
-    queryFn: () => documentService.getDocumentSignatures(doc.code),
-    enabled: isOpen && activeTab === "signatures",
-  });
+  const doc = fresh ?? document;
+
+  const { data: versions = [], isLoading: versionsLoading } = useQuery({ queryKey: ["document-versions", doc.code], queryFn: () => documentService.getDocumentVersions(doc.code), enabled: tab === "versions" });
+  const { data: allTags = [] } = useQuery({ queryKey: ["document-tags"], queryFn: () => documentService.getDocumentTags(), enabled: tab === "tags" });
+  const { data: metadata = {} } = useQuery({ queryKey: ["document-metadata", doc.code], queryFn: () => documentService.getDocumentMetadata(doc.code), enabled: tab === "metadata" });
+  const { data: signatures = [] } = useQuery({ queryKey: ["document-signatures", doc.code], queryFn: () => documentService.getDocumentSignatures(doc.code), enabled: tab === "signatures" });
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ["document-detail", doc.code] });
-    queryClient.invalidateQueries({
-      queryKey: ["document-versions", doc.code],
-    });
-    queryClient.invalidateQueries({
-      queryKey: ["document-metadata", doc.code],
-    });
-    queryClient.invalidateQueries({
-      queryKey: ["document-signatures", doc.code],
-    });
+    ["document-detail", "document-versions", "document-metadata", "document-signatures"].forEach((k) => queryClient.invalidateQueries({ queryKey: [k, doc.code] }));
     queryClient.invalidateQueries({ queryKey: ["allDocuments"] });
     queryClient.invalidateQueries({ queryKey: ["document-advanced-search"] });
   };
+  const onError = (fallback: string) => (e: unknown) => toast.error(apiMessage(e, fallback));
 
-  const archiveMutation = useMutation({
-    mutationFn: (reason?: string) =>
-      documentService.archiveDocument(doc.code, reason),
-    onSuccess: invalidate,
-    onError: (e: any) =>
-      setError(e?.response?.data?.message || "Erreur archivage"),
-  });
-  const restoreMutation = useMutation({
-    mutationFn: (version: number) =>
-      documentService.restoreDocumentVersion(doc.code, version),
-    onSuccess: invalidate,
-    onError: (e: any) =>
-      setError(e?.response?.data?.message || "Erreur restauration"),
-  });
-  const addTagMutation = useMutation({
-    mutationFn: (tag: string) =>
-      documentService.addTagToDocument(doc.code, tag),
+  const archive = useMutation({
+    mutationFn: () => documentService.archiveDocument(doc.code, archiveReason.trim() || undefined),
     onSuccess: () => {
+      toast.success("Document archivé");
+      setArchiving(false);
+      setArchiveReason("");
+      invalidate();
+    },
+    onError: onError("Archivage impossible"),
+  });
+  const restore = useMutation({
+    mutationFn: (version: number) => documentService.restoreDocumentVersion(doc.code, version),
+    onSuccess: invalidate,
+  });
+  const addTag = useMutation({
+    mutationFn: (tag: string) => documentService.addTagToDocument(doc.code, tag),
+    onSuccess: () => {
+      toast.success("Tag ajouté");
       setNewTag("");
       invalidate();
     },
-    onError: (e: any) =>
-      setError(e?.response?.data?.message || "Erreur ajout tag"),
+    onError: onError("Ajout du tag impossible"),
   });
-  const removeTagMutation = useMutation({
-    mutationFn: (tag: string) =>
-      documentService.removeTagFromDocument(doc.code, tag),
+  const removeTag = useMutation({
+    mutationFn: (tag: string) => documentService.removeTagFromDocument(doc.code, tag),
     onSuccess: invalidate,
+    onError: onError("Retrait du tag impossible"),
   });
-  const metadataMutation = useMutation({
-    mutationFn: () =>
-      documentService.updateDocumentMetadata(doc.code, {
-        ...metadata,
-        [metaKey]: metaValue,
-      }),
+  const saveMeta = useMutation({
+    mutationFn: () => documentService.updateDocumentMetadata(doc.code, { ...metadata, [metaKey.trim()]: metaValue }),
     onSuccess: () => {
+      toast.success("Métadonnée enregistrée");
       setMetaKey("");
       setMetaValue("");
       invalidate();
     },
-    onError: (e: any) =>
-      setError(e?.response?.data?.message || "Erreur métadonnée"),
+    onError: onError("Enregistrement impossible"),
   });
-  const deleteMetadataMutation = useMutation({
-    mutationFn: (key: string) =>
-      documentService.deleteDocumentMetadataKey(doc.code, key),
+  const deleteMeta = useMutation({
+    mutationFn: (key: string) => documentService.deleteDocumentMetadataKey(doc.code, key),
     onSuccess: invalidate,
   });
-  const createSignatureMutation = useMutation({
+  const createSignature = useMutation({
     mutationFn: () =>
       documentService.createDocumentSignature(doc.code, {
-        signerName: signatureForm.signerName,
-        signerEmail: signatureForm.signerEmail || undefined,
-        expiresAt: signatureForm.expiresAt || undefined,
+        signerName: signature.signerName.trim(),
+        signerEmail: signature.signerEmail || undefined,
+        expiresAt: signature.expiresAt || undefined,
       }),
     onSuccess: () => {
-      setSignatureForm({ signerName: "", signerEmail: "", expiresAt: "" });
+      toast.success("Demande de signature créée");
+      setSignature({ signerName: "", signerEmail: "", expiresAt: "" });
       invalidate();
     },
-    onError: (e: any) =>
-      setError(e?.response?.data?.message || "Erreur signature"),
+    onError: onError("Création de la signature impossible"),
   });
 
-  if (!isOpen) return null;
-
-  const download = async () =>
-    downloadBlob(
-      await documentService.downloadDocument(doc.code),
-      doc.fileName || `${doc.code}`,
-    );
-  const preview = async () => {
+  const download = useMutation({
+    mutationFn: async () => saveBlob(await documentService.downloadDocument(doc.code), doc.fileName || doc.code),
+    onError: onError("Téléchargement impossible"),
+  });
+  const preview = useMutation({
+    mutationFn: async () => URL.createObjectURL(await documentService.previewDocument(doc.code)),
+    onSuccess: setPreviewUrl,
+    onError: onError("Aperçu impossible"),
+  });
+  const togglePreview = () => {
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
-      return;
-    }
-    const blob = await documentService.previewDocument(doc.code);
-    setPreviewUrl(URL.createObjectURL(blob));
+    } else preview.mutate();
   };
 
-  const tabs: { id: Tab; label: string }[] = [
+  const tabs: TabItem<Tab>[] = [
     { id: "info", label: "Informations" },
     { id: "versions", label: "Versions" },
-    { id: "tags", label: "Tags" },
+    { id: "tags", label: "Tags", count: doc.tags?.length || undefined },
     { id: "metadata", label: "Métadonnées" },
     { id: "signatures", label: "Signatures" },
     { id: "logs", label: "Accès" },
   ];
+  const expired = isPast(doc.expiryDate);
+  const metaEntries = Object.entries(metadata ?? {});
 
   return (
-    <ModalPortal onClose={onClose} size="5xl">
-      <div className="sticky top-0 bg-white border-b p-5 flex justify-between items-center rounded-t-2xl z-10">
-        <div>
-          <h3 className="text-2xl font-bold">Détail du document</h3>
-          <p className="text-sm text-gray-500 font-mono">{doc.code}</p>
-        </div>
-        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-          <X size={24} />
-        </button>
+    <div className="mx-auto w-full max-w-4xl">
+      <PageHeader
+        title={doc.title}
+        subtitle={`${doc.documentTypeName} · ${doc.code}`}
+        onBack={onBack}
+        backLabel="Retour à la liste"
+        badge={<DocStatusChip status={doc.status} />}
+      />
+      <div className="mb-5">
+        <Tabs items={tabs} active={tab} onChange={setTab} />
       </div>
-      <div className="p-6 space-y-5">
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-            {error}
+
+      {tab === "info" && (
+        <div className="space-y-4">
+          <Card>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Detail label="Propriétaire">{label(OWNER_LABEL, doc.ownerType)}</Detail>
+              <Detail label="Code propriétaire" mono>{doc.ownerCode || (doc.ownerId !== undefined ? String(doc.ownerId) : undefined)}</Detail>
+              <Detail label="Espace">{doc.space ? label(SPACE_LABEL, doc.space) : undefined}</Detail>
+              <Detail label="Catégorie">{doc.category ? label(CATEGORY_LABEL, doc.category) : undefined}</Detail>
+              <Detail label="Taille">{doc.fileSize ? formatBytes(doc.fileSize) : undefined}</Detail>
+              <Detail label="Type de fichier">{doc.mimeType}</Detail>
+              <Detail label="Émission">{doc.issueDate ? dayOnly(doc.issueDate) : undefined}</Detail>
+              <Detail label="Expiration">
+                {doc.expiryDate ? (
+                  <span className="inline-flex items-center gap-2">
+                    {dayOnly(doc.expiryDate)}
+                    {expired && <StatusChip tone="danger">Expiré</StatusChip>}
+                  </span>
+                ) : undefined}
+              </Detail>
+              <Detail label="Version courante">{String(doc.currentVersionNumber ?? "")}</Detail>
+              <Detail label="Envoyé le">{doc.uploadedAt ? dateTime(doc.uploadedAt) : undefined}</Detail>
+              <Detail label="Description" wide>{doc.description || undefined}</Detail>
+            </div>
+          </Card>
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <ActionButton variant="ghost" icon={Eye} pending={preview.isPending} onClick={togglePreview}>
+              {previewUrl ? "Masquer l'aperçu" : "Aperçu"}
+            </ActionButton>
+            <ActionButton variant="ghost" icon={Download} pending={download.isPending} onClick={() => download.mutate()}>
+              Télécharger
+            </ActionButton>
+            <ActionButton variant="ghost" icon={Archive} onClick={() => setArchiving(true)}>
+              Archiver
+            </ActionButton>
           </div>
-        )}
-        <div className="flex flex-wrap gap-2 border-b pb-3">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={`px-3 py-1.5 rounded-lg text-sm ${activeTab === t.id ? "bg-gray-950 text-white" : "text-gray-500 hover:bg-gray-100"}`}
+
+          {archiving && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                archive.mutate();
+              }}
+              className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-2 ring-[color:color-mix(in_srgb,var(--logo-pink)_30%,white)] sm:p-5"
             >
-              {t.label}
-            </button>
-          ))}
+              <h4 className="mb-4 text-base font-bold text-gray-950">Archiver ce document</h4>
+              <Field label="Motif" hint="Facultatif.">
+                <input value={archiveReason} onChange={(e) => setArchiveReason(e.target.value)} className={FIELD_SOFT} />
+              </Field>
+              <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <ActionButton variant="ghost" onClick={() => setArchiving(false)} disabled={archive.isPending}>
+                  Annuler
+                </ActionButton>
+                <ActionButton type="submit" pending={archive.isPending}>
+                  Archiver
+                </ActionButton>
+              </div>
+            </form>
+          )}
+
+          {previewUrl && <iframe title="Aperçu du document" src={previewUrl} className="h-[70vh] w-full rounded-[1.5rem] bg-white shadow-sm" />}
         </div>
+      )}
 
-        {activeTab === "info" && (
-          <div className="space-y-5">
-            <div>
-              <h4 className="text-xl font-semibold text-gray-900">
-                {doc.title}
-              </h4>
-              <p className="text-base text-gray-500 mt-1">
-                {doc.documentTypeName}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <span className="text-sm px-3 py-1.5 rounded-full bg-gray-100">
-                {doc.status}
-              </span>
-              {doc.expiryDate && new Date(doc.expiryDate) < new Date() && (
-                <span className="text-sm px-3 py-1.5 rounded-full bg-red-100 text-red-700 flex items-center gap-1.5">
-                  <AlertCircle size={14} /> Expiré
-                </span>
-              )}
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-5 bg-gray-50 rounded-xl">
-              <Info label="Propriétaire" value={`${doc.ownerType}`} />
-              <Info
-                label="Code propriétaire"
-                value={`${doc.ownerCode || doc.ownerId || "—"}`}
-              />
-              <Info label="Espace" value={`${doc.space || "—"}`} />
-              <Info label="Catégorie" value={`${doc.category || "—"}`} />
-              <Info
-                label="Taille"
-                value={
-                  doc.fileSize
-                    ? `${(doc.fileSize / 1024 / 1024).toFixed(2)} Mo`
-                    : "—"
-                }
-              />
-              <Info label="MIME" value={doc.mimeType || "—"} />
-              <Info label="Émission" value={doc.issueDate || "—"} />
-              <Info label="Expiration" value={doc.expiryDate || "—"} />
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={preview}
-                className="px-4 py-2 border border-gray-200 rounded-xl flex items-center gap-2"
-              >
-                <Eye size={16} /> {previewUrl ? "Masquer aperçu" : "Aperçu API"}
-              </button>
-              <button
-                onClick={download}
-                className="px-4 py-2 border border-gray-200 rounded-xl flex items-center gap-2"
-              >
-                <Download size={16} /> Télécharger API
-              </button>
-              <button
-                onClick={() =>
-                  archiveMutation.mutate(
-                    prompt("Motif d'archivage") || undefined,
-                  )
-                }
-                className="px-4 py-2 border border-orange-200 text-orange-700 rounded-lg flex items-center gap-2"
-              >
-                <Archive size={16} /> Archiver
-              </button>
-            </div>
-            {previewUrl && (
-              <iframe
-                title="Aperçu document"
-                src={previewUrl}
-                className="w-full h-[60vh] border rounded-xl bg-gray-50"
-              />
-            )}
-          </div>
-        )}
-
-        {activeTab === "versions" && (
-          <div className="divide-y border rounded-xl">
-            {versions.map((v) => (
-              <div
-                key={v.versionNumber}
-                className="p-4 flex justify-between items-center"
-              >
-                <div>
-                  <p className="font-medium flex items-center gap-2">
-                    <FileText size={16} /> Version {v.versionNumber}{" "}
-                    {v.current ? "(courante)" : ""}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {v.fileName || v.originalFileName || "—"} · {v.uploadedAt}
-                  </p>
+      {tab === "versions" && (
+        <Card>
+          {versionsLoading ? (
+            <ListSkeleton rows={3} />
+          ) : versions.length === 0 ? (
+            <p className="text-sm text-gray-400">Aucune version enregistrée.</p>
+          ) : (
+            <div className="space-y-2">
+              {versions.map((v) => (
+                <div key={v.versionNumber} className="flex items-center justify-between gap-3 rounded-2xl bg-gray-50 p-4">
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                      <FileText size={16} /> Version {v.versionNumber}
+                      {v.current && <Tag tone="pink">Courante</Tag>}
+                    </p>
+                    <p className="truncate text-xs text-gray-500">
+                      {v.fileName || v.originalFileName || "Fichier"} · {dateTime(v.uploadedAt)}
+                    </p>
+                  </div>
+                  <ActionButton
+                    variant="ghost"
+                    icon={RotateCcw}
+                    disabled={v.current}
+                    pending={restore.isPending && restore.variables === v.versionNumber}
+                    onClick={() =>
+                      toast.confirm({
+                        message: `Restaurer la version ${v.versionNumber} ?`,
+                        detail: "Elle deviendra la version courante du document.",
+                        confirmLabel: "Restaurer",
+                        pendingLabel: "Restauration",
+                        successMessage: "Version restaurée",
+                        errorMessage: "Restauration impossible",
+                        onConfirm: () => restore.mutateAsync(v.versionNumber),
+                      })
+                    }
+                  >
+                    Restaurer
+                  </ActionButton>
                 </div>
-                <button
-                  disabled={v.current}
-                  onClick={() => restoreMutation.mutate(v.versionNumber)}
-                  className="px-3 py-1.5 border border-gray-200 rounded-xl text-sm disabled:opacity-40 flex items-center gap-1"
-                >
-                  <RotateCcw size={14} /> Restaurer
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {tab === "tags" && (
+        <Card>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <select value={newTag} onChange={(e) => setNewTag(e.target.value)} aria-label="Tag" className={FIELD_SOFT}>
+              <option value="">Choisir un tag</option>
+              {allTags.map((t) => (
+                <option key={t.code} value={t.code}>
+                  {t.name} · {t.code}
+                </option>
+              ))}
+            </select>
+            <ActionButton icon={TagIcon} pending={addTag.isPending} disabled={!newTag} onClick={() => addTag.mutate(newTag)}>
+              Ajouter
+            </ActionButton>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {(doc.tags ?? []).length === 0 && <p className="text-sm text-gray-400">Aucun tag sur ce document.</p>}
+            {(doc.tags ?? []).map((t) => (
+              <span key={t.code} className="inline-flex items-center gap-1 rounded-full bg-gray-100 py-1 pl-3 pr-1 text-xs font-semibold text-gray-700">
+                {t.color && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: t.color }} />}
+                {t.name || t.code}
+                <button type="button" aria-label={`Retirer ${t.name || t.code}`} onClick={() => removeTag.mutate(t.code)} className="rounded-full p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
+                  <X size={12} />
                 </button>
+              </span>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {tab === "metadata" && (
+        <Card>
+          <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+            <input value={metaKey} onChange={(e) => setMetaKey(e.target.value)} placeholder="Clé" aria-label="Clé" className={FIELD_SOFT} />
+            <input value={metaValue} onChange={(e) => setMetaValue(e.target.value)} placeholder="Valeur" aria-label="Valeur" className={FIELD_SOFT} />
+            <ActionButton icon={Database} pending={saveMeta.isPending} disabled={!metaKey.trim()} onClick={() => saveMeta.mutate()}>
+              Enregistrer
+            </ActionButton>
+          </div>
+          <div className="mt-4 space-y-2">
+            {metaEntries.length === 0 && <p className="text-sm text-gray-400">Aucune métadonnée.</p>}
+            {metaEntries.map(([k, v]) => (
+              <div key={k} className="flex items-center justify-between gap-3 rounded-2xl bg-gray-50 p-4">
+                <p className="min-w-0 break-words text-sm text-gray-800">
+                  <span className="font-semibold">{k}</span> : {String(v)}
+                </p>
+                <IconButton
+                  icon={Trash2}
+                  label="Supprimer la métadonnée"
+                  tone="danger"
+                  pending={deleteMeta.isPending && deleteMeta.variables === k}
+                  onClick={() =>
+                    toast.confirm({
+                      message: `Supprimer la métadonnée « ${k} » ?`,
+                      confirmLabel: "Supprimer",
+                      pendingLabel: "Suppression",
+                      successMessage: "Métadonnée supprimée",
+                      errorMessage: "Suppression impossible",
+                      onConfirm: () => deleteMeta.mutateAsync(k),
+                    })
+                  }
+                />
               </div>
             ))}
           </div>
-        )}
+        </Card>
+      )}
 
-        {activeTab === "tags" && (
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <select
-                value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-xl bg-white"
-              >
-                <option value="">Choisir un tag</option>
-                {allTags.map((t) => (
-                  <option key={t.code} value={t.code}>
-                    {t.name} · {t.code}
-                  </option>
-                ))}
-              </select>
-              <button
-                disabled={!newTag}
-                onClick={() => addTagMutation.mutate(newTag)}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-40"
-              >
-                Ajouter
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {(doc.tags || []).map((t) => (
-                <span
-                  key={t.code}
-                  className="px-3 py-1 bg-gray-100 rounded-full text-sm flex items-center gap-2"
-                >
-                  <Tag size={13} /> {t.name || t.code}
-                  <button
-                    onClick={() => removeTagMutation.mutate(t.code)}
-                    className="text-red-600"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
+      {tab === "signatures" && (
+        <Card>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <input value={signature.signerName} onChange={(e) => setSignature({ ...signature, signerName: e.target.value })} placeholder="Nom du signataire" aria-label="Nom du signataire" className={FIELD_SOFT} />
+            <input value={signature.signerEmail} onChange={(e) => setSignature({ ...signature, signerEmail: e.target.value })} placeholder="E-mail" aria-label="E-mail" className={FIELD_SOFT} />
+            <input type="datetime-local" value={signature.expiresAt} onChange={(e) => setSignature({ ...signature, expiresAt: e.target.value })} aria-label="Expire le" className={FIELD_SOFT} />
+            <ActionButton icon={PenLine} pending={createSignature.isPending} disabled={!signature.signerName.trim()} onClick={() => createSignature.mutate()}>
+              Créer la demande
+            </ActionButton>
           </div>
-        )}
+          <div className="mt-4 space-y-2">
+            {signatures.length === 0 && <p className="text-sm text-gray-400">Aucune signature demandée.</p>}
+            {signatures.map((s) => (
+              <div key={s.id} className="flex items-center justify-between gap-3 rounded-2xl bg-gray-50 p-4">
+                <p className="min-w-0 truncate text-sm text-gray-800">
+                  <span className="font-semibold">{s.signerName}</span> {s.signerEmail ? `· ${s.signerEmail}` : ""}
+                </p>
+                <StatusChip tone={s.status === "SIGNED" ? "success" : s.status === "EXPIRED" ? "neutral" : "warn"}>{s.status === "SIGNED" ? "Signé" : s.status === "EXPIRED" ? "Expiré" : s.status === "PENDING" ? "En attente" : s.status}</StatusChip>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
-        {activeTab === "metadata" && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              <input
-                value={metaKey}
-                onChange={(e) => setMetaKey(e.target.value)}
-                placeholder="Clé"
-                className="px-3 py-2 border border-gray-200 rounded-xl"
-              />
-              <input
-                value={metaValue}
-                onChange={(e) => setMetaValue(e.target.value)}
-                placeholder="Valeur"
-                className="px-3 py-2 border border-gray-200 rounded-xl"
-              />
-              <button
-                disabled={!metaKey}
-                onClick={() => metadataMutation.mutate()}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-40 flex items-center justify-center gap-2"
-              >
-                <Database size={16} /> Enregistrer
-              </button>
-            </div>
-            <div className="divide-y border rounded-xl">
-              {Object.entries(metadata || {}).map(([k, v]) => (
-                <div key={k} className="p-3 flex justify-between text-sm">
-                  <span>
-                    <strong>{k}</strong> : {String(v)}
-                  </span>
-                  <button
-                    onClick={() => deleteMetadataMutation.mutate(k)}
-                    className="text-red-600"
-                  >
-                    Supprimer
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === "signatures" && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-              <input
-                value={signatureForm.signerName}
-                onChange={(e) =>
-                  setSignatureForm({
-                    ...signatureForm,
-                    signerName: e.target.value,
-                  })
-                }
-                placeholder="Nom signataire"
-                className="px-3 py-2 border border-gray-200 rounded-xl"
-              />
-              <input
-                value={signatureForm.signerEmail}
-                onChange={(e) =>
-                  setSignatureForm({
-                    ...signatureForm,
-                    signerEmail: e.target.value,
-                  })
-                }
-                placeholder="Email"
-                className="px-3 py-2 border border-gray-200 rounded-xl"
-              />
-              <input
-                type="datetime-local"
-                value={signatureForm.expiresAt}
-                onChange={(e) =>
-                  setSignatureForm({
-                    ...signatureForm,
-                    expiresAt: e.target.value,
-                  })
-                }
-                className="px-3 py-2 border border-gray-200 rounded-xl"
-              />
-              <button
-                disabled={!signatureForm.signerName}
-                onClick={() => createSignatureMutation.mutate()}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-40 flex items-center justify-center gap-2"
-              >
-                <PenLine size={16} /> Créer
-              </button>
-            </div>
-            <div className="divide-y border rounded-xl">
-              {signatures.map((s) => (
-                <div key={s.id} className="p-3 flex justify-between text-sm">
-                  <span>
-                    {s.signerName} · {s.signerEmail || "—"}
-                  </span>
-                  <strong>{s.status}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        {activeTab === "logs" && (
+      {tab === "logs" && (
+        <Card>
           <DocumentAccessLogsPanel documentCode={doc.code} />
-        )}
-      </div>
-    </ModalPortal>
+        </Card>
+      )}
+    </div>
   );
 };
-
-const Info: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div>
-    <p className="text-xs text-gray-500">{label}</p>
-    <p className="font-medium text-sm break-words">{value}</p>
-  </div>
-);

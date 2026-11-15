@@ -1,137 +1,129 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { FolderOpen, Search, AlertTriangle, CheckCircle } from "lucide-react";
+import { CheckCircle2, FolderOpen, FolderSearch, TriangleAlert } from "lucide-react";
 import { documentService } from "../../services/document.service";
-
-const ownerTypes = [
-  "CUSTOMER",
-  "MEMBER",
-  "BUSINESS",
-  "CONTRACT",
-  "INVOICE",
-  "PAYMENT",
-  "PROPOSAL",
-  "ASSET",
-];
+import type { DocumentResponse } from "../../services/document.service";
+import { ActionButton, EmptyState, ErrorBlock, Field, ListHeader } from "../../components/subscription/kit";
+import { FIELD } from "../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../components/ui/Skeleton";
+import { ChartCard, KpiRow } from "../../components/operations/OpsCharts";
+import { Gauge } from "../../components/reporting/ReportCharts";
+import { DocStatusChip } from "../../components/documents/docKit";
+import { OWNER_LABEL, OWNER_TYPES, SPACE_LABEL, label } from "../../components/documents/docUtils";
+import { DocumentDetailView } from "./DocumentDetail";
 
 export const DocumentOwnerFolderPage: React.FC = () => {
   const [ownerType, setOwnerType] = useState("MEMBER");
   const [ownerCode, setOwnerCode] = useState("");
-  const [submitted, setSubmitted] = useState<{
-    ownerType: string;
-    ownerCode: string;
-  } | null>(null);
-  const { data, isLoading } = useQuery({
+  const [submitted, setSubmitted] = useState<{ ownerType: string; ownerCode: string } | null>(null);
+  const [selected, setSelected] = useState<DocumentResponse | null>(null);
+
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["document-folder", submitted?.ownerType, submitted?.ownerCode],
-    queryFn: () =>
-      documentService.getDocumentFolder(
-        submitted!.ownerType,
-        submitted!.ownerCode,
-      ),
+    queryFn: () => documentService.getDocumentFolder(submitted!.ownerType, submitted!.ownerCode),
     enabled: !!submitted?.ownerCode,
   });
 
+  if (selected) return <DocumentDetailView document={selected} onBack={() => setSelected(null)} />;
+
+  // Le backend renvoie une part entre 0 et 1 ; on tolère aussi un pourcentage déjà calculé.
+  const raw = data?.completeness ?? 0;
+  const percent = Math.round(raw <= 1 ? raw * 100 : raw);
+  const missing = data?.missingRequiredTypes ?? [];
+  const spaces = Object.entries(data?.bySpace ?? {});
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900">
-          Dossier documentaire propriétaire
-        </h2>
-        <p className="text-sm text-gray-500 mt-1">
-          Consultez les documents groupés par espace et les exigences
-          manquantes.
-        </p>
-      </div>
-      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-        <select
-          value={ownerType}
-          onChange={(e) => setOwnerType(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-xl bg-white"
-        >
-          {ownerTypes.map((t) => (
-            <option key={t}>{t}</option>
-          ))}
-        </select>
-        <input
-          value={ownerCode}
-          onChange={(e) => setOwnerCode(e.target.value)}
-          placeholder="Code propriétaire"
-          className="md:col-span-2 px-3 py-2 border border-gray-200 rounded-xl font-mono"
-        />
-        <button
-          disabled={!ownerCode}
-          onClick={() => setSubmitted({ ownerType, ownerCode })}
-          className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          <Search size={16} /> Charger
-        </button>
-      </div>
-      {isLoading && <div className="text-center py-10">Chargement...</div>}
-      {data && (
-        <div className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
-              <p className="text-sm text-gray-500">Total documents</p>
-              <p className="text-2xl font-bold">{data.totalDocuments}</p>
+    <div className="space-y-5">
+      <ListHeader title="Dossier documentaire d'un propriétaire" subtitle="Documents groupés par espace et pièces obligatoires manquantes" />
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          setSubmitted({ ownerType, ownerCode: ownerCode.trim() });
+        }}
+        className="grid gap-3 rounded-[1.5rem] bg-gray-50 p-4 sm:grid-cols-[14rem_1fr_auto] sm:items-end sm:p-5"
+      >
+        <Field label="Type de propriétaire">
+          <select value={ownerType} onChange={(e) => setOwnerType(e.target.value)} className={FIELD}>
+            {OWNER_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {label(OWNER_LABEL, t)}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Code propriétaire">
+          <input value={ownerCode} onChange={(e) => setOwnerCode(e.target.value)} className={FIELD} />
+        </Field>
+        <ActionButton type="submit" icon={FolderSearch} disabled={!ownerCode.trim()}>
+          Charger
+        </ActionButton>
+      </form>
+
+      {!submitted ? (
+        <EmptyState icon={FolderOpen} title="Aucun dossier chargé" hint="Choisissez un type et saisissez un code propriétaire." />
+      ) : isLoading ? (
+        <ListSkeleton rows={4} />
+      ) : isError || !data ? (
+        <ErrorBlock message="Impossible de charger ce dossier." onRetry={() => refetch()} />
+      ) : (
+        <>
+          <div className="grid gap-5 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <KpiRow
+                columns={3}
+                items={[
+                  { label: "Documents", value: String(data.totalDocuments ?? 0) },
+                  { label: "Pièces manquantes", value: String(missing.length), tone: missing.length > 0 ? "danger" : "success" },
+                  { label: "Espaces", value: String(spaces.length) },
+                ]}
+              />
             </div>
-            <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
-              <p className="text-sm text-gray-500">Complétude</p>
-              <p className="text-2xl font-bold">
-                {Math.round((data.completeness ?? 0) * 100)}%
-              </p>
-            </div>
-            <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
-              <p className="text-sm text-gray-500">Types manquants</p>
-              <p className="text-2xl font-bold">
-                {data.missingRequiredTypes?.length ?? 0}
-              </p>
-            </div>
+            <ChartCard title="Complétude" subtitle="Pièces obligatoires fournies">
+              <Gauge value={percent} color={percent >= 100 ? "#2E9E6B" : "#E0529C"} caption="complet" />
+            </ChartCard>
           </div>
-          {(data.missingRequiredTypes || []).length > 0 ? (
-            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-orange-700 flex gap-2">
-              <AlertTriangle size={18} /> {data.missingRequiredTypes.join(", ")}
+
+          {missing.length > 0 ? (
+            <div className="flex items-start gap-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-800">
+              <TriangleAlert size={18} className="mt-0.5 shrink-0" />
+              <p>
+                <span className="font-semibold">Pièces obligatoires manquantes : </span>
+                {missing.join(", ")}
+              </p>
             </div>
           ) : (
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-green-700 flex gap-2">
-              <CheckCircle size={18} /> Aucun type obligatoire manquant.
+            <div className="flex items-center gap-3 rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-800">
+              <CheckCircle2 size={18} /> Aucune pièce obligatoire manquante.
             </div>
           )}
-          {Object.entries(data.bySpace || {}).map(([space, documentsRaw]) => {
-            const documents = documentsRaw as any[];
-            return (
-              <div
-                key={space}
-                className="bg-white rounded-xl shadow-sm overflow-hidden"
-              >
-                <div className="px-5 py-3 border-b flex items-center gap-2">
-                  <FolderOpen size={16} />
-                  <h3 className="font-semibold">{space}</h3>
-                  <span className="text-sm text-gray-500">
-                    {documents.length}
-                  </span>
+
+          {spaces.length === 0 ? (
+            <EmptyState icon={FolderOpen} title="Dossier vide" hint="Aucun document n'est rattaché à ce propriétaire." />
+          ) : (
+            spaces.map(([space, docs]) => (
+              <section key={space} className="rounded-[1.5rem] bg-white p-4 shadow-sm sm:p-5">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="flex items-center gap-2 text-base font-bold text-gray-950">
+                    <FolderOpen size={18} /> {label(SPACE_LABEL, space)}
+                  </h3>
+                  <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">{docs.length}</span>
                 </div>
-                <div className="divide-y divide-gray-100">
-                  {documents.map((doc) => (
-                    <div
-                      key={doc.code}
-                      className="px-5 py-3 flex justify-between"
-                    >
-                      <div>
-                        <p className="font-medium">{doc.title}</p>
-                        <p className="text-xs text-gray-500 font-mono">
-                          {doc.code} · {doc.documentTypeName}
-                        </p>
+                <div className="space-y-2">
+                  {docs.map((d) => (
+                    <button key={d.code} type="button" onClick={() => setSelected(d)} className="flex w-full items-center justify-between gap-3 rounded-2xl bg-gray-50 p-4 text-left transition hover:bg-gray-100">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-900">{d.documentTypeName}</p>
+                        <p className="font-mono text-xs text-gray-400">{d.code}</p>
                       </div>
-                      <span className="text-xs px-2 py-1 rounded-full bg-gray-100 self-start">
-                        {doc.status}
-                      </span>
-                    </div>
+                      <DocStatusChip status={d.status} />
+                    </button>
                   ))}
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              </section>
+            ))
+          )}
+        </>
       )}
     </div>
   );
