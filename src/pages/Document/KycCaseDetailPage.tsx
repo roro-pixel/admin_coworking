@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, CheckCircle2, Download, Eye, FileCheck2, FileText, FileX2, History, MessageSquare, Plus, ScanSearch, ShieldCheck, Trash2, Upload, UserCheck, XCircle } from "lucide-react";
+import { CalendarClock, CheckCircle2, Download, Eye, FileCheck2, FileText, FileX2, History, MessageSquare, Plus, ScanSearch, ShieldAlert, ShieldCheck, Trash2, Upload, UserCheck, XCircle } from "lucide-react";
 import { AdminLayout } from "../../components/layout/AdminLayout";
 import { brandVars } from "../../components/layout/adminTheme";
 import { documentService, kycService } from "../../services/document.service";
@@ -16,11 +16,12 @@ import { toast } from "../../components/ui/toastStore";
 import { RefreshButton } from "../../components/reporting/reportKit";
 import { saveBlob } from "../../components/payment/paymentUtils";
 import { DocStatusChip, Fact, KycStatusChip, RiskChip, RowCheck } from "../../components/documents/docKit";
+import { KycCaseExtras } from "../../components/documents/KycCaseExtras";
 import { KycDocumentReviewPanel } from "../../components/documents/KycDocumentReviewPanel";
 import { OWNER_LABEL, RISK_LEVELS, dayOnly, label } from "../../components/documents/docUtils";
 import { kycRiskLevelLabels } from "../../services/document.service";
 
-type Tab = "overview" | "documents" | "requirements" | "notes" | "timeline" | "expiry" | "ocr" | "upload";
+type Tab = "overview" | "documents" | "requirements" | "notes" | "timeline" | "expiry" | "ocr" | "upload" | "advanced";
 
 const Card: React.FC<{ title: string; hint?: string; children: React.ReactNode }> = ({ title, hint, children }) => (
   <section className="rounded-[1.5rem] bg-white p-4 shadow-sm sm:p-5">
@@ -37,7 +38,7 @@ export const KycCaseDetailPage: React.FC = () => {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { admin } = useAuth();
+  const { admin, hasPermission } = useAuth();
   const reviewerId = Number(admin?.id) || 1;
 
   const [tab, setTab] = useState<Tab>("overview");
@@ -104,6 +105,7 @@ export const KycCaseDetailPage: React.FC = () => {
         ["kyc-case-notes", code],
         ["kyc-case-timeline", code],
         ["kyc-case-expiry", code],
+        ["kyc-case-cross-checks", code],
       ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
     );
 
@@ -245,6 +247,7 @@ export const KycCaseDetailPage: React.FC = () => {
     { id: "expiry", label: "Expiration", icon: CalendarClock },
     { id: "ocr", label: "OCR", icon: ScanSearch },
     { id: "upload", label: "Envoi admin", icon: Upload },
+    { id: "advanced", label: "Avancé", icon: ShieldAlert },
   ];
 
   const ocr = ocrQuery.data as (typeof ocrQuery.data & Record<string, unknown>) | undefined;
@@ -707,6 +710,17 @@ export const KycCaseDetailPage: React.FC = () => {
             )}
           </Card>
         </div>
+      )}
+
+      {tab === "advanced" && (
+        <KycCaseExtras
+          caseCode={kycCase.code}
+          status={String(kycCase.status)}
+          kycLevel={kycCase.kycLevel}
+          canManage={hasPermission("KYC:MANAGE")}
+          canReject={hasPermission("KYC:REJECT")}
+          onChanged={invalidate}
+        />
       )}
 
       {tab === "upload" && (

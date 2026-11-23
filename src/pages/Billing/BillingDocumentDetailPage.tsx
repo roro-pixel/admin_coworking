@@ -9,12 +9,13 @@ import {
   CheckCircle,
   CreditCard,
   Pencil,
-  DollarSign,
   Download,
   Eye,
   FilePlus2,
   FileText,
   History,
+  UserRoundCog,
+  HandCoins,
   Mail,
   MessageSquare,
   Package,
@@ -60,11 +61,23 @@ import { CatalogPicker } from "../../components/billing/CatalogPicker";
 import { NoticeTimeline } from "../../components/billing/dunning/NoticeTimeline";
 import { BillingShell } from "../../components/billing/BillingShell";
 import { DOC_TYPE_LABEL, STATUS_LABEL, STATUS_TONE } from "../../components/billing/billingLabels";
+import { billingError, needsOverrideReason } from "../../components/billing/billingErrors";
+import { DepositsPanel } from "../../components/billing/DepositsPanel";
+import { SendPanel } from "../../components/billing/SendPanel";
+import { QuoteNegotiationPanel } from "../../components/billing/QuoteNegotiationPanel";
+import { InvoiceChangesPanel, ChangeCustomerPanel } from "../../components/billing/InvoiceChangesPanel";
+import { WithholdingsPanel } from "../../components/billing/WithholdingsPanel";
+import { DeliveryPanel } from "../../components/billing/DeliveryPanel";
+import { ElementsPanel } from "../../components/billing/ElementsPanel";
+import { ClaimsPanel } from "../../components/billing/ClaimPanels";
+import { PromisesPanel, PaymentPlanPanel } from "../../components/billing/CollectionPanels";
 
 /* Statuts à partir desquels un document peut encore être annulé (DELETE) : exclut les états terminaux. */
 const CANCELLABLE = new Set(["DRAFT", "ISSUED", "SENT", "VIEWED", "ACCEPTED", "NEGOTIATION", "VALIDATED", "PARTIALLY_PAID", "PAID", "OVERDUE"]);
 
-type PanelId = "creditNote" | "applyTo" | "corrective" | "issueOverride" | "versions" | "refundWallet" | "cancel" | "reject" | "pay" | "schedule" | "signature";
+type PanelId = "creditNote" | "applyTo" | "corrective" | "issueOverride" | "versions" | "refundWallet" | "cancel" | "reject" | "pay" | "schedule" | "signature" | "send" | "changeCustomer" | "paymentPlan";
+
+const DEEP_PANELS: PanelId[] = ["creditNote", "applyTo", "corrective", "send", "changeCustomer", "paymentPlan", "versions", "schedule"];
 
 type CorrectiveLine = {
   description: string;
@@ -92,7 +105,12 @@ const DetailBody: React.FC = () => {
   const { documentNumber } = useParams<{ documentNumber: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { admin } = useAuth();
+  const { admin, hasPermission } = useAuth();
+  const canCreate = hasPermission("BILLING:CREATE");
+  const canUpdate = hasPermission("BILLING:UPDATE");
+  const canCancelPerm = hasPermission("BILLING:CANCEL");
+  const canSendPerm = hasPermission("BILLING:SEND");
+  const canPay = hasPermission("PAYMENT:PROCESS");
   const queryClient = useQueryClient();
 
   // Un seul panneau ouvert à la fois : il s'affiche sous la barre d'actions, à la place des anciennes modales.
@@ -131,10 +149,10 @@ const DetailBody: React.FC = () => {
     enabled: !!documentNumber,
   });
 
-  // Lien profond depuis l'onglet Outils ou la liste : /billing/documents/{n}?panel=creditNote|applyTo|corrective
+  // Lien profond : /billing/documents/{n}?panel=creditNote|applyTo|corrective|send|changeCustomer|paymentPlan|versions|schedule
   useEffect(() => {
     const panel = searchParams.get("panel");
-    if (panel === "creditNote" || panel === "applyTo" || panel === "corrective") setActivePanel(panel);
+    if (panel && (DEEP_PANELS as string[]).includes(panel)) setActivePanel(panel as PanelId);
   }, [searchParams]);
 
   // ── Données complémentaires ──
@@ -169,7 +187,7 @@ const DetailBody: React.FC = () => {
     refetch();
   };
 
-  const fail = (fallback: string) => (e: unknown) => setActionError(apiMessage(e, fallback));
+  const fail = (fallback: string) => (e: unknown) => setActionError(billingError(e, fallback));
 
   /** Mutation de workflow sans paramètre : même mécanique pour toutes les transitions de statut. */
   const useWorkflow = (fn: () => Promise<unknown>, okMsg: string, errorMsg = "Erreur lors de l'action.") =>
@@ -202,8 +220,12 @@ const DetailBody: React.FC = () => {
         setIssueViolations(violations);
         setActivePanel("issueOverride");
         setActionError(null);
+      } else if (needsOverrideReason(e)) {
+        setIssueViolations([]);
+        setActivePanel("issueOverride");
+        setActionError(billingError(e, "La remise dépasse la limite : indiquez le motif de dérogation."));
       } else {
-        setActionError(apiMessage(e, "Erreur lors de l'émission."));
+        setActionError(billingError(e, "Erreur lors de l'émission."));
       }
     },
   });
@@ -213,8 +235,6 @@ const DetailBody: React.FC = () => {
   const convertMutation = useWorkflow(() => billingService.convertToInvoice(documentNumber!), "Devis converti en facture.");
   const markViewedMutation = useWorkflow(() => billingService.markViewed(documentNumber!), "Devis marqué comme consulté.");
   const negotiationMutation = useWorkflow(() => billingService.startNegotiation(documentNumber!), "Négociation ouverte.");
-  const requestDepositMutation = useWorkflow(() => billingService.requestDeposit(documentNumber!), "Acompte demandé.");
-  const markDepositPaidMutation = useWorkflow(() => billingService.markDepositPaid(documentNumber!), "Acompte marqué comme reçu.");
 
   // rejectQuote accepte un motif facultatif que l'ancien écran n'envoyait jamais : on le saisit maintenant dans un panneau.
   const rejectMutation = useMutation({
@@ -407,7 +427,7 @@ const DetailBody: React.FC = () => {
 
   const anyPending =
     issueMutation.isPending || sendMutation.isPending || sendEmailMutation.isPending || acceptMutation.isPending || convertMutation.isPending ||
-    markViewedMutation.isPending || negotiationMutation.isPending || requestDepositMutation.isPending || markDepositPaidMutation.isPending ||
+    markViewedMutation.isPending || negotiationMutation.isPending ||
     selectOptionsMutation.isPending || payInstallmentMutation.isPending;
 
   // ── États de chargement ──
@@ -436,7 +456,15 @@ const DetailBody: React.FC = () => {
   const canValidate = !locked && ["INVOICE", "CREDIT_NOTE", "DEBIT_NOTE", "PROFORMA_INVOICE"].includes(t) && ["DRAFT", "ISSUED"].includes(s);
   // Réapplication d'un avoir : il doit être scellé (locked) et pas encore consommé (status !== ISSUED).
   const canApplyToAnother = isCreditNote && locked && s !== "ISSUED";
-  const canCancel = CANCELLABLE.has(s);
+  const canCancel = CANCELLABLE.has(s) && canCancelPerm;
+  const unpaid = (document.paidAmount ?? 0) === 0;
+  // Révision d'un devis (retour en NEGOTIATION) ou demande de modification d'une facture non payée (circuit d'approbation).
+  const quoteEditable = isQuote && ["DRAFT", "ISSUED", "SENT", "VIEWED", "NEGOTIATION", "ACCEPTED"].includes(s);
+  const invoiceEditable = isInvoice && (s === "DRAFT" || (["ISSUED", "SENT"].includes(s) && unpaid));
+  const canEdit = canUpdate && !locked && (quoteEditable || invoiceEditable || (!isQuote && !isInvoice && ["DRAFT", "ISSUED", "SENT"].includes(s)));
+  const editLabel = isQuote && s !== "DRAFT" ? "Réviser" : isInvoice && s !== "DRAFT" ? "Demander une modification" : "Modifier";
+  const canChangeCustomer = isInvoice && canCreate && ["ISSUED", "SENT"].includes(s) && unpaid;
+  const canPlanDeposits = isQuote ? ["DRAFT", "ISSUED", "SENT", "VIEWED", "NEGOTIATION", "ACCEPTED"].includes(s) : isInvoice && s === "DRAFT";
   const displayNumber = document.fiscalNumber ?? document.documentNumber;
   const optionalLines = document.lines?.filter((l) => l.optional) ?? [];
   const canSelectOptions = isQuote && optionalLines.length > 0 && ["DRAFT", "ISSUED", "SENT", "VIEWED", "NEGOTIATION"].includes(s);
@@ -526,12 +554,14 @@ const DetailBody: React.FC = () => {
             <ActionButton variant="ghost" icon={Printer} onClick={() => handlePrint(t)}>
               Imprimer
             </ActionButton>
-            <ActionButton variant="ghost" icon={Mail} pending={sendEmailMutation.isPending} disabled={anyPending} onClick={() => sendEmailMutation.mutate()}>
-              E-mail
-            </ActionButton>
-            {!locked && (s === "DRAFT" || s === "ISSUED" || s === "SENT") && (
+            {canSendPerm && s !== "DRAFT" && (
+              <ActionButton variant="ghost" icon={Mail} disabled={anyPending} onClick={() => togglePanel("send")}>
+                Envoyer
+              </ActionButton>
+            )}
+            {canEdit && (
               <ActionButton variant="ghost" icon={Pencil} onClick={() => navigate(`/billing/documents/${document.documentNumber}/edit`)} disabled={anyPending}>
-                Modifier
+                {editLabel}
               </ActionButton>
             )}
             {!locked && (
@@ -563,9 +593,6 @@ const DetailBody: React.FC = () => {
           <>
             <ActionButton icon={Send} pending={sendMutation.isPending} disabled={anyPending} onClick={() => sendMutation.mutate()}>
               Marquer envoyé
-            </ActionButton>
-            <ActionButton variant="ghost" icon={Mail} pending={sendEmailMutation.isPending} disabled={anyPending} onClick={() => sendEmailMutation.mutate()}>
-              Envoyer par e-mail
             </ActionButton>
           </>
         )}
@@ -604,22 +631,12 @@ const DetailBody: React.FC = () => {
             Demander une signature
           </ActionButton>
         )}
-        {isQuote && s === "ACCEPTED" && (
-          <ActionButton variant="ghost" icon={DollarSign} pending={requestDepositMutation.isPending} disabled={anyPending} onClick={() => requestDepositMutation.mutate()}>
-            Demander un acompte
-          </ActionButton>
-        )}
-        {isQuote && s === "DEPOSIT_REQUESTED" && (
-          <ActionButton icon={CheckCircle} pending={markDepositPaidMutation.isPending} disabled={anyPending} onClick={() => markDepositPaidMutation.mutate()}>
-            Marquer l'acompte reçu
-          </ActionButton>
-        )}
         {isQuote && ["ACCEPTED", "DEPOSIT_PAID"].includes(s) && (
           <ActionButton icon={ArrowRight} pending={convertMutation.isPending} disabled={anyPending} onClick={() => convertMutation.mutate()}>
             Convertir en facture
           </ActionButton>
         )}
-        {isInvoice && ["ISSUED", "SENT", "PARTIALLY_PAID", "OVERDUE"].includes(s) && (
+        {isInvoice && canPay && ["ISSUED", "SENT", "PARTIALLY_PAID", "OVERDUE"].includes(s) && (
           <>
             <ActionButton
               icon={CreditCard}
@@ -643,7 +660,17 @@ const DetailBody: React.FC = () => {
             </ActionButton>
           </>
         )}
-        {isInvoice && locked && (
+        {canChangeCustomer && (
+          <ActionButton variant="ghost" icon={UserRoundCog} onClick={() => togglePanel("changeCustomer")}>
+            Changer le client
+          </ActionButton>
+        )}
+        {isInvoice && canPay && ["ISSUED", "SENT", "PARTIALLY_PAID", "OVERDUE"].includes(s) && (
+          <ActionButton variant="ghost" icon={HandCoins} onClick={() => togglePanel("paymentPlan")}>
+            Plan de paiement
+          </ActionButton>
+        )}
+        {isInvoice && locked && canCreate && (
           <>
             <ActionButton variant="ghost" icon={FileText} onClick={() => togglePanel("creditNote")}>
               Créer un avoir
@@ -689,6 +716,42 @@ const DetailBody: React.FC = () => {
 
       {/* ── Panneaux en ligne ── */}
       <div data-no-print>
+        {activePanel === "send" && (
+          <SendPanel
+            documentNumber={document.documentNumber}
+            customerType={document.customerType}
+            customerCode={document.customerCode}
+            onSent={() => {
+              invalidateAll();
+              setActivePanel(null);
+            }}
+          />
+        )}
+
+        {activePanel === "changeCustomer" && (
+          <ChangeCustomerPanel
+            invoiceNumber={document.documentNumber}
+            onCancel={() => setActivePanel(null)}
+            onDone={(newInvoice) => {
+              invalidateAll();
+              setActivePanel(null);
+              if (newInvoice && newInvoice !== document.documentNumber) navigate(`/billing/documents/${newInvoice}`);
+            }}
+          />
+        )}
+
+        {activePanel === "paymentPlan" && (
+          <PaymentPlanPanel
+            documentNumber={document.documentNumber}
+            onCancel={() => setActivePanel(null)}
+            onCreated={() => {
+              invalidateAll();
+              queryClient.invalidateQueries({ queryKey: ["billing-promises", document.documentNumber] });
+              setActivePanel(null);
+            }}
+          />
+        )}
+
         {activePanel === "creditNote" && (
           <CreditNotePanel
             invoiceNumber={document.documentNumber}
@@ -1185,6 +1248,24 @@ const DetailBody: React.FC = () => {
         </div>
       </section>
 
+      {/* ── Demande de modification en attente (facture) ── */}
+      {isInvoice && s !== "DRAFT" && (
+        <InvoiceChangesPanel
+          invoiceNumber={document.documentNumber}
+          currency={document.currency}
+          canRequest={canEdit && invoiceEditable}
+          onRequest={() => navigate(`/billing/documents/${document.documentNumber}/edit`)}
+        />
+      )}
+
+      {/* ── Négociation et révisions (devis) ── */}
+      {isQuote && s !== "DRAFT" && <QuoteNegotiationPanel quoteNumber={document.documentNumber} currency={document.currency} status={s} />}
+
+      {/* ── Acomptes ── */}
+      {(isQuote || isInvoice) && (
+        <DepositsPanel documentNumber={document.documentNumber} kind={isQuote ? "QUOTE" : "INVOICE"} currency={document.currency} canPlan={canPlanDeposits && canUpdate} />
+      )}
+
       {/* ── Options du devis ── */}
       {canSelectOptions && (
         <Section title="Options du devis" description="Cochez les options retenues. Les options non sélectionnées seront supprimées définitivement." icon={CheckCircle}>
@@ -1346,6 +1427,25 @@ const DetailBody: React.FC = () => {
             )}
           </div>
         </Section>
+      )}
+
+      {/* ── Promesses de paiement (PAYMENT:PROCESS) ── */}
+      {isInvoice && s !== "DRAFT" && (
+        <PromisesPanel documentNumber={document.documentNumber} currency={document.currency} balanceDue={document.balanceDue} canCreate={canPay && document.balanceDue > 0} />
+      )}
+
+      {/* ── Retenues à la source ── */}
+      {(isInvoice || isQuote) && s !== "DRAFT" && <WithholdingsPanel documentNumber={document.documentNumber} currency={document.currency} canRecord={isInvoice && canUpdate} />}
+
+      {/* ── Livraison ── */}
+      {(isInvoice || isQuote) && s !== "DRAFT" && <DeliveryPanel documentNumber={document.documentNumber} canCreate={canCreate} />}
+
+      {/* ── Éléments facturés (rattachements) ── */}
+      <ElementsPanel documentNumber={document.documentNumber} editable={canUpdate && !locked} />
+
+      {/* ── Réclamations ── */}
+      {isInvoice && s !== "DRAFT" && (
+        <ClaimsPanel documentNumber={document.documentNumber} customerType={document.customerType} customerCode={document.customerCode} currency={document.currency} canDecide={canUpdate} canOpen={canCreate} />
       )}
 
       {/* ── Relances d'impayés ── */}

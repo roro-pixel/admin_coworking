@@ -2,9 +2,9 @@ import React, { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { billingService } from "../../services/billing.service";
 import type { BillingDocument } from "../../services/billing.service";
-import { useAuth } from "../../contexts/AuthContext";
 import { CheckField, Field, PanelForm } from "../subscription/kit";
-import { FIELD_SOFT, apiMessage, formatMoney } from "../subscription/kitUtils";
+import { FIELD_SOFT, formatMoney } from "../subscription/kitUtils";
+import { billingError } from "./billingErrors";
 import { toast } from "../ui/toastStore";
 import { currencyLabel } from "../payment/paymentUtils";
 
@@ -18,7 +18,6 @@ export const CreditNotePanel: React.FC<{
   onCancel: () => void;
   onCreated: (creditNote: BillingDocument) => void;
 }> = ({ invoiceNumber, balanceDue, currency, onCancel, onCreated }) => {
-  const { admin } = useAuth();
   const queryClient = useQueryClient();
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
@@ -31,7 +30,6 @@ export const CreditNotePanel: React.FC<{
       billingService.createCreditNote(invoiceNumber, {
         amount: amount && parseFloat(amount) > 0 ? parseFloat(amount) : null,
         reason: reason.trim(),
-        createdBy: admin?.email || String(admin?.id) || "admin",
         validateImmediately,
         applyImmediately,
       }),
@@ -41,7 +39,7 @@ export const CreditNotePanel: React.FC<{
       toast.success(`Avoir ${creditNote.documentNumber} créé.`);
       onCreated(creditNote);
     },
-    onError: (e: unknown) => setError(apiMessage(e, "Erreur lors de la création de l'avoir.")),
+    onError: (e: unknown) => setError(billingError(e, "Erreur lors de la création de l'avoir.")),
   });
 
   return (
@@ -105,7 +103,7 @@ export const ApplyToPanel: React.FC<{
       toast.success(`Avoir appliqué sur ${target.trim()}.`);
       onApplied(doc, target.trim());
     },
-    onError: (e: unknown) => setError(apiMessage(e, "Erreur lors de la ré-application de l'avoir.")),
+    onError: (e: unknown) => setError(billingError(e, "Erreur lors de la ré-application de l'avoir.")),
   });
 
   return (
@@ -148,7 +146,7 @@ export const CancelPanel: React.FC<{
       toast.success(doc.locked ? "Facture annulée par un avoir. Elle reste validée (SEFC)." : "Document annulé.");
       onCancelled(doc);
     },
-    onError: (e: unknown) => setError(apiMessage(e, "Erreur lors de l'annulation.")),
+    onError: (e: unknown) => setError(billingError(e, "Erreur lors de l'annulation.")),
   });
 
   return (

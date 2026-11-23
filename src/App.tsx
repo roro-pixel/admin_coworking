@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -62,8 +62,40 @@ import { CompaniesPage } from "./pages/companies/CompaniesPage";
 import { CompanyCreatePage } from "./pages/companies/CompanyCreatePage";
 import { CompanyDetailPage } from "./pages/companies/CompanyDetailPage";
 import { MarketplacePage } from "./pages/marketplace/MarketplacePage";
+import { TemplatesPage } from "./pages/templates/TemplatesPage";
+import { TemplateDetailPage } from "./pages/templates/TemplateDetailPage";
 import { MarketplaceOrderDetailPage } from "./pages/marketplace/MarketplaceOrderDetailPage";
 import { SectionHub } from "./pages/SectionHub";
+import { AccountsPage } from "./pages/accounting/AccountsPage";
+import { EntriesPage } from "./pages/accounting/EntriesPage";
+import { EntryFormPage } from "./pages/accounting/EntryFormPage";
+import { EntryDetailPage } from "./pages/accounting/EntryDetailPage";
+import { TreasuryPage } from "./pages/accounting/treasury/TreasuryPage";
+import { BankAccountPage } from "./pages/accounting/treasury/BankAccountPage";
+import { PurchasesPage } from "./pages/accounting/purchases/PurchasesPage";
+import { InvoiceDetailPage } from "./pages/accounting/purchases/InvoiceDetailPage";
+import { OrderDetailPage } from "./pages/accounting/purchases/OrderDetailPage";
+import { SupplierStatementPage } from "./pages/accounting/purchases/SupplierStatementPage";
+import { SalesControlPage } from "./pages/accounting/purchases/SalesControlPage";
+import { VatPage } from "./pages/accounting/vat/VatPage";
+import { VatReturnPage } from "./pages/accounting/vat/VatReturnPage";
+import { FixedAssetsPage } from "./pages/accounting/fixedassets/FixedAssetsPage";
+import { FixedAssetDetailPage } from "./pages/accounting/fixedassets/FixedAssetDetailPage";
+import { InventoryDetailPage } from "./pages/accounting/fixedassets/InventoryDetailPage";
+import { AnalyticPage } from "./pages/accounting/analytic/AnalyticPage";
+import { BudgetPage } from "./pages/accounting/budget/BudgetPage";
+import { BudgetDetailPage } from "./pages/accounting/budget/BudgetDetailPage";
+import { PeriodPage } from "./pages/accounting/period/PeriodPage";
+import { ClosingPage } from "./pages/accounting/closing/ClosingPage";
+import { ExchangePage } from "./pages/accounting/exchange/ExchangePage";
+import { FundPage } from "./pages/accounting/fund/FundPage";
+import { RequestFormPage } from "./pages/accounting/fund/RequestFormPage";
+import { RequestDetailPage } from "./pages/accounting/fund/RequestDetailPage";
+import { NeedFormPage } from "./pages/accounting/fund/NeedFormPage";
+import { VoucherVerifyPage } from "./pages/accounting/fund/VoucherVerifyPage";
+import { ApprovalsPage } from "./pages/accounting/approval/ApprovalsPage";
+import { AuditPage } from "./pages/audit/AuditPage";
+import { ApprovalDetailPage } from "./pages/accounting/approval/ApprovalDetailPage";
 
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -78,6 +110,7 @@ function App() {
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<AdminLogin />} />
+            <Route path="/verify/voucher/:number" element={<VoucherVerifyPage />} />
             <Route
               path="/quote/sign/:token"
               element={<PublicQuoteSignaturePage />}
@@ -587,6 +620,278 @@ function App() {
               }
             />
             <Route
+              path="/accounting"
+              element={
+                <ProtectedRoute>
+                  <Navigate to="/accounting/entries" replace />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/entries"
+              element={
+                <ProtectedRoute>
+                  <EntriesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/entries/new"
+              element={
+                <ProtectedRoute>
+                  <EntryFormPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/entries/:reference"
+              element={
+                <ProtectedRoute>
+                  <EntryDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/entries/:reference/edit"
+              element={
+                <ProtectedRoute>
+                  <EntryFormPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/accounts"
+              element={
+                <ProtectedRoute>
+                  <AccountsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/treasury"
+              element={
+                <ProtectedRoute>
+                  <TreasuryPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/treasury/:code"
+              element={
+                <ProtectedRoute>
+                  <BankAccountPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/purchases"
+              element={
+                <ProtectedRoute>
+                  <PurchasesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/purchases/invoices/:number"
+              element={
+                <ProtectedRoute>
+                  <InvoiceDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/purchases/orders/:number"
+              element={
+                <ProtectedRoute>
+                  <OrderDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/purchases/suppliers/:code"
+              element={
+                <ProtectedRoute>
+                  <SupplierStatementPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/sales-control"
+              element={
+                <ProtectedRoute>
+                  <SalesControlPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/vat"
+              element={
+                <ProtectedRoute>
+                  <VatPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/vat/:id"
+              element={
+                <ProtectedRoute>
+                  <VatReturnPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/fixed-assets"
+              element={
+                <ProtectedRoute>
+                  <FixedAssetsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/fixed-assets/inventories/:code"
+              element={
+                <ProtectedRoute>
+                  <InventoryDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/fixed-assets/:code"
+              element={
+                <ProtectedRoute>
+                  <FixedAssetDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/analytic"
+              element={
+                <ProtectedRoute>
+                  <AnalyticPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/budget"
+              element={
+                <ProtectedRoute>
+                  <BudgetPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/budget/:id"
+              element={
+                <ProtectedRoute>
+                  <BudgetDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/period"
+              element={
+                <ProtectedRoute>
+                  <PeriodPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/closing"
+              element={
+                <ProtectedRoute>
+                  <ClosingPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/exchange"
+              element={
+                <ProtectedRoute>
+                  <ExchangePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/fund"
+              element={
+                <ProtectedRoute>
+                  <FundPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/fund/new"
+              element={
+                <ProtectedRoute>
+                  <RequestFormPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/fund/needs/new"
+              element={
+                <ProtectedRoute>
+                  <NeedFormPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/fund/needs/:number/edit"
+              element={
+                <ProtectedRoute>
+                  <NeedFormPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/fund/:number/edit"
+              element={
+                <ProtectedRoute>
+                  <RequestFormPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/fund/:number"
+              element={
+                <ProtectedRoute>
+                  <RequestDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/approvals"
+              element={
+                <ProtectedRoute>
+                  <ApprovalsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting/approvals/:number"
+              element={
+                <ProtectedRoute>
+                  <ApprovalDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/templates"
+              element={
+                <ProtectedRoute>
+                  <TemplatesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/templates/:code"
+              element={
+                <ProtectedRoute>
+                  <TemplateDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/marketplace"
               element={
                 <ProtectedRoute>
@@ -647,6 +952,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ServicesMaster />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/audit"
+              element={
+                <ProtectedRoute>
+                  <AuditPage />
                 </ProtectedRoute>
               }
             />

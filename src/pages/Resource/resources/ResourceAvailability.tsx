@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, CalendarDays, DoorOpen, Layers, List, Lock, Plus, RefreshCw, Unlock } from "lucide-react";
+import { ArrowRight, CalendarDays, DoorOpen, Layers, List, Lock, Plus, Power, RefreshCw, Trash2, Unlock } from "lucide-react";
 import { resourceService, SLOT_DURATION_OPTIONS } from "../../../services/resource.service";
 import type { ResourceSummaryResponse, SlotDurationMinutes } from "../../../services/resource.service";
-import { ActionButton, CheckField, DataCard, EmptyState, ErrorBlock, Field, HeadRow, ListHeader, PanelForm, Pagination, Section, StatusChip, Tabs } from "../../../components/subscription/kit";
+import { ActionButton, CheckField, DataCard, EmptyState, ErrorBlock, Field, HeadRow, IconButton, ListHeader, PanelForm, Pagination, Section, StatusChip, Tabs } from "../../../components/subscription/kit";
 import type { TabItem } from "../../../components/subscription/kit";
 import { FIELD, ROW_HOVER, apiMessage, formatDateTime } from "../../../components/subscription/kitUtils";
 import { ListSkeleton, Skeleton } from "../../../components/ui/Skeleton";
@@ -18,7 +18,7 @@ const VIEWS: TabItem<View>[] = [
   { id: "calendar", label: "Calendrier", icon: CalendarDays },
   { id: "list", label: "Liste", icon: List },
 ];
-const COLS = "lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1.3fr)_6rem_7rem_6rem_6rem]";
+const COLS = "lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1.3fr)_6rem_7rem_6rem_6rem_auto]";
 
 const newGenerate = (resourceCode: string) => ({
   resourceCode,
@@ -26,12 +26,13 @@ const newGenerate = (resourceCode: string) => ({
   endedAt: "",
   capacity: 1,
   active: true,
+  outsideOpeningHours: false,
   // undefined = la durée déjà en vigueur sur la ressource s'applique. Ce n'est un nombre
   // que si l'utilisateur coche explicitement « Changer la durée ».
   slotDurationOverride: undefined as SlotDurationMinutes | undefined,
 });
 
-type Capacity = { mode: "reserve" | "release"; slotId: string; quantity: number };
+type Capacity = { mode: "reserve" | "release"; slotId: string; quantity: number; reason: string };
 
 export const ResourceAvailability: React.FC = () => {
   const queryClient = useQueryClient();
@@ -88,6 +89,7 @@ export const ResourceAvailability: React.FC = () => {
         slotDurationMinutes: generate!.slotDurationOverride,
         totalCapacity: generate!.capacity,
         active: generate!.active,
+        outsideOpeningHours: generate!.outsideOpeningHours || undefined,
       }),
     onSuccess: async () => {
       await refresh();
@@ -100,8 +102,9 @@ export const ResourceAvailability: React.FC = () => {
 
   const adjustCapacity = useMutation({
     mutationFn: () => {
-      const id = Number(capacity!.slotId);
-      return capacity!.mode === "reserve" ? resourceService.reserveAvailabilitySlot(id, capacity!.quantity) : resourceService.releaseAvailabilitySlot(id, capacity!.quantity);
+      const slot = slots.find((s) => String(s.id) === capacity!.slotId);
+      if (!slot) return Promise.reject(new Error("Créneau introuvable"));
+      return capacity!.mode === "reserve" ? resourceService.reserveAvailabilitySlot(slot, capacity!.quantity, capacity!.reason.trim()) : resourceService.releaseAvailabilitySlot(slot, capacity!.quantity, capacity!.reason.trim());
     },
     onSuccess: async () => {
       await refresh();
@@ -117,6 +120,22 @@ export const ResourceAvailability: React.FC = () => {
     setGenerateInfo(selectedSummary);
     setGenerate(newGenerate(selectedResource));
   };
+  const refreshSlots = () => queryClient.invalidateQueries({ queryKey: ["resource-availabilities"] });
+  const toggleSlot = useMutation({
+    mutationFn: (s: { id: number | string; active: boolean }) => resourceService.updateAvailabilityActive(s.id, !s.active),
+    onSuccess: refreshSlots,
+    onError: (e) => toast.error(apiMessage(e, "Changement d'état impossible")),
+  });
+  const removeSlot = useMutation({ mutationFn: (id: number | string) => resourceService.deleteAvailability(id), onSuccess: refreshSlots });
+  const purge = useMutation({
+    mutationFn: () => resourceService.deleteFutureAvailabilities({ resourceCode: selectedResource }),
+    onSuccess: async (r) => {
+      await refreshSlots();
+      toast.success(`${r.deleted} créneau(x) supprimé(s), ${r.kept} conservé(s) car réservés`);
+    },
+    onError: (e) => toast.error(apiMessage(e, "Suppression impossible")),
+  });
+
   const slotLabel = (s: (typeof slots)[number]) => `${formatDateTime(s.startedAt)} à ${s.endedAt.slice(11, 16)}, ${s.remainingCapacity}/${s.totalCapacity} places`;
 
   return (
@@ -192,6 +211,7 @@ export const ResourceAvailability: React.FC = () => {
             </Field>
           </div>
           <CheckField checked={generate.active} onChange={(v) => setGenerate({ ...generate, active: v })} label="Actif immédiatement" />
+          <CheckField checked={generate.outsideOpeningHours} onChange={(v) => setGenerate({ ...generate, outsideOpeningHours: v })} label="Autoriser hors des horaires d'ouverture (exception ponctuelle)" />
         </PanelForm>
       )}
 
@@ -216,7 +236,7 @@ export const ResourceAvailability: React.FC = () => {
               onCancel={() => setCapacity(null)}
               pending={adjustCapacity.isPending}
               submitLabel={capacity.mode === "reserve" ? "Réserver" : "Libérer"}
-              submitDisabled={!capacity.slotId}
+              submitDisabled={!capacity.slotId || !capacity.reason.trim()}
               error={capacityError}
               onSubmit={(e) => { e.preventDefault(); setCapacityError(null); adjustCapacity.mutate(); }}
             >
@@ -231,14 +251,18 @@ export const ResourceAvailability: React.FC = () => {
               <Field label={capacity.mode === "reserve" ? "Quantité à réserver" : "Quantité à libérer"} required>
                 <input type="number" min={1} value={capacity.quantity} onChange={(e) => setCapacity({ ...capacity, quantity: parseInt(e.target.value) || 1 })} className={`${FIELD} sm:max-w-[10rem]`} />
               </Field>
+              <Field label="Motif" required hint="Rattrapage seulement : l'opération est journalisée. Une libération ne rend jamais une place occupée par une réservation.">
+                <input value={capacity.reason} onChange={(e) => setCapacity({ ...capacity, reason: e.target.value })} className={FIELD} />
+              </Field>
             </PanelForm>
           )}
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Tabs items={VIEWS} active={view} onChange={setView} variant="soft" />
             <div className="flex flex-wrap gap-2">
-              <ActionButton variant="ghost" icon={Lock} onClick={() => { setCapacityError(null); setCapacity({ mode: "reserve", slotId: "", quantity: 1 }); }}>Réserver</ActionButton>
-              <ActionButton variant="ghost" icon={Unlock} onClick={() => { setCapacityError(null); setCapacity({ mode: "release", slotId: "", quantity: 1 }); }}>Libérer</ActionButton>
+              <ActionButton variant="ghost" icon={Lock} onClick={() => { setCapacityError(null); setCapacity({ mode: "reserve", slotId: "", quantity: 1, reason: "" }); }}>Réserver</ActionButton>
+              <ActionButton variant="ghost" icon={Trash2} onClick={() => toast.confirm({ message: "Supprimer les créneaux futurs libres de cette ressource ?", detail: "Les créneaux déjà réservés sont conservés.", confirmLabel: "Supprimer", pendingLabel: "Suppression", tone: "danger", onConfirm: () => purge.mutateAsync() })}>Purger les créneaux libres</ActionButton>
+              <ActionButton variant="ghost" icon={Unlock} onClick={() => { setCapacityError(null); setCapacity({ mode: "release", slotId: "", quantity: 1, reason: "" }); }}>Libérer</ActionButton>
             </div>
           </div>
 
@@ -269,6 +293,7 @@ export const ResourceAvailability: React.FC = () => {
                     <span>Places</span>
                     <span>Disponible</span>
                     <span>Actif</span>
+                    <span className="text-right">Actions</span>
                   </HeadRow>
                   <DataCard>
                     {paged.slice.map((s) => (
@@ -279,7 +304,16 @@ export const ResourceAvailability: React.FC = () => {
                           <Cell title="Durée"><span className="text-sm text-gray-700">{s.slotDurationMinutes} min</span></Cell>
                           <Cell title="Places"><span className="text-sm text-gray-700">{s.remainingCapacity} / {s.totalCapacity}</span></Cell>
                           <Cell title="Disponible"><StatusChip tone={s.available ? "success" : "danger"}>{s.available ? "Oui" : "Non"}</StatusChip></Cell>
-                          <Cell title="Actif"><StatusChip tone={s.active ? "success" : "neutral"}>{s.active ? "Oui" : "Non"}</StatusChip></Cell>
+                          <Cell title="Actif"><StatusChip tone={s.active ? "success" : "neutral"}>{s.active ? "Oui" : "Non"}</StatusChip>{s.subscribersOnly && <span className="ml-1"><StatusChip tone="pink">Abonnés</StatusChip></span>}</Cell>
+                          <div className="flex items-center gap-1 max-lg:col-span-2 lg:justify-end">
+                            <IconButton icon={Power} label={s.active ? "Désactiver le créneau" : "Réactiver le créneau"} tone={s.active ? "success" : "neutral"} pending={toggleSlot.isPending && toggleSlot.variables?.id === s.id} onClick={() => toggleSlot.mutate({ id: s.id, active: s.active })} />
+                            <IconButton
+                              icon={Trash2}
+                              label="Supprimer le créneau"
+                              tone="danger"
+                              onClick={() => toast.confirm({ message: "Supprimer ce créneau ?", detail: "Refusé s'il est déjà réservé.", confirmLabel: "Supprimer", pendingLabel: "Suppression", successMessage: "Créneau supprimé", errorMessage: "Suppression impossible (créneau réservé ?)", onConfirm: () => removeSlot.mutateAsync(s.id) })}
+                            />
+                          </div>
                         </div>
                       </div>
                     ))}

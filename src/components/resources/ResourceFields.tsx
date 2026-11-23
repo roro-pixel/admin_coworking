@@ -13,6 +13,7 @@ export interface ResourceForm {
   capacity: number;
   zone: string;
   locationLabel: string;
+  floorLabel: string;
   status: ResourceStatus;
   bookingEnabled: boolean;
   portalVisible: boolean;
@@ -29,6 +30,7 @@ export const RESOURCE_DEFAULTS: ResourceForm = {
   capacity: 1,
   zone: "",
   locationLabel: "",
+  floorLabel: "",
   status: "ACTIVE",
   bookingEnabled: true,
   portalVisible: true,
@@ -46,6 +48,7 @@ export const resourceToForm = (r: ResourceResponse): ResourceForm => ({
   capacity: r.capacity ?? 1,
   zone: r.zone || "",
   locationLabel: r.locationLabel || "",
+  floorLabel: r.floorLabel || "",
   status: r.status as ResourceStatus,
   bookingEnabled: r.bookingEnabled,
   portalVisible: r.portalVisible,
@@ -84,6 +87,9 @@ export const ResourceFields: React.FC<Props> = ({ value: f, onChange: set, types
       </Field>
       <Field label="Zone">
         <input value={f.zone} onChange={(e) => set({ zone: e.target.value })} className={FIELD} />
+      </Field>
+      <Field label="Étage (libellé)">
+        <input value={f.floorLabel} onChange={(e) => set({ floorLabel: e.target.value })} placeholder="Ex. 2e étage" className={FIELD} />
       </Field>
       <Field label="Emplacement" className="sm:col-span-2">
         <input value={f.locationLabel} onChange={(e) => set({ locationLabel: e.target.value })} placeholder="Ex. 2e étage, porte 12" className={FIELD} />

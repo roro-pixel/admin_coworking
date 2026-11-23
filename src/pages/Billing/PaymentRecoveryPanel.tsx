@@ -57,7 +57,10 @@ export const PaymentRecoveryPanel: React.FC = () => {
   });
 
   const recovery = data as RecoveryOverview | undefined;
-  const payableDocuments = payableQuery.data ?? [];
+  const payableDocuments = useMemo(
+    () => payableQuery.data?.content ?? [],
+    [payableQuery.data],
+  );
 
   const groupedDocuments = useMemo(() => {
     const map = new Map<string, PayableDocument[]>();
@@ -99,14 +102,14 @@ export const PaymentRecoveryPanel: React.FC = () => {
         expiresAt: undefined,
         metadataJson: undefined,
       }),
-    onSuccess: (intent) => {
+    onSuccess: (overview) => {
       setError(null);
       queryClient.invalidateQueries({ queryKey: ["payment-intents"] });
       refetch();
 
       navigate("/payments", {
         state: {
-          intentNumber: intent.intentNumber,
+          intentNumber: overview.paymentIntent?.intentNumber,
           message: "Intention de recouvrement créée avec succès.",
         },
       });

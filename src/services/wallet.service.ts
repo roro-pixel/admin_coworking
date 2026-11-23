@@ -9,6 +9,10 @@ export type WalletStatus =
 export type LedgerDirection = "CREDIT" | "DEBIT";
 export type LedgerEntryType =
   | "ADMIN_TOPUP"
+  | "TOPUP"
+  | "TRANSFER_IN"
+  | "TRANSFER_OUT"
+  | "TRANSFER_FEE"
   | "ADMIN_DEBIT"
   | "PAYMENT"
   | "REFUND"
@@ -19,6 +23,16 @@ export type LedgerEntryType =
   | "CASHBACK"
   | "PROMOTIONAL_CREDIT"
   | "OVERPAYMENT_CREDIT";
+
+export interface WalletHoldLine {
+  holdNumber: string;
+  amount: number;
+  sourceType?: string;
+  sourceCode?: string;
+  sourceLabel?: string;
+  expiresAt?: string;
+  createdAt?: string;
+}
 
 export interface Wallet {
   walletNumber: string;
@@ -31,10 +45,16 @@ export interface Wallet {
   heldBalance: number;
   openedAt: string;
   closedAt: string | null;
+  ownerName?: string;
+  /** Réservations actives, renvoyées avec le portefeuille. */
+  activeHolds?: WalletHoldLine[];
 }
 
 export interface LedgerEntry {
   entryNumber: string;
+  transactionNumber?: string;
+  transactionUuid?: string;
+  sourceLabel?: string;
   walletNumber: string;
   direction: LedgerDirection;
   amount: number;
@@ -52,10 +72,13 @@ export interface WalletHold {
   holdNumber: string;
   walletNumber: string;
   amount: number;
-  sourceType: string;
-  sourceCode: string;
-  expiresAt: string;
+  currency?: string;
+  sourceType?: string;
+  sourceCode?: string;
+  sourceLabel?: string;
+  expiresAt?: string;
   status: "ACTIVE" | "CAPTURED" | "RELEASED" | "EXPIRED";
+  createdBy?: string;
   createdAt: string;
 }
 
@@ -87,7 +110,8 @@ export interface LimitSnapshot {
   remainingDailyTopUp: number;
   maxBalance: number;
   maxDailyOperations: number;
-  dailyOperationsUsed: number;
+  /** int64 : peut arriver en texte au-delà de 2^53. */
+  dailyOperationsUsed: number | string;
   /** Phrase à afficher quand un plafond bloque. */
   upgradePath?: string | null;
 }
@@ -99,7 +123,7 @@ export interface LimitSnapshot {
 export interface WalletIntegrityReport {
   walletNumber: string;
   entriesChecked: number;
-  brokenLinks: unknown[];
+  brokenLinks: string[];
   unchained: number;
   expectedBalance: number;
   actualBalance: number;
@@ -127,6 +151,11 @@ export const safeNumber = (
   return value ?? defaultValue;
 };
 
+const newIdemKey = (): string =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `idem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
 export const walletService = {
   // Get or create wallet
   getOrCreateWallet: async (
@@ -151,7 +180,11 @@ export const walletService = {
     return response.data;
   },
 
-  // Liste des portefeuilles
+  /**
+   * Liste des portefeuilles. Le serveur ne filtre que par ownerType et ownerCode (+ pagination) :
+   * `status`, `currency` et `searchText` sont donc appliqués ici, sur la page reçue.
+   * Pour retrouver un portefeuille précis par propriétaire et devise, demander une page assez large (size 50).
+   */
   getWallets: async (params?: {
     ownerType?: string;
     ownerCode?: string;
@@ -162,41 +195,51 @@ export const walletService = {
     size?: number;
     sort?: string;
   }): Promise<PageResponse<Wallet>> => {
-    const response = await apiClient.get("/sni/api/v1/wallets", { params });
+    const { status, currency, searchText, ...serverParams } = params ?? {};
+    const response = await apiClient.get("/sni/api/v1/wallets", { params: serverParams });
     const data = response.data;
+    const needle = searchText?.trim().toLowerCase();
+    const keep = (w: Wallet) =>
+      (!status || w.status === status) &&
+      (!currency || w.currency === currency) &&
+      (!needle ||
+        [w.walletNumber, w.ownerCode, w.ownerName].some((v) => v?.toLowerCase().includes(needle)));
+    const filtered = !!(status || currency || needle);
+    const narrow = (page: PageResponse<Wallet>): PageResponse<Wallet> =>
+      filtered ? { ...page, content: page.content.filter(keep) } : page;
 
     // Structure: { data: [], pageable: { totalElements, totalPages, page, size } }
     if (data?.data !== undefined && Array.isArray(data.data)) {
       const pageable = data.pageable || {};
-      return {
+      return narrow({
         content: data.data,
         totalElements: pageable.totalElements ?? data.data.length,
         totalPages: pageable.totalPages ?? 1,
         size: pageable.size ?? params?.size ?? 20,
         number: pageable.page ?? params?.page ?? 0,
-      };
+      });
     }
 
     // Structure: { content: [], totalElements, totalPages }
     if (data?.content !== undefined && Array.isArray(data.content)) {
-      return {
+      return narrow({
         content: data.content,
         totalElements: data.totalElements ?? data.content.length,
         totalPages: data.totalPages ?? 1,
         size: data.size ?? params?.size ?? 20,
         number: data.number ?? params?.page ?? 0,
-      };
+      });
     }
 
     // Structure: tableau direct
     if (Array.isArray(data)) {
-      return {
+      return narrow({
         content: data,
         totalElements: data.length,
         totalPages: 1,
         size: data.length,
         number: 0,
-      };
+      });
     }
 
     return { content: [], totalElements: 0, totalPages: 0, size: 0, number: 0 };
@@ -206,28 +249,36 @@ export const walletService = {
   getWalletByOwner: async (
     ownerType: string,
     ownerCode: string,
+    currency?: string,
   ): Promise<Wallet | null> => {
     const response = await walletService.getWallets({
       ownerType,
       ownerCode,
-      size: 1,
+      currency,
+      size: 50,
     });
     return response.content?.[0] || null;
   },
 
-  // Admin top-up
-  adminTopUp: async (data: {
-    ownerType: string;
-    ownerCode: string;
-    currency: string;
-    amount: number;
-    createdBy: string;
-    reference?: string;
-    metadataJson?: string;
-  }): Promise<Wallet> => {
+  /**
+   * Top-up administrateur (PAYMENT:PROCESS). Le créateur vient du jeton.
+   * Réponse non typée côté serveur : on la lit comme un portefeuille, à confirmer avec le backend.
+   */
+  adminTopUp: async (
+    data: {
+      ownerType: string;
+      ownerCode: string;
+      currency: string;
+      amount: number;
+      reference?: string;
+      metadataJson?: string;
+    },
+    idempotencyKey?: string,
+  ): Promise<Wallet> => {
     const response = await apiClient.post(
       "/sni/api/v1/wallets/admin/top-up",
       data,
+      { headers: { "Idempotency-Key": idempotencyKey ?? newIdemKey() } },
     );
     return response.data;
   },
@@ -278,7 +329,7 @@ export const walletService = {
     return { content: [], totalElements: 0, totalPages: 0, size: 0, number: 0 };
   },
 
-  // Get holds
+  /** Réservations : la route est `/wallet-holds` filtrée par `walletNumber` (pas de sous-route du portefeuille). */
   getWalletHolds: async (
     walletNumber: string,
     params?: {
@@ -287,12 +338,12 @@ export const walletService = {
       sourceCode?: string;
       page?: number;
       size?: number;
+      sort?: string;
     },
   ): Promise<PageResponse<WalletHold>> => {
-    const response = await apiClient.get(
-      `/sni/api/v1/wallets/${walletNumber}/holds`,
-      { params },
-    );
+    const response = await apiClient.get("/sni/api/v1/wallet-holds", {
+      params: { ...params, walletNumber },
+    });
     const data = response.data;
 
     if (data?.data !== undefined && Array.isArray(data.data)) {
@@ -323,35 +374,30 @@ export const walletService = {
     return { content: [], totalElements: 0, totalPages: 0, size: 0, number: 0 };
   },
 
-  // Create hold
+  /** Seul `walletNumber` et `amount` sont obligatoires ; le créateur vient du jeton. */
   createHold: async (data: {
     walletNumber: string;
     amount: number;
-    sourceType: string;
-    sourceCode: string;
-    expiresAt: string;
-    createdBy: string;
+    sourceType?: string;
+    sourceCode?: string;
+    expiresAt?: string;
   }): Promise<WalletHold> => {
     const response = await apiClient.post("/sni/api/v1/wallet-holds", data);
     return response.data;
   },
 
-  // Capture hold
-  captureHold: async (holdNumber: string, createdBy: string): Promise<void> => {
-    await apiClient.patch(
+  captureHold: async (holdNumber: string): Promise<WalletHold> => {
+    const response = await apiClient.patch(
       `/sni/api/v1/wallet-holds/${holdNumber}/capture`,
-      null,
-      { params: { createdBy } },
     );
+    return response.data;
   },
 
-  // Release hold
-  releaseHold: async (holdNumber: string, createdBy: string): Promise<void> => {
-    await apiClient.patch(
+  releaseHold: async (holdNumber: string): Promise<WalletHold> => {
+    const response = await apiClient.patch(
       `/sni/api/v1/wallet-holds/${holdNumber}/release`,
-      null,
-      { params: { createdBy } },
     );
+    return response.data;
   },
 
   // ── Sécurité et intégrité (ADMIN / SUPER_ADMIN) ─────────────────────────────

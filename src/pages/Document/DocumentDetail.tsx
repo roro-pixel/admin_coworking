@@ -342,7 +342,7 @@ export const DocumentDetailView: React.FC<{ document: DocumentResponse; onBack: 
                 <p className="min-w-0 truncate text-sm text-gray-800">
                   <span className="font-semibold">{s.signerName}</span> {s.signerEmail ? `· ${s.signerEmail}` : ""}
                 </p>
-                <StatusChip tone={s.status === "SIGNED" ? "success" : s.status === "EXPIRED" ? "neutral" : "warn"}>{s.status === "SIGNED" ? "Signé" : s.status === "EXPIRED" ? "Expiré" : s.status === "PENDING" ? "En attente" : s.status}</StatusChip>
+                <StatusChip tone={s.status === "SIGNED" ? "success" : s.status === "EXPIRED" || s.status === "DECLINED" ? "neutral" : "warn"}>{s.status === "SIGNED" ? "Signé" : s.status === "EXPIRED" ? "Expiré" : s.status === "DECLINED" ? "Refusé" : s.status === "PENDING" ? "En attente" : s.status}</StatusChip>
               </div>
             ))}
           </div>

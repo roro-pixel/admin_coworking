@@ -62,9 +62,27 @@ export const ResourcesList: React.FC = () => {
   const onError = (fallback: string) => (e: unknown) => toast.error(apiMessage(e, fallback));
   const booking = useMutation({ mutationFn: (r: ResourceResponse) => resourceService.updateResourceBookingEnabled(r.code, !r.bookingEnabled), onSuccess: refresh, onError: onError("Modification de la réservabilité impossible") });
   const portal = useMutation({ mutationFn: (r: ResourceResponse) => resourceService.updateResourcePortalVisible(r.code, !r.portalVisible), onSuccess: refresh, onError: onError("Modification de la visibilité impossible") });
-  const active = useMutation({ mutationFn: (r: ResourceResponse) => resourceService.updateResourceActive(r.code, !r.active), onSuccess: refresh, onError: onError("Changement d'état impossible") });
+  const active = useMutation({ mutationFn: (r: ResourceResponse) => resourceService.updateResourceActive(r.code, !r.active), onSuccess: refresh, onError: (e, r) => (r.active ? askCancel(e, "désactiver la ressource", () => resourceService.updateResourceActive(r.code, false, true).then(refresh)) : toast.error(apiMessage(e, "Changement d'état impossible"))) });
   const order = useMutation({ mutationFn: (v: { code: string; displayOrder: number }) => resourceService.updateResourceDisplayOrder(v.code, v.displayOrder), onSuccess: refresh, onError: onError("Modification de l'ordre impossible") });
-  const remove = useMutation({ mutationFn: (code: string) => resourceService.deleteResource(code), onSuccess: refresh });
+  // Refus 409 (réservations à venir) : on propose d'annuler les réservations et de prévenir les clients.
+  const askCancel = (e: unknown, what: string, retry: () => Promise<unknown>) => {
+    if ((e as { response?: { status?: number } })?.response?.status !== 409) return toast.error(apiMessage(e, "Opération impossible"));
+    toast.confirm({
+      message: `Des réservations à venir sont touchées : ${what} ?`,
+      detail: "Elles seront annulées et les clients prévenus (remboursement selon la politique).",
+      confirmLabel: "Annuler les réservations et continuer",
+      pendingLabel: "En cours",
+      successMessage: "Opération effectuée",
+      errorMessage: "Opération impossible",
+      tone: "danger",
+      onConfirm: retry,
+    });
+  };
+  const remove = useMutation({
+    mutationFn: (v: { code: string; cancel?: boolean }) => resourceService.deleteResource(v.code, v.cancel),
+    onSuccess: refresh,
+    onError: (e, v) => askCancel(e, "supprimer la ressource", () => resourceService.deleteResource(v.code, true).then(refresh)),
+  });
 
   const busy = (m: { isPending: boolean; variables?: unknown }, code: string) => m.isPending && (m.variables as { code?: string } | undefined)?.code === code;
   const hasFilters = !!(search || typeFilter || groupFilter || statusFilter);
@@ -164,7 +182,7 @@ export const ResourcesList: React.FC = () => {
                             pendingLabel: "Suppression",
                             successMessage: "Ressource supprimée",
                             errorMessage: "Suppression impossible",
-                            onConfirm: () => remove.mutateAsync(r.code),
+                            onConfirm: () => remove.mutateAsync({ code: r.code }),
                           })
                         }
                       />

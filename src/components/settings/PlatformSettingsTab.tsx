@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { AlertTriangle, History, KeyRound, RotateCcw, Save, SlidersHorizontal } from "lucide-react";
@@ -139,11 +139,16 @@ const History_: React.FC<{ settingKey: string }> = ({ settingKey }) => {
   );
 };
 
-const SettingCard: React.FC<{ setting: SettingView; canEdit: boolean; onSaved: () => void }> = ({
+export const SettingCard: React.FC<{ setting: SettingView; canEdit: boolean; onSaved: () => void; highlight?: boolean }> = ({
   setting,
   canEdit,
   onSaved,
+  highlight,
 }) => {
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (highlight) rootRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlight]);
   const queryClient = useQueryClient();
   const server = setting.value ?? "";
   const [value, setValue] = useState(server);
@@ -179,7 +184,7 @@ const SettingCard: React.FC<{ setting: SettingView; canEdit: boolean; onSaved: (
     onError: (e) => setError(e instanceof Error && !("response" in e) ? e.message : apiMessage(e, "Enregistrement impossible.")),
   });
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm">
+    <div ref={rootRef} className={`rounded-2xl bg-white p-4 shadow-sm ${highlight ? "ring-2 ring-[color:var(--logo-pink-dark)]" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-semibold text-gray-900">{setting.label}</p>
@@ -275,16 +280,31 @@ export const PlatformSettingsTab: React.FC = () => {
   // « ?domain=SUBSCRIPTIONS » ouvre directement le domaine demandé
   const [searchParams] = useSearchParams();
   const [domain, setDomain] = useState<string | null>(searchParams.get("domain"));
+  // « ?key=… » met en évidence un paramètre précis (lien depuis les alertes d'audit)
+  const focusKey = searchParams.get("key");
 
   const domains = useQuery<SettingDomainView[]>({
     queryKey: [DOMAINS_KEY],
     queryFn: platformSettingsService.getDomains,
   });
 
+  // « ?key=… » : le domaine réel vient de GET /admin/settings/{clé}
+  const focused = useQuery<SettingView>({
+    queryKey: [SETTINGS_KEY, "one", focusKey],
+    queryFn: () => platformSettingsService.getSetting(focusKey as string),
+    enabled: !!focusKey,
+    retry: false,
+  });
+  const focusDomain = focused.data?.domain;
+  useEffect(() => {
+    if (focusDomain) setDomain(focusDomain);
+  }, [focusDomain]);
+
   useEffect(() => {
     if (!domains.data?.length) return;
+    if (focusKey && focused.isLoading) return;
     if (!domain || !domains.data.some((d) => d.domain === domain)) setDomain(domains.data[0].domain);
-  }, [domains.data, domain]);
+  }, [domains.data, domain, focusKey, focused.isLoading]);
 
   const settings = useQuery<SettingView[]>({
     queryKey: [SETTINGS_KEY, domain],
@@ -337,6 +357,9 @@ export const PlatformSettingsTab: React.FC = () => {
       </nav>
 
       <div className="space-y-3">
+        {focusKey && focused.isError && (
+          <div role="alert" className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-800">{apiMessage(focused.error, "Paramètre introuvable.")}</div>
+        )}
         {restartPending && (
           <div role="status" className="flex items-start gap-2 rounded-2xl bg-amber-50 p-3 text-sm text-amber-800">
             <AlertTriangle size={18} className="mt-0.5 shrink-0" />
@@ -353,7 +376,7 @@ export const PlatformSettingsTab: React.FC = () => {
           ) : (
             <div className="space-y-3">
               {settings.data.map((s) => (
-                <SettingCard key={s.key} setting={s} canEdit onSaved={() => undefined} />
+                <SettingCard key={s.key} setting={s} canEdit onSaved={() => undefined} highlight={s.key === focusKey} />
               ))}
             </div>
           )}

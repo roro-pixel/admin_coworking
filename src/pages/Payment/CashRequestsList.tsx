@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, ClipboardList, Download, Plus, XCircle } from "lucide-react";
+import { Ban, CheckCircle2, ClipboardList, Download, Paperclip, Plus, Trash2, XCircle } from "lucide-react";
 import { paymentService } from "../../services/payment.service";
-import type { CashRequest, CashRequestType } from "../../services/payment.service";
+import type { CashMovementAttachment, CashRequest, CashRequestType } from "../../services/payment.service";
 import { useAuth } from "../../contexts/AuthContext";
 import {
   ActionButton,
@@ -26,6 +26,7 @@ import { toast } from "../../components/ui/toastStore";
 import { ListSkeleton } from "../../components/ui/Skeleton";
 import { REQUEST_STATUS, REQUEST_TYPES } from "../../components/payment/paymentLabels";
 import { currencyLabel, saveBlob } from "../../components/payment/paymentUtils";
+import { readPdfError } from "../../services/documentTemplate.service";
 
 const PAGE_SIZE = 20;
 
@@ -47,7 +48,9 @@ const STATUS_FILTERS = [
 ];
 
 export const CashRequestsList: React.FC = () => {
-  const { admin } = useAuth();
+  const { admin, hasPermission } = useAuth();
+  const canReview = hasPermission("CASH_MOVEMENT:APPROVE");
+  const canWrite = hasPermission("CASH_MOVEMENT:CREATE");
   const queryClient = useQueryClient();
 
   const [page, setPage] = useState(0);
@@ -61,6 +64,7 @@ export const CashRequestsList: React.FC = () => {
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [files, setFiles] = useState<CashMovementAttachment[]>([]);
 
   const { data: sessionsData } = useQuery({
     queryKey: ["cash-sessions-open-select"],
@@ -93,9 +97,11 @@ export const CashRequestsList: React.FC = () => {
         currency: form.currency,
         reason: form.reason,
         requestedBy: admin?.email || "admin",
+        attachments: files.filter((f) => f.fileName.trim() && f.storagePath.trim()).length ? files.filter((f) => f.fileName.trim() && f.storagePath.trim()) : undefined,
       }),
     onSuccess: () => {
       invalidate();
+      setFiles([]);
       setIsFormOpen(false);
       setError(null);
       setForm(initialForm);
@@ -122,6 +128,23 @@ export const CashRequestsList: React.FC = () => {
     },
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: (r: CashRequest) => paymentService.cancelCashRequest(r.requestNumber, reviewNote ? { note: reviewNote } : undefined),
+    onSuccess: () => {
+      invalidate();
+      setReviewNote("");
+    },
+  });
+  const confirmCancel = (r: CashRequest) =>
+    toast.confirm({
+      message: `Annuler ${r.requestNumber} ?`,
+      detail: "La demande n'engage plus aucun fonds.",
+      confirmLabel: "Annuler la demande",
+      successMessage: "Demande annulée",
+      errorMessage: "Annulation impossible",
+      onConfirm: () => cancelMutation.mutateAsync(r),
+    });
+
   const confirmApprove = (r: CashRequest) =>
     toast.confirm({
       message: `Approuver ${r.requestNumber} ?`,
@@ -146,14 +169,14 @@ export const CashRequestsList: React.FC = () => {
     setDownloading(requestNumber);
     try {
       saveBlob(await paymentService.getCashRequestDocumentPdf(requestNumber), `demande_caisse_${requestNumber}.pdf`);
-    } catch {
-      toast.error("Téléchargement impossible");
+    } catch (e) {
+      toast.error((await readPdfError(e)).message || "Téléchargement impossible");
     } finally {
       setDownloading(null);
     }
   };
 
-  const hasPending = requests.some((r) => r.status === "PENDING");
+  const hasPending = (canReview || canWrite) && requests.some((r) => r.status === "PENDING");
   const hasFilters = !!(sessionNumber || requestType);
 
   return (
@@ -246,6 +269,23 @@ export const CashRequestsList: React.FC = () => {
               className={FIELD_SOFT}
             />
           </Field>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-gray-700">Pièces jointes</p>
+              <ActionButton variant="ghost" icon={Paperclip} onClick={() => setFiles([...files, { fileName: "", contentType: "application/pdf", storagePath: "", label: "" }])}>
+                Ajouter
+              </ActionButton>
+            </div>
+            <p className="text-xs text-gray-500">Chaque pièce est référencée par son chemin de stockage : le fichier doit déjà être enregistré.</p>
+            {files.map((f, i) => (
+              <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
+                <input aria-label="Nom du fichier" placeholder="Nom du fichier" value={f.fileName} onChange={(e) => setFiles(files.map((x, j) => (j === i ? { ...x, fileName: e.target.value } : x)))} className={FIELD_SOFT} />
+                <input aria-label="Chemin de stockage" placeholder="Chemin de stockage" value={f.storagePath} onChange={(e) => setFiles(files.map((x, j) => (j === i ? { ...x, storagePath: e.target.value } : x)))} className={`${FIELD_SOFT} font-mono`} />
+                <input aria-label="Libellé" placeholder="Libellé" value={f.label ?? ""} onChange={(e) => setFiles(files.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} className={FIELD_SOFT} />
+                <IconButton icon={Trash2} label="Retirer" tone="danger" onClick={() => setFiles(files.filter((_, j) => j !== i))} />
+              </div>
+            ))}
+          </div>
         </PanelForm>
       )}
 
@@ -365,9 +405,24 @@ export const CashRequestsList: React.FC = () => {
                     <p className="mt-1 font-semibold text-gray-950">{REQUEST_TYPES[r.requestType] ?? r.requestType}</p>
                     <p className="mt-0.5 line-clamp-2 text-sm text-gray-600">{r.reason || "Aucun motif renseigné"}</p>
                     <p className="mt-1 text-xs text-gray-400">
-                      <span className="font-mono">{r.sessionNumber}</span> · {r.requestedBy} · {formatDateTime(r.createdAt)}
+                      <span className="font-mono">{r.sessionNumber}</span> · {r.requestedBy} · {formatDateTime(r.requestedAt ?? r.createdAt)}
                     </p>
-                    {r.reviewNote && <p className="mt-1 text-xs text-gray-500">Décision : {r.reviewNote}</p>}
+                    {r.reviewNote && <p className="mt-1 text-xs text-gray-500">Décision{r.reviewedBy ? ` de ${r.reviewedBy}` : ""} : {r.reviewNote}</p>}
+                    {(r.executedMovementNumber ?? r.generatedMovementNumber) && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Exécutée{r.executedAt ? ` le ${formatDateTime(r.executedAt)}` : ""} : mouvement <span className="font-mono">{r.executedMovementNumber ?? r.generatedMovementNumber}</span>
+                      </p>
+                    )}
+                    {(r.attachments ?? []).length > 0 && (
+                      <p className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-gray-500">
+                        <Paperclip size={12} />
+                        {(r.attachments ?? []).map((a, i) => (
+                          <span key={`${a.storagePath}-${i}`} title={a.storagePath}>
+                            {a.label || a.fileName}
+                          </span>
+                        ))}
+                      </p>
+                    )}
                   </div>
                   <p className="whitespace-nowrap text-right text-lg font-bold tabular-nums text-gray-950 lg:order-none">
                     {formatMoney(r.amount, currencyLabel(r.currency))}
@@ -379,12 +434,13 @@ export const CashRequestsList: React.FC = () => {
                       pending={downloading === r.requestNumber}
                       onClick={() => downloadPdf(r.requestNumber)}
                     />
-                    {r.status === "PENDING" && (
+                    {r.status === "PENDING" && canReview && (
                       <>
                         <IconButton icon={CheckCircle2} label="Approuver" tone="success" onClick={() => confirmApprove(r)} />
                         <IconButton icon={XCircle} label="Refuser" tone="danger" onClick={() => confirmReject(r)} />
                       </>
                     )}
+                    {r.status === "PENDING" && canWrite && <IconButton icon={Ban} label="Annuler la demande" onClick={() => confirmCancel(r)} />}
                   </div>
                 </div>
               );

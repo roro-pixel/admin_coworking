@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Routes, Route, useLocation, useSearchParams } from "react-router-dom";
 import { AdminLayout } from "../../components/layout/AdminLayout";
 import { brandVars } from "../../components/layout/adminTheme";
-import { Building2, Tag, Users, Shield, Package, DollarSign, XCircle, CalendarDays, Search, Clock } from "lucide-react";
+import { Building2, Tag, Users, Shield, Package, DollarSign, XCircle, CalendarDays, Search, Clock, MapPin, Boxes, Wrench, DoorOpen } from "lucide-react";
 import { PageHeader, Tabs } from "../../components/subscription/kit";
 import type { TabItem } from "../../components/subscription/kit";
 import { Toaster } from "../../components/ui/Toaster";
@@ -21,8 +21,14 @@ import { ResourceDetailPage } from "./resources/ResourceDetailPage";
 import { ResourcePolicyDetailPage } from "./policies/ResourcePolicyDetailPage";
 import { ResourcePlanningAdminPage } from "./resources/ResourcePlanningAdminPage";
 import { ResourceAdvancedSearchPage } from "./resources/ResourceAdvancedSearchPage";
+import { ResourceSitesPage } from "./sites/ResourceSitesPage";
+import { ResourceBundlesPanel } from "./bundles/ResourceBundlesPanel";
+import { ResourceOperationsPage } from "./operations/ResourceOperationsPage";
+import { FindRoomPanel } from "./find/FindRoomPanel";
+import { CalendarDaysPanel } from "./closures/CalendarDaysPanel";
+import { PricingSimulator, PricingConflictsPanel } from "../../components/resources/PricingTools";
 
-type TabId = "resources" | "types" | "groups" | "policies" | "amenities" | "pricing" | "schedule" | "closures" | "advancedSearch";
+type TabId = "resources" | "types" | "groups" | "policies" | "amenities" | "pricing" | "schedule" | "closures" | "advancedSearch" | "sites" | "bundles" | "operations" | "find";
 type ScheduleSubTab = "availability" | "planning";
 
 const tabs: TabItem<TabId>[] = [
@@ -34,7 +40,11 @@ const tabs: TabItem<TabId>[] = [
   { id: "pricing", label: "Tarifs", icon: DollarSign },
   { id: "schedule", label: "Agenda", icon: CalendarDays },
   { id: "advancedSearch", label: "Recherche avancée", icon: Search },
+  { id: "find", label: "Trouver une salle", icon: DoorOpen },
   { id: "closures", label: "Fermetures", icon: XCircle },
+  { id: "sites", label: "Sites et plan", icon: MapPin },
+  { id: "bundles", label: "Lots", icon: Boxes },
+  { id: "operations", label: "Exploitation", icon: Wrench },
 ];
 const subTabs: TabItem<ScheduleSubTab>[] = [
   { id: "availability", label: "Disponibilités", icon: CalendarDays },
@@ -46,6 +56,28 @@ const isLegacySchedule = (v: unknown): v is ScheduleSubTab => v === "availabilit
 
 const resolveTab = (query: string | null, state?: string): TabId | null =>
   isTabId(query) ? query : isLegacySchedule(query) ? "schedule" : isTabId(state) ? state : isLegacySchedule(state) ? "schedule" : null;
+
+const PricingPane: React.FC = () => (
+  <div className="space-y-8">
+    <PricingRulesList />
+    <PricingSimulator />
+    <PricingConflictsPanel />
+  </div>
+);
+
+const ClosuresPane: React.FC = () => {
+  const [sub, setSub] = useState<"closures" | "days">("closures");
+  const items: TabItem<"closures" | "days">[] = [
+    { id: "closures", label: "Fermetures", icon: XCircle },
+    { id: "days", label: "Jours particuliers", icon: CalendarDays },
+  ];
+  return (
+    <div className="space-y-5">
+      <Tabs items={items} active={sub} onChange={setSub} variant="soft" />
+      {sub === "closures" ? <ResourceClosuresList /> : <CalendarDaysPanel />}
+    </div>
+  );
+};
 
 const ResourceSchedulePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -104,10 +136,14 @@ const ResourceTabs: React.FC = () => {
     groups: <ResourceGroupsList />,
     policies: <ResourcePoliciesList />,
     amenities: <AmenitiesList />,
-    pricing: <PricingRulesList />,
+    pricing: <PricingPane />,
     schedule: <ResourceSchedulePage />,
     advancedSearch: <ResourceAdvancedSearchPage />,
-    closures: <ResourceClosuresList />,
+    closures: <ClosuresPane />,
+    sites: <ResourceSitesPage />,
+    bundles: <ResourceBundlesPanel />,
+    operations: <ResourceOperationsPage />,
+    find: <FindRoomPanel />,
   };
 
   return (

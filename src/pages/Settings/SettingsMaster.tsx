@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Key, Shield, SlidersHorizontal, Trash2, Users } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Key, ScrollText, Shield, SlidersHorizontal, Trash2, Users } from "lucide-react";
 import { AdminLayout } from "../../components/layout/AdminLayout";
 import { brandVars } from "../../components/layout/adminTheme";
 import { Toaster } from "../../components/ui/Toaster";
@@ -13,7 +13,7 @@ import { AdminPermissionsPage } from "./AdminPermissionsPage";
 import { PurgePanel } from "../../components/admin/PurgePanel";
 import { PlatformSettingsTab } from "../../components/settings/PlatformSettingsTab";
 
-type TabId = "users" | "roles" | "permissions" | "platform";
+type TabId = "users" | "roles" | "permissions" | "platform" | "audit";
 
 interface Tab extends TabItem<TabId> {
   permissions: string[];
@@ -30,11 +30,14 @@ const allTabs: Tab[] = [
   },
   // Réservé aux rôles ADMIN et SUPER_ADMIN (le serveur contrôle aussi SYSTEM:SETTINGS)
   { id: "platform", label: "Plateforme", icon: SlidersHorizontal, permissions: ["SYSTEM:SETTINGS"] },
+  // Ouvre le centre d'audit (/audit), page à part avec ses propres onglets
+  { id: "audit", label: "Audit", icon: ScrollText, permissions: ["SYSTEM:AUDIT"] },
 ];
 
 export const SettingsMaster: React.FC = () => {
   const { hasPermission, isAdmin } = useAuth();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const admin = isAdmin();
   const visibleTabs = admin
@@ -44,14 +47,18 @@ export const SettingsMaster: React.FC = () => {
   const tabs = visibleTabs.length > 0 ? visibleTabs : allTabs.filter((t) => t.id !== "platform");
 
   // « ?tab=users » (lien de retour de la fiche utilisateur) ouvre l'onglet demandé s'il est visible
-  const requested = tabs.find((t) => t.id === searchParams.get("tab"))?.id;
-  const firstTab: TabId = requested ?? tabs[0]?.id ?? "users";
+  const requested = tabs.find((t) => t.id !== "audit" && t.id === searchParams.get("tab"))?.id;
+  const firstTab: TabId = requested ?? tabs.find((t) => t.id !== "audit")?.id ?? "users";
 
   const [activeTab, setActiveTab] = useState<TabId>(firstTab);
   const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(new Set([firstTab]));
   const [showPurge, setShowPurge] = useState(false);
 
   const handleTabChange = (tabId: TabId) => {
+    if (tabId === "audit") {
+      navigate("/audit");
+      return;
+    }
     setActiveTab(tabId);
     setVisitedTabs((previous) => new Set([...previous, tabId]));
   };

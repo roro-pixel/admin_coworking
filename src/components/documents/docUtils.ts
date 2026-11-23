@@ -3,9 +3,10 @@ import type { Tone } from "../subscription/kitUtils";
 
 /*
  * Libellés, tons et petits outils partagés par les écrans Documents et KYC.
+ * Aucun composant ici : les composants sont dans docKit.tsx.
  */
 
-// **************** Libellés ********* 
+// ───────────────────────── Libellés ─────────────────────────
 
 export const DOC_STATUS_LABEL: Record<string, string> = {
   DRAFT: "Brouillon",
@@ -18,6 +19,7 @@ export const DOC_STATUS_LABEL: Record<string, string> = {
   EXPIRED: "Expiré",
   ARCHIVED: "Archivé",
   SUPERSEDED: "Remplacé",
+  // statut de vérification d'un document KYC
   PENDING: "En attente",
   VERIFIED: "Vérifié",
 };
@@ -69,7 +71,7 @@ export const KYC_STATUS_TONE: Record<string, Tone> = {
   CANCELLED: "neutral",
 };
 
-/** Statuts proposés dans les filtres */
+/** Statuts proposés dans les filtres : ceux que renvoie le tableau de bord KYC du backend */
 export const KYC_FILTER_STATUSES = [
   "NOT_STARTED",
   "IN_PROGRESS",
@@ -86,11 +88,10 @@ export const RISK_TONE: Record<string, Tone> = {
   LOW: "success",
   MEDIUM: "warn",
   HIGH: "warn",
-  CRITICAL: "danger",
   VERY_HIGH: "danger",
 };
 
-export const RISK_LEVELS = ["LOW", "MEDIUM", "HIGH", "VERY_HIGH", "CRITICAL"];
+export const RISK_LEVELS = ["LOW", "MEDIUM", "HIGH", "VERY_HIGH"];
 
 export const OWNER_LABEL: Record<string, string> = {
   MEMBER: "Membre",
@@ -186,7 +187,7 @@ export const STATUS_COLOR: Record<string, string> = {
 
 export const PALETTE = ["#E0529C", "#5B8DEF", "#2E9E6B", "#E5A23B", "#9B8FD1", "#4FB6C4", "#D6455D", "#8A8F9C"];
 
-// ************** Formats *************
+// ───────────────────────── Formats ─────────────────────────
 
 export const fmtInt = (n: number): string => n.toLocaleString("fr-FR");
 
@@ -240,7 +241,7 @@ export const numericOrText = (v: string): number | string => {
 export const toCsv = (rows: (string | number | null | undefined)[][]): string =>
   rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
 
-// ********************* Hooks ********************
+// ───────────────────────── Hooks ─────────────────────────
 
 export function useDebounced<T>(value: T, delay = 350): T {
   const [v, setV] = useState(value);

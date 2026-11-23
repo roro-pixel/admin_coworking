@@ -2,8 +2,10 @@ import { apiClient } from "./api";
 import { API, toList, toPage } from "./pagination";
 import type { PageParams, PageResult } from "./pagination";
 
-// Centre de contrôle et conformité des portefeuilles (ADMIN, SUPER_ADMIN).
-// Reset PIN, limites et intégrité sont dans wallet.service.ts.
+// Centre de contrôle et conformité des portefeuilles
+// Rôles : ADMIN / SUPER_ADMIN uniquement.
+// Les routes de sécurité d'un portefeuille (reset PIN, limites, intégrité)
+// sont dans wallet.service.ts : elles sont rattachées à /wallets/{n}.
 
 const CONTROL = `${API}/wallets/control`;
 const COMPLIANCE = `${API}/wallets/compliance`;
@@ -20,7 +22,10 @@ export type WalletAdminActionType =
   | "RESET_PIN"
   | "RAISE_LIMIT"
   | "CLOSE"
-  | "REVIEW_FLAG";
+  | "REVIEW_FLAG"
+  | "RELEASE_HOLD"
+  | "TRANSFER"
+  | "RESTITUTE";
 
 /** Quatre yeux : toute action est créée PENDING_APPROVAL. */
 export type WalletAdminActionStatus =
@@ -37,21 +42,23 @@ export interface WalletAdminActionRequest {
   until?: string | null;
 }
 
-/** Seuls type, status et walletNumber sont garantis. */
 export interface AdminActionView {
   actionNumber: string;
   walletNumber: string;
-  type: WalletAdminActionType | string;
-  status: WalletAdminActionStatus | string;
+  type: WalletAdminActionType;
   amount?: number | null;
+  currency?: string | null;
   reference?: string | null;
   reason?: string | null;
-  until?: string | null;
+  status: WalletAdminActionStatus;
   requestedBy?: string | null;
-  requestedAt?: string | null;
-  decidedBy?: string | null;
-  decidedAt?: string | null;
-  [key: string]: unknown;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  rejectedBy?: string | null;
+  rejectionReason?: string | null;
+  executedAt?: string | null;
+  resultReference?: string | null;
+  createdAt?: string | null;
 }
 
 export type WalletFlagSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -112,28 +119,50 @@ export interface WalletControlDashboard {
   latestReconciliation?: TreasuryReconciliation | null;
 }
 
-/** Snapshot de trésorerie : type ouvert. */
 export interface TreasurySnapshot {
-  currency?: string;
-  [key: string]: unknown;
+  currency: string;
+  totalWalletBalance: number;
+  totalHeldBalance: number;
+  walletCount: number;
 }
 
 export interface TreasuryReconciliationRequest {
   date: string;
-  currency: string;
-  ledgerAccountBalance: number;
+  currency?: string;
+  ledgerAccountBalance?: number;
   availableCash: number;
   explanation?: string;
 }
 
+export type TreasuryReconciliationStatus = "BALANCED" | "VARIANCE" | "UNDER_REVIEW";
+
 export interface TreasuryReconciliation {
-  reconciliationNumber?: string;
-  date?: string;
-  currency?: string;
-  ledgerAccountBalance?: number;
-  availableCash?: number;
-  explanation?: string | null;
-  [key: string]: unknown;
+  reconciliationNumber: string;
+  reconciliationDate: string;
+  currency: string;
+  totalWalletBalance: number;
+  totalHeldBalance: number;
+  walletCount: number;
+  ledgerAccountBalance?: number | null;
+  availableCash?: number | null;
+  coverageRatio?: number | null;
+  variance?: number | null;
+  varianceExplained?: boolean | null;
+  explainedBy?: string | null;
+  status: TreasuryReconciliationStatus | string;
+  preparedBy?: string | null;
+  createdAt?: string | null;
+}
+
+export interface WalletPayInvoiceRequest {
+  documentNumber: string;
+  amount?: number;
+}
+
+/** `invoice` et `transaction` : réponses du module facturation et paiement, lues telles quelles. */
+export interface WalletPayInvoiceResponse {
+  invoice?: Record<string, unknown>;
+  transaction?: Record<string, unknown>;
 }
 
 // ═══ Conformité ═══════════════════════════════════════════════════════════════
@@ -177,12 +206,17 @@ export interface CaseNote {
   note: string;
   author?: string | null;
   createdAt?: string | null;
-  [key: string]: unknown;
 }
 
 export interface ComplianceRuleStat {
   ruleCode: string;
-  [key: string]: unknown;
+  name?: string;
+  action?: ComplianceRuleAction | string;
+  hits?: number | string;
+  confirmed?: number | string;
+  dismissed?: number | string;
+  falsePositiveRate?: number;
+  hitsLast30Days?: number | string;
 }
 
 export interface ComplianceDashboard {
@@ -229,6 +263,14 @@ export interface ComplianceRule {
   effectiveFrom?: string | null;
   effectiveTo?: string | null;
   rationale?: string | null;
+  detector?: string | null;
+  hitCount?: number | string;
+  confirmedCount?: number | string;
+  dismissedCount?: number | string;
+  falsePositiveRate?: number | null;
+  createdBy?: string | null;
+  approvedBy?: string | null;
+  updatedAt?: string | null;
 }
 
 export interface ComplianceRuleUpdateRequest {
@@ -264,7 +306,8 @@ export type ScreeningListType = "SANCTION" | "PEP";
 
 export interface ScreeningListEntryInput {
   fullName: string;
-  aliases?: string[];
+  /** Texte libre : plusieurs alias séparés par « | ». */
+  aliases?: string;
   birthYear?: number | null;
   nationality?: string | null;
   reference?: string | null;
@@ -286,13 +329,23 @@ export interface ScreeningCheckRequest {
   birthYear?: number | null;
 }
 
-/** result est le seul champ garanti ; un POSSIBLE_MATCH/MATCH non revu attend review. */
+export type ScreeningTrigger = "ONBOARDING" | "PERIODIC" | "PHONE_CHANGE" | "MANUAL" | "CASE_REVIEW";
+
 export interface CheckView {
   checkNumber: string;
   subjectType?: string;
   subjectCode?: string;
-  result: ScreeningResult | string;
-  [key: string]: unknown;
+  subjectName?: string;
+  trigger?: ScreeningTrigger | string;
+  listsChecked?: string;
+  result: ScreeningResult;
+  matchDetails?: string | null;
+  checkedAt?: string;
+  checkedBy?: string | null;
+  caseNumber?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  reviewOutcome?: string | null;
 }
 
 export interface FreezeRequest {
@@ -305,12 +358,40 @@ export interface FreezeRequest {
 export interface FreezeView {
   freezeNumber: string;
   walletNumber?: string;
-  [key: string]: unknown;
+  authority?: string;
+  instructionReference?: string;
+  instructionDate?: string | null;
+  rationale?: string;
+  frozenBy?: string | null;
+  frozenAt?: string;
+  liftedBy?: string | null;
+  liftedAt?: string | null;
+  liftReference?: string | null;
+  liftRationale?: string | null;
+  caseNumber?: string | null;
+}
+
+export interface AuditEntryView {
+  entryUuid: string;
+  occurredAt: string;
+  actor?: string;
+  actorRole?: string;
+  action: string;
+  subjectType?: string;
+  subjectCode?: string;
+  beforeState?: string | null;
+  afterState?: string | null;
+  rationale?: string | null;
+  previousHash?: string;
+  currentHash?: string;
+  retainUntil?: string;
 }
 
 export interface AuditVerifyResult {
-  entries: number;
-  brokenEntries: number;
+  /** int64 : peut arriver en texte au-delà de 2^53. */
+  entries: number | string;
+  /** Identifiants des entrées dont le chaînage est rompu. */
+  brokenEntries: string[];
 }
 
 // ═══ Service ══════════════════════════════════════════════════════════════════
@@ -428,6 +509,28 @@ export const walletControlService = {
       await apiClient.post(
         `${CONTROL}/flags/${encodeURIComponent(flagNumber)}/resolve`,
         data,
+      )
+    ).data,
+
+  /** Paie une facture avec le solde du portefeuille (PAYMENT:PROCESS, ADMIN ou SUPER_ADMIN). */
+  payInvoice: async (
+    walletNumber: string,
+    data: WalletPayInvoiceRequest,
+    idempotencyKey?: string,
+  ): Promise<WalletPayInvoiceResponse> =>
+    (
+      await apiClient.post(
+        `${CONTROL}/wallets/${encodeURIComponent(walletNumber)}/pay-invoice`,
+        data,
+        {
+          headers: {
+            "Idempotency-Key":
+              idempotencyKey ??
+              (typeof crypto !== "undefined" && "randomUUID" in crypto
+                ? crypto.randomUUID()
+                : `idem-${Date.now()}-${Math.random().toString(36).slice(2)}`),
+          },
+        },
       )
     ).data,
 
@@ -665,8 +768,8 @@ export const walletControlService = {
   getAuditTrail: async (
     subjectType: string,
     subjectCode: string,
-  ): Promise<Array<Record<string, unknown>>> =>
-    toList<Record<string, unknown>>(
+  ): Promise<AuditEntryView[]> =>
+    toList<AuditEntryView>(
       (
         await apiClient.get(
           `${COMPLIANCE}/audit/${encodeURIComponent(subjectType)}/${encodeURIComponent(subjectCode)}`,

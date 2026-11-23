@@ -16,6 +16,7 @@ import { toast } from "../../components/ui/toastStore";
 import { saveBlob } from "../../components/payment/paymentUtils";
 import { ChartCard, KpiRow, KpiRowSkeleton, RatioBar } from "../../components/operations/OpsCharts";
 import { PillChoice } from "../../components/operations/opsKit";
+import { StatementActions } from "../../components/billing/StatementActions";
 import { NoticeTimeline } from "../../components/billing/dunning/NoticeTimeline";
 import { DOC_TYPE_LABEL, STATUS_LABEL, STATUS_TONE } from "../../components/billing/billingLabels";
 
@@ -220,6 +221,8 @@ export const BillingCustomerStatement: React.FC = () => {
               )}
             </>
           )}
+
+          <StatementActions customerType={customerType} customerCode={resolvedCode} defaultEmail={customerType === "MEMBER" ? selectedMember?.email : selectedCustomer?.email} />
 
           <NoticeTimeline customer={{ type: customerType, code: resolvedCode }} />
         </>

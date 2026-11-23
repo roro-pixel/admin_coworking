@@ -29,7 +29,7 @@ const parseEntries = (text: string): { ok: ScreeningListEntryInput[]; bad: strin
       if (!fullName || (year && !Number.isInteger(birthYear))) return bad.push(line);
       ok.push({
         fullName,
-        aliases: aliases ? aliases.split("|").map((a) => a.trim()).filter(Boolean) : undefined,
+        aliases: aliases || undefined,
         birthYear,
         nationality: nationality || null,
         reference: reference || null,
@@ -128,7 +128,7 @@ export const ScreeningPanel: React.FC = () => {
         }
       />
 
-      {checkResult && <OpenReport title="Résultat du contrôle" data={checkResult} onClose={() => setCheckResult(null)} />}
+      {checkResult && <OpenReport title="Résultat du contrôle" data={checkResult as unknown as Record<string, unknown>} onClose={() => setCheckResult(null)} />}
       {uploadResult && <OpenReport title="Liste chargée" data={uploadResult} onClose={() => setUploadResult(null)} />}
 
       {panel === "check" && (

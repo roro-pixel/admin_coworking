@@ -8,7 +8,8 @@ import { apiMessage, formatDate, formatMoney } from "../../../components/subscri
 import { DetailsSkeleton } from "../../../components/ui/Skeleton";
 import { toast } from "../../../components/ui/toastStore";
 import { ADJ_LABEL, DetailShell, UNIT_LABEL, dayLabel, hhmm } from "../../../components/resources/resKit";
-import { PricingFields, pricingError, pricingPayload, ruleToForm } from "../../../components/resources/PricingFields";
+import { RuleHistory } from "../../../components/resources/PricingTools";
+import { CHANNELS, HOLIDAY_MODES, SEGMENTS, PricingFields, pricingError, pricingPayload, ruleToForm } from "../../../components/resources/PricingFields";
 import type { PricingForm } from "../../../components/resources/PricingFields";
 
 export const PricingRuleDetailPage: React.FC = () => {
@@ -110,13 +111,23 @@ export const PricingRuleDetailPage: React.FC = () => {
           </Section>
           <Section title="Conditions" icon={TagIcon}>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Detail label="Jour">{dayLabel(rule.dayOfWeek)}</Detail>
+              <Detail label="Jours">{rule.daysOfWeek ? String(rule.daysOfWeek).split(",").map((d) => ["", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"][Number(d.trim())] ?? d).join(", ") : dayLabel(rule.dayOfWeek)}</Detail>
               <Detail label="Plage horaire">{rule.startsAt || rule.endsAt ? `de ${hhmm(rule.startsAt) || "00:00"} à ${hhmm(rule.endsAt) || "24:00"}` : "Toute la journée"}</Detail>
               <Detail label="Validité">{`${from}, ${until}`}</Detail>
               <Detail label="Ajustement">{rule.adjustmentType ? `${ADJ_LABEL[rule.adjustmentType]}: ${rule.adjustmentValue ?? 0}` : "Aucun"}</Detail>
               <Detail label="Dernière minute">{rule.lastMinuteMinutes ? `${rule.lastMinuteMinutes} min avant le début` : "Non"}</Detail>
+              <Detail label="Segment client">{rule.customerSegment ? SEGMENTS[rule.customerSegment] ?? rule.customerSegment : "Tous"}</Detail>
+              <Detail label="Abonnement">{rule.planCode || "Tous"}</Detail>
+              <Detail label="Canal">{rule.channel ? CHANNELS[rule.channel] ?? rule.channel : "Tous"}</Detail>
+              <Detail label="Jours fériés">{rule.holidayMode ? HOLIDAY_MODES[rule.holidayMode] ?? rule.holidayMode : "Sans effet"}</Detail>
+              <Detail label="Participants">{rule.minParticipants || rule.maxParticipants ? `${rule.minParticipants ?? 1} à ${rule.maxParticipants ?? "∞"}` : "Tous"}</Detail>
+              <Detail label="Durée (min)">{rule.minDurationMinutes || rule.maxDurationMinutes ? `${rule.minDurationMinutes ?? 0} à ${rule.maxDurationMinutes ?? "∞"}` : "Toutes"}</Detail>
+              <Detail label="Délai minimum">{rule.minLeadMinutes ? `${rule.minLeadMinutes} min avant le début` : "Aucun"}</Detail>
+              <Detail label="Cumulable">{rule.stackable === false ? "Non" : "Oui"}</Detail>
+              <Detail label="Par participant">{rule.perParticipant ? "Oui" : "Non"}</Detail>
             </div>
           </Section>
+          <RuleHistory ruleId={rule.id} />
           <div className="flex justify-end">
             <ActionButton
               variant="danger"

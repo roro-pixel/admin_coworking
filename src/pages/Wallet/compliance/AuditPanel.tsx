@@ -37,9 +37,9 @@ export const AuditPanel: React.FC = () => {
           </ActionButton>
           {verify && (
             <div className="flex flex-wrap items-center gap-3">
-              <StatusChip tone={verify.brokenEntries === 0 ? "success" : "danger"}>{verify.brokenEntries === 0 ? "Chaîne intacte" : "Chaîne rompue"}</StatusChip>
+              <StatusChip tone={verify.brokenEntries.length === 0 ? "success" : "danger"}>{verify.brokenEntries.length === 0 ? "Chaîne intacte" : "Chaîne rompue"}</StatusChip>
               <span className="text-sm text-gray-600">
-                {verify.entries.toLocaleString("fr-FR")} entrée{verify.entries > 1 ? "s" : ""} contrôlée{verify.entries > 1 ? "s" : ""}, {verify.brokenEntries.toLocaleString("fr-FR")} rompue{verify.brokenEntries > 1 ? "s" : ""}
+                {Number(verify.entries).toLocaleString("fr-FR")} entrée{Number(verify.entries) > 1 ? "s" : ""} contrôlée{Number(verify.entries) > 1 ? "s" : ""}, {verify.brokenEntries.length.toLocaleString("fr-FR")} rompue{verify.brokenEntries.length > 1 ? "s" : ""}
               </span>
             </div>
           )}
@@ -73,7 +73,7 @@ export const AuditPanel: React.FC = () => {
             ) : (
               trail.data.map((e, i) => (
                 <ItemRow key={i}>
-                  <OpenFields entries={Object.entries(e).filter(([, v]) => v !== null && v !== undefined && v !== "")} />
+                  <OpenFields entries={Object.entries(e as unknown as Record<string, unknown>).filter(([, v]) => v !== null && v !== undefined && v !== "")} />
                 </ItemRow>
               ))
             )

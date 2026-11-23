@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Info, Package, Pencil, Plus, Power, Trash2, X, XCircle } from "lucide-react";
+import { Eye, Info, Package, Pencil, Plus, Power, Trash2, X, XCircle } from "lucide-react";
 import { billingService } from "../../services/billing.service";
 import type { BillingDiscountPolicy, BillingItemMode, ClearableCatalogField, ServiceCatalogItem } from "../../services/billing.service";
 import {
@@ -23,6 +23,8 @@ import { FIELD, FIELD_SOFT, ROW_HOVER, apiMessage, formatMoney } from "../../com
 import { ListSkeleton } from "../../components/ui/Skeleton";
 import { toast } from "../../components/ui/toastStore";
 import { currencyLabel } from "../../components/payment/paymentUtils";
+import { CatalogItemDetail } from "../../components/billing/CatalogItemDetail";
+import type { CatalogItem } from "../../components/billing/CatalogItemDetail";
 
 const discountPolicies: { value: BillingDiscountPolicy; label: string }[] = [
   { value: "NONE", label: "Aucune limite" },
@@ -81,7 +83,7 @@ const defaultForm: CatalogFormState = {
   unit: "",
   unitPrice: 0,
   currency: "XAF",
-  taxRuleCode: "TVA_CG_18",
+  taxRuleCode: "",
   displayOrder: 1,
   costPrice: "",
   floorPrice: "",
@@ -157,6 +159,15 @@ const Group: React.FC<{ title: string; children: React.ReactNode }> = ({ title, 
   </div>
 );
 
+/** Liste déroulante alimentée par l'API ; une valeur déjà enregistrée mais absente de la liste reste choisissable. */
+const SelectRef: React.FC<{ value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; empty?: string; disabled?: boolean; className?: string }> = ({ value, onChange, options, empty = "Non précisé", disabled, className = FIELD_SOFT }) => (
+  <select className={className} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
+    <option value="">{empty}</option>
+    {value && !options.some((o) => o.value === value) && <option value={value}>{value}</option>}
+    {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+  </select>
+);
+
 export const BillingCatalogManager: React.FC = () => {
   const queryClient = useQueryClient();
   const [q, setQ] = useState("");
@@ -168,6 +179,14 @@ export const BillingCatalogManager: React.FC = () => {
   const [form, setForm] = useState<CatalogFormState>(defaultForm);
   const [clearedFields, setClearedFields] = useState<Set<ClearableCatalogField>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [detailItem, setDetailItem] = useState<CatalogItem | null>(null);
+
+  // Familles, sous-familles, unités et taxes : jamais codées en dur, tout vient de l'API (lot C0)
+  const refs = useQuery({ queryKey: ["billing-catalog-references"], queryFn: () => billingService.getCatalogReferences(), staleTime: 60_000 });
+  const categories = refs.data?.categories ?? [];
+  const units = refs.data?.units ?? [];
+  const taxRules = (refs.data?.taxRules ?? []).filter((t) => t.selectableOnItem !== false);
+  const subcategories = categories.find((c) => c.code === form.category)?.subcategories ?? [];
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["billing-catalog-items", q, category, active, page],
@@ -181,7 +200,7 @@ export const BillingCatalogManager: React.FC = () => {
       }),
   });
 
-  const items = data?.content ?? [];
+  const items = (data?.content ?? []) as CatalogItem[];
   const totalElements = data?.totalElements ?? 0;
   const totalPages = data?.totalPages ?? 1;
 
@@ -262,7 +281,8 @@ export const BillingCatalogManager: React.FC = () => {
 
   const openCreateForm = () => {
     setEditingItem(null);
-    setForm(defaultForm);
+    setDetailItem(null);
+    setForm({ ...defaultForm, taxRuleCode: (taxRules.find((t) => t.currentlyValid !== false) ?? taxRules[0])?.code ?? "" });
     setClearedFields(new Set());
     setIsFormOpen(true);
     setError(null);
@@ -270,6 +290,7 @@ export const BillingCatalogManager: React.FC = () => {
 
   const openEditForm = (item: ServiceCatalogItem) => {
     setEditingItem(item);
+    setDetailItem(null);
     setForm({
       name: item.name ?? "",
       description: item.description ?? "",
@@ -277,7 +298,7 @@ export const BillingCatalogManager: React.FC = () => {
       unit: item.unit ?? "",
       unitPrice: item.unitPrice ?? 0,
       currency: item.currency ?? "XAF",
-      taxRuleCode: item.taxRuleCode ?? "TVA_CG_18",
+      taxRuleCode: item.taxRuleCode ?? "",
       displayOrder: item.displayOrder ?? 1,
       costPrice: item.costPrice?.toString() ?? "",
       floorPrice: item.floorPrice?.toString() ?? "",
@@ -358,20 +379,25 @@ export const BillingCatalogManager: React.FC = () => {
             <Field label="Nom" required className="xl:col-span-2">
               <input className={FIELD_SOFT} value={form.name} onChange={(e) => set("name", e.target.value)} />
             </Field>
-            <Field label="Catégorie">
-              <input className={FIELD_SOFT} value={form.category} onChange={(e) => set("category", e.target.value)} placeholder="ESPACE" />
+            <Field label="Famille">
+              <SelectRef value={form.category} onChange={(v) => setForm({ ...form, category: v, subcategory: "" })} options={categories.filter((c) => c.active !== false).map((c) => ({ value: c.code, label: c.label }))} />
             </Field>
             <Field label="Unité">
-              <input className={FIELD_SOFT} value={form.unit} onChange={(e) => set("unit", e.target.value)} placeholder="jour, heure, mois" />
+              <SelectRef value={form.unit} onChange={(v) => set("unit", v)} options={units.filter((u) => u.active !== false).map((u) => ({ value: u.code, label: u.symbol ? `${u.label} (${u.symbol})` : u.label }))} />
             </Field>
             <Field label="Prix unitaire">
               <input className={FIELD_SOFT} type="number" min="0" value={form.unitPrice} onChange={(e) => set("unitPrice", parseFloat(e.target.value) || 0)} />
             </Field>
             <Field label="Devise">
-              <input className={FIELD_SOFT} value={form.currency} onChange={(e) => set("currency", e.target.value)} />
+              <select className={FIELD_SOFT} value={form.currency} onChange={(e) => set("currency", e.target.value)}>
+                <option value="XAF">XAF (FCFA)</option>
+                <option value="EUR">EUR</option>
+                <option value="USD">USD</option>
+                {!["XAF", "EUR", "USD"].includes(form.currency) && <option value={form.currency}>{form.currency}</option>}
+              </select>
             </Field>
             <Field label="Règle de taxe">
-              <input className={FIELD_SOFT} value={form.taxRuleCode} onChange={(e) => set("taxRuleCode", e.target.value)} />
+              <SelectRef value={form.taxRuleCode} onChange={(v) => set("taxRuleCode", v)} empty="Aucune" options={taxRules.map((t) => ({ value: t.code, label: `${t.name}${t.rate != null ? ` (${t.rate} %)` : ""}` }))} />
             </Field>
             <Field label="Ordre d'affichage">
               <input className={FIELD_SOFT} type="number" min="0" value={form.displayOrder} onChange={(e) => set("displayOrder", parseInt(e.target.value, 10) || 0)} />
@@ -455,8 +481,8 @@ export const BillingCatalogManager: React.FC = () => {
 
             <Group title="Classement">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Sous-catégorie">
-                  <input className={FIELD} value={form.subcategory} onChange={(e) => set("subcategory", e.target.value)} />
+                <Field label="Sous-famille">
+                  <SelectRef className={FIELD} disabled={!form.category} value={form.subcategory} onChange={(v) => set("subcategory", v)} empty={form.category ? "Non précisé" : "Choisissez d'abord une famille"} options={subcategories.filter((c) => c.active !== false).map((c) => ({ value: c.code, label: c.label }))} />
                 </Field>
                 <Field label="Référence externe">
                   <input className={FIELD} value={form.externalReference} onChange={(e) => set("externalReference", e.target.value)} />
@@ -490,11 +516,16 @@ export const BillingCatalogManager: React.FC = () => {
         </PanelForm>
       )}
 
+      {detailItem && !isFormOpen && <CatalogItemDetail item={detailItem} onEdit={() => openEditForm(detailItem)} onClose={() => setDetailItem(null)} />}
+
       {!isFormOpen && <ErrorBanner message={error} />}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_12rem]">
         <SearchField value={q} onChange={(v) => { setQ(v); setPage(0); }} placeholder="Rechercher un article" />
-        <input className={`${FIELD_SOFT} bg-white shadow-sm`} value={category} onChange={(e) => { setCategory(e.target.value); setPage(0); }} placeholder="Catégorie" aria-label="Catégorie" />
+        <select className={`${FIELD_SOFT} bg-white shadow-sm`} value={category} onChange={(e) => { setCategory(e.target.value); setPage(0); }} aria-label="Famille">
+          <option value="">Toutes les familles</option>
+          {categories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+        </select>
         <select className={`${FIELD_SOFT} bg-white shadow-sm`} value={active} onChange={(e) => { setActive(e.target.value); setPage(0); }} aria-label="Statut">
           <option value="true">Actifs</option>
           <option value="false">Inactifs</option>
@@ -513,7 +544,7 @@ export const BillingCatalogManager: React.FC = () => {
           <HeadRow cols={COLS}>
             <span>Code</span>
             <span>Nom</span>
-            <span>Catégorie</span>
+            <span>Famille</span>
             <span>Prix</span>
             <span>Statut</span>
             <span className="text-right">Actions</span>
@@ -524,6 +555,7 @@ export const BillingCatalogManager: React.FC = () => {
                 <p className="truncate font-mono text-xs font-semibold text-[color:var(--logo-pink-dark)]">{item.itemCode}</p>
                 <div className="lg:order-last lg:text-right">
                   <div className="flex justify-end gap-1">
+                    <IconButton icon={Eye} label="Détails" onClick={() => { setDetailItem(item); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
                     <IconButton icon={Pencil} label="Modifier" onClick={() => openEditForm(item)} />
                     <IconButton
                       icon={Power}
@@ -536,13 +568,13 @@ export const BillingCatalogManager: React.FC = () => {
                   </div>
                 </div>
                 <div className="col-span-2 min-w-0 lg:col-span-1">
-                  <p className="truncate font-semibold text-gray-950">{item.name}</p>
+                  <button type="button" onClick={() => { setDetailItem(item); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="block max-w-full truncate text-left font-semibold text-gray-950 hover:underline">{item.name}</button>
                   {item.description && <p className="truncate text-xs text-gray-400">{item.description}</p>}
                 </div>
-                <p className="text-sm text-gray-600">{item.category ?? ""}</p>
+                <p className="text-sm text-gray-600">{item.categoryLabel ?? item.category ?? ""}</p>
                 <p className="text-sm font-bold tabular-nums text-gray-950">
                   {formatMoney(item.unitPrice, currencyLabel(item.currency))}
-                  {item.unit ? <span className="font-normal text-gray-400"> / {item.unit}</span> : null}
+                  {item.unit ? <span className="font-normal text-gray-400"> / {item.unitLabel ?? item.unit}</span> : null}
                 </p>
                 <div className="flex flex-col items-start gap-1">
                   <StatusChip tone={item.active === false ? "neutral" : "success"}>{item.active === false ? "Inactif" : "Actif"}</StatusChip>

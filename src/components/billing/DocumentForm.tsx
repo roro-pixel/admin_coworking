@@ -16,6 +16,8 @@ import type {
   BillingLine,
   BillingLineType,
   CreateBillingDocumentPayload,
+  SimulationRequest,
+  InvoiceChange,
 } from "../../services/billing.service";
 import { CustomerAutocomplete } from "../customers/CustomerAutocomplete";
 import { MemberAutocomplete } from "../members/MemberAutocomplete";
@@ -23,12 +25,14 @@ import type { CustomerSummaryResponse } from "../../services/customer.service";
 import type { MemberSummaryResponse } from "../../services/member.service";
 import { ActionButton, ErrorBanner, Field, IconButton, ItemRow, PageHeader, Section, Switch, Tabs } from "../subscription/kit";
 import type { TabItem } from "../subscription/kit";
-import { FIELD, FIELD_SOFT, FOCUS, apiMessage, formatMoney } from "../subscription/kitUtils";
+import { FIELD, FIELD_SOFT, FOCUS, formatMoney } from "../subscription/kitUtils";
+import { billingError, needsOverrideReason } from "./billingErrors";
+import { AlertList } from "./AlertList";
 import { PillChoice } from "../operations/opsKit";
 import { Skeleton } from "../ui/Skeleton";
 import { toast } from "../ui/toastStore";
 import { currencyLabel } from "../payment/paymentUtils";
-import { DOC_TYPE_LABEL, LINE_TYPE_OPTIONS } from "./billingLabels";
+import { DOC_TYPE_LABEL, LINE_TYPE_OPTIONS, NEGOTIATION_ORIGIN_LABEL } from "./billingLabels";
 import { CatalogPicker } from "./CatalogPicker";
 
 /*
@@ -37,7 +41,7 @@ import { CatalogPicker } from "./CatalogPicker";
 
 type Kind = "invoice" | "quote";
 type Tab = "client" | "lines" | "discounts" | "advance" | "payment";
-type CustomerKind = "CUSTOMER" | "MEMBER" | "EXTERNAL";
+type CustomerKind = "CUSTOMER" | "MEMBER" | "BUSINESS_ENTITY" | "EXTERNAL";
 type FormLine = Partial<BillingLine> & { lineOrder: number };
 
 const CONFIG = {
@@ -109,6 +113,7 @@ const TABS: TabItem<Tab>[] = [
 const CUSTOMER_KIND_OPTIONS: { value: CustomerKind; label: string }[] = [
   { value: "CUSTOMER", label: "Client" },
   { value: "MEMBER", label: "Membre" },
+  { value: "BUSINESS_ENTITY", label: "Entreprise" },
   { value: "EXTERNAL", label: "Client externe" },
 ];
 
@@ -175,7 +180,13 @@ const docToState = (d: BillingDocument) => ({
 const DocumentFormInner: React.FC<{ kind: Kind; doc?: BillingDocument }> = ({ kind, doc }) => {
   const cfg = CONFIG[kind];
   const edit = !!doc;
-  const ro = edit && doc!.status !== "DRAFT";
+  // Modes de modification :
+  //  - brouillon : mise à jour directe ;
+  //  - devis déjà parti : révision (nouvelle version, motif obligatoire) ;
+  //  - facture émise non payée : demande de modification (circuit d'approbation INVOICE_CHANGE).
+  const mode: "create" | "draft" | "revise" | "change" = !edit ? "create" : doc!.status === "DRAFT" ? "draft" : kind === "quote" ? "revise" : "change";
+  const needsReason = mode === "revise" || mode === "change";
+  const ro = false;
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const draftKey = edit ? `billing-draft-edit-${doc!.documentNumber}` : `billing-draft-${kind}`;
@@ -268,6 +279,10 @@ const DocumentFormInner: React.FC<{ kind: Kind; doc?: BillingDocument }> = ({ ki
   };
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [changeReason, setChangeReason] = useState("");
+  const [changeOrigin, setChangeOrigin] = useState<"CLIENT_PROPOSAL" | "COUNTER_PROPOSAL" | "INTERNAL">("INTERNAL");
+  const [overrideReason, setOverrideReason] = useState("");
+  const [overrideAsked, setOverrideAsked] = useState(false);
 
   //  Aides lignes / remises / clauses 
   const addLine = () => setLines([...lines, buildDefaultLine(edit ? Math.max(0, ...lines.map((l) => l.lineOrder)) + 1 : lines.length + 1)]);
@@ -298,13 +313,13 @@ const DocumentFormInner: React.FC<{ kind: Kind; doc?: BillingDocument }> = ({ ki
   //  Validation 
   const isClientValid = () => {
     if (edit) return true;
-    if (customerType === "CUSTOMER") return !!selectedCustomer;
+    if (customerType === "CUSTOMER" || customerType === "BUSINESS_ENTITY") return !!selectedCustomer;
     if (customerType === "MEMBER") return !!selectedMember;
     return !!(externalInfo.name && externalInfo.email);
   };
   const isLineValid = (l: FormLine) => !!l.description && l.quantity! > 0 && l.unitPrice! >= 0;
   const hasValidLines = lines.some(isLineValid);
-  const isValid = isClientValid() && hasValidLines;
+  const isValid = isClientValid() && hasValidLines && (!needsReason || !!changeReason.trim());
 
   const totalEstimated = lines.filter((l) => !l.optional).reduce((sum, l) => sum + (l.quantity ?? 1) * (l.unitPrice ?? 0), 0);
   const optionsTotal = lines.filter((l) => l.optional).reduce((sum, l) => sum + (l.quantity ?? 1) * (l.unitPrice ?? 0), 0);
@@ -359,8 +374,8 @@ const DocumentFormInner: React.FC<{ kind: Kind; doc?: BillingDocument }> = ({ ki
         payload.customerEmail = doc!.customerEmail;
         if (doc!.customerPhone) payload.customerPhone = doc!.customerPhone;
       }
-    } else if (customerType === "CUSTOMER" && selectedCustomer) {
-      payload.customerType = "CUSTOMER";
+    } else if ((customerType === "CUSTOMER" || customerType === "BUSINESS_ENTITY") && selectedCustomer) {
+      payload.customerType = customerType;
       payload.customerCode = selectedCustomer.customerId;
     } else if (customerType === "MEMBER" && selectedMember) {
       payload.customerType = "MEMBER";
@@ -408,21 +423,13 @@ const DocumentFormInner: React.FC<{ kind: Kind; doc?: BillingDocument }> = ({ ki
 
   const { data: simulation, isFetching: isSimulating } = useQuery({
     queryKey: [cfg.simKey, debouncedTrigger],
-    queryFn: () => billingService.simulateDocument(buildPayload()),
+    queryFn: () => billingService.simulateExact(buildPayload() as unknown as SimulationRequest),
     enabled: hasValidLines,
   });
 
   const createMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: (): Promise<BillingDocument | InvoiceChange> => {
       if (!edit) return kind === "invoice" ? billingService.createManualInvoice(buildPayload()) : billingService.createManualQuote(buildPayload());
-      const base = {
-        dueDate: generalData.dueDate || undefined,
-        terms: generalData.terms,
-        paymentInstructions: paymentData.paymentInstructions,
-        bankDetailsJson: paymentData.bankDetailsJson || undefined,
-        internalNotes,
-      };
-      if (ro) return billingService.updateDocument(doc!.documentNumber, base);
       const kept = lines.filter(isLineValid);
       const keptOrders = new Set(kept.map((l) => l.lineOrder));
       const upserts: UpdateBillingLinePayload[] = kept.map((l) => ({
@@ -442,8 +449,12 @@ const DocumentFormInner: React.FC<{ kind: Kind; doc?: BillingDocument }> = ({ ki
         catalogSourceCode: l.catalogSourceCode || undefined,
       }));
       const removals: UpdateBillingLinePayload[] = (doc!.lines || []).map((l, i) => l.lineOrder ?? i + 1).filter((o) => !keptOrders.has(o)).map((lineOrder) => ({ action: "REMOVE", lineOrder }));
-      return billingService.updateDocument(doc!.documentNumber, {
-        ...base,
+      const changes = {
+        dueDate: generalData.dueDate || undefined,
+        terms: generalData.terms,
+        paymentInstructions: paymentData.paymentInstructions,
+        bankDetailsJson: paymentData.bankDetailsJson || undefined,
+        internalNotes,
         title: generalData.title,
         description: generalData.description,
         issueDate: generalData.issueDate || undefined,
@@ -455,16 +466,43 @@ const DocumentFormInner: React.FC<{ kind: Kind; doc?: BillingDocument }> = ({ ki
         lines: [...upserts, ...removals],
         discounts: discounts.filter((d) => d.description && d.value > 0),
         clauses: clauses.filter((c) => c.title && c.body),
-      });
+      };
+      if (mode === "revise")
+        return billingService.reviseQuote(doc!.documentNumber, {
+          reason: changeReason.trim(),
+          origin: changeOrigin,
+          discountOverrideReason: overrideReason.trim() || undefined,
+          changes,
+        });
+      if (mode === "change")
+        return billingService.requestInvoiceChange(doc!.documentNumber, {
+          reason: changeReason.trim(),
+          discountOverrideReason: overrideReason.trim() || undefined,
+          changes,
+        });
+      return billingService.updateDocument(doc!.documentNumber, changes);
     },
     onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: ["billing-documents"] });
-      if (edit) queryClient.invalidateQueries({ queryKey: ["billing-document", doc!.documentNumber] });
+      if (edit) {
+        queryClient.invalidateQueries({ queryKey: ["billing-document", doc!.documentNumber] });
+        queryClient.invalidateQueries({ queryKey: ["billing-document-versions", doc!.documentNumber] });
+        queryClient.invalidateQueries({ queryKey: ["billing-invoice-changes", doc!.documentNumber] });
+        queryClient.invalidateQueries({ queryKey: ["billing-quote-negotiation", doc!.documentNumber] });
+      }
       clearDraft();
-      toast.success(edit ? "Document mis à jour." : cfg.okMsg);
-      navigate(edit ? `/billing/documents/${(saved as BillingDocument)?.documentNumber ?? doc!.documentNumber}` : "/billing");
+      if (mode === "change") {
+        const c = saved as unknown as { status?: string; approvalNumber?: string };
+        toast.success(c.status === "PENDING" ? `Modification envoyée à l'approbation${c.approvalNumber ? ` (${c.approvalNumber})` : ""}. La facture garde sa version actuelle jusqu'à l'accord.` : "Modification appliquée.");
+      } else {
+        toast.success(mode === "revise" ? "Devis révisé : nouvelle version créée." : edit ? "Document mis à jour." : cfg.okMsg);
+      }
+      navigate(edit && mode !== "change" ? `/billing/documents/${(saved as BillingDocument)?.documentNumber ?? doc!.documentNumber}` : edit ? `/billing/documents/${doc!.documentNumber}` : "/billing");
     },
-    onError: (e: unknown) => setErrorMessage(apiMessage(e, edit ? "Erreur lors de la mise à jour." : cfg.errorMsg)),
+    onError: (e: unknown) => {
+      if (needsOverrideReason(e)) setOverrideAsked(true);
+      setErrorMessage(billingError(e, edit ? "Erreur lors de la mise à jour." : cfg.errorMsg));
+    },
   });
 
   const validLinesForSim = lines.filter(isLineValid);
@@ -477,7 +515,7 @@ const DocumentFormInner: React.FC<{ kind: Kind; doc?: BillingDocument }> = ({ ki
     <div className="mx-auto w-full max-w-4xl space-y-5">
       <PageHeader
         title={edit ? `Modifier ${DOC_TYPE_LABEL[doc!.documentType] ?? "le document"} ${doc!.documentNumber}` : cfg.title}
-        subtitle={edit ? (ro ? "Document déjà émis : seuls l'échéance, les conditions, le paiement et les notes internes sont modifiables." : "Brouillon : tous les champs de la création sont modifiables.") : cfg.subtitle}
+        subtitle={!edit ? cfg.subtitle : mode === "draft" ? "Brouillon : tous les champs de la création sont modifiables." : mode === "revise" ? "Chaque révision crée une nouvelle version du devis ; rien n'est effacé." : "Facture émise non payée : la modification part à l'approbation et ne s'applique qu'après accord."}
         onBack={() => navigate(edit ? `/billing/documents/${doc!.documentNumber}` : "/billing")}
         backLabel={edit ? "Retour au document" : "Retour à la liste"}
       />
@@ -503,10 +541,10 @@ const DocumentFormInner: React.FC<{ kind: Kind; doc?: BillingDocument }> = ({ ki
             <>
               <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-5">
                 {[
-                  ["Sous-total", simulation.subtotalAmount],
-                  ["Remise lignes", simulation.lineDiscountAmount],
-                  ["Remise document", simulation.documentDiscountAmount],
-                  ["Taxes", simulation.taxAmount],
+                  ["Sous-total", simulation.subtotalAmount ?? 0],
+                  ["Remise lignes", simulation.lineDiscountAmount ?? 0],
+                  ["Remise document", simulation.documentDiscountAmount ?? 0],
+                  ["Taxes", simulation.taxAmount ?? 0],
                 ].map(([label, value]) => (
                   <div key={label}>
                     <dt className="text-xs font-semibold text-gray-400">{label}</dt>
@@ -515,7 +553,7 @@ const DocumentFormInner: React.FC<{ kind: Kind; doc?: BillingDocument }> = ({ ki
                 ))}
                 <div className="col-span-2 sm:col-span-1">
                   <dt className="text-xs font-semibold text-gray-400">Total</dt>
-                  <dd className="mt-1 text-2xl font-bold tracking-tight tabular-nums text-[color:var(--logo-pink-dark)]">{money(simulation.totalAmount)}</dd>
+                  <dd className="mt-1 text-2xl font-bold tracking-tight tabular-nums text-[color:var(--logo-pink-dark)]">{money(simulation.totalAmount ?? 0)}</dd>
                 </div>
               </dl>
               {kind === "quote" && optionsTotal > 0 && (
@@ -523,11 +561,12 @@ const DocumentFormInner: React.FC<{ kind: Kind; doc?: BillingDocument }> = ({ ki
                   + {formatMoney(optionsTotal, cur)} de lignes optionnelles, exclues du total tant qu'elles ne sont pas sélectionnées par le client.
                 </p>
               )}
-              {simulation.violations.length > 0 && (
+              <AlertList alerts={simulation.alerts} className="mt-4" />
+              {(simulation.violations ?? []).length > 0 && (
                 <div className="mt-4 space-y-2">
-                  {simulation.violations.map((v, i) => (
+                  {(simulation.violations ?? []).map((v, i) => (
                     <p key={i} className={`rounded-2xl px-4 py-2.5 text-sm ${v.severity === "BLOCK" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}>
-                      {v.message}
+                      {v.message ?? v.type}
                     </p>
                   ))}
                   {kind === "invoice" && simulation.blocked && (
@@ -571,6 +610,11 @@ const DocumentFormInner: React.FC<{ kind: Kind; doc?: BillingDocument }> = ({ ki
                     <CustomerAutocomplete onSelect={setSelectedCustomer} selectedCustomer={selectedCustomer} placeholder="Rechercher par nom ou e-mail" />
                   </PlainLabel>
                 )}
+                {customerType === "BUSINESS_ENTITY" && (
+                  <PlainLabel text="Entreprise" required>
+                    <CustomerAutocomplete onSelect={setSelectedCustomer} selectedCustomer={selectedCustomer} typeFilter="COMPANY" placeholder="Rechercher une entreprise par nom ou e-mail" />
+                  </PlainLabel>
+                )}
                 {customerType === "MEMBER" && (
                   <PlainLabel text="Membre" required>
                     <MemberAutocomplete onSelect={(m) => { setSelectedMember(m); setBillingCompany(""); }} selectedMember={selectedMember} placeholder="Rechercher par nom ou e-mail" />
@@ -605,6 +649,35 @@ const DocumentFormInner: React.FC<{ kind: Kind; doc?: BillingDocument }> = ({ ki
                 )}
               </div>
             </Section>
+            )}
+
+            {needsReason && (
+              <Section title="Motif de la modification" icon={FileText} description={mode === "revise" ? "Conservé dans la frise de négociation" : "Joint à la demande d'approbation"}>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label="Motif" required className="sm:col-span-2">
+                    <input type="text" value={changeReason} maxLength={1000} onChange={(e) => setChangeReason(e.target.value)} className={FIELD} placeholder={mode === "revise" ? "Le client demande 10 % de moins sur la salle" : "Remise commerciale accordée par la direction"} />
+                  </Field>
+                  {mode === "revise" && (
+                    <Field label="Origine de la proposition">
+                      <select value={changeOrigin} onChange={(e) => setChangeOrigin(e.target.value as typeof changeOrigin)} className={FIELD}>
+                        {Object.entries(NEGOTIATION_ORIGIN_LABEL).map(([k, v]) => (
+                          <option key={k} value={k}>{v}</option>
+                        ))}
+                      </select>
+                    </Field>
+                  )}
+                  {(simulation?.blocked || overrideAsked || overrideReason) && (
+                    <Field label="Motif de dérogation" hint="Remise au-delà de la limite du catalogue : nécessite le droit de dérogation (BILLING:DISCOUNT_OVERRIDE)." className="sm:col-span-2">
+                      <input type="text" value={overrideReason} maxLength={1000} onChange={(e) => setOverrideReason(e.target.value)} className={FIELD} />
+                    </Field>
+                  )}
+                </div>
+                {mode === "revise" && doc!.status === "ACCEPTED" && (
+                  <p className="mt-4 rounded-2xl bg-amber-50 px-4 py-2.5 text-xs text-amber-700">
+                    Ce devis est accepté : le réviser le remet en négociation, annule ses signatures et libère son stock réservé. Le client devra accepter de nouveau.
+                  </p>
+                )}
+              </Section>
             )}
 
             <Section title="Informations générales" icon={FileText}>
@@ -1016,11 +1089,14 @@ export const DocumentForm: React.FC<{ kind?: Kind; documentNumber?: string }> = 
         </div>
       </div>
     );
-  const editable = !doc.locked && (doc.status === "DRAFT" || doc.status === "ISSUED" || doc.status === "SENT");
+  const isQuoteDoc = doc.documentType === "QUOTE";
+  const editable = !doc.locked && (isQuoteDoc
+    ? ["DRAFT", "ISSUED", "SENT", "VIEWED", "NEGOTIATION", "ACCEPTED"].includes(doc.status)
+    : doc.documentType === "INVOICE" && (doc.status === "DRAFT" || ((doc.status === "ISSUED" || doc.status === "SENT") && !(doc.paidAmount > 0))));
   if (!editable)
     return (
       <div className="mx-auto w-full max-w-4xl space-y-4 rounded-3xl bg-white p-8 text-center shadow-sm">
-        <p className="text-sm text-gray-600">Ce document n'est plus modifiable{doc.locked ? " : il est validé fiscalement. Corrigez-le par un avoir ou une facture rectificative." : " dans son statut actuel."}</p>
+        <p className="text-sm text-gray-600">Ce document n'est plus modifiable{doc.locked ? " : il est validé fiscalement. Corrigez-le par un avoir ou une facture rectificative." : doc.paidAmount > 0 ? " : un paiement est déjà imputé. Corrigez-le par un avoir ou une facture rectificative." : isQuoteDoc && doc.status === "EXPIRED" ? " : réactivez d'abord le devis (nouvelle date de validité)." : " dans son statut actuel."}</p>
         <ActionButton onClick={() => navigate(`/billing/documents/${doc.documentNumber}`)}>Retour au document</ActionButton>
       </div>
     );

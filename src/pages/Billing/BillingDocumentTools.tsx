@@ -55,8 +55,10 @@ export const BillingDocumentTools: React.FC = () => {
   const s = typedDocument?.status;
   const locked = !!typedDocument?.locked;
   const isDraft = s === "DRAFT";
-  const isRestrictedEditable = s === "ISSUED" || s === "SENT";
-  const isEditable = isDraft || isRestrictedEditable;
+  const isQuoteDoc = t === "QUOTE";
+  const unpaid = (typedDocument?.paidAmount ?? 0) === 0;
+  // Devis : révision jusqu'à l'acceptation incluse. Facture : brouillon, ou émise non payée (demande approuvée).
+  const isEditable = isDraft || (isQuoteDoc && ["ISSUED", "SENT", "VIEWED", "NEGOTIATION", "ACCEPTED"].includes(s ?? "")) || (t === "INVOICE" && ["ISSUED", "SENT"].includes(s ?? "") && unpaid) || (!isQuoteDoc && t !== "INVOICE" && ["ISSUED", "SENT"].includes(s ?? ""));
   const isInvoice = t === "INVOICE";
   const isCreditNote = t === "CREDIT_NOTE";
   const canValidate = !locked && !!t && ["INVOICE", "CREDIT_NOTE", "DEBIT_NOTE", "PROFORMA_INVOICE"].includes(t) && !!s && ["DRAFT", "ISSUED"].includes(s);
@@ -246,8 +248,8 @@ export const BillingDocumentTools: React.FC = () => {
           <Section title="Modification" icon={FilePen}>
             {isEditable && !locked ? (
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-gray-600">{isDraft ? "Brouillon : le formulaire complet de création s'ouvre prérempli." : "Document déjà émis : seuls l'échéance, les conditions, le paiement et les notes internes sont modifiables."}</p>
-                <ActionButton icon={FilePen} onClick={() => navigate(`/billing/documents/${typedDocument!.documentNumber}/edit`)}>Modifier le document</ActionButton>
+                <p className="text-sm text-gray-600">{isDraft ? "Brouillon : le formulaire complet s'ouvre prérempli." : isQuoteDoc ? "Devis déjà émis : une révision (motif obligatoire) archive la version et remet le devis en négociation ; un devis accepté perd ses signatures et libère son stock réservé." : "Facture émise non payée : la modification passe par une demande soumise au circuit d'approbation (nouvelle version, ou rectificative si la facture est certifiée)."}</p>
+                <ActionButton icon={FilePen} onClick={() => navigate(`/billing/documents/${typedDocument!.documentNumber}/edit`)}>{isDraft ? "Modifier le document" : isQuoteDoc ? "Réviser le devis" : "Demander une modification"}</ActionButton>
               </div>
             ) : (
               <span className="inline-flex items-center gap-1 text-sm text-gray-500"><Lock size={14} /> Ce document n'est plus modifiable à ce statut.</span>

@@ -109,6 +109,7 @@ export interface ResourceRequest {
   capacity?: number;
   zone?: string;
   locationLabel?: string;
+  floorLabel?: string;
   status?: ResourceStatus;
   bookingEnabled?: boolean;
   portalVisible?: boolean;
@@ -120,6 +121,7 @@ export interface UpdateResourceRequest {
   capacity?: number;
   zone?: string;
   locationLabel?: string;
+  floorLabel?: string;
   bookingEnabled?: boolean;
   portalVisible?: boolean;
 }
@@ -137,12 +139,25 @@ export interface ResourceResponse {
   capacity: number | null;
   zone: string | null;
   locationLabel: string | null;
+  floorLabel?: string | null;
+  siteCode?: string | null;
+  floorCode?: string | null;
+  planX?: number | null;
+  planY?: number | null;
+  includedParticipants?: number | null;
+  extraParticipantPrice?: number | null;
+  depositAmount?: number | null;
+  usageRules?: string | null;
+  endChecklist?: string[] | null;
   status: ResourceStatus | string;
   bookingEnabled: boolean;
   portalVisible: boolean;
   displayOrder: number | null;
   active: boolean;
-  /** Durée de créneau en vigueur sur la ressource (lecture seule). */
+  /** Duree de creneau en vigueur sur cette ressource (lecture seule) -
+      permet de pre-remplir le formulaire de disponibilite plutot que de
+      proposer 30 par defaut a une ressource qui travaille au quart
+      d'heure. */
   slotDurationMinutes?: number;
 }
 
@@ -197,7 +212,9 @@ export interface ResourceAmenityLinkRequest {
   extraPrice?: number;
 }
 
-/** Diviseurs de 60 : seules valeurs acceptées par le backend pour slotDurationMinutes. */
+/** Diviseurs de 60 uniquement - seules valeurs acceptees par le backend
+    pour slotDurationMinutes. A utiliser pour un selecteur ferme plutot
+    qu'un champ libre (§1 de la doc). */
 export const SLOT_DURATION_OPTIONS = [5, 10, 15, 20, 30, 60] as const;
 export type SlotDurationMinutes = (typeof SLOT_DURATION_OPTIONS)[number];
 
@@ -206,13 +223,20 @@ export interface ResourceAvailabilityRequest {
   startedAt: string;
   endedAt: string;
   /**
-   * Facultatif : la durée déjà en vigueur sur la ressource s'applique (30 si aucune).
-   * Une autre valeur n'est acceptée que si la ressource n'a aucun créneau futur,
-   * sinon 409 (message à afficher tel quel). Diviseurs de 60 uniquement, sinon 400.
+   * Facultatif. Absent, la duree DEJA EN VIGUEUR sur la ressource
+   * s'applique (30 par defaut si la ressource n'en porte aucune). La
+   * valeur ne decrit pas cette disponibilite precise : elle est ecrite
+   * jusqu'a la ressource, ou elle vit. Une valeur differente de celle
+   * deja en place n'est acceptee que si la ressource n'a aucun creneau
+   * futur - sinon 409 (message a afficher tel quel, il contient le
+   * compte de creneaux a supprimer d'abord). Seuls les diviseurs de 60
+   * sont admis (SLOT_DURATION_OPTIONS), sinon 400.
    */
   slotDurationMinutes?: SlotDurationMinutes;
   totalCapacity?: number;
   active?: boolean;
+  /** Dérogation de l'équipe : hors des horaires d'ouverture du jour */
+  outsideOpeningHours?: boolean;
 }
 export interface ResourceAvailabilityResponse {
   id: number;
@@ -224,6 +248,7 @@ export interface ResourceAvailabilityResponse {
   remainingCapacity: number;
   available: boolean;
   active: boolean;
+  subscribersOnly?: boolean;
 }
 export interface ResourceAvailabilityGroupResponse {
   resourceCode: string;
@@ -245,6 +270,13 @@ export interface ResourceClosureRequest {
   endedAt: string;
   reason?: string;
   active?: boolean;
+  /** CLOSURE (défaut), MAINTENANCE, CLEANING, PRIVATE_EVENT, OTHER */
+  kind?: string;
+  /** NONE (défaut), WEEKLY, YEARLY */
+  recurrence?: string;
+  recurrenceUntil?: string | null;
+  /** Annule les réservations à venir touchées et prévient les clients */
+  cancelBookings?: boolean;
 }
 export interface ResourceClosureResponse {
   id: number;
@@ -253,6 +285,9 @@ export interface ResourceClosureResponse {
   endedAt: string;
   reason?: string | null;
   active: boolean;
+  kind?: string | null;
+  recurrence?: string | null;
+  recurrenceUntil?: string | null;
 }
 
 export interface PublicCalendarDay {
@@ -315,6 +350,20 @@ export interface ResourcePricingRuleRequest {
   validFrom?: string | null;
   validUntil?: string | null;
   active?: boolean;
+  /** « 1,2,3,4,5 » (1 = lundi), remplace dayOfWeek */
+  daysOfWeek?: string | null;
+  customerSegment?: string | null;
+  planCode?: string | null;
+  minParticipants?: number | null;
+  maxParticipants?: number | null;
+  minDurationMinutes?: number | null;
+  maxDurationMinutes?: number | null;
+  minLeadMinutes?: number | null;
+  channel?: string | null;
+  /** ONLY, EXCLUDED ou vide */
+  holidayMode?: string | null;
+  stackable?: boolean;
+  perParticipant?: boolean;
 }
 export interface ResourcePricingRuleResponse extends ResourcePricingRuleRequest {
   id: number;
@@ -350,6 +399,7 @@ export interface ResourcePhoto {
 }
 
 // ─── Ouverture / tarification groupees sur plusieurs ressources ───────────────
+// Additif uniquement : les points d'entree unitaires n'ont pas change.
 
 export interface BulkAvailabilityRequest {
   resourceCodes: string[];
@@ -380,8 +430,11 @@ export interface BulkPricingRuleRequest {
 export type BulkResultStatus = "PROCESSED" | "SKIPPED";
 
 /**
- * Réponse commune aux endpoints /bulk. Toujours 200 : le statut "SKIPPED" n'est pas une erreur.
- * detail = nombre de créneaux écrits (disponibilités), null pour les tarifs.
+ * Reponse commune aux deux endpoints /bulk (disponibilites et tarifs).
+ * Toujours 200, meme quand des ressources sont ecartees - status:
+ * "SKIPPED" n'est PAS une erreur a traiter dans un catch. `detail` porte
+ * le nombre de creneaux ecrits pour les disponibilites, reste null pour
+ * les tarifs (rien a compter).
  */
 export interface BulkOperationResult {
   processed: number;
@@ -389,7 +442,7 @@ export interface BulkOperationResult {
   results: {
     resourceCode: string;
     status: BulkResultStatus;
-    /** Motif de l'écart, affichable tel quel ; null si succès. */
+    /** Motif de l'ecart, redige pour etre affiche tel quel. null si succes. */
     reason: string | null;
     detail: number | null;
   }[];
@@ -403,13 +456,18 @@ export interface PricingRuleOverlap {
   dayOfWeek: string | number | null;
   startsAt: string | null;
   endsAt: string | null;
-  /** true = la règle existante l'emporterait (priorité supérieure) : la règle proposée ne serait jamais appliquée. */
+  /** true = la regle EXISTANTE l'emporterait (priorite superieure) - la
+      regle proposee serait creee mais jamais appliquee sur cette plage.
+      Le seul signal qui merite un avertissement franc. */
   wins: boolean;
 }
 
 export interface PricingRuleOverlapPreviewItem {
   resourceCode: string;
-  /** true = une règle active strictement identique existe déjà. Un chevauchement n'est pas une faute en soi. */
+  /** true = une regle active est deja strictement identique (meme unite,
+      prix, jour, plage horaire, priorite) - n'apporte rien, merite un
+      regard. Un chevauchement (overlapping non vide) n'est PAS une
+      faute en soi, c'est le mecanisme normal des grilles tarifaires. */
   duplicate: boolean;
   overlapping: PricingRuleOverlap[];
 }
@@ -601,8 +659,10 @@ export const resourceService = {
   ): Promise<void> => {
     await apiClient.put(`${API}/resources/${code}`, data);
   },
-  deleteResource: async (code: string): Promise<void> => {
-    await apiClient.delete(`${API}/resources/${code}`);
+  deleteResource: async (code: string, cancelBookings?: boolean): Promise<void> => {
+    await apiClient.delete(`${API}/resources/${code}`, {
+      params: { cancelBookings: cancelBookings || undefined },
+    });
   },
   searchResources: async (query: string): Promise<ResourceSummaryResponse[]> =>
     arr<ResourceSummaryResponse>(
@@ -627,17 +687,18 @@ export const resourceService = {
   updateResourceStatus: async (
     code: string,
     status: ResourceStatus,
+    cancelBookings?: boolean,
   ): Promise<void> => {
     await apiClient.patch(`${API}/resources/${code}/status`, null, {
-      params: { status },
+      params: { status, cancelBookings: cancelBookings || undefined },
     });
   },
   updateResourceBookingEnabled: async (
     code: string,
     bookingEnabled: boolean,
   ): Promise<void> => {
-    await apiClient.patch(`${API}/resources/${code}/booking-enabled`, null, {
-      params: { bookingEnabled },
+    await apiClient.patch(`${API}/resources/${code}/booking-enabled`, {
+      bookingEnabled,
     });
   },
   updateResourcePortalVisible: async (
@@ -645,23 +706,25 @@ export const resourceService = {
   portalVisible: boolean,
 ): Promise<void> => {
   await apiClient.patch(`/sni/api/v1/resources/${code}/portal-visible`, {
-    portalVisible,
+    visible: portalVisible,
   });
 },
   updateResourceActive: async (
     code: string,
     active: boolean,
+    cancelBookings?: boolean,
   ): Promise<void> => {
-    await apiClient.patch(`${API}/resources/${code}/active`, null, {
-      params: { active },
+    await apiClient.patch(`${API}/resources/${code}/active`, {
+      active,
+      cancelBookings: cancelBookings || undefined,
     });
   },
   updateResourceDisplayOrder: async (
     code: string,
     displayOrder: number,
   ): Promise<void> => {
-    await apiClient.patch(`${API}/resources/${code}/display-order`, null, {
-      params: { displayOrder },
+    await apiClient.patch(`${API}/resources/${code}/display-order`, {
+      displayOrder,
     });
   },
 
@@ -747,9 +810,14 @@ export const resourceService = {
   ): Promise<ResourceAvailabilityResponse> =>
     (await apiClient.post(`${API}/resource-availabilities`, data)).data,
   /**
-   * Ouvre la même plage sur jusqu'à 20 ressources. Répond 200 avec un compte-rendu même
-   * en cas d'échecs partiels ; les doublons dans resourceCodes sont ignorés.
-   * 400 si durée hors diviseurs de 60, liste vide ou plus de 20 codes.
+   * Ouvre la meme plage sur jusqu'a 20 ressources (bokati.resource.bulk-max-resources
+   * cote serveur). 200 avec un compte-rendu meme en cas d'echecs partiels -
+   * chaque ressource est traitee dans sa propre transaction, celles qui
+   * aboutissent sont ecrites meme si d'autres echouent. Les doublons dans
+   * resourceCodes sont ramenes a une occurrence (ordre de saisie) : ne
+   * comptez pas sur results.length === resourceCodes.length. Un 400 (sans
+   * ecriture) sort uniquement pour ce qui releve de la requete elle-meme :
+   * duree hors diviseurs de 60, liste vide, ou plus de 20 codes.
    */
   createAvailabilitiesBulk: async (
     data: BulkAvailabilityRequest,
@@ -793,28 +861,53 @@ export const resourceService = {
         })
       ).data,
     ),
+  /**
+   * Rattrapage seulement (pas pour un écran ordinaire) : le motif est
+   * obligatoire, l'opération est journalisée côté serveur.
+   * POST /resource-availabilities/reserve
+   */
   reserveAvailabilitySlot: async (
-    id: number,
-    quantity?: number,
-  ): Promise<ResourceAvailabilityResponse> =>
-    (
-      await apiClient.patch(
-        `${API}/resource-availabilities/${id}/reserve`,
-        null,
-        { params: { quantity } },
-      )
-    ).data,
+    slot: { resourceCode: string; startedAt: string; endedAt: string },
+    quantity: number,
+    reason: string,
+    bookingNumber?: string,
+  ): Promise<void> => {
+    await apiClient.post(`${API}/resource-availabilities/reserve`, {
+      resourceCode: slot.resourceCode,
+      startedAt: slot.startedAt,
+      endedAt: slot.endedAt,
+      quantity,
+      reason,
+      bookingNumber: bookingNumber || undefined,
+    });
+  },
+  /** PATCH /resource-availabilities/release — ne rend jamais une place occupée par une réservation active */
   releaseAvailabilitySlot: async (
-    id: number,
-    quantity?: number,
-  ): Promise<ResourceAvailabilityResponse> =>
-    (
-      await apiClient.patch(
-        `${API}/resource-availabilities/${id}/release`,
-        null,
-        { params: { quantity } },
-      )
-    ).data,
+    slot: { resourceCode: string; startedAt: string; endedAt: string },
+    quantity: number,
+    reason: string,
+    bookingNumber?: string,
+  ): Promise<void> => {
+    await apiClient.patch(`${API}/resource-availabilities/release`, {
+      resourceCode: slot.resourceCode,
+      startedAt: slot.startedAt,
+      endedAt: slot.endedAt,
+      quantity,
+      reason,
+      bookingNumber: bookingNumber || undefined,
+    });
+  },
+  /** Désactive ou réactive un créneau à venir (refusé s'il est réservé) */
+  updateAvailabilityActive: async (id: number | string, active: boolean): Promise<void> => {
+    await apiClient.patch(`${API}/resource-availabilities/${id}/active`, null, { params: { active } });
+  },
+  /** Supprime un créneau à venir sans réservation */
+  deleteAvailability: async (id: number | string): Promise<void> => {
+    await apiClient.delete(`${API}/resource-availabilities/${id}`);
+  },
+  /** Supprime les créneaux à venir sans réservation d'une ressource ; les réservés restent */
+  deleteFutureAvailabilities: async (params: { resourceCode: string; from?: string; to?: string }): Promise<{ deleted: number; kept: number }> =>
+    (await apiClient.delete(`${API}/resource-availabilities`, { params })).data,
 
   createClosure: async (
     data: ResourceClosureRequest,
@@ -834,12 +927,17 @@ export const resourceService = {
     page<ResourceClosureResponse>(
       (await apiClient.get(`${API}/resource-closures`, { params })).data,
     ),
-  updateClosureActive: async (id: number, active: boolean): Promise<void> => {
-    await apiClient.patch(`${API}/resource-closures/${id}/active`, null, {
-      params: { active },
+  updateClosureActive: async (
+    id: number | string,
+    active: boolean,
+    cancelBookings?: boolean,
+  ): Promise<void> => {
+    await apiClient.patch(`${API}/resource-closures/${id}/active`, {
+      active,
+      cancelBookings: cancelBookings || undefined,
     });
   },
-  deleteClosure: async (id: number): Promise<void> => {
+  deleteClosure: async (id: number | string): Promise<void> => {
     await apiClient.delete(`${API}/resource-closures/${id}`);
   },
 
@@ -877,14 +975,25 @@ export const resourceService = {
     data: ResourcePricingRuleRequest,
   ): Promise<ResourcePricingRuleResponse> =>
     (await apiClient.post(`${API}/resource-pricing-rules`, data)).data,
-  /** Pose la même grille tarifaire sur jusqu'à 20 ressources (detail toujours null). */
+  /**
+   * Pose la meme grille tarifaire sur jusqu'a 20 ressources. Meme forme de
+   * reponse que createAvailabilitiesBulk (detail vaut toujours null ici,
+   * rien a compter). Poser plusieurs regles sur UNE ressource fonctionnait
+   * deja via plusieurs appels a createPricingRule - cet endpoint couvre le
+   * cas inverse : une meme grille sur tout un parc.
+   */
   createPricingRulesBulk: async (
     data: BulkPricingRuleRequest,
   ): Promise<BulkOperationResult> =>
     (await apiClient.post(`${API}/resource-pricing-rules/bulk`, data)).data,
   /**
-   * N'écrit rien : à appeler avant de valider un lot. Un code ressource inconnu
-   * fait échouer toute la prévisualisation (404). Seul `wins: true` mérite un avertissement.
+   * N'ecrit rien - a appeler avant de valider un lot. Un code ressource
+   * inconnu fait echouer la PREVIEW ENTIERE en 404 (contrairement a la
+   * creation, qui ecarterait juste cette ressource) : validez la
+   * selection avant d'appeler. Un chevauchement (`overlapping` non vide)
+   * n'est pas une erreur - seul `wins: true` sur une regle existante
+   * merite un avertissement franc (la regle proposee serait creee mais
+   * jamais appliquee).
    */
   previewPricingRulesBulk: async (
     data: BulkPricingRuleRequest,
@@ -910,7 +1019,7 @@ export const resourceService = {
     ),
   updatePricingRule: async (
     id: number,
-    data: Partial<ResourcePricingRuleRequest>,
+    data: Partial<ResourcePricingRuleRequest> & { clear?: string[] },
   ): Promise<void> => {
     await apiClient.put(`${API}/resource-pricing-rules/${id}`, data);
   },
@@ -950,7 +1059,7 @@ export const resourceService = {
     data: Partial<ResourcePhotoRequest>,
   ): Promise<ResourcePhoto> =>
     (
-      await apiClient.put(
+      await apiClient.patch(
         `${API}/resources/${resourceCode}/photos/${photoId}`,
         data,
       )

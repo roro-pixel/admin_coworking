@@ -20,7 +20,7 @@ const LEVELS: { key: string; label: string; color: string }[] = [
 ];
 const PINK = "#e6007e";
 
-type Op = { mode: "reserve" | "release"; slotId: string; quantity: number };
+type Op = { mode: "reserve" | "release"; slotId: string; quantity: number; reason: string };
 
 export const ResourcePlanningAdminPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -124,8 +124,9 @@ export const ResourcePlanningAdminPage: React.FC = () => {
   });
   const adjust = useMutation({
     mutationFn: () => {
-      const id = Number(op!.slotId);
-      return op!.mode === "reserve" ? resourceService.reserveAvailabilitySlot(id, op!.quantity || 1) : resourceService.releaseAvailabilitySlot(id, op!.quantity || 1);
+      const slot = slots.find((s) => String(s.id) === op!.slotId);
+      if (!slot) return Promise.reject(new Error("Créneau introuvable"));
+      return op!.mode === "reserve" ? resourceService.reserveAvailabilitySlot(slot, op!.quantity || 1, op!.reason.trim()) : resourceService.releaseAvailabilitySlot(slot, op!.quantity || 1, op!.reason.trim());
     },
     onSuccess: async () => { await refreshAll(); toast.success(op?.mode === "reserve" ? "Capacité réservée" : "Capacité libérée"); setOp(null); },
     onError: (e) => setOpError(apiMessage(e, "Opération impossible")),
@@ -237,7 +238,7 @@ export const ResourcePlanningAdminPage: React.FC = () => {
               onCancel={() => setOp(null)}
               pending={adjust.isPending}
               submitLabel={op.mode === "reserve" ? "Réserver" : "Libérer"}
-              submitDisabled={!op.slotId}
+              submitDisabled={!op.slotId || !op.reason.trim()}
               error={opError}
               onSubmit={(e) => { e.preventDefault(); setOpError(null); adjust.mutate(); }}
             >
@@ -250,12 +251,15 @@ export const ResourcePlanningAdminPage: React.FC = () => {
               <Field label="Quantité" required>
                 <input type="number" min={1} value={op.quantity} onChange={(e) => setOp({ ...op, quantity: parseInt(e.target.value) || 1 })} className={`${FIELD} sm:max-w-[10rem]`} />
               </Field>
+              <Field label="Motif" required hint="Rattrapage seulement : l'opération est journalisée.">
+                <input value={op.reason} onChange={(e) => setOp({ ...op, reason: e.target.value })} className={FIELD} />
+              </Field>
             </PanelForm>
           )}
 
           <div className="flex flex-wrap gap-2">
-            <ActionButton variant="ghost" icon={Lock} onClick={() => { setOpError(null); setOp({ mode: "reserve", slotId: "", quantity: 1 }); }}>Réserver</ActionButton>
-            <ActionButton variant="ghost" icon={Unlock} onClick={() => { setOpError(null); setOp({ mode: "release", slotId: "", quantity: 1 }); }}>Libérer</ActionButton>
+            <ActionButton variant="ghost" icon={Lock} onClick={() => { setOpError(null); setOp({ mode: "reserve", slotId: "", quantity: 1, reason: "" }); }}>Réserver</ActionButton>
+            <ActionButton variant="ghost" icon={Unlock} onClick={() => { setOpError(null); setOp({ mode: "release", slotId: "", quantity: 1, reason: "" }); }}>Libérer</ActionButton>
           </div>
 
           <Section title="Réservations du mois" icon={CalendarDays}>

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calculator, CalendarDays, Coffee, DoorClosed, DollarSign, Pencil, Plus, Settings, Unlink } from "lucide-react";
+import { Calculator, CalendarDays, Coffee, DoorClosed, DollarSign, Pencil, Plus, Settings, SlidersHorizontal, Unlink } from "lucide-react";
 import { resourceService } from "../../../services/resource.service";
 import type { ResourceBookingUnit, ResourcePricingRuleResponse } from "../../../services/resource.service";
 import { ActionButton, CheckField, Detail, EmptyState, ErrorBlock, Field, IconButton, PageHeader, PanelForm, Pagination, Section, Switch, Tabs, Tag } from "../../../components/subscription/kit";
@@ -12,11 +12,13 @@ import { toast } from "../../../components/ui/toastStore";
 import { DetailShell, Row, STATUSES, STATUS_LABEL, StatusBadge, UNITS, UNIT_LABEL, dayLabel, hhmm } from "../../../components/resources/resKit";
 import { ResourceFields, resourceError, resourceToForm } from "../../../components/resources/ResourceFields";
 import type { ResourceForm } from "../../../components/resources/ResourceFields";
+import { ResourceSettingsPanel } from "../../../components/resources/ResourceSettingsPanel";
 import { ResourceAvailabilityCalendar } from "./ResourceAvailabilityCalendar";
 
-type Tab = "info" | "amenities" | "pricing" | "availability" | "calendar";
+type Tab = "info" | "settings" | "amenities" | "pricing" | "availability" | "calendar";
 const TABS: TabItem<Tab>[] = [
   { id: "info", label: "Informations", icon: Settings },
+  { id: "settings", label: "Réglages", icon: SlidersHorizontal },
   { id: "amenities", label: "Équipements", icon: Coffee },
   { id: "pricing", label: "Tarifs", icon: DollarSign },
   { id: "availability", label: "Disponibilités", icon: CalendarDays },
@@ -80,6 +82,7 @@ export const ResourceDetailPage: React.FC = () => {
         capacity: f.capacity,
         zone: f.zone.trim() || undefined,
         locationLabel: f.locationLabel.trim() || undefined,
+        floorLabel: f.floorLabel.trim() || undefined,
         bookingEnabled: f.bookingEnabled,
         portalVisible: f.portalVisible,
       });
@@ -160,7 +163,7 @@ export const ResourceDetailPage: React.FC = () => {
           <div className="rounded-2xl bg-white px-4 py-3 shadow-sm">
             <label className="block text-xs font-semibold text-gray-500">
               Statut rapide
-              <select value={String(resource.status)} disabled={setStatus.isPending} onChange={(e) => setStatus.mutate(e.target.value)} className={`${FIELD_SOFT} mt-1`}>
+              <select value={String(resource.status)} disabled={setStatus.isPending} onChange={(e) => (["MAINTENANCE", "OUT_OF_SERVICE", "ARCHIVED"].includes(e.target.value) ? (toast.error("Ce statut peut toucher des réservations : utilisez l'onglet Réglages."), open("settings")) : setStatus.mutate(e.target.value))} className={`${FIELD_SOFT} mt-1`}>
                 {STATUSES.map((s) => (
                   <option key={s} value={s}>
                     {STATUS_LABEL[s]}
@@ -175,6 +178,12 @@ export const ResourceDetailPage: React.FC = () => {
       <div className="mb-5">
         <Tabs items={TABS} active={tab} onChange={open} variant="soft" />
       </div>
+
+      {seen("settings") && (
+        <div className={hidden("settings")}>
+          <ResourceSettingsPanel resource={resource} />
+        </div>
+      )}
 
       <div className={hidden("info")}>
         {editing && form ? (
@@ -210,6 +219,7 @@ export const ResourceDetailPage: React.FC = () => {
               <Detail label="Capacité">{resource.capacity ? `${resource.capacity} personne${resource.capacity > 1 ? "s" : ""}` : undefined}</Detail>
               <Detail label="Zone">{resource.zone}</Detail>
               <Detail label="Emplacement">{resource.locationLabel}</Detail>
+              <Detail label="Étage">{resource.floorLabel}</Detail>
               <Detail label="Durée de créneau">{resource.slotDurationMinutes ? `${resource.slotDurationMinutes} min` : undefined}</Detail>
               <Detail label="Ordre d'affichage">{resource.displayOrder !== null && resource.displayOrder !== undefined ? String(resource.displayOrder) : undefined}</Detail>
               <Detail label="Description" wide>{resource.description}</Detail>

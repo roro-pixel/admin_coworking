@@ -12,6 +12,8 @@ import {
   FolderOpen,
   GitBranch,
   GitCompareArrows,
+  Layers,
+  Network,
   ListChecks,
   Search,
   ShieldCheck,
@@ -39,6 +41,9 @@ import { DocumentOwnerFolderPage } from "./DocumentOwnerFolderPage";
 import { DocumentGovernancePage } from "./DocumentGovernancePage";
 import { DocumentAnalyticsExportPage } from "./DocumentAnalyticsExportPage";
 import { DocumentOperationsHub } from "./DocumentOperationsHub";
+import { GedExplorerPage } from "./GedExplorerPage";
+import { DocumentSpacesPage } from "./DocumentSpacesPage";
+import { KycCenterPage } from "./KycCenterPage";
 
 type TabId =
   | "dashboard"
@@ -49,6 +54,9 @@ type TabId =
   | "bulk"
   | "reviewed"
   | "crossValidation"
+  | "kycCenter"
+  | "explorer"
+  | "spaces"
   | "gedDashboard"
   | "documents"
   | "advancedSearch"
@@ -75,7 +83,10 @@ const SECTIONS: Section[] = [
   { id: "bulk", label: "Revue en masse", icon: CheckSquare, group: "kyc", view: <KycBulkReviewPage /> },
   { id: "reviewed", label: "Documents traités", icon: ClipboardCheck, group: "kyc", view: <KycReviewedDocumentsPage /> },
   { id: "crossValidation", label: "Validation croisée", icon: GitCompareArrows, group: "kyc", view: <KycCrossValidationPage /> },
+  { id: "kycCenter", label: "Centre KYC", icon: Network, group: "kyc", view: <KycCenterPage /> },
   { id: "gedDashboard", label: "Tableau de bord", icon: FileSearch, group: "ged", view: <DocumentGedDashboard /> },
+  { id: "explorer", label: "Explorateur", icon: FolderOpen, group: "ged", view: <GedExplorerPage /> },
+  { id: "spaces", label: "Espaces", icon: Layers, group: "ged", view: <DocumentSpacesPage /> },
   { id: "documents", label: "Documents", icon: FolderOpen, group: "ged", view: <DocumentsList /> },
   { id: "advancedSearch", label: "Recherche", icon: Search, group: "ged", view: <DocumentAdvancedSearchPage /> },
   { id: "folder", label: "Dossier", icon: FolderOpen, group: "ged", view: <DocumentOwnerFolderPage /> },

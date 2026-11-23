@@ -1,21 +1,22 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, ShieldCheck, Tag as TagIcon, Trash2 } from "lucide-react";
+import { Plus, Power, PowerOff, ShieldCheck, Tag as TagIcon, Trash2 } from "lucide-react";
 import { documentService } from "../../services/document.service";
+import { gedService } from "../../services/ged.service";
 import type { DocumentRetentionAction, DocumentRetentionReference } from "../../services/document.service";
 import { ActionButton, CheckField, EmptyState, ErrorBlock, Field, IconButton, ListHeader, PanelForm, Tag } from "../../components/subscription/kit";
 import { FIELD, apiMessage } from "../../components/subscription/kitUtils";
 import { ListSkeleton } from "../../components/ui/Skeleton";
 import { toast } from "../../components/ui/toastStore";
-import { CATEGORIES, CATEGORY_LABEL, SPACES, SPACE_LABEL, fmtInt, label } from "../../components/documents/docUtils";
+import { SPACES, SPACE_LABEL, fmtInt, label } from "../../components/documents/docUtils";
 
 const EMPTY_TAG = { code: "", name: "", color: "#E0529C", space: "KYC_SPACE" };
 const EMPTY_POLICY = {
   code: "",
   name: "",
   space: "KYC_SPACE",
-  category: "",
   documentTypeCode: "",
+  folderCode: "",
   retentionDays: 365,
   retentionReference: "UPLOAD_DATE" as DocumentRetentionReference,
   action: "ARCHIVE" as DocumentRetentionAction,
@@ -51,7 +52,7 @@ export const DocumentGovernancePage: React.FC = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["document-tags"] }),
   });
   const createPolicy = useMutation({
-    mutationFn: () => documentService.createRetentionPolicy({ ...policyForm!, category: policyForm!.category || undefined, documentTypeCode: policyForm!.documentTypeCode || undefined }),
+    mutationFn: () => documentService.createRetentionPolicy({ ...policyForm!, folderCode: policyForm!.folderCode || undefined, documentTypeCode: policyForm!.documentTypeCode || undefined }),
     onSuccess: () => {
       toast.success("Politique créée");
       queryClient.invalidateQueries({ queryKey: ["document-retention-policies"] });
@@ -59,6 +60,14 @@ export const DocumentGovernancePage: React.FC = () => {
       setError(null);
     },
     onError: (e) => setError(apiMessage(e, "Création de la politique impossible")),
+  });
+  const activatePolicy = useMutation({
+    mutationFn: (code: string) => gedService.activateRetentionPolicy(code),
+    onSuccess: () => {
+      toast.success("Politique réactivée");
+      queryClient.invalidateQueries({ queryKey: ["document-retention-policies"] });
+    },
+    onError: (e) => toast.error(apiMessage(e, "Réactivation impossible")),
   });
   const deletePolicy = useMutation({
     mutationFn: (code: string) => documentService.deleteRetentionPolicy(code),
@@ -167,16 +176,6 @@ export const DocumentGovernancePage: React.FC = () => {
                 <input value={policyForm.name} onChange={(e) => setPolicyForm({ ...policyForm, name: e.target.value })} className={FIELD} />
               </Field>
               <Field label="Espace">{spaceSelect(policyForm.space, (v) => setPolicyForm({ ...policyForm, space: v }))}</Field>
-              <Field label="Catégorie">
-                <select value={policyForm.category} onChange={(e) => setPolicyForm({ ...policyForm, category: e.target.value })} className={FIELD}>
-                  <option value="">Toutes les catégories</option>
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {label(CATEGORY_LABEL, c)}
-                    </option>
-                  ))}
-                </select>
-              </Field>
               <Field label="Type de document" hint="Facultatif.">
                 <select value={policyForm.documentTypeCode} onChange={(e) => setPolicyForm({ ...policyForm, documentTypeCode: e.target.value })} className={FIELD}>
                   <option value="">Tous les types</option>
@@ -187,8 +186,11 @@ export const DocumentGovernancePage: React.FC = () => {
                   ))}
                 </select>
               </Field>
+              <Field label="Dossier" hint="Facultatif : code du dossier concerné.">
+                <input value={policyForm.folderCode} onChange={(e) => setPolicyForm({ ...policyForm, folderCode: e.target.value })} className={FIELD} />
+              </Field>
               <Field label="Durée de conservation (jours)">
-                <input type="number" min={0} value={policyForm.retentionDays} onChange={(e) => setPolicyForm({ ...policyForm, retentionDays: Number(e.target.value) || 0 })} className={FIELD} />
+                <input type="number" min={1} value={policyForm.retentionDays} onChange={(e) => setPolicyForm({ ...policyForm, retentionDays: Number(e.target.value) || 0 })} className={FIELD} />
               </Field>
               <Field label="Calculée depuis la">
                 <select value={policyForm.retentionReference} onChange={(e) => setPolicyForm({ ...policyForm, retentionReference: e.target.value as DocumentRetentionReference })} className={FIELD}>
@@ -226,21 +228,25 @@ export const DocumentGovernancePage: React.FC = () => {
                 <div className="flex shrink-0 items-center gap-2">
                   <Tag tone="pink">{ACTION_LABEL[String(p.action)] ?? String(p.action)}</Tag>
                   {p.active === false && <Tag>Inactive</Tag>}
-                  <IconButton
-                    icon={Trash2}
-                    label="Supprimer la politique"
-                    tone="danger"
-                    onClick={() =>
-                      toast.confirm({
-                        message: `Supprimer la politique « ${p.name} » ?`,
-                        confirmLabel: "Supprimer",
-                        pendingLabel: "Suppression",
-                        successMessage: "Politique supprimée",
-                        errorMessage: "Suppression impossible",
-                        onConfirm: () => deletePolicy.mutateAsync(p.code),
-                      })
-                    }
-                  />
+                  {p.active === false ? (
+                    <IconButton icon={Power} label="Réactiver la politique" tone="success" pending={activatePolicy.isPending} onClick={() => activatePolicy.mutate(p.code)} />
+                  ) : (
+                    <IconButton
+                      icon={PowerOff}
+                      label="Désactiver la politique"
+                      tone="danger"
+                      onClick={() =>
+                        toast.confirm({
+                          message: `Désactiver la politique « ${p.name} » ? Elle reste listée et peut être réactivée.`,
+                          confirmLabel: "Désactiver",
+                          pendingLabel: "Désactivation",
+                          successMessage: "Politique désactivée",
+                          errorMessage: "Désactivation impossible",
+                          onConfirm: () => deletePolicy.mutateAsync(p.code),
+                        })
+                      }
+                    />
+                  )}
                 </div>
               </div>
             ))}

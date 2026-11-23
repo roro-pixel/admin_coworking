@@ -32,13 +32,14 @@ import { Dots } from "../../components/ui/Toaster";
 import { toast } from "../../components/ui/toastStore";
 import { ListSkeleton } from "../../components/ui/Skeleton";
 import { ReceiptModal } from "../../components/payment/ReceiptModal";
+import { CashSessionSelect } from "../../components/payment/CashSessionSelect";
 import {
   CUSTOMER_TYPES,
   CUSTOMER_TYPE_LABEL,
   INTENT_STATUS,
   PURPOSE_LABEL,
 } from "../../components/payment/paymentLabels";
-import { currencyLabel, saveBlob } from "../../components/payment/paymentUtils";
+import { computeChange, currencyLabel, parseDigits, saveBlob } from "../../components/payment/paymentUtils";
 
 const PAGE_SIZE = 20;
 const COLS = "lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_8rem_minmax(0,1fr)_9rem_11rem]";
@@ -48,7 +49,6 @@ const STATUS_FILTERS = [
   { value: "PENDING", label: "En attente" },
   { value: "SUCCEEDED", label: "Payées" },
   { value: "PROCESSING", label: "En cours" },
-  { value: "FAILED", label: "Échouées" },
   { value: "PARTIALLY_REFUNDED", label: "Remb. en partie" },
   { value: "REFUNDED", label: "Remboursées" },
   { value: "EXPIRED", label: "Expirées" },
@@ -56,7 +56,8 @@ const STATUS_FILTERS = [
 ];
 
 export const PaymentIntentsList: React.FC = () => {
-  const { admin } = useAuth();
+  const { hasPermission } = useAuth();
+  const canProcess = hasPermission("PAYMENT:PROCESS");
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -78,10 +79,13 @@ export const PaymentIntentsList: React.FC = () => {
   const [debtCustomerType, setDebtCustomerType] = useState("MEMBER");
   const [debtCustomerCode, setDebtCustomerCode] = useState("");
   const [debtSearchText, setDebtSearchText] = useState("");
-  const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
+  const [debtPage, setDebtPage] = useState(0);
+  // Sélection conservée d'une page à l'autre : on garde le document entier (devise, solde).
+  const [selected, setSelected] = useState<Record<string, PayableDocument>>({});
   const [debtError, setDebtError] = useState<string | null>(null);
   const [debtPayMethod, setDebtPayMethod] = useState<"CASH" | "WALLET">("CASH");
   const [debtCashSession, setDebtCashSession] = useState("");
+  const [debtTendered, setDebtTendered] = useState(0);
   const [debtWalletNumber, setDebtWalletNumber] = useState("");
 
   // Reçu
@@ -118,26 +122,21 @@ export const PaymentIntentsList: React.FC = () => {
         status: statusFilter || undefined,
         page,
         size: PAGE_SIZE,
-        sort: "createdAt,desc",
       }),
   });
 
   const { data: payableDocuments, isLoading: isLoadingDebts } = useQuery({
-    queryKey: ["payable-documents", debtCustomerType, debtCustomerCode, debtSearchText],
+    queryKey: ["payable-documents", debtCustomerType, debtCustomerCode, debtSearchText, debtPage],
     queryFn: () =>
       paymentService.getPayableDocuments({
         customerType: debtCustomerType || undefined,
         customerCode: debtCustomerCode || undefined,
         searchText: debtSearchText || undefined,
+        page: debtPage,
+        size: PAGE_SIZE,
       }),
     enabled: isDebtsOpen && (!!debtCustomerCode || !!debtSearchText),
   });
-
-  const { data: openSessionsData } = useQuery({
-    queryKey: ["cash-sessions-open-select"],
-    queryFn: () => paymentService.getCashSessions({ status: "OPEN", size: 100 }),
-  });
-  const openSessions = openSessionsData?.content || [];
 
   const closeFromBilling = () => {
     setIsFromBillingOpen(false);
@@ -184,32 +183,53 @@ export const PaymentIntentsList: React.FC = () => {
     else fromBillingsMutation.mutate(docs);
   };
 
+  const selectedList = Object.values(selected);
+  const selectedNumbers = selectedList.map((d) => d.documentNumber);
+  const selectedCurrency = selectedList[0]?.currency || "XAF";
+  const selectedTotal = selectedList.reduce((sum, d) => sum + (d.balanceDue || d.totalAmount || 0), 0);
+
+  const createDebtIntent = () =>
+    paymentService.createPaymentIntentFromBillings({
+      documentNumbers: selectedNumbers,
+      idempotencyKey: `multi-pay-${selectedNumbers.join("-")}-${Date.now()}`,
+    });
+
   const paySelectedDocumentsMutation = useMutation({
     mutationFn: async () => {
-      const intent = await paymentService.createPaymentIntentFromBillings({
-        documentNumbers: selectedDocuments,
-        idempotencyKey: `multi-pay-${Date.now()}`,
-      });
+      const intent = await createDebtIntent();
       if (debtPayMethod === "CASH") {
         return paymentService.payCash(intent.intentNumber, {
-          receivedBy: admin?.email || "admin",
-          cashSessionNumber: debtCashSession || undefined,
+          cashSessionNumber: debtCashSession,
+          tenderedAmount: debtTendered > 0 ? debtTendered : undefined,
         });
       }
-      return paymentService.payWallet(intent.intentNumber, {
-        walletNumber: debtWalletNumber,
-        createdBy: admin?.email || "admin",
-      });
+      return paymentService.payWallet(intent.intentNumber, { walletNumber: debtWalletNumber.trim() });
     },
     onSuccess: (data) => {
       setDebtError(null);
-      setSelectedDocuments([]);
+      setSelected({});
+      setDebtTendered(0);
       queryClient.invalidateQueries({ queryKey: ["payable-documents"] });
       queryClient.invalidateQueries({ queryKey: ["payment-intents"] });
-      toast.success("Paiement enregistré");
+      queryClient.invalidateQueries({ queryKey: ["cash-sessions-open-select"] });
+      toast.success(
+        data.changeAmount && data.changeAmount > 0
+          ? `Paiement enregistré. Monnaie à rendre : ${formatMoney(data.changeAmount, currencyLabel(selectedCurrency))}`
+          : "Paiement enregistré",
+      );
       setReceiptTxn(data.transactionNumber);
     },
     onError: (e: unknown) => setDebtError(apiMessage(e, "Erreur lors du paiement multiple.")),
+  });
+
+  // Choisir un autre moyen (chèque, virement, mobile money…) : on crée l'intention puis on ouvre sa fiche.
+  const openIntentMutation = useMutation({
+    mutationFn: createDebtIntent,
+    onSuccess: (intent) => {
+      queryClient.invalidateQueries({ queryKey: ["payment-intents"] });
+      navigate(`/payments/${intent.intentNumber}`);
+    },
+    onError: (e: unknown) => setDebtError(apiMessage(e, "Impossible de créer l'intention.")),
   });
 
   const downloadReceipt = async (transactionNumber: string) => {
@@ -223,37 +243,50 @@ export const PaymentIntentsList: React.FC = () => {
     }
   };
 
-  // Un paiement multi-documents ne porte que sur une devise : on la déduit de la première ligne choisie.
-  const docs: PayableDocument[] = payableDocuments || [];
-  const selectedCurrency = docs.find((d) => selectedDocuments.includes(d.documentNumber))?.currency || "XAF";
-  const selectedTotal = docs
-    .filter((d) => selectedDocuments.includes(d.documentNumber))
-    .reduce((sum, d) => sum + (d.balanceDue || d.totalAmount || 0), 0);
+  // Un paiement multi-documents ne porte que sur une devise : celle du premier document coché.
+  const docs: PayableDocument[] = payableDocuments?.content || [];
 
-  const toggleDocument = (docNumber: string, docCurrency?: string) => {
-    setSelectedDocuments((prev) => {
-      if (prev.includes(docNumber)) return prev.filter((d) => d !== docNumber);
-      if (prev.length > 0 && docCurrency && docCurrency !== selectedCurrency) {
+  const toggleDocument = (doc: PayableDocument) => {
+    setSelected((prev) => {
+      if (prev[doc.documentNumber]) {
+        const { [doc.documentNumber]: _removed, ...rest } = prev;
+        return rest;
+      }
+      const first = Object.values(prev)[0];
+      if (first && doc.currency && first.currency && doc.currency !== first.currency) {
         setDebtError(
-          `Une seule devise à la fois (${currencyLabel(selectedCurrency)}). Décochez d'abord ces documents pour choisir des documents en ${currencyLabel(docCurrency)}.`,
+          `Une seule devise à la fois (${currencyLabel(first.currency)}). Décochez d'abord ces documents pour choisir des documents en ${currencyLabel(doc.currency)}.`,
         );
         return prev;
       }
       setDebtError(null);
-      return [...prev, docNumber];
+      return { ...prev, [doc.documentNumber]: doc };
     });
   };
 
+  const pageAllSelected = docs.length > 0 && docs.every((d) => selected[d.documentNumber]);
   const selectAll = () => {
-    const firstCurrency = docs[0]?.currency;
-    const same = docs.filter((d) => !firstCurrency || d.currency === firstCurrency).map((d) => d.documentNumber);
-    setSelectedDocuments(selectedDocuments.length === same.length ? [] : same);
+    setSelected((prev) => {
+      if (pageAllSelected) {
+        const next = { ...prev };
+        docs.forEach((d) => delete next[d.documentNumber]);
+        return next;
+      }
+      const currency = Object.values(prev)[0]?.currency ?? docs[0]?.currency;
+      const next = { ...prev };
+      docs.filter((d) => !currency || d.currency === currency).forEach((d) => {
+        next[d.documentNumber] = d;
+      });
+      return next;
+    });
   };
 
   const intents: PaymentIntent[] = intentsData?.content || [];
   const totalPages = intentsData?.totalPages ?? Math.ceil((intentsData?.totalElements || 0) / PAGE_SIZE);
+  const cashCalc = debtTendered > 0 ? computeChange(selectedTotal, debtTendered) : null;
   const canPay =
-    selectedDocuments.length > 0 && (debtPayMethod === "CASH" || debtWalletNumber.trim().length > 0);
+    selectedNumbers.length > 0 &&
+    (debtPayMethod === "CASH" ? !!debtCashSession : debtWalletNumber.trim().length > 0);
 
   return (
     <div className="space-y-5">
@@ -261,6 +294,7 @@ export const PaymentIntentsList: React.FC = () => {
         title="Intentions de paiement"
         subtitle="Toutes les demandes d'encaissement, leur statut et leur règlement."
         action={
+          canProcess ? (
           <div className="flex flex-col gap-2 sm:flex-row">
             <ActionButton icon={Plus} onClick={() => navigate("/payments/create")}>
               Nouveau paiement
@@ -284,12 +318,14 @@ export const PaymentIntentsList: React.FC = () => {
                 setIsFromBillingOpen(false);
                 setIsDebtsOpen(true);
                 setDebtError(null);
-                setSelectedDocuments([]);
+                setSelected({});
+                setDebtPage(0);
               }}
             >
               Dettes client
             </ActionButton>
           </div>
+          ) : undefined
         }
       />
 
@@ -338,7 +374,8 @@ export const PaymentIntentsList: React.FC = () => {
                 value={debtCustomerType}
                 onChange={(e) => {
                   setDebtCustomerType(e.target.value);
-                  setSelectedDocuments([]);
+                  setSelected({});
+                  setDebtPage(0);
                 }}
                 className={FIELD_SOFT}
               >
@@ -354,7 +391,8 @@ export const PaymentIntentsList: React.FC = () => {
                 value={debtCustomerCode}
                 onChange={(e) => {
                   setDebtCustomerCode(e.target.value);
-                  setSelectedDocuments([]);
+                  setSelected({});
+                  setDebtPage(0);
                 }}
                 placeholder="MBR-0001"
                 className={`${FIELD_SOFT} font-mono`}
@@ -363,7 +401,10 @@ export const PaymentIntentsList: React.FC = () => {
             <Field label="Recherche">
               <input
                 value={debtSearchText}
-                onChange={(e) => setDebtSearchText(e.target.value)}
+                onChange={(e) => {
+                  setDebtSearchText(e.target.value);
+                  setDebtPage(0);
+                }}
                 placeholder="Nom, source…"
                 className={FIELD_SOFT}
               />
@@ -388,11 +429,11 @@ export const PaymentIntentsList: React.FC = () => {
                   onClick={selectAll}
                   className={`mb-2 rounded-full px-3 py-1.5 text-xs font-semibold text-[color:var(--logo-pink-dark)] hover:bg-[color:color-mix(in_srgb,var(--logo-pink)_12%,white)] ${FOCUS}`}
                 >
-                  {selectedDocuments.length === docs.length ? "Tout décocher" : "Tout cocher"}
+                  {pageAllSelected ? "Tout décocher sur cette page" : "Tout cocher sur cette page"}
                 </button>
                 <ul className="space-y-2">
                   {docs.map((d) => {
-                    const on = selectedDocuments.includes(d.documentNumber);
+                    const on = !!selected[d.documentNumber];
                     return (
                       <li key={d.documentNumber}>
                         <label
@@ -403,7 +444,7 @@ export const PaymentIntentsList: React.FC = () => {
                           <input
                             type="checkbox"
                             checked={on}
-                            onChange={() => toggleDocument(d.documentNumber, d.currency)}
+                            onChange={() => toggleDocument(d)}
                             className="h-4 w-4 shrink-0 rounded accent-[color:var(--logo-pink-dark)]"
                           />
                           <span className="min-w-0 flex-1">
@@ -426,16 +467,25 @@ export const PaymentIntentsList: React.FC = () => {
                     );
                   })}
                 </ul>
+                <div className="mt-3">
+                  <Pagination
+                    page={debtPage}
+                    totalPages={payableDocuments?.totalPages || 1}
+                    total={payableDocuments?.totalElements ?? docs.length}
+                    noun="document"
+                    onChange={setDebtPage}
+                  />
+                </div>
               </>
             )}
           </div>
 
-          {selectedDocuments.length > 0 && (
+          {selectedNumbers.length > 0 && (
             <div className="mt-5 rounded-2xl bg-gray-50 p-4">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                   <p className="text-sm text-gray-500">
-                    {selectedDocuments.length} document{selectedDocuments.length > 1 ? "s" : ""} à régler
+                    {selectedNumbers.length} document{selectedNumbers.length > 1 ? "s" : ""} à régler
                   </p>
                   <p className="text-2xl font-bold tracking-tight text-gray-950">
                     {formatMoney(selectedTotal, currencyLabel(selectedCurrency))}
@@ -464,19 +514,19 @@ export const PaymentIntentsList: React.FC = () => {
                     ))}
                   </div>
                   {debtPayMethod === "CASH" ? (
-                    <select
-                      value={debtCashSession}
-                      onChange={(e) => setDebtCashSession(e.target.value)}
-                      className={`${FIELD_SOFT} bg-white shadow-sm sm:w-56`}
-                      aria-label="Session de caisse"
-                    >
-                      <option value="">Sans session de caisse</option>
-                      {openSessions.map((s) => (
-                        <option key={s.sessionNumber} value={s.sessionNumber}>
-                          {s.sessionNumber} · {s.registerCode}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <CashSessionSelect value={debtCashSession} onChange={setDebtCashSession} required label="Session de caisse" />
+                      <Field label="Montant remis" hint={cashCalc ? (cashCalc.invalid || cashCalc.remainingAfter > 0 ? "Inférieur au total : le paiement sera refusé ou partiel" : `À rendre : ${formatMoney(cashCalc.change, currencyLabel(selectedCurrency))}`) : "Facultatif"}>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={debtTendered === 0 ? "" : debtTendered}
+                          onChange={(e) => setDebtTendered(parseDigits(e.target.value))}
+                          placeholder={String(selectedTotal)}
+                          className={`${FIELD_SOFT} bg-white tabular-nums shadow-sm`}
+                        />
+                      </Field>
+                    </div>
                   ) : (
                     <input
                       value={debtWalletNumber}
@@ -493,6 +543,13 @@ export const PaymentIntentsList: React.FC = () => {
                     onClick={() => paySelectedDocumentsMutation.mutate()}
                   >
                     Payer la sélection
+                  </ActionButton>
+                  <ActionButton
+                    variant="ghost"
+                    pending={openIntentMutation.isPending}
+                    onClick={() => openIntentMutation.mutate()}
+                  >
+                    Autre moyen…
                   </ActionButton>
                 </div>
               </div>
@@ -566,7 +623,12 @@ export const PaymentIntentsList: React.FC = () => {
                       {intent.customerEmail ? ` · ${intent.customerEmail}` : ""}
                     </p>
                   </div>
-                  <p className="text-sm font-bold tabular-nums text-gray-950">{formatMoney(intent.amount, currencyLabel(intent.currency))}</p>
+                  <div>
+                    <p className="text-sm font-bold tabular-nums text-gray-950">{formatMoney(intent.amount, currencyLabel(intent.currency))}</p>
+                    {(intent.paidAmount ?? 0) > 0 && intent.status !== "SUCCEEDED" && (
+                      <p className="text-xs text-emerald-700">dont {formatMoney(intent.paidAmount, currencyLabel(intent.currency))} payé</p>
+                    )}
+                  </div>
                   <p className="min-w-0 truncate text-sm text-gray-600 max-lg:hidden">
                     {intent.resolvedSourceLabel || intent.sourceCode || intent.sourceType}
                   </p>

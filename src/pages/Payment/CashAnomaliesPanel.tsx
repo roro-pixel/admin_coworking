@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowUpRight, CheckCheck, Eye, ScanSearch, ShieldOff } from "lucide-react";
 import { paymentService } from "../../services/payment.service";
-import type { CashAnomalyFlag, CashAnomalyReviewStatus } from "../../services/payment.service";
+import type { CashAnomalyFlag, CashAnomalyStatus } from "../../services/payment.service";
 import { useAuth } from "../../contexts/AuthContext";
 import {
   ActionButton,
@@ -19,81 +19,88 @@ import {
   Section,
   StatusChip,
 } from "../../components/subscription/kit";
-import { FIELD, FIELD_SOFT, formatDateTime } from "../../components/subscription/kitUtils";
+import { FIELD, FIELD_SOFT, apiMessage, formatDateTime } from "../../components/subscription/kitUtils";
 import { statusOf } from "../../components/subscription/labels";
 import { Dots } from "../../components/ui/Toaster";
 import { toast } from "../../components/ui/toastStore";
 import { ListSkeleton } from "../../components/ui/Skeleton";
-import { ANOMALY_REVIEW, SEVERITY, humanize } from "../../components/payment/paymentLabels";
+import { ANOMALY_STATUS, ANOMALY_TYPE_LABEL, SEVERITY, anomalyTypeLabel } from "../../components/payment/paymentLabels";
 
 const PAGE_SIZE = 20;
 const COLS = "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_6rem_minmax(0,2fr)_8rem_10rem]";
 
 export const CashAnomaliesPanel: React.FC = () => {
-  const { admin } = useAuth();
+  const { hasPermission } = useAuth();
+  // Analyse et revue : CASH_VARIANCE:DECIDE. La lecture reste sous CASH:READ.
+  const canDecide = hasPermission("CASH_VARIANCE:DECIDE");
   const queryClient = useQueryClient();
 
   const [page, setPage] = useState(0);
   const [sessionNumber, setSessionNumber] = useState("");
   const [registerCode, setRegisterCode] = useState("");
   const [severity, setSeverity] = useState("");
-  const [reviewStatus, setReviewStatus] = useState("");
+  const [status, setStatus] = useState("");
+  const [anomalyType, setAnomalyType] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [analyzeSession, setAnalyzeSession] = useState("");
   const [reviewNote, setReviewNote] = useState("");
   const [reviewing, setReviewing] = useState<string | null>(null);
 
   const { data, isLoading, isFetching, isError, refetch } = useQuery({
-    queryKey: ["cash-anomalies", page, sessionNumber, registerCode, severity, reviewStatus],
+    queryKey: ["cash-anomalies", page, sessionNumber, registerCode, severity, status, anomalyType],
     queryFn: () =>
       paymentService.getCashAnomalies({
         sessionNumber: sessionNumber || undefined,
         registerCode: registerCode || undefined,
         severity: severity || undefined,
-        reviewStatus: reviewStatus || undefined,
+        status: status || undefined,
+        anomalyType: anomalyType || undefined,
         page,
         size: PAGE_SIZE,
-        sort: "createdAt,desc",
       }),
   });
   const anomalies: CashAnomalyFlag[] = data?.content || [];
 
   const analyzeMutation = useMutation({
     mutationFn: () => paymentService.analyzeCashSession(analyzeSession),
-    onSuccess: () => {
+    onSuccess: (flags) => {
       queryClient.invalidateQueries({ queryKey: ["cash-anomalies"] });
-      toast.success("Analyse terminée");
+      toast.success(
+        flags.length === 0
+          ? "Analyse terminée : aucune anomalie détectée"
+          : `Analyse terminée : ${flags.length} anomalie${flags.length > 1 ? "s" : ""}`,
+      );
     },
-    onError: () => toast.error("Analyse de la session impossible"),
+    onError: (e: unknown) => toast.error(apiMessage(e, "Analyse de la session impossible")),
   });
 
   const reviewMutation = useMutation({
-    mutationFn: ({ flag, status }: { flag: CashAnomalyFlag; status: CashAnomalyReviewStatus }) =>
+    mutationFn: ({ flag, status }: { flag: CashAnomalyFlag; status: CashAnomalyStatus }) =>
       paymentService.reviewCashAnomaly(flag.flagNumber, {
-        reviewedBy: admin?.email || "admin",
         status,
-        note: reviewNote || undefined,
+        note: reviewNote.trim() || undefined,
       }),
     onSuccess: () => {
       setReviewNote("");
       queryClient.invalidateQueries({ queryKey: ["cash-anomalies"] });
       toast.success("Revue enregistrée");
     },
-    onError: () => toast.error("Revue impossible"),
+    onError: (e: unknown) => toast.error(apiMessage(e, "Revue impossible")),
     onSettled: () => setReviewing(null),
   });
 
-  const review = (flag: CashAnomalyFlag, status: CashAnomalyReviewStatus) => {
+  const review = (flag: CashAnomalyFlag, status: CashAnomalyStatus) => {
     setReviewing(`${flag.flagNumber}:${status}`);
     reviewMutation.mutate({ flag, status });
   };
 
-  const hasFilters = !!(sessionNumber || registerCode || severity || reviewStatus);
+  const hasFilters = !!(sessionNumber || registerCode || severity || status || anomalyType);
 
   return (
     <div className="space-y-5">
       <ListHeader title="Anomalies de caisse" subtitle="Analyse des sessions, suivi et revue des écarts suspects." />
 
+      {canDecide && (
       <Section title="Analyser une session" description="Lance la détection d'anomalies sur une session." icon={ScanSearch}>
         <form
           onSubmit={(e) => {
@@ -110,6 +117,7 @@ export const CashAnomaliesPanel: React.FC = () => {
           </ActionButton>
         </form>
       </Section>
+      )}
 
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">
@@ -126,7 +134,8 @@ export const CashAnomaliesPanel: React.FC = () => {
               setSessionNumber("");
               setRegisterCode("");
               setSeverity("");
-              setReviewStatus("");
+              setStatus("");
+              setAnomalyType("");
               setPage(0);
             }}
           >
@@ -171,23 +180,41 @@ export const CashAnomaliesPanel: React.FC = () => {
             </Field>
             <Field label="Statut de la revue">
               <select
-                value={reviewStatus}
+                value={status}
                 onChange={(e) => {
-                  setReviewStatus(e.target.value);
+                  setStatus(e.target.value);
                   setPage(0);
                 }}
                 className={FIELD_SOFT}
               >
                 <option value="">Tous</option>
-                {Object.entries(ANOMALY_REVIEW).map(([k, v]) => (
+                {Object.entries(ANOMALY_STATUS).map(([k, v]) => (
                   <option key={k} value={k}>
                     {v.label}
                   </option>
                 ))}
               </select>
             </Field>
+            <Field label="Type d'anomalie">
+              <select
+                value={anomalyType}
+                onChange={(e) => {
+                  setAnomalyType(e.target.value);
+                  setPage(0);
+                }}
+                className={FIELD_SOFT}
+              >
+                <option value="">Tous</option>
+                {Object.entries(ANOMALY_TYPE_LABEL).map(([k, label]) => (
+                  <option key={k} value={k}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </Field>
           </FilterPanel>
         )}
+        {canDecide && (
         <Field label="Note de revue" hint="Facultative. Elle est jointe à la prochaine action de revue.">
           <input
             value={reviewNote}
@@ -196,6 +223,7 @@ export const CashAnomaliesPanel: React.FC = () => {
             className={`${FIELD_SOFT} bg-white shadow-sm`}
           />
         </Field>
+        )}
       </div>
 
       {isLoading ? (
@@ -217,12 +245,12 @@ export const CashAnomaliesPanel: React.FC = () => {
           <DataCard>
             {anomalies.map((a) => {
               const sev = statusOf(SEVERITY, a.severity);
-              const rev = statusOf(ANOMALY_REVIEW, a.reviewStatus || "PENDING");
-              const current = a.reviewStatus || "PENDING";
-              const actions: { status: CashAnomalyReviewStatus; label: string; icon: React.ElementType; tone: "pink" | "success" | "neutral" | "danger" }[] = [
+              const rev = statusOf(ANOMALY_STATUS, a.status || "OPEN");
+              const current = a.status || "OPEN";
+              const actions: { status: CashAnomalyStatus; label: string; icon: React.ElementType; tone: "pink" | "success" | "neutral" | "danger" }[] = [
                 { status: "ACKNOWLEDGED", label: "Prendre en compte", icon: Eye, tone: "pink" },
                 { status: "RESOLVED", label: "Marquer comme résolue", icon: CheckCheck, tone: "success" },
-                { status: "FALSE_POSITIVE", label: "Faux positif", icon: ShieldOff, tone: "neutral" },
+                { status: "DISMISSED", label: "Écarter (faux positif)", icon: ShieldOff, tone: "neutral" },
                 { status: "ESCALATED", label: "Escalader", icon: ArrowUpRight, tone: "danger" },
               ];
               return (
@@ -232,10 +260,10 @@ export const CashAnomaliesPanel: React.FC = () => {
                 >
                   <div className="min-w-0">
                     <p className="truncate font-mono text-xs font-semibold text-[color:var(--logo-pink-dark)]">{a.flagNumber}</p>
-                    <p className="text-xs text-gray-400">{formatDateTime(a.createdAt)}</p>
+                    <p className="text-xs text-gray-400">{formatDateTime(a.detectedAt)}</p>
                   </div>
                   <div className="flex items-center justify-end gap-0.5 lg:order-last">
-                    {actions.map((act) => (
+                    {canDecide && actions.map((act) => (
                       <IconButton
                         key={act.status}
                         icon={act.icon}
@@ -252,8 +280,15 @@ export const CashAnomaliesPanel: React.FC = () => {
                     <StatusChip tone={sev.tone}>{sev.label}</StatusChip>
                   </div>
                   <div className="col-span-2 min-w-0 lg:col-span-1">
-                    <p className="truncate text-sm font-semibold text-gray-900">{humanize(a.anomalyType)}</p>
+                    <p className="truncate text-sm font-semibold text-gray-900">{anomalyTypeLabel(a.anomalyType)}</p>
                     {a.description && <p className="line-clamp-2 text-xs text-gray-500">{a.description}</p>}
+                    {a.movementNumber && <p className="truncate font-mono text-[11px] text-gray-400">Mouvement {a.movementNumber}</p>}
+                    {a.reviewedBy && (
+                      <p className="truncate text-[11px] text-gray-400">
+                        Revue par {a.reviewedBy}
+                        {a.reviewNote ? ` : ${a.reviewNote}` : ""}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <StatusChip tone={rev.tone}>{rev.label}</StatusChip>

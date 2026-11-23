@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { KeyRound, ShieldCheck } from "lucide-react";
 import { walletService } from "../../../services/wallet.service";
 import { walletControlService } from "../../../services/walletControl.service";
+import { useAuth } from "../../../contexts/AuthContext";
 import { ActionButton, ErrorBlock, Section, StatusChip } from "../../subscription/kit";
 import { formatMoney } from "../../subscription/kitUtils";
 import { Skeleton } from "../../ui/Skeleton";
@@ -20,8 +21,11 @@ const Stat: React.FC<{ label: string; value: React.ReactNode }> = ({ label, valu
 /** Sécurité d'un portefeuille : intégrité du ledger, plafonds appliqués et réinitialisation du code secret. */
 export const WalletSecurityPanel: React.FC<{ walletNumber: string }> = ({ walletNumber }) => {
   const qc = useQueryClient();
-  const integrity = useQuery({ queryKey: ["wallet-integrity", walletNumber], queryFn: () => walletService.getIntegrity(walletNumber) });
-  const limits = useQuery({ queryKey: ["wallet-limits", walletNumber], queryFn: () => walletService.getLimits(walletNumber) });
+  const { isAdmin, hasPermission } = useAuth();
+  // Plafonds et intégrité : rôle ADMIN ou SUPER_ADMIN en plus du droit PAYMENT:READ.
+  const allowed = isAdmin() && hasPermission("PAYMENT:READ");
+  const integrity = useQuery({ queryKey: ["wallet-integrity", walletNumber], queryFn: () => walletService.getIntegrity(walletNumber), enabled: allowed });
+  const limits = useQuery({ queryKey: ["wallet-limits", walletNumber], queryFn: () => walletService.getLimits(walletNumber), enabled: allowed });
 
   const resetMutation = useMutation({
     mutationFn: () => walletControlService.createAction(walletNumber, { type: "RESET_PIN", reason: "Réinitialisation du code secret demandée par l'administration" }),
@@ -42,6 +46,10 @@ export const WalletSecurityPanel: React.FC<{ walletNumber: string }> = ({ wallet
   const intact = !!i && i.brokenLinks.length === 0 && i.balanceDrift === 0;
   const l = limits.data;
   const cur = currencyLabel(l?.currency ?? "XAF");
+
+  if (!allowed) {
+    return <p className="rounded-2xl bg-gray-50 p-5 text-sm text-gray-600">L'intégrité et les plafonds sont réservés aux administrateurs.</p>;
+  }
 
   return (
     <div className="space-y-5">
@@ -87,10 +95,10 @@ export const WalletSecurityPanel: React.FC<{ walletNumber: string }> = ({ wallet
               <div className="mb-1.5 flex items-baseline justify-between gap-3 text-sm">
                 <span className="font-semibold text-gray-700">Opérations du jour</span>
                 <span className="tabular-nums text-gray-500">
-                  {l.dailyOperationsUsed} sur {l.maxDailyOperations}
+                  {String(l.dailyOperationsUsed)} sur {l.maxDailyOperations}
                 </span>
               </div>
-              <RatioBar value={l.dailyOperationsUsed} total={Math.max(l.maxDailyOperations, 1)} />
+              <RatioBar value={Number(l.dailyOperationsUsed)} total={Math.max(l.maxDailyOperations, 1)} />
             </div>
             <div className="grid grid-cols-2 gap-4 pt-1">
               <Stat label="Plafond par transfert" value={formatMoney(l.maxSingleTransfer, cur)} />

@@ -36,7 +36,7 @@ export const WalletLookupPanel: React.FC = () => {
 
   const { data: existingWallets, isFetching: isSearching } = useQuery({
     queryKey: ["wallet-owner-search", ownerType, debouncedCode, currency],
-    queryFn: () => walletService.getWallets({ ownerType, ownerCode: debouncedCode, currency, size: 5 }),
+    queryFn: () => walletService.getWallets({ ownerType, ownerCode: debouncedCode, currency, size: 50 }),
     enabled: !!debouncedCode,
   });
 

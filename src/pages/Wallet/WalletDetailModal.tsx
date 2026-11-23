@@ -36,7 +36,8 @@ const buildDefaultHoldForm = () => {
 export const WalletDetailModal: React.FC = () => {
   const { walletNumber } = useParams<{ walletNumber: string }>();
   const navigate = useNavigate();
-  const { admin } = useAuth();
+  const { hasPermission } = useAuth();
+  const canProcess = hasPermission("PAYMENT:PROCESS");
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<Tab>("ledger");
@@ -81,10 +82,9 @@ export const WalletDetailModal: React.FC = () => {
       walletService.createHold({
         walletNumber: walletNumber!,
         amount: holdForm.amount,
-        sourceType: holdForm.sourceType,
-        sourceCode: holdForm.sourceCode,
-        expiresAt: new Date(holdForm.expiresAt).toISOString(),
-        createdBy: admin?.email || "admin",
+        sourceType: holdForm.sourceCode ? holdForm.sourceType : undefined,
+        sourceCode: holdForm.sourceCode || undefined,
+        expiresAt: holdForm.expiresAt ? new Date(holdForm.expiresAt).toISOString() : undefined,
       }),
     onSuccess: () => {
       invalidate();
@@ -96,7 +96,6 @@ export const WalletDetailModal: React.FC = () => {
     onError: (e: unknown) => setHoldError(apiMessage(e, "Erreur lors de la création de la réservation.")),
   });
 
-  const createdBy = admin?.email || "admin";
   const confirmCapture = (hold: WalletHold, cur: string) =>
     toast.confirm({
       message: `Capturer ${hold.holdNumber} ?`,
@@ -106,7 +105,7 @@ export const WalletDetailModal: React.FC = () => {
       successMessage: "Réservation capturée.",
       errorMessage: "Erreur lors de la capture de la réservation.",
       onConfirm: async () => {
-        await walletService.captureHold(hold.holdNumber, createdBy);
+        await walletService.captureHold(hold.holdNumber);
         invalidate();
       },
     });
@@ -119,7 +118,7 @@ export const WalletDetailModal: React.FC = () => {
       successMessage: "Réservation libérée.",
       errorMessage: "Erreur lors de la libération de la réservation.",
       onConfirm: async () => {
-        await walletService.releaseHold(hold.holdNumber, createdBy);
+        await walletService.releaseHold(hold.holdNumber);
         invalidate();
       },
     });
@@ -175,7 +174,7 @@ export const WalletDetailModal: React.FC = () => {
     <div className="space-y-5">
       <PageHeader
         title={wallet.walletNumber}
-        subtitle={`${OWNER_TYPE_LABEL[wallet.ownerType] ?? wallet.ownerType} · ${wallet.ownerCode}`}
+        subtitle={`${OWNER_TYPE_LABEL[wallet.ownerType] ?? wallet.ownerType} · ${wallet.ownerName ? `${wallet.ownerName} (${wallet.ownerCode})` : wallet.ownerCode}`}
         onBack={() => navigate("/wallets")}
         backLabel="Retour aux portefeuilles"
         badge={<StatusChip tone={WALLET_STATUS_TONE[wallet.status] ?? "neutral"}>{WALLET_STATUS_LABEL[wallet.status] ?? wallet.status}</StatusChip>}
@@ -243,7 +242,7 @@ export const WalletDetailModal: React.FC = () => {
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-gray-900">{ENTRY_TYPE_LABEL[e.entryType] ?? e.entryType}</p>
                           <p className="text-xs text-gray-500">
-                            {e.sourceCode && <span className="font-mono">{e.sourceCode} · </span>}
+                            {e.sourceLabel ? `${e.sourceLabel} · ` : e.sourceCode ? <span className="font-mono">{e.sourceCode} · </span> : null}
                             {formatDateTime(e.createdAt)}
                           </p>
                           {e.reference && <p className="text-xs text-gray-400">Réf. {e.reference}</p>}
@@ -270,9 +269,11 @@ export const WalletDetailModal: React.FC = () => {
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-gray-500">Réservations de fonds sur ce portefeuille</p>
-            <ActionButton icon={Plus} onClick={() => setIsCreateHoldOpen(!isCreateHoldOpen)}>
-              Nouvelle réservation
-            </ActionButton>
+            {canProcess && (
+              <ActionButton icon={Plus} onClick={() => setIsCreateHoldOpen(!isCreateHoldOpen)}>
+                Nouvelle réservation
+              </ActionButton>
+            )}
           </div>
 
           {isCreateHoldOpen && (
@@ -284,7 +285,7 @@ export const WalletDetailModal: React.FC = () => {
               onCancel={() => setIsCreateHoldOpen(false)}
               onSubmit={(e) => {
                 e.preventDefault();
-                if (holdForm.amount <= 0 || !holdForm.sourceCode) return setHoldError("Le montant et le code source sont obligatoires.");
+                if (holdForm.amount <= 0) return setHoldError("Le montant doit être supérieur à 0.");
                 if (holdForm.amount > available) return setHoldError(`Montant supérieur au solde disponible (${formatMoney(available, cur)}).`);
                 setHoldError(null);
                 createHoldMutation.mutate();
@@ -312,10 +313,10 @@ export const WalletDetailModal: React.FC = () => {
                     <option value="OTHER">Autre</option>
                   </select>
                 </Field>
-                <Field label="Code source" required>
+                <Field label="Code source" hint="Facultatif">
                   <input value={holdForm.sourceCode} onChange={(e) => setHoldForm({ ...holdForm, sourceCode: e.target.value })} placeholder="BKG-000001" className={`${FIELD_SOFT} font-mono`} />
                 </Field>
-                <Field label="Expiration" required>
+                <Field label="Expiration" hint="Facultatif : sans date, la réservation reste active jusqu'à capture ou libération">
                   <input type="datetime-local" value={holdForm.expiresAt} onChange={(e) => setHoldForm({ ...holdForm, expiresAt: e.target.value })} className={FIELD_SOFT} />
                 </Field>
               </div>
@@ -330,26 +331,28 @@ export const WalletDetailModal: React.FC = () => {
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
               {holds.map((hold) => {
                 const isActive = hold.status === "ACTIVE";
-                const isExpired = new Date(hold.expiresAt) < new Date();
+                const isExpired = !!hold.expiresAt && new Date(hold.expiresAt) < new Date();
                 return (
                   <ItemRow key={hold.holdNumber} className={!isActive ? "opacity-70" : ""}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate font-mono text-sm font-semibold text-gray-900">{hold.holdNumber}</p>
                         <p className="mt-0.5 text-xs text-gray-500">
-                          {hold.sourceType} · {hold.sourceCode}
+                          {hold.sourceLabel || [hold.sourceType, hold.sourceCode].filter(Boolean).join(" · ") || "Sans source"}
                         </p>
-                        <p className={`mt-0.5 text-xs ${isExpired && isActive ? "font-semibold text-red-600" : "text-gray-400"}`}>
-                          Expire le {formatDateTime(hold.expiresAt)}
-                          {isExpired && isActive && " (dépassé)"}
-                        </p>
+                        {hold.expiresAt && (
+                          <p className={`mt-0.5 text-xs ${isExpired && isActive ? "font-semibold text-red-600" : "text-gray-400"}`}>
+                            Expire le {formatDateTime(hold.expiresAt)}
+                            {isExpired && isActive && " (dépassé)"}
+                          </p>
+                        )}
                       </div>
                       <div className="flex flex-col items-end gap-2">
                         <p className="text-base font-bold tabular-nums text-[color:var(--logo-pink-dark)]">{formatMoney(hold.amount, cur)}</p>
                         <StatusChip tone={HOLD_STATUS_TONE[hold.status] ?? "neutral"}>{HOLD_STATUS_LABEL[hold.status] ?? hold.status}</StatusChip>
                       </div>
                     </div>
-                    {isActive && (
+                    {isActive && canProcess && (
                       <div className="mt-4 flex flex-wrap gap-2">
                         <ActionButton icon={CheckCircle} className="!px-4 !py-2" onClick={() => confirmCapture(hold, cur)}>
                           Capturer

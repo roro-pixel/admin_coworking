@@ -1,8 +1,10 @@
 import { apiClient } from "./api";
 import { API } from "./pagination";
 
-// Paramètres de la plateforme (ADMIN, SUPER_ADMIN, droit SYSTEM:SETTINGS).
-// Le serveur filtre les domaines (27 pour SUPER_ADMIN, 13 pour ADMIN) ; valeurs échangées en texte.
+// Paramètres de la plateforme (administration)
+// Rôles ADMIN et SUPER_ADMIN + droit SYSTEM:SETTINGS. Le serveur filtre les
+// domaines : 27 pour SUPER_ADMIN, 13 pour ADMIN. Toutes les valeurs voyagent
+// sous forme de texte.
 
 export type SettingType =
   | "TEXT"
@@ -59,9 +61,29 @@ export const platformSettingsService = {
     return Array.isArray(data) ? data : (data?.data ?? []);
   },
 
-  async getSettings(domain?: string): Promise<SettingView[]> {
-    const { data } = await apiClient.get(BASE, { params: domain ? { domain } : undefined });
+  async getSettings(domain?: string, q?: string): Promise<SettingView[]> {
+    const params: Record<string, string> = {};
+    if (domain) params.domain = domain;
+    if (q) params.q = q;
+    const { data } = await apiClient.get(BASE, { params: Object.keys(params).length ? params : undefined });
     return Array.isArray(data) ? data : (data?.data ?? []);
+  },
+
+  /** Un seul réglage, avec son domaine (404 : clé inconnue ; 403 : domaine réservé au super administrateur). */
+  async getSetting(settingKey: string): Promise<SettingView> {
+    try {
+      const { data } = await apiClient.get(`${BASE}/${key(settingKey)}`);
+      return data?.data ?? data;
+    } catch (error) {
+      // Repli : la route de liste filtrée (?q=) renvoie le même réglage, avec son domaine.
+      try {
+        const found = (await platformSettingsService.getSettings(undefined, settingKey)).find((x) => x.key === settingKey);
+        if (found) return found;
+      } catch {
+        /* on garde l'erreur d'origine */
+      }
+      throw error;
+    }
   },
 
   async update(settingKey: string, value: string, reason?: string): Promise<SettingView> {

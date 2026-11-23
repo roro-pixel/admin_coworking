@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { BarChart3 } from "lucide-react";
 import { paymentService } from "../../services/payment.service";
-import type { CashRegisterStatistics } from "../../services/payment.service";
+import type { CashRegisterMetrics } from "../../services/payment.service";
 import { DataCard, EmptyState, ErrorBlock, Field, HeadRow, ListHeader } from "../../components/subscription/kit";
 import { FIELD_SOFT, formatMoney } from "../../components/subscription/kitUtils";
 import { ListSkeleton } from "../../components/ui/Skeleton";
@@ -18,8 +18,9 @@ import {
 import { CHART_COLORS } from "../../components/operations/opsChartData";
 import type { Slice } from "../../components/operations/opsChartData";
 import { LOGO_PINK } from "../../components/layout/adminTheme";
+import { endOfDayIso, startOfDayIso } from "../../components/payment/paymentUtils";
 
-const COLS = "lg:grid-cols-[minmax(0,1.6fr)_6rem_7rem_8rem_9rem_8rem]";
+const COLS = "lg:grid-cols-[minmax(0,1.5fr)_7rem_6rem_8rem_8rem_7rem_8rem]";
 const GREEN = CHART_COLORS[2];
 const RED = "#D9534F";
 
@@ -37,7 +38,11 @@ export const CashMetricsDashboard: React.FC = () => {
   const [toDate, setToDate] = useState("");
   const [registerCode, setRegisterCode] = useState("");
 
-  const params = { fromDate: fromDate || undefined, toDate: toDate || undefined };
+  // fromDate et toDate sont des instants ISO 8601 côté API : on envoie le début et la fin de journée locale.
+  const params = {
+    fromDate: fromDate ? startOfDayIso(fromDate) : undefined,
+    toDate: toDate ? endOfDayIso(toDate) : undefined,
+  };
 
   const { data: overview, isLoading, isError, refetch } = useQuery({
     queryKey: ["cash-metrics-overview", registerCode, fromDate, toDate],
@@ -48,6 +53,16 @@ export const CashMetricsDashboard: React.FC = () => {
     queryKey: ["cash-metrics-registers", fromDate, toDate],
     queryFn: () => paymentService.getCashMetricsRegisters(params),
   });
+
+  // Durée moyenne, écart moyen et évolution viennent des statistiques de chaque caisse, pas des métriques.
+  const registerStats = useQueries({
+    queries: registers.map((r) => ({
+      queryKey: ["cash-register-stats", r.registerCode, fromDate, toDate],
+      queryFn: () => paymentService.getCashRegisterStatistics(r.registerCode, params),
+      staleTime: 60_000,
+    })),
+  });
+  const statsByRegister = new Map(registers.map((r, i) => [r.registerCode, registerStats[i]?.data]));
 
   const { data: selectedRegisterStats } = useQuery({
     queryKey: ["cash-register-stats", registerCode, fromDate, toDate],
@@ -204,41 +219,55 @@ export const CashMetricsDashboard: React.FC = () => {
           <>
             <HeadRow cols={COLS}>
               <span>Caisse</span>
-              <span className="text-right">Sessions</span>
+              <span className="text-right">Ouvertes / à valider</span>
               <span className="text-right">Mouvements</span>
+              <span className="text-right">Encaissements</span>
+              <span className="text-right">Position nette</span>
               <span className="text-right">Durée moyenne</span>
               <span className="text-right">Écart moyen</span>
-              <span className="text-right">Évolution</span>
             </HeadRow>
             <DataCard>
-              {registers.map((r: CashRegisterStatistics) => (
-                <div
-                  key={r.registerCode}
-                  className={`grid grid-cols-2 items-center gap-x-4 gap-y-1 rounded-2xl p-4 max-lg:mb-2 max-lg:bg-gray-50 ${COLS}`}
-                >
-                  <div className="col-span-2 min-w-0 lg:col-span-1">
-                    <p className="truncate font-semibold text-gray-950">{r.registerName}</p>
-                    <p className="truncate font-mono text-xs text-gray-400">{r.registerCode}</p>
+              {registers.map((r: CashRegisterMetrics) => {
+                const stats = statsByRegister.get(r.registerCode);
+                return (
+                  <div
+                    key={r.registerCode}
+                    className={`grid grid-cols-2 items-center gap-x-4 gap-y-1 rounded-2xl p-4 max-lg:mb-2 max-lg:bg-gray-50 ${COLS}`}
+                  >
+                    <div className="col-span-2 min-w-0 lg:col-span-1">
+                      <p className="truncate font-semibold text-gray-950">{r.registerName || r.registerCode}</p>
+                      <p className="truncate font-mono text-xs text-gray-400">
+                        {r.registerCode}
+                        {r.deviceCode ? ` · ${r.deviceCode}` : ""}
+                      </p>
+                    </div>
+                    <p className="text-sm tabular-nums text-gray-700 lg:text-right">
+                      <span className="text-xs text-gray-400 lg:hidden">Sessions · </span>
+                      {Number(r.openSessionCount || 0)} / {Number(r.closingReviewSessionCount || 0)}
+                    </p>
+                    <p className="text-sm tabular-nums text-gray-700 lg:text-right">
+                      <span className="text-xs text-gray-400 lg:hidden">Mouvements · </span>
+                      {Number(r.movementCount || 0)}
+                    </p>
+                    <p className="text-sm tabular-nums text-gray-700 lg:text-right">
+                      <span className="text-xs text-gray-400 lg:hidden">Encaissements · </span>
+                      {formatMoney(r.totalPayments ?? 0)}
+                    </p>
+                    <p className="text-sm font-semibold tabular-nums text-gray-950 lg:text-right">
+                      <span className="text-xs font-normal text-gray-400 lg:hidden">Position · </span>
+                      {formatMoney(r.netCashPosition ?? 0)}
+                    </p>
+                    <p className="text-sm tabular-nums text-gray-700 lg:text-right">
+                      <span className="text-xs text-gray-400 lg:hidden">Durée · </span>
+                      {stats ? `${Math.round(stats.averageSessionDurationMinutes || 0)} min` : "…"}
+                    </p>
+                    <p className="text-sm tabular-nums text-gray-700 lg:text-right">
+                      <span className="text-xs text-gray-400 lg:hidden">Écart · </span>
+                      {stats ? formatMoney(stats.averageVarianceAmount ?? 0) : "…"}
+                    </p>
                   </div>
-                  <p className="text-sm tabular-nums text-gray-700 lg:text-right">
-                    <span className="text-xs text-gray-400 lg:hidden">Sessions · </span>
-                    {r.sessionCount}
-                  </p>
-                  <p className="text-sm tabular-nums text-gray-700 lg:text-right">
-                    <span className="text-xs text-gray-400 lg:hidden">Mouvements · </span>
-                    {r.movementCount}
-                  </p>
-                  <p className="text-sm tabular-nums text-gray-700 lg:text-right">
-                    <span className="text-xs text-gray-400 lg:hidden">Durée · </span>
-                    {Math.round(r.averageSessionDurationMinutes || 0)} min
-                  </p>
-                  <p className="text-sm tabular-nums text-gray-700 lg:text-right">
-                    <span className="text-xs text-gray-400 lg:hidden">Écart · </span>
-                    {formatMoney(r.averageVarianceAmount ?? 0)}
-                  </p>
-                  <p className="text-sm font-semibold tabular-nums text-gray-700 lg:text-right">{trend(r.periodOverPeriodChangePercentage)}</p>
-                </div>
-              ))}
+                );
+              })}
             </DataCard>
           </>
         )}

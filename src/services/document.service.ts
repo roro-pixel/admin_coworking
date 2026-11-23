@@ -64,6 +64,28 @@ const appendFormData = (formData: FormData, data: Record<string, any>) => {
   });
 };
 
+/** Recopie `label` dans `name` : les écrans lisent `name`, l'API envoie `label`. */
+const retentionBody = (d: Partial<DocumentRetentionPolicy>) => ({
+  code: d.code,
+  name: d.name,
+  space: d.space || undefined,
+  documentTypeCode: d.documentTypeCode || undefined,
+  folderCode: d.folderCode || undefined,
+  retentionDays: d.retentionDays,
+  retentionReference: d.retentionReference,
+  action: d.action,
+});
+
+const withSignatureStatus = (s: DocumentSignature): DocumentSignature => ({
+  ...s,
+  status: s.status ?? s.signatureStatus ?? "PENDING",
+});
+
+const withName = <T extends { name?: string; label?: string }>(t: T): T & { name: string } => ({
+  ...t,
+  name: t.name ?? t.label ?? "",
+});
+
 // ==================== ENUMS ====================
 export type DocumentStatus =
   | "DRAFT"
@@ -84,6 +106,7 @@ export type DocumentSpace =
   | "ASSET_SPACE"
   | "ADMINISTRATIVE_SPACE"
   | "GENERAL_SPACE"
+  // Compat anciens écrans / backend transitional values
   | "ADMINISTRATIVE"
   | "GENERIC";
 
@@ -112,13 +135,15 @@ export type KycCaseStatus =
   | "REJECTED"
   | "EXPIRED"
   | "CANCELLED"
+  // Compat legacy frontend/backend transitional values
   | "NOT_STARTED"
   | "IN_PROGRESS"
   | "SUBMITTED"
   | "UNDER_REVIEW"
   | "PENDING_CORRECTION"
   | "RENEWAL_REQUIRED";
-export type KycRiskLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | "VERY_HIGH";
+/** Niveaux de risque de l'API : LOW, MEDIUM, HIGH, VERY_HIGH (CRITICAL n'existe pas). */
+export type KycRiskLevel = "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH";
 export type KycDocumentVerificationStatus =
   | "PENDING"
   | "VERIFIED"
@@ -213,7 +238,9 @@ export interface DocumentVersion {
 
 export interface DocumentTag {
   code: string;
+  /** Libellé renvoyé par l'API (`label`) ; `name` est conservé comme alias pour les anciens écrans */
   name: string;
+  label?: string;
   color?: string;
   space?: DocumentSpace | string;
 }
@@ -223,7 +250,13 @@ export interface DocumentSignature {
   documentCode: string;
   signerName: string;
   signerEmail?: string;
-  status: "PENDING" | "SIGNED" | "EXPIRED" | string;
+  signerType?: string;
+  signerId?: string;
+  /** PENDING, SIGNED, DECLINED ou EXPIRED (champ API `signatureStatus`, recopié dans `status`) */
+  signatureStatus?: "PENDING" | "SIGNED" | "DECLINED" | "EXPIRED" | string;
+  status: "PENDING" | "SIGNED" | "DECLINED" | "EXPIRED" | string;
+  ipAddress?: string;
+  userAgent?: string;
   requestedAt?: string;
   signedAt?: string;
   signatureImageBase64?: string;
@@ -297,8 +330,9 @@ export interface DocumentRetentionPolicy {
   code: string;
   name: string;
   space?: DocumentSpace | string;
-  category?: DocumentCategory | string;
   documentTypeCode?: string;
+  folderCode?: string;
+  folderName?: string;
   retentionDays: number;
   retentionReference: DocumentRetentionReference;
   action: DocumentRetentionAction;
@@ -395,7 +429,7 @@ export interface KycOcrResult {
   rawOcrJson: { status: string; rawText?: string; [key: string]: any };
 }
 
-// ==================== FOLDERS / WORKFLOWS / SHARING ====================
+// ==================== GED V3 - FOLDERS / WORKFLOWS / SHARING ====================
 export interface FolderDetailResponse {
   code: string;
   name: string;
@@ -447,7 +481,7 @@ export interface DocumentBatchUploadRequest {
   folderCode?: string;
   referenceCode?: string;
   tagCodes?: string[];
-  tags?: string[];
+  tags?: string[]; // compat ancienne UI
   titlePrefix?: string;
   metadata?: Record<string, string>;
 }
@@ -482,6 +516,7 @@ export interface DocumentWorkflowStepRequest {
   approverValue: string;
   required?: boolean;
   autoApproveDays?: number;
+  // Compat anciens écrans
   name?: string;
   order?: number;
   assignedTo?: number;
@@ -522,6 +557,7 @@ export interface DocumentShareRequest {
   password?: string;
   allowDownload?: boolean;
   maxAccessCount?: number;
+  // Compat ancienne UI
   expiresAt?: string;
   note?: string;
 }
@@ -539,6 +575,7 @@ export interface DocumentShareResponse {
   createdAt?: string;
   createdBy?: string;
   active?: boolean;
+  // Compat ancienne UI
   targetType?: "DOCUMENT" | "FOLDER" | string;
   targetCode?: string;
   publicUrl?: string;
@@ -604,6 +641,7 @@ export interface KycCrossValidationRuleRequest {
   fieldToCompare: string;
   blocking?: boolean;
   active?: boolean;
+  // Compat ancienne UI
   name?: string;
   sourceField?: string;
   targetField?: string;
@@ -670,6 +708,7 @@ export const kycStatusLabels: Record<string, string> = {
   REJECTED: "Rejeté",
   EXPIRED: "Expiré",
   CANCELLED: "Annulé",
+  // Compatibilité ancienne UI
   NOT_STARTED: "Non commencé",
   IN_PROGRESS: "En cours",
   SUBMITTED: "Soumis",
@@ -682,7 +721,6 @@ export const kycRiskLevelLabels: Record<string, string> = {
   LOW: "Faible",
   MEDIUM: "Moyen",
   HIGH: "Élevé",
-  CRITICAL: "Critique",
   VERY_HIGH: "Très élevé",
 };
 
@@ -690,7 +728,6 @@ export const kycRiskLevelColors: Record<string, string> = {
   LOW: "bg-green-100 text-green-700",
   MEDIUM: "bg-yellow-100 text-yellow-700",
   HIGH: "bg-orange-100 text-orange-700",
-  CRITICAL: "bg-red-100 text-red-700",
   VERY_HIGH: "bg-red-100 text-red-700",
 };
 
@@ -981,17 +1018,34 @@ export const documentService = {
     ).data,
 
   // ---------- Tags ----------
-  createDocumentTag: async (data: DocumentTag): Promise<DocumentTag> =>
-    (await apiClient.post("/sni/api/v1/document-tags", data)).data,
+  createDocumentTag: async (data: Pick<DocumentTag, "code" | "color" | "space"> & { name?: string; label?: string }): Promise<DocumentTag> =>
+    withName(
+      (
+        await apiClient.post("/sni/api/v1/document-tags", {
+          code: data.code,
+          label: data.label ?? data.name,
+          color: data.color,
+          space: data.space,
+        })
+      ).data,
+    ),
 
+  /** PUT : seuls le libellé et la couleur sont modifiables (le code et l'espace ne changent pas). */
   updateDocumentTag: async (
     code: string,
     data: Partial<DocumentTag>,
   ): Promise<DocumentTag> =>
-    (await apiClient.put(`/sni/api/v1/document-tags/${code}`, data)).data,
+    withName(
+      (
+        await apiClient.put(`/sni/api/v1/document-tags/${code}`, {
+          label: data.label ?? data.name,
+          color: data.color,
+        })
+      ).data,
+    ),
 
   getDocumentTag: async (code: string): Promise<DocumentTag> =>
-    (await apiClient.get(`/sni/api/v1/document-tags/${code}`)).data,
+    withName((await apiClient.get(`/sni/api/v1/document-tags/${code}`)).data),
 
   getDocumentTags: async (params?: {
     space?: string;
@@ -999,31 +1053,38 @@ export const documentService = {
   }): Promise<DocumentTag[]> =>
     toList<DocumentTag>(
       (await apiClient.get("/sni/api/v1/document-tags", { params })).data,
-    ),
+    ).map(withName),
 
   deleteDocumentTag: async (code: string): Promise<void> => {
     await apiClient.delete(`/sni/api/v1/document-tags/${code}`);
   },
 
+  /** POST /documents/{code}/tags avec { tagCodes } ; renvoie les étiquettes du document. */
   addTagToDocument: async (
     documentCode: string,
-    tagCode: string,
-  ): Promise<DocumentResponse> =>
-    (
-      await apiClient.post(
-        `/sni/api/v1/documents/${documentCode}/tags/${tagCode}`,
-      )
-    ).data,
+    tagCode: string | string[],
+  ): Promise<DocumentTag[]> =>
+    toList<DocumentTag>(
+      (
+        await apiClient.post(`/sni/api/v1/documents/${documentCode}/tags`, {
+          tagCodes: Array.isArray(tagCode) ? tagCode : [tagCode],
+        })
+      ).data,
+    ).map(withName),
+
+  getDocumentTagsOf: async (documentCode: string): Promise<DocumentTag[]> =>
+    toList<DocumentTag>(
+      (await apiClient.get(`/sni/api/v1/documents/${documentCode}/tags`)).data,
+    ).map(withName),
 
   removeTagFromDocument: async (
     documentCode: string,
     tagCode: string,
-  ): Promise<DocumentResponse> =>
-    (
-      await apiClient.delete(
-        `/sni/api/v1/documents/${documentCode}/tags/${tagCode}`,
-      )
-    ).data,
+  ): Promise<void> => {
+    await apiClient.delete(
+      `/sni/api/v1/documents/${documentCode}/tags/${tagCode}`,
+    );
+  },
 
   // ---------- Metadata ----------
   updateDocumentMetadata: async (
@@ -1070,7 +1131,7 @@ export const documentService = {
     toList<DocumentSignature>(
       (await apiClient.get(`/sni/api/v1/documents/${documentCode}/signatures`))
         .data,
-    ),
+    ).map(withSignatureStatus),
 
   signDocumentSignature: async (
     documentCode: string,
@@ -1136,8 +1197,12 @@ export const documentService = {
   createRetentionPolicy: async (
     data: Omit<DocumentRetentionPolicy, "active"> & { active?: boolean },
   ): Promise<DocumentRetentionPolicy> =>
-    (await apiClient.post("/sni/api/v1/document-retention-policies", data))
-      .data,
+    (
+      await apiClient.post(
+        "/sni/api/v1/document-retention-policies",
+        retentionBody(data),
+      )
+    ).data,
 
   updateRetentionPolicy: async (
     code: string,
@@ -1146,10 +1211,11 @@ export const documentService = {
     (
       await apiClient.put(
         `/sni/api/v1/document-retention-policies/${code}`,
-        data,
+        retentionBody({ code, ...data }),
       )
     ).data,
 
+  /** DELETE désactive la politique (elle reste listée) ; PATCH …/activate la réactive. */
   deleteRetentionPolicy: async (code: string): Promise<void> => {
     await apiClient.delete(`/sni/api/v1/document-retention-policies/${code}`);
   },

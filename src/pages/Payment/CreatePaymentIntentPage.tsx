@@ -6,7 +6,6 @@ import type { CustomerSummaryResponse } from "../../services/customer.service";
 import type { MemberSummaryResponse } from "../../services/member.service";
 import { CustomerAutocomplete } from "../../components/customers/CustomerAutocomplete";
 import { MemberAutocomplete } from "../../components/members/MemberAutocomplete";
-import { useAuth } from "../../contexts/AuthContext";
 import { ActionButton, Field, PageHeader, Section } from "../../components/subscription/kit";
 import { FIELD, apiMessage } from "../../components/subscription/kitUtils";
 import { CUSTOMER_TYPES, PURPOSES } from "../../components/payment/paymentLabels";
@@ -31,7 +30,6 @@ const buildDefaultFormData = () => ({
 
 export const CreatePaymentIntentPage: React.FC = () => {
   const navigate = useNavigate();
-  const { admin } = useAuth();
   const queryClient = useQueryClient();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -70,7 +68,6 @@ export const CreatePaymentIntentPage: React.FC = () => {
         description: formData.description || undefined,
         idempotencyKey: `intent-${formData.customerCode}-${formData.amount}-${Date.now()}`,
         expiresAt: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : undefined,
-        createdBy: admin?.email || String(admin?.id) || "admin",
       }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["payment-intents"] });

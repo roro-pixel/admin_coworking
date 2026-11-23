@@ -32,6 +32,7 @@ export const ResourceCreatePage: React.FC = () => {
         capacity: form.capacity,
         zone: form.zone.trim() || undefined,
         locationLabel: form.locationLabel.trim() || undefined,
+        floorLabel: form.floorLabel.trim() || undefined,
         status: form.status,
         bookingEnabled: form.bookingEnabled,
         portalVisible: form.portalVisible,

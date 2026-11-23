@@ -1,312 +1,167 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Award, Plus } from "lucide-react";
+import { Award, Pencil, Plus, Power } from "lucide-react";
 import { bookingService } from "../../services/booking.service";
-import type { BookingQuotaOverride } from "../../services/booking.service";
-import { useAuth } from "../../contexts/AuthContext";
-import { toast } from "../../components/ui/toastStore";
-import { TableSkeleton } from "../../components/ui/Skeleton";
-import {
-  ActionButton,
-  DataCard,
-  EmptyState,
-  Field,
-  HeadRow,
-  ListHeader,
-  PanelForm,
-  StatusChip,
-  Tabs,
-} from "../../components/subscription/kit";
+import type { BookingQuotaOverride, LookupItem } from "../../services/booking.service";
+import { ActionButton, EmptyState, ErrorBlock, Field, IconButton, ItemRow, ListHeader, PanelForm, StatusChip, Tabs } from "../../components/subscription/kit";
 import type { TabItem } from "../../components/subscription/kit";
-import { FIELD_SOFT, ROW_HOVER, apiMessage, formatDate } from "../../components/subscription/kitUtils";
+import { FIELD, apiMessage, formatDate } from "../../components/subscription/kitUtils";
+import { ListSkeleton } from "../../components/ui/Skeleton";
+import { toast } from "../../components/ui/toastStore";
+import { ResourceAutocomplete } from "../../components/resources/ResourceAutocomplete";
+import { useAuth } from "../../contexts/AuthContext";
+import { OWNER_LABEL, OwnerPicker, label, ownerFields } from "../../components/bookings/bookingKit";
+import { toLocalInput } from "../../components/resources/resKit";
 
-type OwnerType = "MEMBER" | "CUSTOMER" | "BUSINESS_ENTITY";
-
-const OWNER_TYPES: Record<OwnerType, { label: string; codeLabel: string; placeholder: string }> = {
-  MEMBER: { label: "Membre", codeLabel: "Code membre", placeholder: "MBR-00001" },
-  CUSTOMER: { label: "Customer", codeLabel: "Code customer", placeholder: "CUS-00001" },
-  BUSINESS_ENTITY: { label: "Business", codeLabel: "Code business", placeholder: "BUS-00001" },
-};
-
-const OWNER_TABS: TabItem<OwnerType>[] = (Object.keys(OWNER_TYPES) as OwnerType[]).map((id) => ({
-  id,
-  label: OWNER_TYPES[id].label,
-}));
-
-const COLS =
-  "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.6fr)_6rem]";
-
-const buildDefaultFormData = () => ({
-  resourceCode: "",
-  extraActiveBookings: 0,
-  extraBookingsPerDay: 0,
-  extraBookingsPerWeek: 0,
-  extraBookingsPerMonth: 0,
-  reason: "",
-  validFrom: new Date().toISOString().split("T")[0],
-  validUntil: "",
-});
-
-type ExtraKey =
-  | "extraActiveBookings"
-  | "extraBookingsPerDay"
-  | "extraBookingsPerWeek"
-  | "extraBookingsPerMonth";
-
-const EXTRAS: { key: ExtraKey; label: string }[] = [
-  { key: "extraActiveBookings", label: "Réservations actives +" },
-  { key: "extraBookingsPerDay", label: "Par jour +" },
-  { key: "extraBookingsPerWeek", label: "Par semaine +" },
-  { key: "extraBookingsPerMonth", label: "Par mois +" },
+type Filter = "all" | "active" | "inactive";
+const FILTERS: TabItem<Filter>[] = [
+  { id: "all", label: "Toutes" },
+  { id: "active", label: "Actives" },
+  { id: "inactive", label: "Inactives" },
 ];
 
-export const BookingQuotaOverrides: React.FC = () => {
-  const { admin } = useAuth();
-  const queryClient = useQueryClient();
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [ownerType, setOwnerType] = useState<OwnerType>("MEMBER");
-  const [ownerCode, setOwnerCode] = useState("");
-  const [formData, setFormData] = useState(buildDefaultFormData);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Remise à zéro complète à chaque ouverture
-  useEffect(() => {
-    if (isPanelOpen) {
-      setOwnerType("MEMBER");
-      setOwnerCode("");
-      setFormData(buildDefaultFormData());
-      setErrorMessage(null);
-      setTimeout(() => panelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
-    }
-  }, [isPanelOpen]);
-
-  const { data: overridesRaw, isLoading } = useQuery({
-    queryKey: ["booking-quota-overrides"],
-    queryFn: () => bookingService.getQuotaOverrides(),
+const Form: React.FC<{ item: BookingQuotaOverride | null; onDone: () => void; onCancel: () => void }> = ({ item, onDone, onCancel }) => {
+  const [owner, setOwner] = useState<LookupItem | null>(null);
+  const [resourceCode, setResourceCode] = useState(item?.resourceCode ?? "");
+  const [num, setNum] = useState({
+    extraActiveBookings: item?.extraActiveBookings ?? 0,
+    extraBookingsPerDay: item?.extraBookingsPerDay ?? 0,
+    extraBookingsPerWeek: item?.extraBookingsPerWeek ?? 0,
+    extraBookingsPerMonth: item?.extraBookingsPerMonth ?? 0,
   });
+  const [reason, setReason] = useState(item?.reason ?? "");
+  const [from, setFrom] = useState(toLocalInput(item?.validFrom));
+  const [until, setUntil] = useState(toLocalInput(item?.validUntil));
+  const [error, setError] = useState<string | null>(null);
 
-  // Wrapper défensif
-  const overrides: BookingQuotaOverride[] = Array.isArray(overridesRaw)
-    ? overridesRaw
-    : (overridesRaw as any)?.data || (overridesRaw as any)?.content || [];
-
-  const createMutation = useMutation({
+  const mutation = useMutation({
     mutationFn: () => {
-      const payload: any = {
-        ownerType,
-        ownerCode,
-        reason: formData.reason,
-        approvedBy: admin?.email || "admin",
-        extraActiveBookings: formData.extraActiveBookings,
-        extraBookingsPerDay: formData.extraBookingsPerDay,
-        extraBookingsPerWeek: formData.extraBookingsPerWeek,
-        extraBookingsPerMonth: formData.extraBookingsPerMonth,
-        validFrom: formData.validFrom,
-        validUntil: formData.validUntil || undefined,
+      const body = {
+        resourceCode: resourceCode || undefined,
+        ...num,
+        reason: reason.trim(),
+        validFrom: from ? `${from}:00` : undefined,
+        validUntil: until ? `${until}:00` : undefined,
       };
-      if (formData.resourceCode) payload.resourceCode = formData.resourceCode;
-      return bookingService.createQuotaOverride(payload);
+      return item ? bookingService.updateQuotaOverride(item.overrideNumber, body) : bookingService.createQuotaOverride({ ...ownerFields(owner), ...body });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["booking-quota-overrides"] });
-      setIsPanelOpen(false);
-      toast.success("Dérogation créée");
+      toast.success(item ? "Dérogation modifiée" : "Dérogation créée");
+      onDone();
     },
-    onError: (error: unknown) =>
-      setErrorMessage(apiMessage(error, "Erreur lors de la création de la dérogation.")),
+    onError: (e) => setError(apiMessage(e, "Enregistrement impossible")),
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!ownerCode.trim()) {
-      setErrorMessage("Le code du bénéficiaire est obligatoire.");
-      return;
-    }
-    if (!formData.reason.trim()) {
-      setErrorMessage("Le motif est obligatoire.");
-      return;
-    }
-    setErrorMessage(null);
-    createMutation.mutate();
-  };
+  const fields: { key: keyof typeof num; label: string }[] = [
+    { key: "extraActiveBookings", label: "Actives en plus" },
+    { key: "extraBookingsPerDay", label: "Par jour en plus" },
+    { key: "extraBookingsPerWeek", label: "Par semaine en plus" },
+    { key: "extraBookingsPerMonth", label: "Par mois en plus" },
+  ];
+  return (
+    <PanelForm
+      title={item ? `Modifier ${item.overrideNumber}` : "Nouvelle dérogation"}
+      pending={mutation.isPending}
+      submitLabel={item ? "Enregistrer" : "Créer"}
+      submitDisabled={(!item && !owner) || !reason.trim()}
+      error={error}
+      onCancel={onCancel}
+      onSubmit={(e) => {
+        e.preventDefault();
+        setError(null);
+        mutation.mutate();
+      }}
+    >
+      {!item && <Field label="Titulaire" required><OwnerPicker value={owner} onChange={setOwner} /></Field>}
+      <Field label="Ressource" hint="Vide : toutes les ressources.">
+        <ResourceAutocomplete selectedCode={resourceCode} onSelect={(r) => setResourceCode(r?.code ?? "")} placeholder="Toutes les ressources" />
+      </Field>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {fields.map((f) => (
+          <Field key={f.key} label={f.label}>
+            <input type="number" min={0} value={num[f.key]} onChange={(e) => setNum({ ...num, [f.key]: Math.max(0, Number(e.target.value)) })} className={FIELD} />
+          </Field>
+        ))}
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Valable à partir du"><input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} className={FIELD} /></Field>
+        <Field label="Valable jusqu'au" hint="Vide : sans limite."><input type="datetime-local" value={until} onChange={(e) => setUntil(e.target.value)} className={FIELD} /></Field>
+      </div>
+      <Field label="Motif" required><input value={reason} onChange={(e) => setReason(e.target.value)} className={FIELD} /></Field>
+    </PanelForm>
+  );
+};
 
-  const owner = OWNER_TYPES[ownerType];
+export const BookingQuotaOverrides: React.FC = () => {
+  const queryClient = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission("BOOKING:CREATE");
+  const canUpdate = hasPermission("BOOKING:UPDATE");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [editing, setEditing] = useState<BookingQuotaOverride | "new" | null>(null);
 
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["booking-quota-overrides", filter],
+    queryFn: () => bookingService.getQuotaOverrides(filter === "all" ? undefined : { active: filter === "active" }),
+  });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["booking-quota-overrides"] });
+  const toggle = useMutation({
+    mutationFn: (o: BookingQuotaOverride) => bookingService.setQuotaOverrideActive(o.overrideNumber, !o.active),
+    onSuccess: (o) => {
+      toast.success(o.active ? "Dérogation activée" : "Dérogation désactivée");
+      refresh();
+    },
+    onError: (e) => toast.error(apiMessage(e, "Changement impossible")),
+  });
+
+  const rows = data ?? [];
   return (
     <div className="space-y-5">
       <ListHeader
-        title="Dérogations de quotas"
-        action={
-          <ActionButton icon={Plus} className="w-full sm:w-auto" onClick={() => setIsPanelOpen(true)}>
-            Nouvelle dérogation
-          </ActionButton>
-        }
+        title="Dérogations de quota"
+        subtitle="Réservations supplémentaires accordées à un client, pour une durée donnée."
+        action={canCreate ? <ActionButton icon={Plus} onClick={() => setEditing("new")}>Nouvelle dérogation</ActionButton> : undefined}
       />
-
-      {isPanelOpen && (
-        <div ref={panelRef}>
-          <PanelForm
-            title="Nouvelle dérogation de quota"
-            onSubmit={handleSubmit}
-            onCancel={() => setIsPanelOpen(false)}
-            pending={createMutation.isPending}
-            submitLabel="Créer"
-            error={errorMessage}
-          >
-            <Field label="Type de bénéficiaire" required>
-              <Tabs
-                items={OWNER_TABS}
-                active={ownerType}
-                variant="soft"
-                onChange={(t) => {
-                  setOwnerType(t);
-                  setOwnerCode("");
-                }}
-              />
-            </Field>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label={owner.codeLabel} required>
-                <input
-                  value={ownerCode}
-                  onChange={(e) => setOwnerCode(e.target.value)}
-                  placeholder={owner.placeholder}
-                  required
-                  className={FIELD_SOFT}
-                />
-              </Field>
-              <Field label="Ressource spécifique" hint="Laisser vide pour toutes les ressources">
-                <input
-                  value={formData.resourceCode}
-                  onChange={(e) => setFormData({ ...formData, resourceCode: e.target.value })}
-                  placeholder="ROOM-001"
-                  className={FIELD_SOFT}
-                />
-              </Field>
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-semibold text-gray-600">Quotas supplémentaires accordés</p>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                {EXTRAS.map((x) => (
-                  <Field key={x.key} label={x.label}>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formData[x.key]}
-                      onChange={(e) => setFormData({ ...formData, [x.key]: parseInt(e.target.value) || 0 })}
-                      className={FIELD_SOFT}
-                    />
-                  </Field>
-                ))}
-              </div>
-            </div>
-
-            <Field label="Motif" required>
-              <textarea
-                value={formData.reason}
-                onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                rows={2}
-                required
-                placeholder="Ex : événement exceptionnel, client VIP..."
-                className={`${FIELD_SOFT} resize-none`}
-              />
-            </Field>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Valide du" required>
-                <input
-                  type="date"
-                  value={formData.validFrom}
-                  onChange={(e) => setFormData({ ...formData, validFrom: e.target.value })}
-                  required
-                  className={FIELD_SOFT}
-                />
-              </Field>
-              <Field label="Valide au" hint="Laisser vide pour une durée illimitée">
-                <input
-                  type="date"
-                  value={formData.validUntil}
-                  min={formData.validFrom}
-                  onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
-                  className={FIELD_SOFT}
-                />
-              </Field>
-            </div>
-          </PanelForm>
-        </div>
-      )}
-
+      {editing && <Form item={editing === "new" ? null : editing} onDone={() => { setEditing(null); refresh(); }} onCancel={() => setEditing(null)} />}
+      <Tabs items={FILTERS} active={filter} onChange={setFilter} variant="soft" />
       {isLoading ? (
-        <TableSkeleton rows={5} cols={6} />
-      ) : overrides.length === 0 ? (
+        <ListSkeleton />
+      ) : isError ? (
+        <ErrorBlock message="Impossible de charger les dérogations." onRetry={() => refetch()} />
+      ) : rows.length === 0 ? (
         <EmptyState icon={Award} title="Aucune dérogation" />
       ) : (
-        <DataCard>
-          <HeadRow cols={COLS}>
-            <span>N°</span>
-            <span>Bénéficiaire</span>
-            <span>Ressource</span>
-            <span>Extras (actives / jour / semaine / mois)</span>
-            <span>Période et motif</span>
-            <span>Statut</span>
-          </HeadRow>
-
-          <div className="space-y-2">
-            {overrides.map((o) => {
-              const extras = `+${o.extraActiveBookings} / +${o.extraBookingsPerDay} / +${o.extraBookingsPerWeek} / +${o.extraBookingsPerMonth}`;
-              const ownerLabel = OWNER_TYPES[o.ownerType as OwnerType]?.label ?? o.ownerType;
-              return (
-                <div
-                  key={o.overrideNumber}
-                  className={`rounded-2xl bg-gray-50 p-3 ${ROW_HOVER} ${!o.active ? "opacity-60" : ""}`}
-                >
-                  {/* Desktop */}
-                  <div className={`hidden items-center gap-4 px-1 lg:grid ${COLS}`}>
-                    <span className="truncate font-mono text-xs text-gray-500">{o.overrideNumber}</span>
-                    <div className="min-w-0">
-                      <p className="truncate font-mono text-xs font-semibold text-gray-900">{o.ownerCode}</p>
-                      <p className="mt-0.5 text-xs text-gray-400">{ownerLabel}</p>
-                    </div>
-                    <span className="truncate text-sm text-gray-700">{o.resourceCode || "Toutes"}</span>
-                    <span className="text-sm font-semibold text-emerald-700">{extras}</span>
-                    <div className="min-w-0 text-sm text-gray-700">
-                      <p>
-                        Du {formatDate(o.validFrom)}
-                        {o.validUntil && ` au ${formatDate(o.validUntil)}`}
-                      </p>
-                      <p className="mt-0.5 truncate text-xs text-gray-400" title={o.reason}>
-                        {o.reason}
-                      </p>
-                    </div>
-                    <span>
-                      <StatusChip tone={o.active ? "success" : "neutral"}>{o.active ? "Actif" : "Inactif"}</StatusChip>
-                    </span>
-                  </div>
-
-                  {/* Mobile et tablette */}
-                  <div className="lg:hidden">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate font-mono text-sm font-semibold text-gray-900">{o.ownerCode}</p>
-                        <p className="mt-0.5 font-mono text-xs text-gray-500">{o.overrideNumber}</p>
-                      </div>
-                      <StatusChip tone={o.active ? "success" : "neutral"}>{o.active ? "Actif" : "Inactif"}</StatusChip>
-                    </div>
-                    <p className="mt-2 text-sm font-semibold text-emerald-700">{extras}</p>
-                    <p className="mt-1 text-xs text-gray-500">
-                      {o.resourceCode || "Toutes les ressources"} · du {formatDate(o.validFrom)}
-                      {o.validUntil && ` au ${formatDate(o.validUntil)}`}
-                    </p>
-                    <p className="mt-2 rounded-xl bg-white p-2 text-xs text-gray-600">{o.reason}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </DataCard>
+        <div className="space-y-2">
+          {rows.map((o) => (
+            <ItemRow key={o.overrideNumber} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-gray-900">
+                  {o.ownerCode} <span className="text-xs font-normal text-gray-500">· {label(OWNER_LABEL, o.ownerType)}</span>{" "}
+                  <span className="font-mono text-xs font-normal text-gray-400">{o.overrideNumber}</span>
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  +{o.extraActiveBookings} actives · +{o.extraBookingsPerDay}/jour · +{o.extraBookingsPerWeek}/semaine · +{o.extraBookingsPerMonth}/mois
+                  {o.resourceCode ? ` · ${o.resourceCode}` : " · toutes ressources"}
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  Du {formatDate(o.validFrom)}{o.validUntil ? ` au ${formatDate(o.validUntil)}` : ""} · {o.reason} · accordée par {o.approvedBy}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <StatusChip tone={o.active ? "success" : "neutral"}>{o.active ? "Active" : "Inactive"}</StatusChip>
+                {canUpdate && (
+                  <>
+                    <IconButton icon={Pencil} label="Modifier" onClick={() => setEditing(o)} />
+                    <IconButton icon={Power} label={o.active ? "Désactiver" : "Activer"} tone={o.active ? "danger" : "success"} pending={toggle.isPending && toggle.variables?.overrideNumber === o.overrideNumber} onClick={() => toggle.mutate(o)} />
+                  </>
+                )}
+              </div>
+            </ItemRow>
+          ))}
+        </div>
       )}
     </div>
   );
 };
+
+export default BookingQuotaOverrides;

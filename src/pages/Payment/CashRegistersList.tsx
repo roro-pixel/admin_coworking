@@ -1,242 +1,275 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Power, Wallet } from "lucide-react";
+import { Plus, Wallet } from "lucide-react";
+import { cashRegisterService } from "../../services/cashRegister.service";
+import type { CashRegisterListItem, CashRegisterType } from "../../services/cashRegister.service";
 import { paymentService } from "../../services/payment.service";
-import type { CashRegister } from "../../services/payment.service";
-import {
-  ActionButton,
-  DataCard,
-  EmptyState,
-  ErrorBlock,
-  Field,
-  HeadRow,
-  IconButton,
-  ListHeader,
-  PanelForm,
-  SearchField,
-  StatusChip,
-  Switch,
-} from "../../components/subscription/kit";
-import { FIELD_SOFT, apiMessage, formatMoney } from "../../components/subscription/kitUtils";
+import type { PaymentMethod } from "../../services/payment.service";
+import { ActionButton, DataCard, EmptyState, ErrorBlock, Field, HeadRow, ListHeader, PanelForm, Pagination, SearchField, StatusChip } from "../../components/subscription/kit";
+import { FIELD_SOFT, ROW_HOVER, apiMessage, formatDateTime, formatMoney } from "../../components/subscription/kitUtils";
+import { statusOf } from "../../components/subscription/labels";
 import { toast } from "../../components/ui/toastStore";
 import { ListSkeleton } from "../../components/ui/Skeleton";
 import { KpiRow, KpiRowSkeleton } from "../../components/operations/OpsCharts";
+import { PillChoice } from "../../components/operations/opsKit";
+import { useAuth } from "../../contexts/AuthContext";
+import { METHOD_LABEL } from "../../components/payment/paymentLabels";
+import { REGISTER_STATUS, REGISTER_TYPE, REGISTER_TYPE_OPTIONS } from "../../components/cash/cashLabels";
+import { parseDigits } from "../../components/payment/paymentUtils";
 
-const COLS = "lg:grid-cols-[8rem_minmax(0,1.5fr)_minmax(0,1fr)_7rem_9rem_3rem]";
+const PAGE_SIZE = 20;
+const COLS = "lg:grid-cols-[8rem_minmax(0,1.5fr)_minmax(0,1fr)_7rem_9rem_9rem]";
 
-const EMPTY_FORM = {
+const EMPTY = {
   name: "",
+  registerType: "COUNTER" as CashRegisterType,
   locationCode: "",
   businessEntityCode: "",
   deviceCode: "",
-  cashControlEnabled: true,
-  maxCashAmount: 500000,
+  parentRegisterCode: "",
+  maxCashAmount: 0,
+  standardFloat: 0,
+  holderEmail: "",
+  backupEmails: "",
   managerEmail: "",
+  acceptedMethods: ["CASH"] as PaymentMethod[],
 };
 
+const ACTIVE_FILTERS = [
+  { value: "", label: "Toutes" },
+  { value: "true", label: "Actives" },
+  { value: "false", label: "Inactives" },
+];
+
 export const CashRegistersList: React.FC = () => {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission("CASH_REGISTER:MANAGE");
+
   const [search, setSearch] = useState("");
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [active, setActive] = useState("");
+  const [page, setPage] = useState(0);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState(EMPTY);
   const [formError, setFormError] = useState<string | null>(null);
-  const [togglingCode, setTogglingCode] = useState<string | null>(null);
 
-  const { data: registersData, isLoading, isError, refetch } = useQuery({
-    queryKey: ["cash-registers"],
-    queryFn: () => paymentService.getCashRegisters({ size: 100 }),
-  });
-
-  const { data: metrics, isLoading: metricsLoading } = useQuery({
-    queryKey: ["cash-metrics-overview-registers-screen"],
-    queryFn: () => paymentService.getCashMetricsOverview(),
-  });
-
-  const createMutation = useMutation({
-    mutationFn: () =>
-      paymentService.createCashRegister({
-        name: formData.name,
-        locationCode: formData.locationCode,
-        businessEntityCode: formData.businessEntityCode,
-        deviceCode: formData.deviceCode || undefined,
-        cashControlEnabled: formData.cashControlEnabled,
-        maxCashAmount: formData.maxCashAmount,
-        managerEmail: formData.managerEmail || undefined,
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["cash-registers", search, active, page],
+    queryFn: () =>
+      cashRegisterService.listRegisters({
+        searchText: search.trim() || undefined,
+        active: active === "" ? undefined : active === "true",
+        page,
+        size: PAGE_SIZE,
       }),
-    onSuccess: () => {
+  });
+  const registers: CashRegisterListItem[] = data?.content ?? [];
+
+  const metrics = useQuery({ queryKey: ["cash-metrics-overview-registers-screen"], queryFn: () => paymentService.getCashMetricsOverview() });
+
+  const create = useMutation({
+    mutationFn: () =>
+      cashRegisterService.createRegister({
+        name: form.name.trim(),
+        registerType: form.registerType,
+        locationCode: form.locationCode.trim() || undefined,
+        businessEntityCode: form.businessEntityCode.trim() || undefined,
+        deviceCode: form.deviceCode.trim() || undefined,
+        parentRegisterCode: form.parentRegisterCode.trim() || undefined,
+        maxCashAmount: form.maxCashAmount > 0 ? form.maxCashAmount : undefined,
+        standardFloat: form.standardFloat > 0 ? form.standardFloat : undefined,
+        managerEmail: form.managerEmail.trim() || undefined,
+        holderEmail: form.holderEmail.trim() || undefined,
+        backupEmails: form.backupEmails.split(/[,\s;]+/).filter(Boolean),
+        acceptedMethods: form.acceptedMethods,
+        acceptedCurrencies: ["XAF"],
+      }),
+    onSuccess: (r) => {
+      toast.success(`Caisse ${r.registerCode} créée.`);
       queryClient.invalidateQueries({ queryKey: ["cash-registers"] });
-      setIsFormOpen(false);
-      setFormError(null);
-      toast.success("Caisse créée");
+      setOpen(false);
+      setForm(EMPTY);
+      navigate(`/payments/registers/${r.registerCode}`);
     },
     onError: (e: unknown) => setFormError(apiMessage(e, "Création impossible.")),
   });
 
-  const activateMutation = useMutation({
-    mutationFn: (code: string) => paymentService.activateCashRegister(code),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["cash-registers"] }),
-  });
-
-  const deactivateMutation = useMutation({
-    mutationFn: (code: string) => paymentService.deactivateCashRegister(code),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["cash-registers"] }),
-  });
-
-  const registers: CashRegister[] = registersData?.content || [];
-  const q = search.trim().toLowerCase();
-  const filtered = registers.filter((r) => r.name.toLowerCase().includes(q) || r.registerCode.toLowerCase().includes(q));
-
-  const openForm = () => {
-    setFormData(EMPTY_FORM);
-    setFormError(null);
-    setIsFormOpen(true);
-  };
-
-  const toggle = (register: CashRegister) => {
-    if (register.active) {
-      toast.confirm({
-        message: `Désactiver « ${register.name} » ?`,
-        detail: "Plus aucune session ne pourra s'ouvrir sur cette caisse.",
-        confirmLabel: "Désactiver",
-        successMessage: "Caisse désactivée",
-        errorMessage: "Désactivation impossible",
-        onConfirm: () => deactivateMutation.mutateAsync(register.registerCode),
-      });
-      return;
-    }
-    setTogglingCode(register.registerCode);
-    activateMutation
-      .mutateAsync(register.registerCode)
-      .then(() => toast.success("Caisse activée"))
-      .catch(() => toast.error("Activation impossible"))
-      .finally(() => setTogglingCode(null));
-  };
+  const toggleMethod = (m: PaymentMethod) =>
+    setForm((f) => ({ ...f, acceptedMethods: f.acceptedMethods.includes(m) ? f.acceptedMethods.filter((x) => x !== m) : [...f.acceptedMethods, m] }));
 
   return (
     <div className="space-y-5">
       <ListHeader
         title="Caisses"
-        subtitle="Les points d'encaissement et leurs règles de contrôle."
+        subtitle={isLoading ? undefined : `${data?.totalElements ?? 0} caisse${(data?.totalElements ?? 0) > 1 ? "s" : ""}`}
         action={
-          <ActionButton icon={Plus} onClick={openForm} className="w-full sm:w-auto">
-            Nouvelle caisse
-          </ActionButton>
+          canManage &&
+          !open && (
+            <ActionButton icon={Plus} onClick={() => setOpen(true)}>
+              Nouvelle caisse
+            </ActionButton>
+          )
         }
       />
 
-      {metricsLoading ? (
-        <KpiRowSkeleton />
-      ) : (
-        metrics && (
-          <KpiRow
-            items={[
-              { label: "Encaissements", value: formatMoney(metrics.totalPayments) },
-              { label: "Entrées d'espèces", value: formatMoney(metrics.totalCashIn), tone: "success" },
-              { label: "Sorties d'espèces", value: formatMoney(metrics.totalCashOut), tone: "danger" },
-              { label: "Sessions ouvertes", value: metrics.openSessionCount ?? 0 },
-            ]}
-          />
-        )
-      )}
+      {metrics.isLoading ? (
+        <KpiRowSkeleton count={3} columns={3} />
+      ) : metrics.data ? (
+        <KpiRow
+          columns={3}
+          items={[
+            { label: "Caisses actives", value: `${metrics.data.activeRegisterCount} / ${metrics.data.registerCount}` },
+            { label: "Sessions ouvertes", value: String(metrics.data.openSessionCount), tone: "success" },
+            { label: "Position nette", value: formatMoney(metrics.data.netCashPosition, "FCFA"), tone: "pink" },
+          ]}
+        />
+      ) : null}
 
-      {isFormOpen && (
+      {open && (
         <PanelForm
           title="Nouvelle caisse"
+          pending={create.isPending}
+          submitLabel="Créer la caisse"
+          submitDisabled={!form.name.trim() || form.acceptedMethods.length === 0}
+          error={formError}
+          onCancel={() => setOpen(false)}
           onSubmit={(e) => {
             e.preventDefault();
-            createMutation.mutate();
+            setFormError(null);
+            create.mutate();
           }}
-          onCancel={() => setIsFormOpen(false)}
-          pending={createMutation.isPending}
-          submitLabel="Créer la caisse"
-          submitDisabled={!formData.name.trim() || !formData.locationCode.trim() || !formData.businessEntityCode.trim()}
-          error={formError}
         >
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Field label="Nom" required>
-              <input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className={FIELD_SOFT} autoFocus />
+              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={FIELD_SOFT} />
             </Field>
-            <Field label="Emplacement" required>
-              <input value={formData.locationCode} onChange={(e) => setFormData({ ...formData, locationCode: e.target.value })} className={`${FIELD_SOFT} font-mono`} />
+            <Field label="Type">
+              <select value={form.registerType} onChange={(e) => setForm({ ...form, registerType: e.target.value as CashRegisterType })} className={FIELD_SOFT}>
+                {REGISTER_TYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
             </Field>
-            <Field label="Entité" required>
-              <input value={formData.businessEntityCode} onChange={(e) => setFormData({ ...formData, businessEntityCode: e.target.value })} className={`${FIELD_SOFT} font-mono`} />
+            <Field label="Site" hint="Code du lieu">
+              <input value={form.locationCode} onChange={(e) => setForm({ ...form, locationCode: e.target.value })} className={`${FIELD_SOFT} font-mono`} />
             </Field>
-            <Field label="Appareil">
-              <input value={formData.deviceCode} onChange={(e) => setFormData({ ...formData, deviceCode: e.target.value })} className={`${FIELD_SOFT} font-mono`} />
+            <Field label="Entité" hint="Générée si vide">
+              <input value={form.businessEntityCode} onChange={(e) => setForm({ ...form, businessEntityCode: e.target.value })} className={`${FIELD_SOFT} font-mono`} />
             </Field>
-            <Field label="Montant maximum en caisse (FCFA)">
-              <input
-                type="number"
-                min={0}
-                value={formData.maxCashAmount}
-                onChange={(e) => setFormData({ ...formData, maxCashAmount: Number(e.target.value) || 0 })}
-                className={FIELD_SOFT}
-              />
+            <Field label="Poste (appareil)" hint="Généré si vide">
+              <input value={form.deviceCode} onChange={(e) => setForm({ ...form, deviceCode: e.target.value })} className={`${FIELD_SOFT} font-mono`} />
             </Field>
-            <Field label="E-mail du responsable" hint="Défini à la création uniquement">
-              <input type="email" value={formData.managerEmail} onChange={(e) => setFormData({ ...formData, managerEmail: e.target.value })} className={FIELD_SOFT} />
+            <Field label="Caisse mère" hint="Pour une petite caisse ou un guichet rattaché">
+              <input value={form.parentRegisterCode} onChange={(e) => setForm({ ...form, parentRegisterCode: e.target.value })} className={`${FIELD_SOFT} font-mono`} />
+            </Field>
+            <Field label="Plafond de détention (FCFA)" hint="Alerte, ou blocage selon le comportement choisi sur la fiche">
+              <input inputMode="numeric" value={form.maxCashAmount || ""} onChange={(e) => setForm({ ...form, maxCashAmount: parseDigits(e.target.value) })} className={`${FIELD_SOFT} tabular-nums`} />
+            </Field>
+            <Field label="Fonds de caisse standard (FCFA)">
+              <input inputMode="numeric" value={form.standardFloat || ""} onChange={(e) => setForm({ ...form, standardFloat: parseDigits(e.target.value) })} className={`${FIELD_SOFT} tabular-nums`} />
+            </Field>
+            <Field label="Titulaire (e-mail)">
+              <input type="email" value={form.holderEmail} onChange={(e) => setForm({ ...form, holderEmail: e.target.value })} className={FIELD_SOFT} />
+            </Field>
+            <Field label="Suppléants (e-mails)" hint="Séparés par une virgule, du premier au dernier rang">
+              <input value={form.backupEmails} onChange={(e) => setForm({ ...form, backupEmails: e.target.value })} className={FIELD_SOFT} />
+            </Field>
+            <Field label="Responsable (e-mail)" hint="Reçoit les rapports et alertes">
+              <input type="email" value={form.managerEmail} onChange={(e) => setForm({ ...form, managerEmail: e.target.value })} className={FIELD_SOFT} />
             </Field>
           </div>
-          <Switch
-            checked={formData.cashControlEnabled}
-            onChange={(v) => setFormData({ ...formData, cashControlEnabled: v })}
-            label="Contrôle de caisse"
-            hint="Comptage et validation des écarts à la clôture"
-          />
+          <div>
+            <p className="mb-2 text-xs font-semibold text-gray-600">Moyens de paiement acceptés</p>
+            <div className="flex flex-wrap gap-2">
+              {(Object.keys(METHOD_LABEL) as PaymentMethod[]).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => toggleMethod(m)}
+                  aria-pressed={form.acceptedMethods.includes(m)}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${form.acceptedMethods.includes(m) ? "bg-[color:var(--logo-pink)] text-white" : "bg-white text-gray-700 shadow-sm hover:bg-gray-100"}`}
+                >
+                  {METHOD_LABEL[m]}
+                </button>
+              ))}
+            </div>
+          </div>
         </PanelForm>
       )}
 
-      <SearchField value={search} onChange={setSearch} placeholder="Nom ou code de la caisse" />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <SearchField
+          className="flex-1"
+          value={search}
+          onChange={(v) => {
+            setSearch(v);
+            setPage(0);
+          }}
+          placeholder="Nom ou code de caisse"
+        />
+        <PillChoice<string>
+          label="État"
+          value={active}
+          onChange={(v) => {
+            setActive(v);
+            setPage(0);
+          }}
+          options={ACTIVE_FILTERS}
+        />
+      </div>
 
       {isLoading ? (
-        <ListSkeleton rows={5} />
+        <ListSkeleton rows={6} />
       ) : isError ? (
         <ErrorBlock message="Impossible de charger les caisses." onRetry={() => refetch()} />
-      ) : filtered.length === 0 ? (
-        <EmptyState icon={Wallet} title="Aucune caisse" hint="Ajustez la recherche ou créez une caisse." />
+      ) : registers.length === 0 ? (
+        <EmptyState icon={Wallet} title="Aucune caisse" hint="Créez la première caisse pour ouvrir des sessions." />
       ) : (
         <>
           <HeadRow cols={COLS}>
             <span>Code</span>
             <span>Nom</span>
-            <span>Emplacement</span>
-            <span>Contrôle</span>
-            <span className="text-right">Plafond</span>
-            <span />
+            <span>Site</span>
+            <span>Type</span>
+            <span className="text-right">Dernier comptage</span>
+            <span>État</span>
           </HeadRow>
           <DataCard>
-            {filtered.map((r) => (
-              <div
-                key={r.registerCode}
-                className={`grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 rounded-2xl p-4 max-lg:mb-2 max-lg:bg-gray-50 ${COLS} ${r.active ? "" : "opacity-60"}`}
-              >
-                <p className="font-mono text-xs font-semibold text-[color:var(--logo-pink-dark)]">{r.registerCode}</p>
-                <div className="lg:order-last">
-                  <IconButton
-                    icon={Power}
-                    label={r.active ? "Désactiver la caisse" : "Activer la caisse"}
-                    tone={r.active ? "success" : "neutral"}
-                    pending={togglingCode === r.registerCode}
-                    onClick={() => toggle(r)}
-                  />
+            {registers.map((r) => {
+              const st = statusOf(REGISTER_STATUS, r.status ?? (r.active ? "ACTIVE" : "CLOSED"));
+              return (
+                <div
+                  key={r.registerCode}
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => navigate(`/payments/registers/${r.registerCode}`)}
+                  onKeyDown={(e) => e.key === "Enter" && navigate(`/payments/registers/${r.registerCode}`)}
+                  className={`grid cursor-pointer grid-cols-1 items-center gap-x-4 gap-y-1 rounded-2xl p-4 transition max-lg:mb-2 max-lg:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--logo-pink)] ${COLS} ${ROW_HOVER}`}
+                >
+                  <p className="truncate font-mono text-xs font-semibold text-[color:var(--logo-pink-dark)]">{r.registerCode}</p>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-gray-900">{r.name}</p>
+                    {r.systemManaged && <p className="text-xs text-gray-400">Tenue par le système</p>}
+                    {r.restrictedToMethod && <p className="text-xs text-gray-400">{METHOD_LABEL[r.restrictedToMethod] ?? r.restrictedToMethod} seulement</p>}
+                  </div>
+                  <p className="truncate text-sm text-gray-600">{r.locationCode || "—"}</p>
+                  <p className="text-sm text-gray-600">{r.registerType ? REGISTER_TYPE[r.registerType] : "—"}</p>
+                  <p className="text-sm tabular-nums text-gray-600 lg:text-right">
+                    {r.lastCountAmount != null ? formatMoney(r.lastCountAmount, "FCFA") : "Jamais compté"}
+                    {r.lastCountAt && <span className="block text-xs text-gray-400">{formatDateTime(r.lastCountAt)}</span>}
+                  </p>
+                  <div>
+                    <StatusChip tone={st.tone}>{st.label}</StatusChip>
+                  </div>
                 </div>
-                <div className="col-span-2 min-w-0 lg:col-span-1">
-                  <p className="truncate font-semibold text-gray-950">{r.name}</p>
-                  {r.managerEmail && <p className="truncate text-xs text-gray-400">{r.managerEmail}</p>}
-                </div>
-                <p className="truncate font-mono text-xs text-gray-500">{r.locationCode}</p>
-                <div>
-                  <StatusChip tone={r.cashControlEnabled ? "success" : "neutral"}>
-                    {r.cashControlEnabled ? "Activé" : "Désactivé"}
-                  </StatusChip>
-                </div>
-                <p className="text-sm font-bold tabular-nums text-gray-950 lg:text-right">
-                  {r.maxCashAmount ? formatMoney(r.maxCashAmount) : ""}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </DataCard>
+          <Pagination page={page} totalPages={data?.totalPages ?? 0} total={data?.totalElements ?? 0} noun="caisse" onChange={setPage} />
         </>
       )}
     </div>

@@ -7,11 +7,12 @@ import { walletControlService } from "../../../services/walletControl.service";
 import { ActionButton, Field, ItemRow, StatusChip } from "../../subscription/kit";
 import { FIELD_SOFT, formatDateTime, formatMoney } from "../../subscription/kitUtils";
 import { toast } from "../../ui/toastStore";
+import { currencyLabel } from "../../payment/paymentUtils";
 import { ACTION_STATUS, ACTION_TYPE_LABEL } from "../walletLabels";
 import { OpenFields } from "./OpenFields";
 import { extraEntries } from "./controlUtils";
 
-const KNOWN = ["actionNumber", "walletNumber", "type", "status", "amount", "reference", "reason", "until", "requestedBy", "requestedAt", "decidedBy", "decidedAt"];
+const KNOWN = ["actionNumber", "walletNumber", "type", "status", "amount", "currency", "reference", "reason", "requestedBy", "approvedBy", "approvedAt", "rejectedBy", "rejectionReason", "executedAt", "resultReference", "createdAt"];
 
 /** Une action administrative à deux visas, avec approbation et rejet quand elle attend le second visa. */
 export const ActionRow: React.FC<{ action: AdminActionView; currency?: string; showWallet?: boolean }> = ({ action, currency = "XAF", showWallet = true }) => {
@@ -77,19 +78,21 @@ export const ActionRow: React.FC<{ action: AdminActionView; currency?: string; s
             )}
             {showWallet && " · "}
             {action.actionNumber}
-            {action.requestedAt ? ` · ${formatDateTime(action.requestedAt)}` : ""}
+            {action.createdAt ? ` · ${formatDateTime(action.createdAt)}` : ""}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {typeof action.amount === "number" && <p className="text-sm font-bold tabular-nums text-[color:var(--logo-pink-dark)]">{formatMoney(action.amount, currency)}</p>}
+          {typeof action.amount === "number" && <p className="text-sm font-bold tabular-nums text-[color:var(--logo-pink-dark)]">{formatMoney(action.amount, action.currency ? currencyLabel(action.currency) : currency)}</p>}
           <StatusChip tone={st.tone}>{st.label}</StatusChip>
         </div>
       </div>
       {action.reason && <p className="mt-2 text-sm text-gray-600">{action.reason}</p>}
       <p className="mt-1 text-xs text-gray-400">
         {action.requestedBy ? `Demandée par ${action.requestedBy}` : ""}
-        {action.decidedBy ? ` · décidée par ${action.decidedBy}` : ""}
-        {action.until ? ` · jusqu'au ${formatDateTime(action.until)}` : ""}
+        {action.approvedBy ? ` · approuvée par ${action.approvedBy}` : ""}
+        {action.rejectedBy ? ` · rejetée par ${action.rejectedBy}${action.rejectionReason ? ` (${action.rejectionReason})` : ""}` : ""}
+        {action.executedAt ? ` · exécutée le ${formatDateTime(action.executedAt)}` : ""}
+        {action.resultReference ? ` · réf. ${action.resultReference}` : ""}
       </p>
       <OpenFields entries={extraEntries(action, KNOWN)} className="mt-2" />
       {pending && !rejecting && (

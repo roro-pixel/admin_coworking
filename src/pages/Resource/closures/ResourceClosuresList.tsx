@@ -8,11 +8,14 @@ import { FIELD, ROW_HOVER, apiMessage, formatDateTime } from "../../../component
 import { ListSkeleton } from "../../../components/ui/Skeleton";
 import { toast } from "../../../components/ui/toastStore";
 import { Cell } from "../../../components/resources/resKit";
+import { ImpactedBookingsList } from "../../../components/resources/ImpactedBookings";
 import { ResourceAutocomplete } from "../../../components/resources/ResourceAutocomplete";
 
 const COLS = "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.2fr)_6rem_6rem_auto]";
 const SIZE = 15;
-const EMPTY = { resourceCode: "", startedAt: "", endedAt: "", reason: "", active: true };
+const KINDS: Record<string, string> = { CLOSURE: "Fermeture", MAINTENANCE: "Maintenance", CLEANING: "Nettoyage", PRIVATE_EVENT: "Événement privé", OTHER: "Autre" };
+const RECURRENCES: Record<string, string> = { NONE: "Aucune", WEEKLY: "Chaque semaine", YEARLY: "Chaque année" };
+const EMPTY = { resourceCode: "", startedAt: "", endedAt: "", reason: "", active: true, kind: "CLOSURE", recurrence: "NONE", recurrenceUntil: "", cancelBookings: false };
 
 const durationLabel = (a: string, b: string) => {
   const minutes = Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000));
@@ -56,6 +59,10 @@ export const ResourceClosuresList: React.FC = () => {
         endedAt: creating!.endedAt,
         reason: creating!.reason.trim() || undefined,
         active: creating!.active,
+        kind: creating!.kind,
+        recurrence: creating!.recurrence,
+        recurrenceUntil: creating!.recurrence === "NONE" ? undefined : creating!.recurrenceUntil || undefined,
+        cancelBookings: creating!.cancelBookings,
       }),
     onSuccess: async () => {
       await Promise.all([refresh(), queryClient.invalidateQueries({ queryKey: ["resource-closures-calendar"] })]);
@@ -66,7 +73,7 @@ export const ResourceClosuresList: React.FC = () => {
     onError: (e) => setError(apiMessage(e, "Création impossible")),
   });
   const toggle = useMutation({
-    mutationFn: (c: ResourceClosureResponse) => resourceService.updateClosureActive(c.id, !c.active),
+    mutationFn: (c: ResourceClosureResponse) => resourceService.updateClosureActive(c.id, !c.active, undefined),
     onSuccess: refresh,
     onError: (e) => toast.error(apiMessage(e, "Changement d'état impossible")),
   });
@@ -96,6 +103,7 @@ export const ResourceClosuresList: React.FC = () => {
             e.preventDefault();
             if (!creating.startedAt || !creating.endedAt) return setError("Les dates de début et de fin sont obligatoires.");
             if (new Date(creating.endedAt) <= new Date(creating.startedAt)) return setError("La date de fin doit être postérieure à la date de début.");
+            if (creating.recurrence !== "NONE" && !creating.recurrenceUntil) return setError("Indiquez la date de fin de la répétition.");
             setError(null);
             create.mutate();
           }}
@@ -115,6 +123,38 @@ export const ResourceClosuresList: React.FC = () => {
           <Field label="Motif">
             <input value={creating.reason} onChange={(e) => setCreating({ ...creating, reason: e.target.value })} placeholder="Ex. Maintenance, événement exceptionnel" className={FIELD} />
           </Field>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Nature">
+              <select value={creating.kind} onChange={(e) => setCreating({ ...creating, kind: e.target.value })} className={FIELD}>
+                {Object.entries(KINDS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Répétition">
+              <select value={creating.recurrence} onChange={(e) => setCreating({ ...creating, recurrence: e.target.value })} className={FIELD}>
+                {Object.entries(RECURRENCES).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {creating.recurrence !== "NONE" && (
+              <Field label="Répéter jusqu'au" required>
+                <input type="date" value={creating.recurrenceUntil} onChange={(e) => setCreating({ ...creating, recurrenceUntil: e.target.value })} className={FIELD} />
+              </Field>
+            )}
+          </div>
+          {creating.resourceCode && creating.startedAt && creating.endedAt && (
+            <div className="space-y-2 rounded-2xl bg-amber-50 p-3">
+              <p className="text-xs font-semibold text-amber-800">Réservations touchées par cette période</p>
+              <ImpactedBookingsList resourceCode={creating.resourceCode} from={creating.startedAt.length === 16 ? `${creating.startedAt}:00` : creating.startedAt} to={creating.endedAt.length === 16 ? `${creating.endedAt}:00` : creating.endedAt} />
+              <CheckField checked={creating.cancelBookings} onChange={(v) => setCreating({ ...creating, cancelBookings: v })} label="Les annuler et prévenir les clients (sinon la création est refusée s'il y en a)" />
+            </div>
+          )}
           <CheckField checked={creating.active} onChange={(v) => setCreating({ ...creating, active: v })} label="Fermeture active immédiatement" />
         </PanelForm>
       )}
@@ -174,6 +214,10 @@ export const ResourceClosuresList: React.FC = () => {
                     </Cell>
                     <Cell title="Motif" className="max-lg:order-4 max-lg:col-span-2">
                       <span className="line-clamp-2 text-sm text-gray-600">{c.reason || "Aucun motif"}</span>
+                      <span className="mt-1 flex flex-wrap gap-1">
+                        {c.kind && c.kind !== "CLOSURE" && <Tag tone="gray">{KINDS[c.kind] ?? c.kind}</Tag>}
+                        {c.recurrence && c.recurrence !== "NONE" && <Tag tone="gray">{RECURRENCES[c.recurrence] ?? c.recurrence}{c.recurrenceUntil ? ` jusqu'au ${c.recurrenceUntil}` : ""}</Tag>}
+                      </span>
                     </Cell>
                     <Cell title="Durée" className="max-lg:order-5 max-lg:col-span-2">
                       <Tag tone="gray">{durationLabel(c.startedAt, c.endedAt)}</Tag>
@@ -182,7 +226,7 @@ export const ResourceClosuresList: React.FC = () => {
                       <StatusChip tone={c.active ? (upcoming ? "info" : "success") : "neutral"}>{c.active ? (upcoming ? "À venir" : "Active") : "Inactive"}</StatusChip>
                     </div>
                     <div className="flex items-center gap-1 max-lg:order-6 max-lg:col-span-2 lg:justify-end">
-                      <IconButton icon={Power} label={c.active ? "Désactiver" : "Activer"} tone={c.active ? "success" : "neutral"} pending={toggle.isPending && toggle.variables?.id === c.id} onClick={() => toggle.mutate(c)} />
+                      <IconButton icon={Power} label={c.active ? "Désactiver" : "Activer"} tone={c.active ? "success" : "neutral"} pending={toggle.isPending && toggle.variables?.id === c.id} onClick={() => (c.active ? toggle.mutate(c) : toast.confirm({ message: `Réactiver la fermeture de ${c.resourceCode} ?`, detail: "Si des réservations tombent dans la période, la réactivation est refusée.", confirmLabel: "Réactiver", pendingLabel: "Activation", onConfirm: () => toggle.mutateAsync(c) }))} />
                       <IconButton
                         icon={Trash2}
                         label="Supprimer"

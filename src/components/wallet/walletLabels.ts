@@ -33,6 +33,10 @@ export const WALLET_STATUS_TONE: Record<WalletStatus, Tone> = {
 
 export const ENTRY_TYPE_LABEL: Record<string, string> = {
   ADMIN_TOPUP: "Top-up admin",
+  TOPUP: "Recharge",
+  TRANSFER_IN: "Transfert reçu",
+  TRANSFER_OUT: "Transfert émis",
+  TRANSFER_FEE: "Frais de transfert",
   ADMIN_DEBIT: "Débit admin",
   PAYMENT: "Paiement",
   REFUND: "Remboursement",
@@ -59,10 +63,13 @@ export const ACTION_TYPE_LABEL: Record<string, string> = {
   RAISE_LIMIT: "Relèvement de plafond",
   CLOSE: "Clôture",
   REVIEW_FLAG: "Revue d'alerte",
+  RELEASE_HOLD: "Libération de réservation",
+  TRANSFER: "Transfert",
+  RESTITUTE: "Restitution",
 };
 export const ACTION_TYPE_OPTIONS = Object.entries(ACTION_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 /** Types d'action qui portent un montant */
-export const ACTION_WITH_AMOUNT = new Set(["TOPUP", "DEBIT", "ADJUST", "REVERSE", "RAISE_LIMIT"]);
+export const ACTION_WITH_AMOUNT = new Set(["TOPUP", "DEBIT", "ADJUST", "REVERSE", "RAISE_LIMIT", "TRANSFER", "RESTITUTE"]);
 /** Types d'action qui portent une date de fin */
 export const ACTION_WITH_UNTIL = new Set(["SUSPEND", "RAISE_LIMIT"]);
 

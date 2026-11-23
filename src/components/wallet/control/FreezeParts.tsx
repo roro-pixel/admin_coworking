@@ -80,7 +80,7 @@ export const FreezeForm: React.FC<{ walletNumber?: string; onClose: () => void }
   );
 };
 
-const lifted = (f: FreezeView) => !!f.liftedAt || (typeof f.status === "string" && f.status.toUpperCase().startsWith("LIFT"));
+const lifted = (f: FreezeView) => !!f.liftedAt;
 
 /** Un gel sur instruction, avec sa levée. */
 export const FreezeRow: React.FC<{ freeze: FreezeView; showWallet?: boolean }> = ({ freeze, showWallet = true }) => {

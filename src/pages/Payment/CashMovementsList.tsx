@@ -1,22 +1,18 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDownLeft, ArrowUpRight, Banknote, Plus, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Banknote, Plus } from "lucide-react";
 import { paymentService } from "../../services/payment.service";
 import type { CashMovement, CreateCashMovementPayload } from "../../services/payment.service";
 import { useAuth } from "../../contexts/AuthContext";
-import { ModalPortal } from "../../components/ui/ModalPortal";
-import { brandVars } from "../../components/layout/adminTheme";
 import {
   ActionButton,
   DataCard,
-  Detail,
   EmptyState,
   ErrorBlock,
   Field,
   FilterButton,
   FilterPanel,
   HeadRow,
-  IconButton,
   ListHeader,
   PanelForm,
   Pagination,
@@ -28,6 +24,10 @@ import { statusOf } from "../../components/subscription/labels";
 import { Dots } from "../../components/ui/Toaster";
 import { toast } from "../../components/ui/toastStore";
 import { ListSkeleton } from "../../components/ui/Skeleton";
+import { cashRegisterService } from "../../services/cashRegister.service";
+import type { CashNature } from "../../services/cashRegister.service";
+import { CASH_DOCUMENT_TYPE } from "../../components/cash/cashLabels";
+import { CashMovementDetail } from "./CashMovementDetail";
 import {
   MANUAL_MOVEMENT_TYPES,
   MOVEMENT_STATUS,
@@ -63,6 +63,14 @@ const buildDefaultFormData = () => ({
   deviceIp: "",
   channel: "MANUAL" as Channel,
   metadataJson: "",
+  natureCode: "",
+  vatAmount: "",
+  vatCode: "",
+  supplierCode: "",
+  beneficiaryName: "",
+  beneficiaryIdNumber: "",
+  beneficiaryPhone: "",
+  requestNumber: "",
 });
 
 const typeLabel = (t: string) => MOVEMENT_TYPES[t]?.label ?? t;
@@ -84,6 +92,7 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({ sessionNum
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState(buildDefaultFormData);
   const [selectedMovement, setSelectedMovement] = useState<CashMovement | null>(null);
+  const [docTypeFilter, setDocTypeFilter] = useState("");
 
   const { data: sessionsData } = useQuery({
     queryKey: ["cash-sessions-open"],
@@ -93,11 +102,12 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({ sessionNum
   const openSessions = sessionsData?.content || [];
 
   const { data: movementsData, isLoading, isFetching, isError, refetch } = useQuery({
-    queryKey: ["cash-movements", sessionFilter, typeFilter, searchText, fromDate, toDate, page, sessionNumber],
+    queryKey: ["cash-movements", sessionFilter, typeFilter, docTypeFilter, searchText, fromDate, toDate, page, sessionNumber],
     queryFn: () =>
       paymentService.getCashMovements({
         sessionNumber: sessionFilter || sessionNumber || undefined,
         movementType: typeFilter || undefined,
+        documentType: docTypeFilter || undefined,
         searchText: searchText || undefined,
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
@@ -109,6 +119,11 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({ sessionNum
   const movements: CashMovement[] = movementsData?.content || [];
   const totalPages = movementsData?.totalPages ?? 0;
   const totalElements = movementsData?.totalElements ?? 0;
+
+  const natures = useQuery({ queryKey: ["cash-natures", "movement-form"], queryFn: () => cashRegisterService.getNatures(), enabled: isFormOpen, staleTime: 300_000 });
+  const formDirection = formData.movementType === "ADJUSTMENT" ? "ADJUSTMENT" : (MOVEMENT_TYPES[formData.movementType]?.inflow ?? true) ? "IN" : "OUT";
+  const natureChoices: CashNature[] = (natures.data ?? []).filter((n) => n.active !== false && (n.direction === formDirection || n.movementType === formData.movementType));
+  const nature = natureChoices.find((n) => n.code === formData.natureCode);
 
   const reasonRequired = REASON_REQUIRED_TYPES.includes(formData.movementType);
 
@@ -133,6 +148,14 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({ sessionNum
         deviceIp: formData.deviceIp || undefined,
         channel: formData.channel,
         metadataJson: formData.metadataJson || undefined,
+        natureCode: formData.natureCode || undefined,
+        vatAmount: formData.vatAmount ? Number(formData.vatAmount) : undefined,
+        vatCode: formData.vatCode || undefined,
+        supplierCode: formData.supplierCode || undefined,
+        beneficiaryName: formData.beneficiaryName || undefined,
+        beneficiaryIdNumber: formData.beneficiaryIdNumber || undefined,
+        beneficiaryPhone: formData.beneficiaryPhone || undefined,
+        requestNumber: formData.requestNumber || undefined,
         createdBy: admin?.email || String(admin?.id || "admin"),
       }),
     onSuccess: () => {
@@ -150,6 +173,9 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({ sessionNum
     if (reasonRequired && !formData.reason.trim()) {
       return setErrorMessage(`Le motif est obligatoire pour un mouvement de type « ${typeLabel(formData.movementType)} ».`);
     }
+    if (nature?.documentRequired && !formData.documentNumber.trim()) return setErrorMessage(`La nature « ${nature.label} » exige un numéro de pièce.`);
+    if (nature?.maxPerOperation && formData.amount > nature.maxPerOperation) return setErrorMessage(`Cette nature est plafonnée à ${formatMoney(nature.maxPerOperation)} par opération.`);
+    if (nature?.priorRequestRequired && !formData.requestNumber.trim()) return setErrorMessage(`La nature « ${nature.label} » exige une demande préalable approuvée.`);
     if (!(sessionFilter || sessionNumber)) return setErrorMessage("Veuillez sélectionner une session ouverte.");
     setErrorMessage(null);
     createMutation.mutate();
@@ -164,13 +190,14 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({ sessionNum
   const resetFilters = () => {
     if (!isEmbedded) setSessionFilter("");
     setTypeFilter("");
+    setDocTypeFilter("");
     setSearchText("");
     setFromDate("");
     setToDate("");
     setPage(0);
   };
 
-  const hasFilters = !!((!isEmbedded && sessionFilter) || typeFilter || fromDate || toDate);
+  const hasFilters = !!((!isEmbedded && sessionFilter) || typeFilter || docTypeFilter || fromDate || toDate);
   const set = <K extends keyof ReturnType<typeof buildDefaultFormData>>(k: K, v: ReturnType<typeof buildDefaultFormData>[K]) =>
     setFormData((f) => ({ ...f, [k]: v }));
 
@@ -212,7 +239,7 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({ sessionNum
             <Field label="Type de mouvement" required>
               <select
                 value={formData.movementType}
-                onChange={(e) => setFormData({ ...formData, movementType: e.target.value as ManualCashMovementType, reason: "" })}
+                onChange={(e) => setFormData({ ...formData, movementType: e.target.value as ManualCashMovementType, reason: "", natureCode: "" })}
                 className={FIELD_SOFT}
               >
                 {MANUAL_MOVEMENT_TYPES.map((t) => (
@@ -244,14 +271,34 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({ sessionNum
               </select>
             </Field>
           </div>
+          <Field
+            label="Nature de l'opération"
+            hint={nature ? [nature.accountNumber ? `Compte ${nature.accountNumber}` : "", nature.maxPerOperation ? `plafond ${formatMoney(nature.maxPerOperation)}` : "", nature.doubleVisaThreshold ? `double visa dès ${formatMoney(nature.doubleVisaThreshold)}` : "", nature.priorRequestRequired ? "demande préalable obligatoire" : ""].filter(Boolean).join(" · ") || undefined : "Facultatif : pilote le compte comptable et les contrôles."}
+          >
+            <select value={formData.natureCode} onChange={(e) => set("natureCode", e.target.value)} className={FIELD_SOFT}>
+              <option value="">Aucune</option>
+              {natureChoices.map((n) => (
+                <option key={n.code} value={n.code}>
+                  {n.label}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label="Motif" required={reasonRequired} hint={reasonRequired ? "Obligatoire pour ce type de mouvement" : "Facultatif"}>
             <textarea rows={2} value={formData.reason} onChange={(e) => set("reason", e.target.value)} className={FIELD_SOFT} />
           </Field>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Field label="Type de document">
-              <input value={formData.documentType} onChange={(e) => set("documentType", e.target.value)} placeholder="INVOICE, RECEIPT" className={FIELD_SOFT} />
+              <select value={formData.documentType} onChange={(e) => set("documentType", e.target.value)} className={FIELD_SOFT}>
+                <option value="">Aucun</option>
+                {Object.entries(CASH_DOCUMENT_TYPE).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
             </Field>
-            <Field label="N° de document">
+            <Field label="N° de document" required={!!nature?.documentRequired}>
               <input value={formData.documentNumber} onChange={(e) => set("documentNumber", e.target.value)} placeholder="FAC-…" className={`${FIELD_SOFT} font-mono`} />
             </Field>
             <Field label="Catégorie de flux">
@@ -271,6 +318,29 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({ sessionNum
             </Field>
             <Field label="Nom de la contrepartie">
               <input value={formData.counterpartyName} onChange={(e) => set("counterpartyName", e.target.value)} placeholder="Bénéficiaire" className={FIELD_SOFT} />
+            </Field>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Field label="Montant de TVA">
+              <input inputMode="decimal" value={formData.vatAmount} onChange={(e) => set("vatAmount", e.target.value.replace(/[^\d.]/g, ""))} className={FIELD_SOFT} />
+            </Field>
+            <Field label="Code TVA">
+              <input value={formData.vatCode} onChange={(e) => set("vatCode", e.target.value)} className={FIELD_SOFT} />
+            </Field>
+            <Field label="Fournisseur (code)">
+              <input value={formData.supplierCode} onChange={(e) => set("supplierCode", e.target.value)} className={`${FIELD_SOFT} font-mono`} />
+            </Field>
+            <Field label="Demande liée" required={!!nature?.priorRequestRequired}>
+              <input value={formData.requestNumber} onChange={(e) => set("requestNumber", e.target.value)} className={`${FIELD_SOFT} font-mono`} />
+            </Field>
+            <Field label="Bénéficiaire">
+              <input value={formData.beneficiaryName} onChange={(e) => set("beneficiaryName", e.target.value)} className={FIELD_SOFT} />
+            </Field>
+            <Field label="Pièce d'identité du bénéficiaire">
+              <input value={formData.beneficiaryIdNumber} onChange={(e) => set("beneficiaryIdNumber", e.target.value)} className={FIELD_SOFT} />
+            </Field>
+            <Field label="Téléphone du bénéficiaire">
+              <input value={formData.beneficiaryPhone} onChange={(e) => set("beneficiaryPhone", e.target.value)} className={FIELD_SOFT} />
             </Field>
           </div>
         </PanelForm>
@@ -322,6 +392,23 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({ sessionNum
                   {Object.entries(MOVEMENT_TYPES).map(([k, v]) => (
                     <option key={k} value={k}>
                       {v.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Type de pièce">
+                <select
+                  value={docTypeFilter}
+                  onChange={(e) => {
+                    setDocTypeFilter(e.target.value);
+                    setPage(0);
+                  }}
+                  className={FIELD_SOFT}
+                >
+                  <option value="">Toutes les pièces</option>
+                  {Object.entries(CASH_DOCUMENT_TYPE).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
                     </option>
                   ))}
                 </select>
@@ -378,7 +465,7 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({ sessionNum
           </HeadRow>
           <DataCard>
             {movements.map((m) => {
-              const inflow = MOVEMENT_TYPES[m.movementType]?.inflow ?? true;
+              const inflow = (m.flowDirection ? m.flowDirection !== "OUT" : MOVEMENT_TYPES[m.movementType]?.inflow) ?? true;
               const Icon = inflow ? ArrowDownLeft : ArrowUpRight;
               const st = m.status && m.status !== "CONFIRMED" ? statusOf(MOVEMENT_STATUS, m.status) : null;
               return (
@@ -427,37 +514,12 @@ export const CashMovementsList: React.FC<CashMovementsListProps> = ({ sessionNum
       )}
 
       {selectedMovement && (
-        <ModalPortal onClose={() => setSelectedMovement(null)} size="2xl">
-          <div style={brandVars} className="rounded-[1.75rem] bg-white p-5 sm:p-6">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="text-lg font-bold text-gray-950">{typeLabel(selectedMovement.movementType)}</h3>
-                <p className="font-mono text-xs text-gray-400">{selectedMovement.movementNumber}</p>
-              </div>
-              <IconButton icon={X} label="Fermer" onClick={() => setSelectedMovement(null)} />
-            </div>
-            <p
-              className={`mt-4 text-3xl font-bold tracking-tight ${
-                (MOVEMENT_TYPES[selectedMovement.movementType]?.inflow ?? true) ? "text-emerald-600" : "text-red-600"
-              }`}
-            >
-              {(MOVEMENT_TYPES[selectedMovement.movementType]?.inflow ?? true) ? "+" : "−"} {formatMoney(selectedMovement.amount)}
-            </p>
-            {selectedMovement.reason && <p className="mt-2 text-sm text-gray-600">{selectedMovement.reason}</p>}
-            <dl className="mt-5 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-              <Detail label="Session" mono>{selectedMovement.sessionNumber}</Detail>
-              <Detail label="Caisse">{selectedMovement.registerName || selectedMovement.registerCode}</Detail>
-              <Detail label="Créé par">{selectedMovement.createdBy}</Detail>
-              <Detail label="Créé le">{formatDateTime(selectedMovement.createdAt)}</Detail>
-              <Detail label="Document" mono>{selectedMovement.documentNumber}</Detail>
-              <Detail label="Référence" mono>{selectedMovement.referenceCode}</Detail>
-              <Detail label="Client lié">{selectedMovement.relatedCustomerName}</Detail>
-              <Detail label="Reçu lié" mono>{selectedMovement.relatedReceiptNumber}</Detail>
-              <Detail label="Transaction liée" mono>{selectedMovement.relatedTransactionNumber}</Detail>
-              <Detail label="Contrepartie">{selectedMovement.counterpartyName}</Detail>
-            </dl>
-          </div>
-        </ModalPortal>
+        <CashMovementDetail
+          key={selectedMovement.movementNumber}
+          movement={selectedMovement}
+          onClose={() => setSelectedMovement(null)}
+          onChanged={() => queryClient.invalidateQueries({ queryKey: ["cash-movements"] })}
+        />
       )}
     </div>
   );

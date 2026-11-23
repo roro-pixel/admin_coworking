@@ -5,7 +5,8 @@ import { CheckCircle2, FileSignature, XCircle } from "lucide-react";
 import { billingService } from "../../services/billing.service";
 import { brandVars } from "../../components/layout/adminTheme";
 import { ActionButton, ErrorBanner, Field } from "../../components/subscription/kit";
-import { FIELD_SOFT, apiMessage } from "../../components/subscription/kitUtils";
+import { FIELD_SOFT, formatDateTime } from "../../components/subscription/kitUtils";
+import { billingError } from "../../components/billing/billingErrors";
 import { Skeleton } from "../../components/ui/Skeleton";
 
 const toBase64SvgSignature = (name: string): string => {
@@ -44,7 +45,7 @@ export const PublicQuoteSignaturePage: React.FC = () => {
 
   const { data: html, isLoading, isError } = useQuery({
     queryKey: ["public-quote-signature", token],
-    queryFn: () => billingService.getPublicQuoteSignaturePage(token!),
+    queryFn: () => billingService.getPublicSignaturePage(token!),
     enabled: !!token,
   });
 
@@ -55,14 +56,14 @@ export const PublicQuoteSignaturePage: React.FC = () => {
       if (!token) throw new Error("Jeton de signature manquant.");
       if (!signerName.trim()) throw new Error("Le nom du signataire est obligatoire.");
       if (!accepted) throw new Error("Vous devez accepter les conditions de signature.");
-      return billingService.confirmPublicQuoteSignature(token, {
+      return billingService.confirmPublicSignature(token, {
         signerName: signerName.trim(),
         signerEmail: signerEmail.trim() || undefined,
         signatureImageBase64: signaturePreview,
       });
     },
     onSuccess: () => setError(null),
-    onError: (e: unknown) => setError(apiMessage(e, (e as Error)?.message || "Erreur lors de la signature.")),
+    onError: (e: unknown) => setError(billingError(e, (e as Error)?.message || "Erreur lors de la signature.")),
   });
 
   if (!token) {
@@ -86,7 +87,11 @@ export const PublicQuoteSignaturePage: React.FC = () => {
       </header>
 
       {confirmMutation.isSuccess ? (
-        <Notice tone="ok" title="Devis signé avec succès" text="Votre signature a bien été enregistrée." />
+        <Notice
+          tone="ok"
+          title="Devis signé avec succès"
+          text={confirmMutation.data?.quoteNumber ? `Votre signature du devis ${confirmMutation.data.quoteNumber} a bien été enregistrée${confirmMutation.data.signedAt ? ` le ${formatDateTime(confirmMutation.data.signedAt)}` : ""}.` : "Votre signature a bien été enregistrée."}
+        />
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
           <section className="overflow-hidden rounded-[1.75rem] bg-white p-2 shadow-sm">

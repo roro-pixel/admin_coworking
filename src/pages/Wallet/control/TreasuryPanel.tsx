@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Landmark, Plus } from "lucide-react";
 import { walletControlService } from "../../../services/walletControl.service";
-import { ActionButton, EmptyState, ErrorBlock, Field, ItemRow, ListHeader, Pagination, PanelForm, Section } from "../../../components/subscription/kit";
+import { ActionButton, EmptyState, ErrorBlock, Field, ItemRow, ListHeader, Pagination, PanelForm, Section, StatusChip } from "../../../components/subscription/kit";
 import { FIELD_SOFT, apiMessage } from "../../../components/subscription/kitUtils";
 import { ListSkeleton, Skeleton } from "../../../components/ui/Skeleton";
 import { toast } from "../../../components/ui/toastStore";
@@ -129,10 +129,15 @@ export const TreasuryPanel: React.FC = () => {
         ) : (
           <>
             <div className="space-y-2">
-              {rows.map((r, i) => (
-                <ItemRow key={String(r.reconciliationNumber ?? i)}>
-                  <p className="font-mono text-sm font-bold text-gray-950">{String(r.reconciliationNumber ?? `Rapprochement ${i + 1}`)}</p>
-                  <OpenFields entries={extraEntries(r, ["reconciliationNumber"])} className="mt-2" />
+              {rows.map((r) => (
+                <ItemRow key={r.reconciliationNumber}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-mono text-sm font-bold text-gray-950">{r.reconciliationNumber}</p>
+                    <StatusChip tone={r.status === "BALANCED" ? "success" : r.status === "VARIANCE" ? "danger" : "info"}>
+                      {r.status === "BALANCED" ? "Équilibré" : r.status === "VARIANCE" ? "Écart" : r.status === "UNDER_REVIEW" ? "En revue" : r.status}
+                    </StatusChip>
+                  </div>
+                  <OpenFields entries={extraEntries(r, ["reconciliationNumber", "status"])} className="mt-2" />
                 </ItemRow>
               ))}
             </div>

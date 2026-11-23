@@ -43,7 +43,7 @@ export const BulkPricingRuleModal: React.FC<BulkPricingRuleModalProps> = ({ isOp
     onClose();
   };
 
-  const payload = () => ({ resourceCodes: resources.map((r) => r.code), ...pricingPayload(form, "create") });
+  const payload = () => ({ resourceCodes: resources.map((r) => r.code), ...pricingPayload(form, "create", false) });
 
   const previewMutation = useMutation({
     mutationFn: () => resourceService.previewPricingRulesBulk(payload() as never),
@@ -100,7 +100,7 @@ export const BulkPricingRuleModal: React.FC<BulkPricingRuleModalProps> = ({ isOp
         <Field label="Ressources" required>
           <ResourceMultiPicker selected={resources} onChange={setResources} />
         </Field>
-        <PricingFields value={form} onChange={(patch) => setForm((p) => ({ ...p, ...patch }))} />
+        <PricingFields value={form} extended={false} onChange={(patch) => setForm((p) => ({ ...p, ...patch }))} />
       </PanelForm>
     );
   }

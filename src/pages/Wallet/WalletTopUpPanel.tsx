@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { PlusCircle, Wallet as WalletIcon } from "lucide-react";
 import { walletService } from "../../services/wallet.service";
 import type { Wallet } from "../../services/wallet.service";
-import { useAuth } from "../../contexts/AuthContext";
 import { ActionButton, ErrorBanner, Field, Section } from "../../components/subscription/kit";
 import { FIELD_SOFT, apiMessage, formatMoney } from "../../components/subscription/kitUtils";
 import { Skeleton } from "../../components/ui/Skeleton";
@@ -20,7 +19,6 @@ import type { MemberSummaryResponse } from "../../services/member.service";
 const defaultForm = { ownerType: "CUSTOMER" as OwnerType, ownerCode: "", currency: "XAF", amount: 0, reference: "", metadataJson: "" };
 
 export const WalletTopUpPanel: React.FC = () => {
-  const { admin } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [form, setForm] = useState(defaultForm);
@@ -39,7 +37,7 @@ export const WalletTopUpPanel: React.FC = () => {
 
   const { data: lookup, isFetching: checking } = useQuery({
     queryKey: ["wallet-topup-preview", form.ownerType, debounced.code, debounced.currency],
-    queryFn: () => walletService.getWallets({ ownerType: form.ownerType, ownerCode: debounced.code, currency: debounced.currency, size: 1 }),
+    queryFn: () => walletService.getWallets({ ownerType: form.ownerType, ownerCode: debounced.code, currency: debounced.currency, size: 50 }),
     enabled: !!debounced.code && !!debounced.currency,
   });
   const preview: Wallet | null = credited ?? lookup?.content?.[0] ?? null;
@@ -52,7 +50,6 @@ export const WalletTopUpPanel: React.FC = () => {
         ownerCode: form.ownerCode,
         currency: form.currency,
         amount: form.amount,
-        createdBy: admin?.email || String(admin?.id || "admin"),
         reference: form.reference || undefined,
         metadataJson: form.metadataJson.trim() || undefined,
       }),

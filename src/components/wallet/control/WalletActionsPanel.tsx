@@ -5,6 +5,8 @@ import { walletControlService } from "../../../services/walletControl.service";
 import { ActionButton, EmptyState, ErrorBlock, Pagination } from "../../subscription/kit";
 import { ListSkeleton } from "../../ui/Skeleton";
 import { ActionForm } from "./ActionForm";
+import { PayInvoiceForm } from "./PayInvoiceForm";
+import { useAuth } from "../../../contexts/AuthContext";
 import { ActionRow } from "./ActionRow";
 
 const PAGE_SIZE = 10;
@@ -13,6 +15,9 @@ const PAGE_SIZE = 10;
 export const WalletActionsPanel: React.FC<{ walletNumber: string; currency: string }> = ({ walletNumber, currency }) => {
   const [page, setPage] = useState(0);
   const [open, setOpen] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const { isAdmin, hasPermission } = useAuth();
+  const canPay = isAdmin() && hasPermission("PAYMENT:PROCESS");
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["wallet-actions", "wallet", walletNumber, page],
     queryFn: () => walletControlService.getWalletActions(walletNumber, { page, size: PAGE_SIZE }),
@@ -23,12 +28,20 @@ export const WalletActionsPanel: React.FC<{ walletNumber: string; currency: stri
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-gray-500">Actions demandées sur ce portefeuille, exécutées après un second visa</p>
-        {!open && (
-          <ActionButton icon={Plus} onClick={() => setOpen(true)}>
-            Nouvelle action
-          </ActionButton>
+        {!open && !paying && (
+          <div className="flex gap-2">
+            {canPay && (
+              <ActionButton variant="ghost" onClick={() => setPaying(true)}>
+                Payer une facture
+              </ActionButton>
+            )}
+            <ActionButton icon={Plus} onClick={() => setOpen(true)}>
+              Nouvelle action
+            </ActionButton>
+          </div>
         )}
       </div>
+      {paying && <PayInvoiceForm walletNumber={walletNumber} onClose={() => setPaying(false)} />}
       {open && <ActionForm walletNumber={walletNumber} onClose={() => setOpen(false)} />}
       {isLoading ? (
         <ListSkeleton rows={3} />

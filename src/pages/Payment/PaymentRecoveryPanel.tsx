@@ -31,9 +31,11 @@ export const PaymentRecoveryPanel: React.FC = () => {
   const [currency, setCurrency] = useState("XAF");
   const [error, setError] = useState<string | null>(null);
 
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
   const payableQuery = useQuery({
-    queryKey: ["recovery-payable-documents", submittedSearch],
-    queryFn: () => paymentService.getPayableDocuments({ searchText: submittedSearch || undefined }),
+    queryKey: ["recovery-payable-documents", submittedSearch, page],
+    queryFn: () => paymentService.getPayableDocuments({ searchText: submittedSearch || undefined, page, size: PAGE_SIZE }),
     enabled: !!submittedSearch,
   });
 
@@ -43,7 +45,9 @@ export const PaymentRecoveryPanel: React.FC = () => {
     enabled: !!customerCode,
   });
   const recovery = data as RecoveryOverview | undefined;
-  const payableDocuments = payableQuery.data ?? [];
+  const payableDocuments = payableQuery.data?.content ?? [];
+  const payableTotal = payableQuery.data?.totalElements ?? 0;
+  const payablePages = payableQuery.data?.totalPages ?? 0;
 
   const groupedDocuments = useMemo(() => {
     const map = new Map<string, PayableDocument[]>();
@@ -80,12 +84,17 @@ export const PaymentRecoveryPanel: React.FC = () => {
         expiresAt: undefined,
         metadataJson: undefined,
       }),
-    onSuccess: (intent) => {
+    onSuccess: (overview) => {
       setError(null);
       queryClient.invalidateQueries({ queryKey: ["payment-intents"] });
       refetch();
+      const intentNumber = overview.paymentIntent?.intentNumber;
+      if (!intentNumber) {
+        setError("Aucune intention n'a été renvoyée : rien à recouvrer pour ce client.");
+        return;
+      }
       navigate("/payments", {
-        state: { intentNumber: intent.intentNumber, message: "Intention de recouvrement créée avec succès." },
+        state: { intentNumber, message: "Intention de recouvrement prête." },
       });
     },
     onError: (e: unknown) => setError(apiMessage(e, "Erreur lors de la création de l'intention de recouvrement.")),
@@ -93,6 +102,7 @@ export const PaymentRecoveryPanel: React.FC = () => {
 
   const submitSearch = () => {
     setSubmittedSearch(searchText.trim());
+    setPage(0);
     setError(null);
   };
 
@@ -141,7 +151,7 @@ export const PaymentRecoveryPanel: React.FC = () => {
         ) : (
           <Section
             title="Résultats"
-            description={`${payableDocuments.length} document${payableDocuments.length > 1 ? "s" : ""} payable${payableDocuments.length > 1 ? "s" : ""}`}
+            description={`${payableTotal} document${payableTotal > 1 ? "s" : ""} payable${payableTotal > 1 ? "s" : ""}`}
             icon={FileText}
           >
             {groupedDocuments.length === 0 ? (
@@ -187,6 +197,19 @@ export const PaymentRecoveryPanel: React.FC = () => {
                     </ul>
                   </article>
                 ))}
+              </div>
+            )}
+            {payablePages > 1 && (
+              <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
+                <ActionButton variant="ghost" disabled={page === 0 || payableQuery.isFetching} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+                  Précédent
+                </ActionButton>
+                <span>
+                  Page {page + 1} / {payablePages}
+                </span>
+                <ActionButton variant="ghost" disabled={page + 1 >= payablePages || payableQuery.isFetching} onClick={() => setPage((p) => p + 1)}>
+                  Suivant
+                </ActionButton>
               </div>
             )}
           </Section>
@@ -277,6 +300,10 @@ export const PaymentRecoveryPanel: React.FC = () => {
               </ActionButton>
             </div>
           </div>
+          <p className="text-xs text-gray-500">
+            La confirmation peut émettre une facture « Recouvrement » pour les éléments encore à facturer, et renvoie l'intention existante
+            si le client en a déjà une.
+          </p>
 
           <div className="grid gap-5 xl:grid-cols-2">
             <Section title="Documents impayés">

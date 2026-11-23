@@ -6,8 +6,13 @@ import { NotificationDropdown } from "../notifications/NotificationDropdown";
 import { brandVars } from "./adminTheme";
 import Logo from "../../assets/img/logo.jpeg";
 
+/*
+ * Taille de base du header (tout l'intérieur est en em : il grossit d'un bloc avec l'écran).
+ *   1280px -> ~13,7px | 1920px -> ~18,9px | 2560px -> ~23,7px ; 16px sur mobile
+ */
 const HEADER_FONT_SIZE = "clamp(1rem, 0.4rem + 0.65vw, 1.5rem)";
 
+/** Salutation selon l'heure locale de l'appareil, donc le fuseau de l'utilisateur : bonsoir de 18h à 4h59 */
 const greeting = (): string => {
   const h = new Date().getHours();
   return h >= 18 || h < 5 ? "Bonsoir" : "Bonjour";

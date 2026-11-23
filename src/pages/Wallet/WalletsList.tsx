@@ -152,7 +152,7 @@ export const WalletsList: React.FC<WalletsListProps> = ({ onOpenLookup, onOpenTo
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <SearchField className="flex-1" value={search} onChange={setSearch} placeholder="Propriétaire, e-mail, nom, portefeuille" />
+        <SearchField className="flex-1" value={search} onChange={setSearch} placeholder="Nom, code propriétaire, portefeuille" />
         <FilterButton open={showFilters} active={!!(statusFilter || ownerTypeFilter || currencyFilter)} onClick={() => setShowFilters(!showFilters)} />
       </div>
 
